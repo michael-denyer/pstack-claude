@@ -1,0 +1,31 @@
+# Rationale template
+
+This is the prose that ships alongside the type sketch. One page. Sentence-case headings, no boilerplate. Replace the italic notes with the actual content.
+
+## Problem
+
+*One paragraph. What we're trying to do, and what about the existing system or constraints makes the shape non-obvious. If [Phase A](../SKILL.md#phase-a-ground-the-problem) surfaced constraints the design now has to honor (existing types we have to interop with, callers we can't break, invariants that crossed our boundary), name them here so the reader sees the same constraints you saw.*
+
+## Shape
+
+*The recommended architecture. Data structures first; then how data flows through the signatures. Name the load-bearing decisions: which invariants are encoded in types, where validation lives, what the system deliberately does not do. Cite the principle behind each decision (e.g., `per boundary-discipline`); don't restate it.*
+
+## Synthesis decision
+
+*Filled in by [arena](../../arena/SKILL.md). Records which candidate became the base and why, what was adapted from each of the others, and what was rejected and why.*
+
+## Tradeoffs accepted
+
+*One bullet per tradeoff the chosen shape makes. Form: "we accept X in exchange for Y." Name anything a future reader might mistake for an oversight, including things that look like premature optimization or premature simplification.*
+
+## Alternatives considered
+
+*Required. Name at least one concrete alternative shape, with one line on why it lost. Two or three when the design space had real contenders; one is fine when the constraints forced the answer, with the conclusion phrased as "this was the only viable shape because..." Avoid listing flavors of the same shape. Distinct from "Synthesis decision" above: this section is about design alternatives the chosen shape considered and rejected, not about other runner candidates.*
+
+## Open questions and risks
+
+*Things you noticed during the sketch that the human needs to weigh in on, and risks worth flagging before implementation starts. Phrase as questions, not assertions, so the human's answer is the resolution rather than a comment.*
+
+## Next implementation step
+
+*The first thing to build against the sketch. One sentence. The thing you'd start writing immediately after synthesis (or after Phase D sign-off, if a checkpoint was opted into).*

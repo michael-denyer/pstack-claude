@@ -1,0 +1,10 @@
+# Session-local Claude Code state — not part of the plugin
+.remember/
+
+# OS / editor
+.DS_Store
+*.swp
+*.swo
+
+# VS Code per-user (the .code-workspace file IS tracked)
+.vscode/

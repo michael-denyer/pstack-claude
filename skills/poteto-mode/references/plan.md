@@ -25,7 +25,7 @@ Resolve what is in scope vs explicitly out, technical or platform constraints, p
 Delegate codebase exploration (the **guard-the-context-window** principle skill).
 
 - Prefer `subagent_type: "poteto-agent"`. `"general-purpose"` is the fallback. Never use Claude Code's built-in `Plan` agent; it ignores this skill.
-- Pass `model:` explicitly. `claude-sonnet-4-6` for code reads, `claude-opus-4-7` for judgment.
+- Pass `model:` explicitly. `claude-sonnet-4-6` for code reads, `claude-opus-4-8` for judgment.
 
 Each explorer returns file pointers, conventions, dependencies, test infrastructure, and entry points. No inlined dumps.
 

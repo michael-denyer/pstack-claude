@@ -22,20 +22,24 @@ This port applies the Cursor → Claude Code substitutions in skill bodies. Earl
 | `.cursor/skills/`, `~/.cursor/skills/`, `~/.cursor/plugins/` | `.claude/skills/`, `~/.claude/skills/`, `~/.claude/plugins/` | Path-only translation. |
 | Cursor `mcps/` directory | Tool list at top of system prompt (`mcp__<server>__<name>` prefixed entries), or `.mcp.json`, or `claude mcp list` | Discovery surface differs. |
 | Model: `composer-2.5-fast` | `claude-sonnet-4-6` | Fast workhorse Claude. |
-| Model: `claude-opus-4-7-thinking-xhigh` | `claude-opus-4-7` (with note "extended thinking" where it appeared in a table) | Claude Code uses model IDs without the Cursor UI suffix; extended thinking is a separate knob. |
-| Model: `gpt-5.3-codex-high-fast`, `gpt-5.5-high-fast` | `claude-sonnet-4-6`, `claude-haiku-4-5` | Within Claude Code, cross-vendor diversity isn't native. Skills that need it now point at `/gsd-review` (which bridges to external CLIs) as the escape hatch. |
+| Model: `claude-opus-4-X-thinking-xhigh` | `claude-opus-4-8` (with note "extended thinking" where it appeared in a table) | Claude Code uses model IDs without the Cursor UI suffix; extended thinking is a separate knob. Originally substituted to `4-7`, then bumped to `4-8` to match the current Claude family. |
+| Model: `gpt-5.3-codex-high-fast`, `gpt-5.5-high-fast` | `claude-sonnet-4-6`, `claude-haiku-4-5` | Within Claude Code, cross-vendor diversity isn't native. Skills that need a harsher pass now route to the bundled `thermo-nuclear-code-quality-review` skill (imported from cursor-team-kit) as the escape hatch. Different style of pressure (strict maintainability rubric), not vendor diversity. |
 
-## New file
+## New / imported files
 
 - `skills/babysit/SKILL.md` — Claude Code analog of Cursor's `/babysit`. Wraps `gh pr view` / `gh pr checks` / `gh run view --log-failed` plus the `loop` skill for pacing. Provenance: workflow informed by Cursor's public /babysit behavior. Not a copy of Cursor's closed-source implementation.
-- `commands/babysit.md` — slash command routing to the new skill.
+- `commands/babysit.md` — slash command routing to the babysit skill.
+- `skills/thermo-nuclear-code-quality-review/SKILL.md` — imported verbatim from `cursor-team-kit`. Used as the harsher-critique escape hatch in `arena`, `interrogate`, `architect`, and `how` (replaces the Cursor-original cross-vendor bridge).
+- `commands/thermo-nuclear-code-quality-review.md` — slash command stub.
+- `.claude-plugin/marketplace.json` — marketplace manifest so the repo is installable via `/plugin marketplace add michael-denyer/pstack-claude`. Declares `allowCrossMarketplaceDependenciesOn: ["claude-plugins-official"]` so the cross-marketplace dependency on `plugin-dev` resolves at install time.
+- `plugin.json` `dependencies` — declares `plugin-dev` (from `claude-plugins-official` marketplace) as a required dependency, since the rewiring routes skill-authoring tasks to `plugin-dev:skill-development`.
 
 ## Per-skill changes applied
 
 ### `skills/poteto-mode/SKILL.md`
 
 - Triggers section: `create-skill` → `plugin-dev:skill-development`; `deslop` "from `cursor-team-kit`" qualifier dropped; `control-cli`/`control-ui` line replaced with `run`/`verify` driver guidance; `Cursor's built-in **babysit**` → this plugin's `babysit`.
-- Subagents section: `Task` → `Agent`; `composer-2.5-fast` → `claude-sonnet-4-6`; `claude-opus-4-7-thinking-xhigh` → `claude-opus-4-7`; "agent mode (readonly strips MCP)" → "full tool access (do not pick a subagent_type that strips MCP)".
+- Subagents section: `Task` → `Agent`; `composer-2.5-fast` → `claude-sonnet-4-6`; `claude-opus-4-8-thinking-xhigh` → `claude-opus-4-8`; "agent mode (readonly strips MCP)" → "full tool access (do not pick a subagent_type that strips MCP)".
 
 ### `skills/poteto-mode/references/plan.md`
 
@@ -66,7 +70,7 @@ This port applies the Cursor → Claude Code substitutions in skill bodies. Earl
 - Transcript paths → `~/.claude/projects/<encoded-cwd>/*.jsonl`.
 - `Task` → `Agent` (in SKILL.md and all three reviewer references).
 - `generalPurpose` → `"general-purpose"`; `readonly: false` + "agent mode" → "pick a subagent_type that retains MCP access".
-- Model slugs updated (`composer-2.5-fast` → `claude-sonnet-4-6`; `claude-opus-4-7-thinking-xhigh` → `claude-opus-4-7`).
+- Model slugs updated (`composer-2.5-fast` → `claude-sonnet-4-6`; `claude-opus-4-8-thinking-xhigh` → `claude-opus-4-8`).
 - `create-skill` (3 routing rules) → `plugin-dev:skill-development`.
 - Reference files: `.cursor/skills/`, `~/.cursor/skills/`, `~/.cursor/plugins/` → `.claude/...`, `~/.claude/...`.
 
@@ -80,14 +84,14 @@ This port applies the Cursor → Claude Code substitutions in skill bodies. Earl
 
 - `generalPurpose` → `"general-purpose"` (all 4 occurrences).
 - `composer-2.5-fast` → `claude-sonnet-4-6` (replace_all).
-- `claude-opus-4-7-thinking-xhigh` → `claude-opus-4-7` (replace_all for inline; table cell updated separately).
+- `claude-opus-4-8-thinking-xhigh` → `claude-opus-4-8` (replace_all for inline; table cell updated separately).
 - Critic model table: GPT slugs → Claude family; added note about bridging to `/gsd-review` for cross-vendor critique.
 - `readonly: true` lines dropped from subagent config blocks.
 
 ### `skills/interrogate/SKILL.md`
 
 - `Task tool` → `Agent` tool.
-- Reviewer model table: `claude-opus-4-7-thinking-xhigh` / `gpt-5.3-codex-high-fast` / `gpt-5.5-high-fast` / `composer-2.5-fast` → Claude family variants.
+- Reviewer model table: `claude-opus-4-8-thinking-xhigh` / `gpt-5.3-codex-high-fast` / `gpt-5.5-high-fast` / `composer-2.5-fast` → Claude family variants.
 - `generalPurpose` → `"general-purpose"`; `readonly: true` dropped.
 - Added cross-vendor-bridge note (`/gsd-review`).
 
@@ -105,7 +109,7 @@ This port applies the Cursor → Claude Code substitutions in skill bodies. Earl
 
 ## Deliberately not changed
 
-- **`claude-opus-4-7` model ID.** Already a valid Claude model; no edit needed beyond stripping the Cursor `-thinking-xhigh` UI suffix. Extended thinking is configured separately, not as a model variant.
+- **`claude-opus-4-8` model ID.** Already a valid Claude model; no edit needed beyond stripping the Cursor `-thinking-xhigh` UI suffix. Extended thinking is configured separately, not as a model variant.
 - **`/loop`, `/deslop`, `/babysit` slash references.** These all resolve in Claude Code now (`loop` is a built-in skill; `deslop` and `babysit` ship in this plugin).
 - **`run_in_background: true`.** Claude Code's `Agent` tool supports this — kept as-is.
 - **"currently open files, recent edits, the cursor location"** in `why/SKILL.md` (line 59). "Cursor location" here means editor cursor (caret position), not the IDE; generic phrasing, no edit.

@@ -30,7 +30,7 @@ Skip Phase A only when the work is genuinely greenfield with no surrounding syst
 
 Run the **arena** skill with the design-sketch task and the Phase A grounding artifacts as input. Pass `references/runner-prompt.md` as each runner's prompt. Each candidate produces a design package shaped per `references/rationale-template.md`: type sketch, function signatures, module map, and prose rationale.
 
-Use these slugs for the Phase B runners (Claude family only): `claude-opus-4-7` (extended thinking), `claude-opus-4-7` (standard), `claude-sonnet-4-6`, and `claude-haiku-4-5`. For cross-vendor diversity (GPT, Gemini, etc.), bridge to external CLIs from the lead via wrappers like `/gsd-review`.
+Use these slugs for the Phase B runners (Claude family only): `claude-opus-4-8` (extended thinking), `claude-opus-4-8` (standard), `claude-sonnet-4-6`, and `claude-haiku-4-5`. When you want a harsher review pass on a shortlisted design before locking it in, run the **thermo-nuclear-code-quality-review** skill on the candidate's sketch.
 
 This is the **exhaust-the-design-space** principle skill made concrete. Whole-shape alternatives, not point fixes inside one shape.
 

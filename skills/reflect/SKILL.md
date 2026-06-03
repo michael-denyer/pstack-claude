@@ -38,15 +38,15 @@ One message, three `Agent` calls, `subagent_type: "general-purpose"`, explicit `
 
 | Lens | `model` | Prompt template |
 |---|---|---|
-| Judgment | `claude-opus-4-7` | `references/judgment-reviewer.md` |
+| Judgment | `claude-opus-4-8` | `references/judgment-reviewer.md` |
 | Tooling | `claude-sonnet-4-6` | `references/tooling-reviewer.md` |
-| Divergent | `claude-opus-4-7` | `references/divergent-reviewer.md` |
+| Divergent | `claude-opus-4-8` | `references/divergent-reviewer.md` |
 
 Pass each template verbatim, substituting the transcript path or digest where marked. Reviewers return findings in the `Agent` response body.
 
 ### 3. Synthesize
 
-One `Agent` call, `subagent_type: "general-purpose"`, `model: claude-opus-4-7`. The synthesizer's quality check includes spot-verifying citations, which can require MCP access; pick a subagent_type that retains MCP access. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
+One `Agent` call, `subagent_type: "general-purpose"`, `model: claude-opus-4-8`. The synthesizer's quality check includes spot-verifying citations, which can require MCP access; pick a subagent_type that retains MCP access. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
 
 ### 4. Structural enforcement check
 

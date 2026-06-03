@@ -64,7 +64,7 @@ Then proceed to Step 3.
 Spawn a single Task subagent that explores and explains in one pass:
 
 - `subagent_type`: `"general-purpose"`
-- `model`: `claude-opus-4-7`
+- `model`: `claude-opus-4-8`
 - `readonly`: `true`
 
 This agent does its own exploration (Glob, Grep, Read) and writes the explanation directly. Read `references/explainer-prompt.md` for the communication style and output format. The agent follows the same structure, it just doesn't have explorer findings as input.
@@ -76,7 +76,7 @@ Proceed to Step 4.
 Once all explorers have returned, spawn a single Task subagent to synthesize their findings into one coherent explanation:
 
 - `subagent_type`: `"general-purpose"`
-- `model`: `claude-opus-4-7`
+- `model`: `claude-opus-4-8`
 - `readonly`: `true`
 
 The explainer gets all explorers' findings and writes the human-facing explanation (see output format below). Read `references/explainer-prompt.md` for the full prompt template. The explainer reconciles overlapping findings, resolves contradictions, and weaves the separate slices into a unified picture.
@@ -113,11 +113,11 @@ After the explanation is complete, spawn architectural critics. Launch all in a 
 
 | Subagent | Model |
 |----------|-------|
-| Critic A | `claude-opus-4-7` (extended thinking) |
+| Critic A | `claude-opus-4-8` (extended thinking) |
 | Critic B | `claude-sonnet-4-6` |
 | Critic C | `claude-haiku-4-5` |
 
-For wider model diversity (cross-vendor critique), bridge to an external CLI from the lead — wrappers like `/gsd-review` spawn other CLIs (GPT, Gemini) in parallel. Inside Claude Code alone, vary across the Claude family by tier and thinking budget.
+For a harsher critique pass on top of the three critics above, run the **thermo-nuclear-code-quality-review** skill against the surfaced issues. Inside Claude Code alone, model diversity is varied across the Claude family by tier and thinking budget.
 
 For each critic:
 - `subagent_type`: `"general-purpose"`

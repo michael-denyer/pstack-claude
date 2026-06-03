@@ -5,8 +5,8 @@
   "author": {
     "name": "Lauren Tan"
   },
-  "homepage": "https://github.com/cursor/plugins/tree/main/pstack",
-  "repository": "https://github.com/cursor/plugins",
+  "homepage": "https://github.com/michael-denyer/pstack-claude",
+  "repository": "https://github.com/michael-denyer/pstack-claude",
   "license": "MIT",
   "keywords": [
     "pstack",
@@ -16,5 +16,8 @@
     "agent-style",
     "subagents",
     "unslop"
+  ],
+  "dependencies": [
+    { "name": "plugin-dev", "marketplace": "claude-plugins-official" }
   ]
 }

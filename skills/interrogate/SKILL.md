@@ -37,7 +37,7 @@ Launch all four in a single message using the `Agent` tool, each with a differen
 
 | Subagent | Model |
 |----------|-------|
-| Reviewer A | `claude-opus-4-7` (extended thinking) |
+| Reviewer A | `claude-opus-4-8` (extended thinking) |
 | Reviewer B | `claude-sonnet-4-6` |
 | Reviewer C | `claude-haiku-4-5` |
 | Reviewer D | `claude-sonnet-4-6` (re-roll with different seed/prompt framing) |
@@ -46,7 +46,7 @@ For each reviewer:
 - `subagent_type`: `"general-purpose"`
 - `model`: the model from the table
 
-For wider model diversity (cross-vendor critique), bridge to an external CLI from the lead — wrappers like `/gsd-review` spawn other CLIs (GPT, Gemini) in parallel. Inside Claude Code alone, the four-way critique varies by Claude tier and thinking budget; re-roll with a re-framed prompt to surface different objections from the same model.
+For a harsher pass on top of the four reviewers, run the **thermo-nuclear-code-quality-review** skill against the diff. Inside Claude Code alone, model diversity is varied by Claude tier and thinking budget; re-roll with a re-framed prompt to surface different objections from the same model.
 
 If a model slug in the table above is rejected as unresolvable when you try to spawn the subagent, check the current list of valid slugs in the `Agent` tool's error message, pick the closest equivalent (prefer the highest-reasoning tier of the same family), spawn with the valid slug, and open a separate PR to update this table. Do not block the review on the slug issue.
 

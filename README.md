@@ -1,6 +1,6 @@
 # pstack for Claude Code
 
-Claude Code port of [poteto](https://x.com/poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack) plugin. Original by Lauren Tan; ships MIT. Includes the `deslop` skill from [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (also MIT).
+Claude Code port of [poteto](https://x.com/poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack) plugin. Original by Lauren Tan; ships MIT. Includes the `deslop` and `thermo-nuclear-code-quality-review` skills from [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (also MIT).
 
 > if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence.
 
@@ -8,7 +8,29 @@ This is not a verbatim copy. Skill bodies have been edited so every Cursor-speci
 
 ## Install
 
-This directory is a Claude Code plugin. Point a marketplace or a local-plugin install at this directory; auto-discovery picks up `.claude-plugin/plugin.json`, `commands/`, `skills/`, and `agents/`.
+This repo ships as a Claude Code marketplace containing one plugin (`pstack`).
+
+```shell
+/plugin marketplace add michael-denyer/pstack-claude
+/plugin install pstack@pstack-claude
+```
+
+## Dependencies
+
+Declared in `plugin.json` and auto-resolved on install:
+
+- **`plugin-dev`** (from the `claude-plugins-official` marketplace) — required. The rewiring routes skill-authoring tasks (in `automate-me`, `reflect`, `poteto-mode`) to the `plugin-dev:skill-development` skill. If you haven't added the official marketplace yet, `/plugin install pstack@pstack-claude` will pull it in automatically, provided `claude-plugins-official` is already added; otherwise:
+
+  ```shell
+  /plugin marketplace add anthropics/claude-plugins-official
+  ```
+
+Not declared as deps, but referenced in skill bodies:
+
+- **`run`, `verify`, `loop`** — Claude Code CLI built-ins (ship with the binary, always available).
+- **`gh` CLI** — system-level requirement of the `babysit` skill. Install via [`brew install gh`](https://cli.github.com) and authenticate with `gh auth login`.
+
+No third-party plugins. The harsher-critique escape hatch lives in the bundled `thermo-nuclear-code-quality-review` skill (imported from cursor-team-kit), not in an external plugin.
 
 ## Slash commands
 
@@ -29,6 +51,7 @@ This directory is a Claude Code plugin. Point a marketplace or a local-plugin in
 | `/unslop` | clean up writing by removing AI tells |
 | `/deslop` | deslop a diff before commit |
 | `/babysit` | monitor an open PR, fix CI/comments, keep it merge-ready |
+| `/thermo-nuclear-code-quality-review` | extremely strict maintainability audit |
 
 ## Subagent
 
@@ -41,7 +64,8 @@ The port is editorial, not mechanical. Anywhere upstream pstack assumed Cursor-s
 ### What's added
 
 - **`skills/babysit/`** — Claude Code analog of Cursor's closed-source `/babysit` built-in. Wraps `gh pr view` / `gh pr checks` / `gh run view --log-failed` plus the `loop` skill for pacing. Workflow informed by Cursor's public /babysit behavior; not a copy of Cursor's implementation.
-- **`skills/deslop/`** — imported verbatim from `cursor-team-kit`. No other team-kit skills are bundled.
+- **`skills/deslop/`** — imported verbatim from `cursor-team-kit`.
+- **`skills/thermo-nuclear-code-quality-review/`** — imported verbatim from `cursor-team-kit`. Used as the harsher-critique escape hatch in `arena`, `interrogate`, `architect`, and `how` (replaces the Cursor-original cross-vendor bridge).
 
 ### What's substituted in skill bodies
 
@@ -58,12 +82,12 @@ The port is editorial, not mechanical. Anywhere upstream pstack assumed Cursor-s
 | Skill paths `.cursor/skills/`, `~/.cursor/plugins/` | `.claude/skills/`, `~/.claude/plugins/` |
 | MCP discovery via Cursor's `mcps/` directory | Tool list at top of system prompt (`mcp__<server>__<name>` entries), or `.mcp.json`, or `claude mcp list` |
 | Model `composer-2.5-fast` (Cursor) | `claude-sonnet-4-6` |
-| Model `claude-opus-4-7-thinking-xhigh` (Cursor UI variant) | `claude-opus-4-7` (extended thinking configured separately) |
+| Model `claude-opus-4-X-thinking-xhigh` (Cursor UI variant) | `claude-opus-4-8` (extended thinking configured separately) |
 | Models `gpt-5.3-codex-high-fast`, `gpt-5.5-high-fast` (via Cursor) | `claude-sonnet-4-6`, `claude-haiku-4-5` (Claude family) |
 
 ### What's lost in translation
 
-**Cross-vendor model diversity.** `arena`, `interrogate`, `architect`, and `how` all rely on stress-testing a design against four *different* model families. Claude Code is single-vendor, so the four-way split collapses to four Claude variants by tier and thinking budget. To recover real cross-vendor critique, bridge to an external CLI from the lead — wrappers like `/gsd-review` (from the GSD plugin) spawn GPT/Gemini/Codex CLIs in parallel and feed results back. The skill bodies now mention this escape hatch; the default is Claude-only.
+**Cross-vendor model diversity.** `arena`, `interrogate`, `architect`, and `how` all rely on stress-testing a design against four *different* model families. Claude Code is single-vendor, so the four-way split collapses to four Claude variants by tier and thinking budget. Instead of bridging to an external CLI for that diversity, the rewiring routes the "harsher pass" to the bundled `thermo-nuclear-code-quality-review` skill — different style of pressure (strict maintainability rubric), not vendor diversity, but it lives in-plugin with no extra installs.
 
 ### What's deliberately kept
 
@@ -81,4 +105,4 @@ Editing skill bodies forks this from upstream. Re-syncing to a future pstack rel
 MIT. Two upstream LICENSE files are preserved:
 
 - [LICENSE](LICENSE) — pstack (Lauren Tan)
-- [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) — Cursor (covers the `deslop` skill)
+- [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) — Cursor (covers the `deslop` and `thermo-nuclear-code-quality-review` skills)

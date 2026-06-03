@@ -163,7 +163,7 @@ If your scope assessment suggests a single-commit trivial target where the PR de
 Spawn one synthesizer subagent:
 
 - `subagent_type`: `"general-purpose"`
-- `model`: `claude-opus-4-7`
+- `model`: `claude-opus-4-8`
 - Pick a subagent_type that retains MCP access. The synthesizer's quality check includes spot-verifying citations, which can require MCP access.
 
 The synthesizer gets:

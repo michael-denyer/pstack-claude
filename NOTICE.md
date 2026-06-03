@@ -9,6 +9,11 @@ This plugin is a port of upstream MIT-licensed work. All upstream copyright noti
 | `skills/poteto-mode/`, `skills/architect/`, `skills/arena/`, `skills/automate-me/`, `skills/figure-it-out/`, `skills/how/`, `skills/interrogate/`, `skills/reflect/`, `skills/show-me-your-work/`, `skills/tdd/`, `skills/typescript-best-practices/`, `skills/unslop/`, `skills/why/`, `skills/principle-*/`, `agents/poteto-agent.md` | [cursor/plugins/pstack @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/pstack) | (c) 2026 Lauren Tan | MIT | [LICENSE](LICENSE) |
 | `skills/deslop/` | [cursor/plugins/cursor-team-kit/skills/deslop @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/cursor-team-kit/skills/deslop) | (c) 2026 Cursor | MIT | [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) |
 | `skills/thermo-nuclear-code-quality-review/` | [cursor/plugins/cursor-team-kit/skills/thermo-nuclear-code-quality-review @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/cursor-team-kit/skills/thermo-nuclear-code-quality-review) | (c) 2026 Cursor | MIT | [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) |
+| `skills/make-pr-easy-to-review/` | [cursor/plugins/cursor-team-kit/skills/make-pr-easy-to-review @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/cursor-team-kit/skills/make-pr-easy-to-review) | (c) 2026 Cursor | MIT | [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) |
+| `skills/fix-ci/` | [cursor/plugins/cursor-team-kit/skills/fix-ci @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/cursor-team-kit/skills/fix-ci) | (c) 2026 Cursor | MIT | [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) |
+| `skills/fix-merge-conflicts/` | [cursor/plugins/cursor-team-kit/skills/fix-merge-conflicts @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/cursor-team-kit/skills/fix-merge-conflicts) | (c) 2026 Cursor | MIT | [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) |
+| `skills/get-pr-comments/` | [cursor/plugins/cursor-team-kit/skills/get-pr-comments @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/cursor-team-kit/skills/get-pr-comments) | (c) 2026 Cursor | MIT | [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) |
+| `skills/what-did-i-get-done/` | [cursor/plugins/cursor-team-kit/skills/what-did-i-get-done @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/cursor-team-kit/skills/what-did-i-get-done) | (c) 2026 Cursor | MIT | [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) |
 
 ## What changed in the port
 
@@ -19,7 +24,7 @@ Summary of structural changes:
 - Manifest moved from `.cursor-plugin/plugin.json` to `.claude-plugin/plugin.json` (Claude Code convention).
 - `.claude-plugin/marketplace.json` added so the repo is installable via `/plugin marketplace add`.
 - `commands/<name>.md` stubs added so each public skill is reachable as a slash command in Claude Code.
-- `deslop` and `thermo-nuclear-code-quality-review` skills imported from `cursor-team-kit` (no other team-kit skills are bundled).
+- Seven skills imported from `cursor-team-kit`: `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`. All copied verbatim — no rewiring needed.
 - `skills/babysit/` written from scratch as the Claude Code analog of Cursor's closed-source `/babysit` built-in.
 
 ## Modifications

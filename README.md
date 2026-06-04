@@ -15,6 +15,25 @@ This repo ships as a Claude Code marketplace containing one plugin (`pstack`).
 /plugin install pstack@pstack-claude
 ```
 
+## Layout
+
+```text
+.
+├── .claude-plugin/marketplace.json   # marketplace manifest (repo root)
+├── plugins/pstack/                   # the plugin itself
+│   ├── .claude-plugin/plugin.json
+│   ├── skills/                       # 39 skills
+│   ├── commands/                     # 20 slash command stubs
+│   └── agents/poteto-agent.md
+├── LICENSE                           # pstack upstream MIT
+├── LICENSE-cursor-team-kit           # cursor-team-kit upstream MIT
+├── NOTICE.md                         # attribution table
+├── CHANGES.md                        # per-skill substitution audit
+└── README.md                         # this file
+```
+
+Plugin-internal path references in the docs below (`skills/<name>/`, `commands/<name>.md`) are relative to `plugins/pstack/`.
+
 ## Dependencies
 
 Declared in `plugin.json` and auto-resolved on install:

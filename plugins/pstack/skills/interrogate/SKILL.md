@@ -37,7 +37,7 @@ Launch all four in a single message using the `Agent` tool, each with a differen
 
 | Subagent | Model |
 |----------|-------|
-| Reviewer A | `claude-haiku-4-5` |
+| Reviewer A | `claude-opus-4-7` |
 | Reviewer B | `claude-sonnet-4-6` |
 | Reviewer C | `claude-opus-4-6` |
 | Reviewer D | `claude-opus--4-8` (extended thinking |

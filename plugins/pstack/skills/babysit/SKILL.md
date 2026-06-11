@@ -1,6 +1,6 @@
 ---
 name: babysit
-description: Monitor an open PR, fix CI failures, address clear review comments, and keep it merge-ready. Claude Code analog of Cursor's built-in /babysit. Use after opening a PR when the user wants the agent to keep driving it without re-prompts.
+description: Watch an open PR — fix failing CI, handle the straightforward review comments, and drive it to a mergeable state. Claude Code analog of Cursor's built-in /babysit. Use after opening a PR when the user wants the agent to shepherd it without re-prompting.
 ---
 
 # Babysit a PR
@@ -9,7 +9,7 @@ Claude Code analog of Cursor's built-in `/babysit`. The implementation is a loop
 
 ## When to use
 
-- A PR is open and the user explicitly wants the agent to keep it green.
+- There's an open PR and the user explicitly wants it kept green.
 - The poteto-mode opening-a-pr playbook routes here after `gh pr create`.
 - A subagent that opens a PR does NOT babysit — return to the parent and let the parent decide.
 

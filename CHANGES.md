@@ -27,7 +27,7 @@ This port applies the Cursor → Claude Code substitutions in skill bodies. Earl
 
 ## New / imported files
 
-- `skills/babysit/SKILL.md` — Claude Code analog of Cursor's `/babysit`. Wraps `gh pr view` / `gh pr checks` / `gh run view --log-failed` plus the `loop` skill for pacing. Provenance: workflow informed by Cursor's public /babysit behavior. Not a copy of Cursor's closed-source implementation.
+- `skills/babysit/SKILL.md` — Claude Code analog of Cursor's `/babysit`. Wraps `gh pr view` / `gh pr checks` / `gh run view --log-failed` plus the `loop` skill for pacing. Provenance: independently authored; workflow informed by Cursor's public `/babysit` behavior. Not a copy of Cursor's closed-source implementation.
 - `commands/babysit.md` — slash command routing to the babysit skill.
 - `skills/thermo-nuclear-code-quality-review/SKILL.md` — imported verbatim from `cursor-team-kit`. Used as the harsher-critique escape hatch in `arena`, `interrogate`, `architect`, and `how` (replaces the Cursor-original cross-vendor bridge).
 - `commands/thermo-nuclear-code-quality-review.md` — slash command stub.
@@ -137,5 +137,5 @@ If you want a clean re-port (e.g. when upstream releases v0.2.0), the rebuild re
 
 - Upstream pstack: [cursor/plugins/pstack @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/pstack) — MIT, (c) 2026 Lauren Tan.
 - Upstream deslop: [cursor/plugins/cursor-team-kit/skills/deslop @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/cursor-team-kit/skills/deslop) — MIT, (c) 2026 Cursor.
-- babysit: independently authored; workflow informed by Cursor's public /babysit behavior.
+- babysit: independently authored; workflow informed by Cursor's public `/babysit` behavior — no code or prose copied.
 - Inspected for prior-art decisions: [v1truv1us/ai-eng-system](https://github.com/v1truv1us/ai-eng-system) (namespaces pstack under `pstack/` but keeps Cursor refs intact); [Evan-Kim2028/agent-fleet](https://github.com/Evan-Kim2028/agent-fleet) (vendors pstack under `base-kit/pstack/`, same posture).

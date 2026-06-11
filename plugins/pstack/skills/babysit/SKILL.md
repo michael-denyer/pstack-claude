@@ -54,4 +54,4 @@ Claude Code analog of Cursor's built-in `/babysit`. The implementation is a loop
 
 ## Provenance
 
-This is a Claude Code analog, not a port of Cursor's `/babysit`. Cursor's implementation is closed source; the workflow above is informed by Cursor's public /babysit behavior.
+This is a Claude Code analog of Cursor's `/babysit`, not a port — Cursor's implementation is closed source. The skill is independently authored; the workflow is informed by Cursor's public `/babysit` behavior. No code or prose was copied from any source.

@@ -25,7 +25,7 @@ Summary of structural changes:
 - `.claude-plugin/marketplace.json` added at repo root so the repo is installable via `/plugin marketplace add`. The marketplace's single plugin entry sources from `./plugins/pstack`.
 - `plugins/pstack/commands/<name>.md` stubs added so each public skill is reachable as a slash command in Claude Code.
 - Seven skills imported from `cursor-team-kit`: `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`. All copied verbatim — no rewiring needed.
-- `plugins/pstack/skills/babysit/` written from scratch as the Claude Code analog of Cursor's closed-source `/babysit` built-in.
+- `plugins/pstack/skills/babysit/` is independently authored as the Claude Code analog of Cursor's `/babysit` built-in. It has no upstream pstack equivalent; its workflow is informed by Cursor's public `/babysit` behavior. No code or prose was copied from any source.
 
 ## Modifications
 
@@ -36,7 +36,7 @@ Files authored for this port (not derived from upstream):
 - `plugins/pstack/.claude-plugin/plugin.json`
 - `.claude-plugin/marketplace.json` (repo root)
 - `plugins/pstack/commands/*.md`
-- `plugins/pstack/skills/babysit/SKILL.md`
+- `plugins/pstack/skills/babysit/SKILL.md` (independently authored; workflow informed by Cursor's public `/babysit` behavior)
 - `NOTICE.md` (this file)
 - `README.md`
 - `CHANGES.md`

@@ -1,6 +1,6 @@
 # pstack for Claude Code
 
-Claude Code port of [poteto](https://x.com/poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack) plugin. Original by Lauren Tan; ships MIT. Imports seven skills from [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (also MIT): `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`.
+Claude Code port of [poteto](https://x.com/poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack) plugin (synced against upstream `e46364b`, pstack v0.9.2). Original by Lauren Tan; ships MIT. Imports seven skills from [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (also MIT): `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`.
 
 > if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence.
 
@@ -22,8 +22,8 @@ This repo ships as a Claude Code marketplace containing one plugin (`pstack`).
 ├── .claude-plugin/marketplace.json   # marketplace manifest (repo root)
 ├── plugins/pstack/                   # the plugin itself
 │   ├── .claude-plugin/plugin.json
-│   ├── skills/                       # 39 skills
-│   ├── commands/                     # 20 slash command stubs
+│   ├── skills/                       # 44 skills
+│   ├── commands/                     # 24 slash command stubs
 │   └── agents/poteto-agent.md
 ├── LICENSE                           # pstack upstream MIT
 ├── LICENSE-cursor-team-kit           # cursor-team-kit upstream MIT
@@ -67,6 +67,9 @@ No third-party plugins. The harsher-critique escape hatch lives in the bundled `
 | `/typescript-best-practices` | ground type-system discipline in TypeScript syntax |
 | `/figure-it-out` | design a rigorous, auditable playbook for a task no bundled playbook fits |
 | `/show-me-your-work` | log decisions to a reviewable tsv decision trail |
+| `/blast-radius` | find what a change could break beyond the diff and prove safety by running code |
+| `/recall` | catch up on recent working context from chat history, live state, and the shared record |
+| `/setup-pstack` | configure pstack per-role model choices |
 | `/unslop` | clean up writing by removing AI tells |
 | `/deslop` | deslop a diff before commit |
 | `/babysit` | monitor an open PR, fix CI/comments, keep it merge-ready |
@@ -113,6 +116,7 @@ The port is editorial, not mechanical. Anywhere upstream pstack assumed Cursor-s
 | Model `composer-2.5-fast` (Cursor) | `claude-sonnet-4-6` |
 | Model `claude-opus-4-X-thinking-xhigh` (Cursor UI variant) | `claude-opus-4-8` (extended thinking configured separately) |
 | Models `gpt-5.3-codex-high-fast`, `gpt-5.5-high-fast` (via Cursor) | `claude-sonnet-4-6`, `claude-haiku-4-5` (Claude family) |
+| Multi-model panels (arena, architect, interrogate, how-critics) | Default triple is `claude-opus-4-8` + `claude-opus-4-6` + `claude-sonnet-4-6` — three distinct models for cross-generation diversity inside the opus tier (replaces the cross-vendor diversity lost in translation). |
 
 ### What's lost in translation
 

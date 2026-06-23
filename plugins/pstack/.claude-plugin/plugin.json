@@ -1,6 +1,7 @@
 {
   "name": "pstack",
-  "version": "0.1.0",
+  "displayName": "pstack (Claude Code port)",
+  "version": "0.9.2",
   "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Ported from cursor/plugins/pstack to Claude Code.",
   "author": {
     "name": "Lauren Tan"

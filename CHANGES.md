@@ -2,6 +2,46 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them.
 
+## 0.9.2 sync (against upstream `e46364b`)
+
+Upstream pstack jumped from `0.1.0` → `0.9.2` between syncs. 30+ commits, including 11 new files.
+
+**New pstack-native skills/playbooks pulled in (Cursor refs in them re-substituted on the way in):**
+
+- `skills/blast-radius/` — find what a change could break beyond the diff.
+- `skills/recall/` — reconstruct recent working context. Cursor transcript path (`~/.cursor/projects/<slug>/agent-transcripts/<uuid>/<uuid>.jsonl`) rewritten to Claude Code path (`~/.claude/projects/<encoded-cwd>/<uuid>.jsonl`).
+- `skills/setup-pstack/` — model-per-role configuration. Substantially rewritten: original wrote `~/.cursor/rules/pstack-models.mdc` (Cursor's `.mdc` always-applied-rule feature, no Claude Code analog). Replacement writes `~/.claude/pstack-models.md` and instructs the user to add an `@~/.claude/pstack-models.md` include to `~/.claude/CLAUDE.md` so the override sheet loads each session.
+- `skills/principle-build-the-lever/`, `skills/principle-sequence-verifiable-units/` — new principles.
+- `skills/poteto-mode/playbooks/{hillclimb,pause-safely,refactoring,session-pickup,trace-forensics}.md` — new playbooks.
+- `skills/interrogate/references/code-quality-review.md` — new interrogate reference.
+
+**Re-applied substitutions across changed + new content:**
+
+- Bulk pass through 28 files via Python regex covering all entries in the substitution table above.
+- Targeted fixes for variants the bulk pass missed:
+  - `recall/SKILL.md` line 15 — Cursor transcript path rewrite.
+  - `why/SKILL.md` line 100 — MCP discovery wording variant.
+  - `poteto-mode/SKILL.md` lines 22–25 — `cursor-team-kit` qualifiers removed; Bugbot triage refs to `babysit`.
+  - `reflect/SKILL.md` lines 37, 45, 49 — readonly/agent-mode language; `Task` → `Agent`.
+  - `poteto-mode/playbooks/session-pickup.md` line 7 — `agent-transcripts/` path.
+  - `poteto-agent.md` description — `generalPurpose` → `general-purpose`.
+- Bumped Opus references from `claude-opus-4-7` to `claude-opus-4-8` (current Claude family head).
+- Multi-model panels (`arena`, `architect`, `interrogate`, `how` critics, and the `setup-pstack` defaults) had a duplicate `claude-sonnet-4-6` in the third slot. Replaced one with `claude-opus-4-6` so the panel runs three distinct models (`claude-opus-4-8`, `claude-opus-4-6`, `claude-sonnet-4-6`) instead of two — cross-generation diversity inside the opus tier where cross-vendor diversity isn't available.
+- All single-subagent delegation defaults bumped from `claude-sonnet-4-6` to `claude-opus-4-8`: `bug-fix`, `feature`, `perf-issue`, `refactoring`, `hillclimb` (the five poteto-mode code-writing playbooks); `how-explorer`, `why-investigators`, `reflect-tooling` (the three multi-subagent dispatches that run the same model in parallel rather than a diverse panel). Setup-pstack override sheet updated to match. Meta-defaults in `poteto-mode/SKILL.md` and `plan.md` rephrased: "default `claude-opus-4-8` for code-writing delegations" replaces the old "claude-sonnet-4-6 for code" wording. Sonnet now appears only in the diverse 3-model panels.
+
+**Command stubs added:** `commands/blast-radius.md`, `commands/recall.md`, `commands/setup-pstack.md`.
+
+**Manifest changes:**
+
+- `plugins/pstack/.claude-plugin/plugin.json` — version `0.1.0` → `0.9.2`; added `displayName: "pstack (Claude Code port)"`.
+- `.claude-plugin/marketplace.json` — plugin entry version bumped to `0.9.2`.
+
+**Team-kit imports:** unchanged. The upstream diff showed only `verify-this` (which we didn't import) changed in `cursor-team-kit/skills/`.
+
+**`babysit` skill:** unchanged. Locally authored; not affected by upstream sync.
+
+---
+
 ## Substitution table
 
 | Cursor primitive | Replaced with | Notes |
@@ -135,7 +175,7 @@ If you want a clean re-port (e.g. when upstream releases v0.2.0), the rebuild re
 
 ## Provenance
 
-- Upstream pstack: [cursor/plugins/pstack @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/pstack) — MIT, (c) 2026 Lauren Tan.
-- Upstream deslop: [cursor/plugins/cursor-team-kit/skills/deslop @ 11ecc12](https://github.com/cursor/plugins/tree/11ecc12a3ffc037b4ef3b64de2be449668e8afc7/cursor-team-kit/skills/deslop) — MIT, (c) 2026 Cursor.
+- Upstream pstack: [cursor/plugins/pstack @ e46364b](https://github.com/cursor/plugins/tree/e46364b8be46000b7df0f260550cd712afbb8d36/pstack) — MIT, (c) 2026 Lauren Tan.
+- Upstream deslop: [cursor/plugins/cursor-team-kit/skills/deslop @ e46364b](https://github.com/cursor/plugins/tree/e46364b8be46000b7df0f260550cd712afbb8d36/cursor-team-kit/skills/deslop) — MIT, (c) 2026 Cursor.
 - babysit: independently authored; workflow informed by Cursor's public `/babysit` behavior — no code or prose copied.
 - Inspected for prior-art decisions: [v1truv1us/ai-eng-system](https://github.com/v1truv1us/ai-eng-system) (namespaces pstack under `pstack/` but keeps Cursor refs intact); [Evan-Kim2028/agent-fleet](https://github.com/Evan-Kim2028/agent-fleet) (vendors pstack under `base-kit/pstack/`, same posture).

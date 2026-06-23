@@ -116,6 +116,7 @@ The port is editorial, not mechanical. Anywhere upstream pstack assumed Cursor-s
 | Model `composer-2.5-fast` (Cursor) | `claude-sonnet-4-6` |
 | Model `claude-opus-4-X-thinking-xhigh` (Cursor UI variant) | `claude-opus-4-8` (extended thinking configured separately) |
 | Models `gpt-5.3-codex-high-fast`, `gpt-5.5-high-fast` (via Cursor) | `claude-sonnet-4-6`, `claude-haiku-4-5` (Claude family) |
+| Multi-model panels (arena, architect, interrogate, how-critics) | Default triple is `claude-opus-4-8` + `claude-opus-4-6` + `claude-sonnet-4-6` — three distinct models for cross-generation diversity inside the opus tier (replaces the cross-vendor diversity lost in translation). |
 
 ### What's lost in translation
 

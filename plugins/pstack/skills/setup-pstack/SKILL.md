@@ -19,7 +19,7 @@ so the file is loaded as context for every session.
 
 ### 1. Detect available models
 
-Enumerate the model slugs you can pass to an `Agent` subagent in this session — that is the dependable source. The most recent Claude family at the time of writing: Opus 4.8 (`claude-opus-4-8`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`). Ask the user to confirm or paste any additional slugs they want available. Never write a slug you have not confirmed is available.
+Enumerate the model slugs you can pass to an `Agent` subagent in this session — that is the dependable source. Claude family currently available: Opus 4.8 (`claude-opus-4-8`), Opus 4.6 (`claude-opus-4-6`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`). The default panels pair `4-8` with `4-6` for cross-generation diversity inside the opus tier. Ask the user to confirm or paste any additional slugs they want available. Never write a slug you have not confirmed is available.
 
 ### 2. Load current state
 
@@ -49,14 +49,14 @@ hillclimb: claude-sonnet-4-6
 judgment and prose: claude-opus-4-8
 how explorer: claude-sonnet-4-6
 how explainer: claude-opus-4-8
-how critics: claude-opus-4-8, claude-sonnet-4-6, claude-sonnet-4-6
+how critics: claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6
 why investigators: claude-sonnet-4-6
 why synthesizer: claude-opus-4-8
 reflect tooling: claude-sonnet-4-6
 reflect judgment, divergent, synthesizer: claude-opus-4-8
-arena runners: claude-opus-4-8, claude-sonnet-4-6, claude-sonnet-4-6
-architect runners: claude-opus-4-8, claude-sonnet-4-6, claude-sonnet-4-6
-interrogate reviewers: claude-opus-4-8, claude-sonnet-4-6, claude-sonnet-4-6
+arena runners: claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6
+architect runners: claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6
+interrogate reviewers: claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6
 ```
 
 ### 6. Wire it in

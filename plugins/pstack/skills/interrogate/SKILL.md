@@ -33,7 +33,7 @@ Write one clear paragraph. Reviewers challenge whether the work achieves the int
 
 ## Step 3, Spawn Reviewers
 
-Launch one reviewer per model in your configured interrogate list (defaults `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-sonnet-4-6`), all in a single message.
+Launch one reviewer per model in your configured interrogate list (defaults `claude-opus-4-8`, `claude-opus-4-6`, `claude-sonnet-4-6`), all in a single message.
 
 For each reviewer:
 - `subagent_type`: `general-purpose`

@@ -26,6 +26,7 @@ Upstream pstack jumped from `0.1.0` → `0.9.2` between syncs. 30+ commits, incl
   - `poteto-mode/playbooks/session-pickup.md` line 7 — `agent-transcripts/` path.
   - `poteto-agent.md` description — `generalPurpose` → `general-purpose`.
 - Bumped Opus references from `claude-opus-4-7` to `claude-opus-4-8` (current Claude family head).
+- Multi-model panels (`arena`, `architect`, `interrogate`, `how` critics, and the `setup-pstack` defaults) had a duplicate `claude-sonnet-4-6` in the third slot. Replaced one with `claude-opus-4-6` so the panel runs three distinct models (`claude-opus-4-8`, `claude-opus-4-6`, `claude-sonnet-4-6`) instead of two — cross-generation diversity inside the opus tier where cross-vendor diversity isn't available.
 
 **Command stubs added:** `commands/blast-radius.md`, `commands/recall.md`, `commands/setup-pstack.md`.
 

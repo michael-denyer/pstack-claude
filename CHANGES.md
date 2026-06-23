@@ -139,7 +139,7 @@ Upstream pstack jumped from `0.1.0` → `0.9.2` between syncs. 30+ commits, incl
 
 ### `skills/arena/SKILL.md`
 
-- Default 4 runners: GPT/composer slugs → Claude family. Added cross-vendor-bridge note.
+- Default 3 runners: GPT/composer slugs → Claude family. Added cross-vendor-bridge note.
 
 ### `skills/architect/SKILL.md`
 

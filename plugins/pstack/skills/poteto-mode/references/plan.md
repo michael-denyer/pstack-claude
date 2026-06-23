@@ -8,7 +8,7 @@ Open a todolist with one item per step below.
 
 Skip the plan when the change is one or two files with an obvious approach. Say so and stop.
 
-Plan when the change spans three or more files, introduces architecture, has competing approaches, has unclear scope, or the user asked for one.
+Plan when the change spans three or more files, introduces architecture, has competing approaches or unclear scope, or the user asked for one.
 
 ## 1. Re-read principles
 
@@ -24,8 +24,8 @@ Resolve what is in scope vs explicitly out, technical or platform constraints, p
 
 Delegate codebase exploration (the **guard-the-context-window** principle skill).
 
-- Prefer `subagent_type: "poteto-agent"`. `"general-purpose"` is the fallback. Never use Claude Code's built-in `Plan` agent; it ignores this skill.
-- Pass `model:` explicitly. `claude-sonnet-4-6` for code reads, `claude-opus-4-8` for judgment.
+- Prefer `subagent_type: "poteto-agent"`. `general-purpose` is the fallback. Never use Claude Code's built-in `Plan` agent; it ignores this skill.
+- Pass `model:` explicitly per the configured roles (defaults `claude-sonnet-4-6` for code, `claude-opus-4-8` for judgment).
 
 Each explorer returns file pointers, conventions, dependencies, test infrastructure, and entry points. No inlined dumps.
 
@@ -33,7 +33,7 @@ Each explorer returns file pointers, conventions, dependencies, test infrastruct
 
 The user specifies where the plan lives.
 
-Use a single file `NN-slug.md` for small plans. For plans with three or more phases, use a directory with `overview.md` plus phase files:
+Single file `NN-slug.md` for small plans. For three or more phases, a directory with `overview.md` plus phase files:
 
 ```
 NN-slug/
@@ -45,7 +45,7 @@ NN-slug/
 
 ### Phase sizing
 
-- One function or type plus tests, or one bug fix. Not "one file"; file sizes vary too much.
+- One function or type plus tests, or one bug fix. Not "one file".
 - Two to three files touched, max.
 - Prefer eight to ten small phases over three to four large ones to preserve option value (the **foundational-thinking** principle skill).
 - Split if a phase has more than five test cases or three functions.
@@ -73,7 +73,7 @@ Order phases so infrastructure and shared types land first (the **foundational-t
 
 For changes touching existing code, apply the **redesign-from-first-principles** principle skill: if we'd built this with the new requirement on day one, what would it look like? Redesign holistically; deliver incrementally.
 
-If a phase creates or edits a skill, the phase instructs the implementer to use the **plugin-dev:skill-development** skill (Claude Code's authoring guidance for SKILL.md files).
+If a phase creates or edits a skill, the phase instructs the implementer to use the **plugin-dev:skill-development** skill (Cursor's built-in for authoring SKILL.md files).
 
 ## 5. Verification per phase
 
@@ -81,16 +81,14 @@ Each phase needs both:
 
 **Static.** Type check, lint, project tests pass.
 
-**Runtime.** Drive the feature on the matching surface yourself:
+**Runtime.** Exercise the feature on the matching surface via the relevant control skill:
 
-- For browser / Electron / Web UIs: use Claude Code's **verify** skill (VS Code extension launches and inspects the app).
-- For CLIs and TUIs: use the **run** skill (launches and drives the CLI/TUI).
-- For native mobile: use whatever simulator-driving skill your team has.
-- If your surface has no fit, flag it in the plan.
+- Browser / Electron / Web UIs: Claude Code's **verify** skill (VS Code extension launches/inspects browser/Electron UIs).
+- CLIs and TUIs: Claude Code's **run** skill (launches/drives CLIs/TUIs).
+- Native mobile: whatever simulator-driving skill your team has.
+- No control skill for the touched surface: flag it in the plan.
 
-For bug fixes, the loop is reproduce on the surface, fix, verify on the same surface. Unit tests show a branch behaves a certain way. They do not prove the bug is gone (the **prove-it-works** principle skill).
-
-If a touched surface has no driver, flag it in the plan.
+For bug fixes, the loop is reproduce on the surface, fix, verify on the same surface. Unit tests show a branch behaves a certain way; they do not prove the bug is gone (the **prove-it-works** principle skill).
 
 ## 6. Implementation guidance
 

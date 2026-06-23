@@ -14,7 +14,7 @@ Apply each criterion to every finding:
 
 - Durability: still true in 6 months once paths, SHAs, tool versions, and code shapes have changed.
 - Specificity: broad enough to apply across tasks, precise enough that a future agent recognizes when to use it. Reject vague platitudes ("write good code") and hyper-specific facts ("`<specific-skill-name>` has 175 tokens at limit 80").
-- Existing-skill-first: propose `new skill via create-skill:` only when no existing skill is a real home, the pattern recurs, and the topic deserves its own skill.
+- Existing-skill-first: propose `new skill via plugin-dev:skill-development:` only when no existing skill is a real home, the pattern recurs, and the topic deserves its own skill.
 - Convergence: findings echoed by 2+ reviewers carry higher confidence. Singletons must clear a higher bar on the other criteria.
 - Decision-changing: a future agent does something different because of the edit, not just reads more text.
 - Structural-mechanism check: route to Backlog when a lint rule, script, metadata flag, or runtime check already enforces the rule or could enforce it cheaply. Skill prose is for things mechanisms cannot enforce.
@@ -41,7 +41,7 @@ Output exactly the format below. No preamble, no narration. One sentence per cel
 |---|---|---|
 | <failure mode in a skill the parent used> | <change to that skill's body> | <skill path + section> |
 | <skill existed but didn't trigger> | <tune the skill's description so it fires next time> | <tune description: <skill path>> |
-| <new pattern, no existing skill is a real home> | <draft a new skill via create-skill> | <new skill via create-skill: <kebab-name>> |
+| <new pattern, no existing skill is a real home> | <draft a new skill via plugin-dev:skill-development> | <new skill via plugin-dev:skill-development: <kebab-name>> |
 
 One row per finding. The user approves row by row.
 

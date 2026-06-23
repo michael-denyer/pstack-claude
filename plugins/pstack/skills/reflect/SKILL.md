@@ -39,7 +39,7 @@ One message, three `Agent` calls, `subagent_type: "general-purpose"`, explicit `
 | Lens | `model` | Prompt template |
 |---|---|---|
 | Judgment | your configured reflect-judgment model (default `claude-opus-4-8`) | `references/judgment-reviewer.md` |
-| Tooling | your configured reflect-tooling model (default `claude-sonnet-4-6`) | `references/tooling-reviewer.md` |
+| Tooling | your configured reflect-tooling model (default `claude-opus-4-8`) | `references/tooling-reviewer.md` |
 | Divergent | your configured reflect-judgment model (default `claude-opus-4-8`) | `references/divergent-reviewer.md` |
 
 Pass each template verbatim, substituting the transcript path or digest where marked. Reviewers return findings in the `Agent` response body.

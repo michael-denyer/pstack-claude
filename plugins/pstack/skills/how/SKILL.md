@@ -45,7 +45,7 @@ The right decomposition depends on the question. Use your judgment. Narrow quest
 Spawn all explorers in a single message:
 
 - `subagent_type`: `general-purpose`
-- `model`: your configured how-explorer model (default `claude-sonnet-4-6`)
+- `model`: your configured how-explorer model (default `claude-opus-4-8`)
 - `readonly`: `true`
 
 Each explorer gets the same base prompt from `references/explorer-prompt.md` plus a specific exploration angle naming its slice. Each explorer should:

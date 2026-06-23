@@ -42,17 +42,17 @@ Write `~/.claude/pstack-models.md` with the shape below. Overwrite the whole fil
 
 Per-role model overrides for pstack skills. Each pstack SKILL.md names a default model inline; the values here override those defaults. Delete a line to fall back to the skill default.
 
-feature, refactoring: claude-sonnet-4-6
+feature, refactoring: claude-opus-4-8
 bug-fix: claude-opus-4-8
-perf-issue: claude-sonnet-4-6
-hillclimb: claude-sonnet-4-6
+perf-issue: claude-opus-4-8
+hillclimb: claude-opus-4-8
 judgment and prose: claude-opus-4-8
-how explorer: claude-sonnet-4-6
+how explorer: claude-opus-4-8
 how explainer: claude-opus-4-8
 how critics: claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6
-why investigators: claude-sonnet-4-6
+why investigators: claude-opus-4-8
 why synthesizer: claude-opus-4-8
-reflect tooling: claude-sonnet-4-6
+reflect tooling: claude-opus-4-8
 reflect judgment, divergent, synthesizer: claude-opus-4-8
 arena runners: claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6
 architect runners: claude-opus-4-8, claude-opus-4-6, claude-sonnet-4-6

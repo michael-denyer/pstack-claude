@@ -1,12 +1,14 @@
-# pstack for Claude Code
+# pstack for Claude Code and Codex
 
-Claude Code port of [poteto](https://x.com/poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack) plugin (synced against upstream `e46364b`, pstack v0.9.2). Original by Lauren Tan; ships MIT. Imports seven skills from [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (also MIT): `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`.
+Claude Code port of [poteto](https://x.com/poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack) plugin (synced against upstream `e46364b`, pstack v0.9.2). The same `skills/` tree also ships as a Codex plugin; see [Running on Codex](#running-on-codex). Original by Lauren Tan; ships MIT. Imports seven skills from [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (also MIT): `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`.
 
 > if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence.
 
 This is not a verbatim copy. Skill bodies have been edited so every Cursor-specific primitive resolves to its Claude Code equivalent — see [Differences from upstream](#differences-from-upstream) for the full list. The exhaustive per-skill audit lives in [CHANGES.md](CHANGES.md); license attribution lives in [NOTICE.md](NOTICE.md); the upstream README is preserved verbatim at [README-UPSTREAM.md](README-UPSTREAM.md).
 
 ## Install
+
+### Claude Code
 
 This repo ships as a Claude Code marketplace containing one plugin (`pstack`).
 
@@ -15,16 +17,36 @@ This repo ships as a Claude Code marketplace containing one plugin (`pstack`).
 /plugin install pstack@pstack-claude
 ```
 
+### Codex
+
+The same plugin carries a `.codex-plugin/plugin.json` manifest and a root `.agents/plugins/marketplace.json`. The verified install is to link the plugin's skills into your cross-runtime skills directory:
+
+```shell
+git clone https://github.com/michael-denyer/pstack-claude
+cd pstack-claude
+for s in plugins/pstack/skills/*/; do ln -s "$PWD/$s" ~/.agents/skills/"$(basename "$s")"; done
+```
+
+Codex reads `plugins/pstack/.codex-plugin/plugin.json` through the links and namespaces the skills under the plugin, so they list as `pstack:poteto-mode`, `pstack:tdd`, and so on. To enable the multi-model and parallel-subagent skills (`interrogate`, `arena`, `how`, `why`, `reflect`, `architect`), turn on subagents in `~/.codex/config.toml`:
+
+```toml
+[features]
+multi_agent = true
+```
+
 ## Layout
 
 ```text
 .
-├── .claude-plugin/marketplace.json   # marketplace manifest (repo root)
+├── .claude-plugin/marketplace.json   # Claude Code marketplace manifest (repo root)
+├── .agents/plugins/marketplace.json  # Codex marketplace manifest (repo root)
 ├── plugins/pstack/                   # the plugin itself
-│   ├── .claude-plugin/plugin.json
-│   ├── skills/                       # 44 skills
-│   ├── commands/                     # 24 slash command stubs
-│   └── agents/poteto-agent.md
+│   ├── .claude-plugin/plugin.json    # Claude Code manifest
+│   ├── .codex-plugin/plugin.json     # Codex manifest (skills: ./skills/)
+│   ├── skills/                       # 44 skills (shared by both runtimes)
+│   │   └── poteto-mode/references/codex-tools.md  # Claude→Codex tool/model/skill map
+│   ├── commands/                     # 24 Claude slash command stubs (not ported to Codex)
+│   └── agents/poteto-agent.md        # Claude subagent (Codex routes via codex-tools.md)
 ├── LICENSE                           # pstack upstream MIT
 ├── LICENSE-cursor-team-kit           # cursor-team-kit upstream MIT
 ├── NOTICE.md                         # attribution table
@@ -33,6 +55,17 @@ This repo ships as a Claude Code marketplace containing one plugin (`pstack`).
 ```
 
 Plugin-internal path references in the docs below (`skills/<name>/`, `commands/<name>.md`) are relative to `plugins/pstack/`.
+
+## Running on Codex
+
+The Codex build shares one `skills/` tree with the Claude Code build. Nothing is forked or generated. The skill bodies stay in Claude Code tool language, and one mapping file does the translation, following the same pattern the official `superpowers` plugin uses for Codex.
+
+- **Skill invocation.** Codex loads `SKILL.md` natively. There is no `Skill` tool. You invoke a skill by name (ask for it, or pick `pstack:poteto-mode` from the list). The 24 Claude `/command` stubs are not ported; Codex discovers skills by description, so the stubs add nothing there. Codex supports plugin-level `commands/` if you later want explicit `/shortcuts`.
+- **Tool, model, and built-in mapping.** When a skill names a Claude tool (the `Agent` tool, `AskUserQuestion`), a `claude-*` model slug, or a Claude built-in skill (`run`, `verify`, `loop`, `plugin-dev:skill-development`), it resolves through [`skills/poteto-mode/references/codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md). `poteto-mode` and every skill that names one of those carries a one-line **Platform note** pointing there.
+- **Subagents.** The `Agent` tool maps to Codex `spawn_agent` / `wait_agent` / `close_agent`, enabled by `multi_agent = true`. Parallel fan-out is multiple `spawn_agent` calls in one turn. Without the flag, `interrogate`, `arena`, `how`, `why`, `reflect`, and `architect` degrade to a single sequential pass. There is no `poteto-agent` subagent type on Codex; route ad-hoc subagents by dispatching a `spawn_agent` told to read `poteto-mode` first.
+- **Models.** The `claude-*` slugs in skills are Claude defaults. On Codex substitute your configured Codex models, keeping multi-model panels genuinely diverse. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`) with Codex slugs instead of `~/.claude/pstack-models.md`.
+
+Verified on a live Codex session: the plugin's skills are discovered and namespaced under `pstack`. The deeper behaviors (mapping resolution mid-task, `spawn_agent` fan-out) follow the proven `superpowers` pattern but are worth confirming in your own session.
 
 ## Dependencies
 

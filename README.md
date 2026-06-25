@@ -34,6 +34,15 @@ Codex reads `plugins/pstack/.codex-plugin/plugin.json` through the links and nam
 multi_agent = true
 ```
 
+For slash-command shortcuts (`/poteto-mode`, `/tdd`, and the rest), link the command files into Codex's prompts directory:
+
+```shell
+mkdir -p ~/.codex/prompts
+for c in plugins/pstack/commands/*.md; do ln -s "$PWD/$c" ~/.codex/prompts/"$(basename "$c")"; done
+```
+
+Each command invokes its skill, so `/tdd` runs the `tdd` skill. Installing the full plugin through the Codex marketplace (the root `.agents/plugins/marketplace.json`) carries skills and commands together; the two symlink steps above are the verified local path. Teardown is `rm ~/.agents/skills/<name>` and `rm ~/.codex/prompts/<name>.md`.
+
 ## Layout
 
 ```text
@@ -45,7 +54,7 @@ multi_agent = true
 │   ├── .codex-plugin/plugin.json     # Codex manifest (skills: ./skills/)
 │   ├── skills/                       # 44 skills (shared by both runtimes)
 │   │   └── poteto-mode/references/codex-tools.md  # Claude→Codex tool/model/skill map
-│   ├── commands/                     # 24 Claude slash command stubs (not ported to Codex)
+│   ├── commands/                     # 24 slash command stubs (Codex-compatible; link into ~/.codex/prompts)
 │   └── agents/poteto-agent.md        # Claude subagent (Codex routes via codex-tools.md)
 ├── LICENSE                           # pstack upstream MIT
 ├── LICENSE-cursor-team-kit           # cursor-team-kit upstream MIT
@@ -60,7 +69,8 @@ Plugin-internal path references in the docs below (`skills/<name>/`, `commands/<
 
 The Codex build shares one `skills/` tree with the Claude Code build. Nothing is forked or generated. The skill bodies stay in Claude Code tool language, and one mapping file does the translation, following the same pattern the official `superpowers` plugin uses for Codex.
 
-- **Skill invocation.** Codex loads `SKILL.md` natively. There is no `Skill` tool. You invoke a skill by name (ask for it, or pick `pstack:poteto-mode` from the list). The 24 Claude `/command` stubs are not ported; Codex discovers skills by description, so the stubs add nothing there. Codex supports plugin-level `commands/` if you later want explicit `/shortcuts`.
+- **Skill invocation.** Codex loads `SKILL.md` natively. There is no `Skill` tool. You invoke a skill by name (ask for it, or pick `pstack:poteto-mode` from the list).
+- **Commands.** The 24 `commands/*.md` files are Codex-compatible as written. Codex reads their `description` frontmatter and the filename and ignores the extra `name` key, and each body invokes its skill. They surface as slash commands when the full plugin is installed, or you can link them into `~/.codex/prompts/` for `/name` shortcuts (see [Install on Codex](#codex)).
 - **Tool, model, and built-in mapping.** When a skill names a Claude tool (the `Agent` tool, `AskUserQuestion`), a `claude-*` model slug, or a Claude built-in skill (`run`, `verify`, `loop`, `plugin-dev:skill-development`), it resolves through [`skills/poteto-mode/references/codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md). `poteto-mode` and every skill that names one of those carries a one-line **Platform note** pointing there.
 - **Subagents.** The `Agent` tool maps to Codex `spawn_agent` / `wait_agent` / `close_agent`, enabled by `multi_agent = true`. Parallel fan-out is multiple `spawn_agent` calls in one turn. Without the flag, `interrogate`, `arena`, `how`, `why`, `reflect`, and `architect` degrade to a single sequential pass. There is no `poteto-agent` subagent type on Codex; route ad-hoc subagents by dispatching a `spawn_agent` told to read `poteto-mode` first.
 - **Models.** The `claude-*` slugs in skills are Claude defaults. On Codex substitute your configured Codex models, keeping multi-model panels genuinely diverse. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`) with Codex slugs instead of `~/.claude/pstack-models.md`.

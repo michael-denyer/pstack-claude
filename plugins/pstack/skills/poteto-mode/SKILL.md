@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 ## Platform Adaptation
 
-These skills use Claude Code tool names (the `Skill` tool, the `Agent` tool, `AskUserQuestion`) and Claude model slugs (`claude-opus-4-8`). On Claude Code they work as written. On Codex and other runtimes, the skills are the same files; only the tool, model, and built-in-skill names resolve differently. When a skill names a Claude tool, a `claude-*` model, or a Claude built-in skill (`run`, `verify`, `plugin-dev:skill-development`), read `references/codex-tools.md` for the Codex equivalent.
+These skills use Claude Code tool names (the `Skill` tool, the `Agent` tool, `AskUserQuestion`) and Claude model slugs (`claude-opus-4-8`). On Claude Code they work as written. On Codex and other runtimes, the skills are the same files; only the tool, model, and built-in-skill names resolve differently. When a skill names a Claude tool, a `claude-*` model, or a Claude built-in skill (`run`, `verify`, `plugin-dev:skill-development`), read [`references/codex-tools.md`](references/codex-tools.md) for the Codex equivalent.
 
 ## Non-negotiables
 

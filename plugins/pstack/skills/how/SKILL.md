@@ -7,7 +7,7 @@ description: "Use for \"how does X work\", code walkthroughs before changing som
 
 Explore the codebase to answer "how does X work?" questions. Produce clear architectural explanations at the level of a senior engineer onboarding onto a subsystem. Enough to build a working mental model, not annotated source code.
 
-**Platform note.** On Codex or another non-Claude runtime, the Claude tool names and `claude-*` slugs named below are Claude defaults. Resolve them via `../poteto-mode/references/codex-tools.md`.
+**Platform note.** On Codex or another non-Claude runtime, the Claude tool names and `claude-*` slugs named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
 
 Two modes:
 

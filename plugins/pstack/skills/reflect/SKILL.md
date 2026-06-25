@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Mine the current conversation for durable learnings, then route them into skill edits.
 
-**Platform note.** On Codex or another non-Claude runtime, the Claude tool names, `claude-*` slugs, and Claude built-in skills named below are Claude defaults. Resolve them via `../poteto-mode/references/codex-tools.md`.
+**Platform note.** On Codex or another non-Claude runtime, the Claude tool names, `claude-*` slugs, and Claude built-in skills named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
 
 ## When to invoke
 

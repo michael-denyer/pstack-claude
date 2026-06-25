@@ -4,7 +4,9 @@ This port applies the Cursor → Claude Code substitutions in skill bodies. Earl
 
 ## Codex port
 
-pstack also ships as a Codex plugin. The skill bodies are not forked or regenerated. The same `skills/` tree serves both runtimes. Skill prose stays in Claude Code tool language, and one mapping file does the Claude to Codex translation, following the pattern the official `superpowers` plugin uses.
+pstack also ships as a Codex plugin. The skill bodies are not forked or regenerated. The same `skills/` tree serves both runtimes. One mapping file does the Claude-to-Codex translation. That single-mapping-file spine is the same one the official `superpowers` plugin ships for Codex.
+
+pstack diverges from superpowers in one respect, and it is deliberate. superpowers writes its skill prose in tool-neutral language ("dispatch a subagent"), so no skill names a runtime tool and no per-skill note is needed. pstack instead keeps the upstream Claude-native prose intact, to stay in lockstep with upstream sync, and adds a one-line Platform note to each skill that names a Claude primitive. The note points at the mapping. Rewriting 44 upstream skills into neutral language would fork them from upstream and was rejected for that reason.
 
 **Added.**
 
@@ -25,6 +27,8 @@ pstack also ships as a Codex plugin. The skill bodies are not forked or regenera
 - `agents/poteto-agent.md`. Codex has no `subagent_type`, so ad-hoc subagents are dispatched via `spawn_agent` told to read `poteto-mode` first. The mapping covers this.
 
 **Verified.** Codex discovers the skills and namespaces them under `pstack` (`pstack:poteto-mode` and so on) in a live session. Mapping resolution mid-task and `spawn_agent` fan-out follow the `superpowers` pattern and are worth confirming per session.
+
+**Maintenance.** The plugin version string now lives in three manifests: `plugins/pstack/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, and `plugins/pstack/.codex-plugin/plugin.json`. A version bump must update all three. `.agents/plugins/marketplace.json` carries no version field.
 
 ## 0.9.2 sync (against upstream `e46364b`)
 

@@ -27,7 +27,7 @@ cd pstack-claude
 for s in plugins/pstack/skills/*/; do ln -s "$PWD/$s" ~/.agents/skills/"$(basename "$s")"; done
 ```
 
-Codex reads `plugins/pstack/.codex-plugin/plugin.json` through the links and namespaces the skills under the plugin, so they list as `pstack:poteto-mode`, `pstack:tdd`, and so on. To enable the multi-model and parallel-subagent skills (`interrogate`, `arena`, `how`, `why`, `reflect`, `architect`), turn on subagents in `~/.codex/config.toml`:
+Codex discovers the linked skills. The plugin namespace (`pstack:poteto-mode`, `pstack:tdd`, and so on) comes from `plugins/pstack/.codex-plugin/plugin.json`. The marketplace install carries that manifest cleanly. The flat symlink links each skill one directory below the manifest, so confirm the namespace still resolves on the symlink path in your own session before relying on it. To enable the multi-model and parallel-subagent skills (`interrogate`, `arena`, `how`, `why`, `reflect`, `architect`), turn on subagents in `~/.codex/config.toml`:
 
 ```toml
 [features]
@@ -67,7 +67,7 @@ Plugin-internal path references in the docs below (`skills/<name>/`, `commands/<
 
 ## Running on Codex
 
-The Codex build shares one `skills/` tree with the Claude Code build. Nothing is forked or generated. The skill bodies stay in Claude Code tool language, and one mapping file does the translation, following the same pattern the official `superpowers` plugin uses for Codex.
+The Codex build shares one `skills/` tree with the Claude Code build. Nothing is forked or generated. One mapping file does the translation. That single-mapping-file spine is the one `superpowers` ships for Codex. pstack diverges in one respect. superpowers writes its skills in tool-neutral language, so no skill names a runtime tool. pstack keeps the upstream Claude-native prose and adds a one-line Platform note to each skill that names a Claude primitive, so the port stays in lockstep with upstream sync.
 
 - **Skill invocation.** Codex loads `SKILL.md` natively. There is no `Skill` tool. You invoke a skill by name (ask for it, or pick `pstack:poteto-mode` from the list).
 - **Commands.** The 24 `commands/*.md` files are Codex-compatible as written. Codex reads their `description` frontmatter and the filename and ignores the extra `name` key, and each body invokes its skill. They surface as slash commands when the full plugin is installed, or you can link them into `~/.codex/prompts/` for `/name` shortcuts (see [Install on Codex](#codex)).
@@ -75,7 +75,7 @@ The Codex build shares one `skills/` tree with the Claude Code build. Nothing is
 - **Subagents.** The `Agent` tool maps to Codex `spawn_agent` / `wait_agent` / `close_agent`, enabled by `multi_agent = true`. Parallel fan-out is multiple `spawn_agent` calls in one turn. Without the flag, `interrogate`, `arena`, `how`, `why`, `reflect`, and `architect` degrade to a single sequential pass. There is no `poteto-agent` subagent type on Codex; route ad-hoc subagents by dispatching a `spawn_agent` told to read `poteto-mode` first.
 - **Models.** The `claude-*` slugs in skills are Claude defaults. On Codex substitute your configured Codex models, keeping multi-model panels genuinely diverse. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`) with Codex slugs instead of `~/.claude/pstack-models.md`.
 
-Verified on a live Codex session: the plugin's skills are discovered and namespaced under `pstack`. The deeper behaviors (mapping resolution mid-task, `spawn_agent` fan-out) follow the proven `superpowers` pattern but are worth confirming in your own session.
+Verified on a live Codex session: the plugin's skills are discovered. Namespacing under `pstack` and the deeper behaviors (mapping resolution mid-task, `spawn_agent` fan-out) follow the proven `superpowers` pattern but are worth confirming in your own session, especially on the symlink install path.
 
 ## Dependencies
 

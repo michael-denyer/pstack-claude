@@ -7,7 +7,7 @@ description: Configure which models pstack uses per role. Detects your available
 
 Write `~/.claude/pstack-models.md`, a per-role model override sheet you include from your global `CLAUDE.md`. Each pstack skill names a default model inline; the override sheet is the layer that adapts those defaults to the models you actually have access to.
 
-**Platform note (Codex/non-Claude runtimes).** On Codex the override sheet is `~/.codex/pstack-models.md`, the slugs are your Codex models (for example `gpt-5.5`) not `claude-*`, and you load it by adding the sheet's contents to `~/.codex/AGENTS.md` (Codex has no `@`-include into a rules file). The role rows in step 5 are identical; only the slugs, the file path, and the load mechanism change. Detect Codex slugs from `~/.codex/config.toml` (`model = ...`) plus whatever the user confirms. See `../poteto-mode/references/codex-tools.md`.
+**Platform note.** On Codex or another non-Claude runtime, the override sheet is `~/.codex/pstack-models.md`, the slugs are your Codex models (for example `gpt-5.5`) not `claude-*`, and you load it by adding the sheet's contents to `~/.codex/AGENTS.md` (Codex has no `@`-include into a rules file). The role rows in step 5 are identical; only the slugs, the file path, and the load mechanism change. Detect Codex slugs from `~/.codex/config.toml` (`model = ...`) plus whatever the user confirms. See [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
 
 Claude Code has no auto-applied "rules" mechanism like Cursor's `.mdc`. Inclusion is explicit: the user adds a line to `~/.claude/CLAUDE.md` (or their project `CLAUDE.md`) such as:
 

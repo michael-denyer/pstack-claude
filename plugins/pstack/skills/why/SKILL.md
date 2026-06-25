@@ -9,7 +9,7 @@ Investigate the motivation and intent behind code. Why was it built this way? Wh
 
 Companion to the `how` skill. `how` answers what the code does and how it works. `why` answers what forces led to its shape.
 
-**Platform note.** On Codex or another non-Claude runtime, the Claude tool names and `claude-*` slugs named below are Claude defaults. Resolve them via `../poteto-mode/references/codex-tools.md`.
+**Platform note.** On Codex or another non-Claude runtime, the Claude tool names and `claude-*` slugs named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
 
 ## How this skill works
 

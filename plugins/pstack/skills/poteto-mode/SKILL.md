@@ -6,6 +6,10 @@ disable-model-invocation: true
 
 # Poteto mode
 
+## Platform Adaptation
+
+These skills use Claude Code tool names (the `Skill` tool, the `Agent` tool, `AskUserQuestion`) and Claude model slugs (`claude-opus-4-8`). On Claude Code they work as written. On Codex and other runtimes, the skills are the same files; only the tool, model, and built-in-skill names resolve differently. When a skill names a Claude tool, a `claude-*` model, or a Claude built-in skill (`run`, `verify`, `plugin-dev:skill-development`), read `references/codex-tools.md` for the Codex equivalent.
+
 ## Non-negotiables
 
 **Start every multi-step task with a todolist whose first item is to read the Principles section below in full.** The principles ground every trigger here. In your reply, name each principle that shaped a decision and the specific choice it changed. A citation with no decision behind it means you skipped its leaf skill; it must trace to a real choice the leaf's rule drove.

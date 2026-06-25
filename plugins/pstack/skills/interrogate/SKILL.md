@@ -10,6 +10,8 @@ Spawn one reviewer per configured model to adversarially review code changes. Ea
 
 The deliverable is a synthesized verdict. Do NOT auto-apply changes.
 
+On Codex or another non-Claude runtime, the `subagent_type`/`model`/`readonly` dispatch fields and the `claude-*` model slugs below are Claude defaults. Resolve them via `../poteto-mode/references/codex-tools.md` (dispatch maps to `spawn_agent`; substitute your configured Codex models, keeping the panel model-diverse).
+
 ## Step 1, Determine Scope
 
 Identify what to review from context:

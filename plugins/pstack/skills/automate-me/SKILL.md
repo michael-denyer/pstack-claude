@@ -10,6 +10,8 @@ A guided flow for turning the user's working conventions into a skill agents wil
 
 This skill orchestrates three others: an inline mining pass (see step 1), the `plugin-dev:skill-development` skill (authoring), and the **unslop** skill (prose discipline). It sequences them; it doesn't replace them.
 
+**Platform note.** On Codex or another non-Claude runtime, the Claude tool names, `claude-*` slugs, and Claude built-in skills named below (including `plugin-dev:skill-development`) are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
+
 ## Flow
 
 ### 0. Check for an existing skill

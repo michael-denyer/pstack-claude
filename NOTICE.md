@@ -26,6 +26,7 @@ Summary of structural changes:
 - `plugins/pstack/commands/<name>.md` stubs added so each public skill is reachable as a slash command in Claude Code.
 - Seven skills imported from `cursor-team-kit`: `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`. All copied verbatim — no rewiring needed.
 - `plugins/pstack/skills/babysit/` is independently authored as the Claude Code analog of Cursor's `/babysit` built-in. It has no upstream pstack equivalent; its workflow is informed by Cursor's public `/babysit` behavior. No code or prose was copied from any source.
+- A Codex build shares the same `skills/` tree. It adds `plugins/pstack/.codex-plugin/plugin.json`, a root `.agents/plugins/marketplace.json`, and `plugins/pstack/skills/poteto-mode/references/codex-tools.md` (the Claude-to-Codex tool, model, and built-in map), plus a one-line Platform note in the skills that name a Claude primitive. The skill content itself is unchanged. See [CHANGES.md](CHANGES.md#codex-port).
 
 ## Modifications
 
@@ -35,6 +36,9 @@ Files authored for this port (not derived from upstream):
 
 - `plugins/pstack/.claude-plugin/plugin.json`
 - `.claude-plugin/marketplace.json` (repo root)
+- `plugins/pstack/.codex-plugin/plugin.json`
+- `.agents/plugins/marketplace.json` (repo root)
+- `plugins/pstack/skills/poteto-mode/references/codex-tools.md`
 - `plugins/pstack/commands/*.md`
 - `plugins/pstack/skills/babysit/SKILL.md` (independently authored; workflow informed by Cursor's public `/babysit` behavior)
 - `NOTICE.md` (this file)

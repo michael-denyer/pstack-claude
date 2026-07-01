@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.3 — dependency declaration removed
+
+`plugin.json` no longer declares `dependencies: [{ "name": "plugin-dev", "marketplace": "claude-plugins-official" }]`, and `marketplace.json` drops the matching `allowCrossMarketplaceDependenciesOn`. The Claude Code desktop app passes every enabled plugin to the CLI as a session-only `--plugin-dir`, which strips marketplace identity (`pstack@inline`); a cross-marketplace dependency can never resolve in that mode, and the loader disables the entire plugin with `dependency-unsatisfied`. Result: pstack loaded in the CLI and the VS Code extension but silently vanished from desktop-app sessions. `optional: true` on a dependency entry passes `claude plugin validate` but is not honored by the loader (tested on 2.1.197). `plugin-dev` is now a documented manual install (README → Dependencies); skill bodies still route skill-authoring to `plugin-dev:skill-development` when it is present.
+
 ## Codex port
 
 pstack also ships as a Codex plugin. The skill bodies are not forked or regenerated. The same `skills/` tree serves both runtimes. One mapping file does the Claude-to-Codex translation. That single-mapping-file spine is the same one the official `superpowers` plugin ships for Codex.

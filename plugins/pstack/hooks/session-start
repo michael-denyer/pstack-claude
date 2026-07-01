@@ -1,43 +1,8 @@
 #!/usr/bin/env bash
-# SessionStart hook for the pstack plugin: injects the poteto-mode dispatch
-# mandate as additional context. JSON-emission pattern adapted from the
-# superpowers plugin (MIT); see NOTICE.md and LICENSE-superpowers.
+# SessionStart hook for the pstack plugin: prints the poteto-mode dispatch
+# mandate to stdout, which Claude Code injects as session context directly.
+# A missing context file fails the hook cleanly instead of injecting noise.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-
-context_body=$(cat "${PLUGIN_ROOT}/hooks/session-start-context.md" 2>&1 || echo "Error reading pstack session-start context")
-
-# Escape string for JSON embedding using bash parameter substitution.
-# Each ${s//old/new} is a single C-level pass.
-escape_for_json() {
-    local s="$1"
-    s="${s//\\/\\\\}"
-    s="${s//\"/\\\"}"
-    s="${s//$'\n'/\\n}"
-    s="${s//$'\r'/\\r}"
-    s="${s//$'\t'/\\t}"
-    printf '%s' "$s"
-}
-
-session_context=$(escape_for_json "$context_body")
-
-# Output context injection as JSON.
-# Cursor hooks expect additional_context (snake_case).
-# Claude Code hooks expect hookSpecificOutput.additionalContext (nested).
-# Copilot CLI (v1.0.11+) and others expect additionalContext (top-level).
-# Emit only the field the current platform consumes.
-#
-# Uses printf instead of heredoc to work around a bash 5.3+ heredoc hang
-# (obra/superpowers#571).
-if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
-  printf '{\n  "additional_context": "%s"\n}\n' "$session_context" | cat
-elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
-  printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$session_context" | cat
-else
-  printf '{\n  "additionalContext": "%s"\n}\n' "$session_context" | cat
-fi
-
-exit 0
+exec cat "$(cd "$(dirname "$0")" && pwd)/session-start-context.md"

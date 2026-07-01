@@ -111,7 +111,7 @@ Run the full explain flow above (Steps 1-4). You must understand the architectur
 
 ### Step 2. Spawn Critics
 
-After the explanation is complete, spawn one architectural critic per model in your configured how-critics list (defaults `claude-opus-4-8`, `claude-opus-4-6`, `claude-sonnet-4-6`), all in a single message.
+After the explanation is complete, spawn one architectural critic per model in your configured how-critics list (defaults `claude-opus-4-8`, `claude-sonnet-5`, `claude-opus-4-6`, `claude-sonnet-4-6`), all in a single message.
 
 For each critic:
 - `subagent_type`: `general-purpose`

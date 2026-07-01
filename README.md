@@ -79,13 +79,16 @@ Verified on a live Codex session installed via the symlinks: the user-facing ski
 
 ## Dependencies
 
-Declared in `plugin.json` and auto-resolved on install:
+Nothing is declared in `plugin.json`. Install the one companion plugin yourself:
 
-- **`plugin-dev`** (from the `claude-plugins-official` marketplace) — required. The rewiring routes skill-authoring tasks (in `automate-me`, `reflect`, `poteto-mode`) to the `plugin-dev:skill-development` skill. If you haven't added the official marketplace yet, `/plugin install pstack@pstack-claude` will pull it in automatically, provided `claude-plugins-official` is already added; otherwise:
+- **`plugin-dev`** (from the `claude-plugins-official` marketplace) — the rewiring routes skill-authoring tasks (in `automate-me`, `reflect`, `poteto-mode`) to the `plugin-dev:skill-development` skill:
 
   ```shell
   /plugin marketplace add anthropics/claude-plugins-official
+  /plugin install plugin-dev@claude-plugins-official
   ```
+
+  Until 0.9.2 this was a `dependencies` entry in `plugin.json`, auto-resolved on marketplace install. The Claude Code desktop app, however, passes every plugin to the CLI as a session-only `--plugin-dir`, which strips marketplace identity (the plugin becomes `pstack@inline`). A cross-marketplace dependency can never resolve in that mode, so the loader disabled the whole plugin with `dependency-unsatisfied` — pstack silently vanished from every desktop-app session while working in the CLI and VS Code. `optional: true` on a dependency entry validates but is not honored (tested on 2.1.197), so 0.9.3 demotes the dependency to documentation. Without `plugin-dev` installed, only the skill-authoring routes degrade; everything else works.
 
 Not declared as deps, but referenced in skill bodies:
 

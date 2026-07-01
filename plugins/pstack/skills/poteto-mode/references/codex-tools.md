@@ -39,7 +39,7 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 
 ## Model names
 
-Skills name Claude defaults (`claude-opus-4-8` for code/prose/judgment; the `claude-opus-4-8` + `claude-sonnet-5` + `claude-opus-4-6` + `claude-sonnet-4-6` quad for diverse-model panels). These slugs do not resolve on Codex. Substitute your configured Codex models:
+Skills name Claude defaults (`claude-opus-4-8` for code/prose/judgment; a four-model quad for diverse-model panels, enumerated in the panel skills). These slugs do not resolve on Codex. Substitute your configured Codex models:
 
 - Single-model roles: your primary Codex model (for example `gpt-5.5`).
 - Diverse-model panels (`interrogate`, `how` critics, `reflect`): the adversarial signal comes from model diversity, so use the distinct Codex models available to you. If only one model family is reachable, vary reasoning effort and note in the verdict that diversity was reduced.

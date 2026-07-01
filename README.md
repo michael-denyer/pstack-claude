@@ -93,7 +93,7 @@ Nothing is declared in `plugin.json`. Install the one companion plugin yourself:
   /plugin install plugin-dev@claude-plugins-official
   ```
 
-  Until 0.9.2 this was a `dependencies` entry in `plugin.json`, auto-resolved on marketplace install. The Claude Code desktop app, however, passes every plugin to the CLI as a session-only `--plugin-dir`, which strips marketplace identity (the plugin becomes `pstack@inline`). A cross-marketplace dependency can never resolve in that mode, so the loader disabled the whole plugin with `dependency-unsatisfied` — pstack silently vanished from every desktop-app session while working in the CLI and VS Code. `optional: true` on a dependency entry validates but is not honored (tested on 2.1.197), so 0.9.3 demotes the dependency to documentation. Without `plugin-dev` installed, only the skill-authoring routes degrade; everything else works.
+  Until 0.9.2 this was a `dependencies` entry in `plugin.json`. The desktop app's `--plugin-dir` load mode can never resolve cross-marketplace dependencies and hard-disables the whole plugin, so 0.9.3 removed the declaration — full mechanism in the 0.9.3 entry of [CHANGES.md](CHANGES.md). Without `plugin-dev` installed, only the skill-authoring routes degrade; everything else works.
 
 Not declared as deps, but referenced in skill bodies:
 
@@ -195,4 +195,4 @@ MIT. Three upstream LICENSE files are preserved:
 
 - [LICENSE](LICENSE) — pstack (Lauren Tan)
 - [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) — Cursor (covers the `deslop` and `thermo-nuclear-code-quality-review` skills)
-- [LICENSE-superpowers](LICENSE-superpowers) — superpowers, Jesse Vincent (covers the adapted `hooks/run-hook.cmd` and the `hooks/session-start` emission pattern)
+- [LICENSE-superpowers](LICENSE-superpowers) — superpowers, Jesse Vincent (covers the vendored `hooks/run-hook.cmd`)

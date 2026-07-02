@@ -2,6 +2,12 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.7 — command trampolines no longer shadow their skills
+
+Every user-facing skill ships with a same-named `commands/<name>.md` trampoline whose body is "Invoke the `<name>` skill and follow it." On Claude Code, the Skill tool resolves a colliding name to the **command**, not the skill — so a model-initiated invoke of `pstack:<name>` got the trampoline back, which told it to invoke the skill, which resolved to the trampoline again. Mutual recursion; the real `SKILL.md` never loaded. This hit every model-side entry path, including the 0.9.5 SessionStart mandate (whose whole job is telling the model to invoke `pstack:poteto-mode`), and it made each name appear twice in the model's skill list. Observed in desktop-app sessions (inline `--plugin-dir` loading, same path as the 0.9.3 entry); reproduced on CLI 2.1.195 with a minimal two-artifact plugin.
+
+Fix: all 24 command files now carry `disable-model-invocation: true` — the flag the `principle-*` leaf skills already use. Verified on 2.1.195 with the same minimal plugin: the Skill tool then resolves the colliding name to the skill (its `SKILL.md` is what gets injected), while a user-typed `/plugin:<name>` still runs the command trampoline, whose "invoke the skill" body now lands on the skill instead of looping. Command bodies are unchanged, so the Codex prompts path (which reads `description` frontmatter and the filename, and ignores keys it doesn't know — the established `name`-key precedent) is untouched. Whether a full Codex plugin install still surfaces the stubs in its picker with the flag present is unverified; if it hides them, the skills themselves remain the primary Codex surface and are invocable by name. Incidental finding from the same repro, recorded for future use: `${CLAUDE_PLUGIN_ROOT}` **is** substituted inside command markdown bodies on 2.1.195, not just in hooks and MCP configs.
+
 ## 0.9.6 — hook hardening and duplication trims (thermo-nuclear review)
 
 A strict maintainability review of the 0.9.3–0.9.5 range drove these:

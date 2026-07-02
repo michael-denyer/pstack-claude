@@ -59,6 +59,7 @@ Each command invokes its skill, so `/tdd` runs the `tdd` skill. Installing the f
 │   ├── commands/                     # 24 slash command stubs (Codex-compatible; link into ~/.codex/prompts)
 │   ├── hooks/                        # SessionStart auto-fire: injects the poteto-mode mandate (Claude Code only)
 │   └── agents/poteto-agent.md        # Claude subagent (Codex routes via codex-tools.md)
+├── tests/skill-collision-repro.sh    # manual repro for the 0.9.7 collision fix (needs claude CLI)
 ├── LICENSE                           # pstack upstream MIT
 ├── LICENSE-cursor-team-kit           # cursor-team-kit upstream MIT
 ├── LICENSE-superpowers               # superpowers upstream MIT (hook runner)

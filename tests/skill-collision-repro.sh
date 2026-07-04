@@ -6,7 +6,7 @@
 # command flips resolution to the skill. That precedence is UNDOCUMENTED
 # upstream, so re-run this after Claude Code upgrades. Last verified on 2.1.195.
 #
-# Manual test: needs the claude CLI and API access; makes three haiku calls.
+# Manual test: needs the claude CLI and API access; makes four haiku calls.
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
@@ -22,6 +22,27 @@ if [ -n "$missing" ]; then
   fail=1
 else
   note "ok: all commands carry disable-model-invocation: true"
+fi
+
+# Mirror invariant (CHANGES 0.9.8): no skill that has a same-named command may
+# carry the flag. Every command body is "invoke the skill", so a flagged skill
+# makes the Skill tool refuse both the model path and the user-typed /command.
+# principle-* leaves have no commands and keep the flag (read by path).
+flagged=""
+for cmd in "$repo"/plugins/pstack/commands/*.md; do
+  skill="$repo/plugins/pstack/skills/$(basename "$cmd" .md)/SKILL.md"
+  # Frontmatter only (lines between the opening and closing ---): skill bodies
+  # may legitimately mention the flag in prose (automate-me does).
+  if [ -f "$skill" ] && sed -n '2,/^---$/p' "$skill" | grep -q '^disable-model-invocation: true$'; then
+    flagged="$flagged$skill"$'\n'
+  fi
+done
+if [ -n "$flagged" ]; then
+  note "FAIL: skills with a same-named command must not carry 'disable-model-invocation: true':"
+  note "$flagged"
+  fail=1
+else
+  note "ok: no command-paired skill carries disable-model-invocation: true"
 fi
 
 # Behavioral checks against a minimal colliding plugin.
@@ -75,5 +96,25 @@ check "collision with flag: Skill tool resolves to skill" "SKILL-RAN" "$(run "$i
 
 # ...and the user-typed command still runs.
 check "collision with flag: /command still runs the command" "CMD-RAN" "$(run '/testplug:foo')"
+
+# The 0.9.8 regression: the flag on the SKILL blocks the Skill tool outright,
+# so a flagged skill is unreachable even once the command stops shadowing it.
+cat > "$scratch/skills/foo/SKILL.md" <<'EOF'
+---
+name: foo
+description: collision test skill
+disable-model-invocation: true
+---
+
+Say exactly: SKILL-RAN
+Then stop. Do not invoke any skill or tool.
+EOF
+out="$(run "$invoke")"
+if printf '%s' "$out" | grep -q 'SKILL-RAN'; then
+  note "FAIL: flagged skill unexpectedly ran via Skill tool: $out"
+  fail=1
+else
+  note "ok: flag on the skill blocks Skill-tool invocation (0.9.8 regression guard)"
+fi
 
 exit "$fail"

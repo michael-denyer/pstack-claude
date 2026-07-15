@@ -69,7 +69,7 @@ fi
 
 # Static invariant (CHANGES maintenance note): the plugin version string is
 # duplicated across three manifests and must move together on a bump.
-verof() { grep -m1 '"version"' "$1" | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/'; }
+verof() { { grep -m1 '"version"' "$1" || true; } | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/'; }
 vc="$(verof "$repo/plugins/pstack/.claude-plugin/plugin.json")"
 vx="$(verof "$repo/plugins/pstack/.codex-plugin/plugin.json")"
 vm="$(verof "$repo/.claude-plugin/marketplace.json")"
@@ -87,14 +87,14 @@ fi
 # drifting silently. (This copy in the test is the assertion anchor; a single generated
 # source for the quad would retire all of them, this check included.)
 setup="$repo/plugins/pstack/skills/setup-pstack/SKILL.md"
-quad_of() { grep -oE 'claude-[a-z0-9-]+' | tr '\n' ' ' | sed 's/ $//'; }
-canon_quad="$(grep -m1 '^arena runners:' "$setup" | quad_of)"
+quad_of() { { grep -oE 'claude-[a-z0-9-]+' || true; } | tr '\n' ' ' | sed 's/ $//'; }
+canon_quad="$(grep -m1 '^arena runners:' "$setup" | quad_of || true)"
 quad_bad=""
 [ -n "$canon_quad" ] || quad_bad="could not read the canonical quad from $setup (arena runners row)"$'\n'
 # Each panel skill states the quad on its one line naming the fourth slug.
 for name in arena architect how interrogate; do
   skill="$repo/plugins/pstack/skills/$name/SKILL.md"
-  n="$(grep -Fc 'claude-sonnet-4-6' "$skill")"
+  n="$(grep -Fc 'claude-sonnet-4-6' "$skill" || true)"
   if [ "$n" != "1" ]; then
     quad_bad="$quad_bad$skill: expected exactly 1 default-quad line, found $n"$'\n'
     continue

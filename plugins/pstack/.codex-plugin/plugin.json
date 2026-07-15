@@ -1,6 +1,6 @@
 {
   "name": "pstack",
-  "version": "0.9.9",
+  "version": "0.9.10",
   "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Codex port of the Claude Code plugin; skills are shared, tool names resolve via skills/poteto-mode/references/codex-tools.md.",
   "author": {
     "name": "Lauren Tan"

@@ -54,9 +54,9 @@ Each command invokes its skill, so `/tdd` runs the `tdd` skill. Installing the f
 ├── plugins/pstack/                   # the plugin itself
 │   ├── .claude-plugin/plugin.json    # Claude Code manifest
 │   ├── .codex-plugin/plugin.json     # Codex manifest (skills: ./skills/)
-│   ├── skills/                       # 44 skills (shared by both runtimes)
+│   ├── skills/                       # 48 skills (shared by both runtimes)
 │   │   └── poteto-mode/references/codex-tools.md  # Claude→Codex tool/model/skill map
-│   ├── commands/                     # 24 slash command stubs (Codex-compatible; link into ~/.codex/prompts)
+│   ├── commands/                     # 27 slash command stubs (Codex-compatible; link into ~/.codex/prompts)
 │   ├── hooks/                        # SessionStart auto-fire: injects the poteto-mode mandate (Claude Code only)
 │   └── agents/poteto-agent.md        # Claude subagent (Codex routes via codex-tools.md)
 ├── tests/skill-collision-repro.sh    # manual repro for the 0.9.7/0.9.8 flag invariants (needs claude CLI)

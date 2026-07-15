@@ -2,6 +2,22 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.10 — sync to upstream v0.11.3
+
+Catches the port up with upstream `cursor/plugins/pstack` from `0452e08` (v0.10.0) to `3fe2823` (v0.11.3). Skill count 44 → 48, commands 24 → 27.
+
+**New skills.**
+
+- `teach` (#153): composes the `how` and `why` skills into one plain explanation. Command-paired public skill; platform note for the parallel dispatch and image-gen tool.
+- `principle-model-the-domain` (#147): encode the domain in a structure instead of scattered conditionals. Verbatim upstream prose, `user-invocable: false` per the 0.9.9 principle convention, woven into `poteto-mode`'s data-shape trigger and Architecture index, and into the `feature` and `refactoring` playbooks.
+- `create-verification-skill` and `maintain-verification-skill` (#150, #151): generate and maintain a persistent, repo-tailored project verification skill plus feature map. A different layer from Claude's built-in `run`/`verify` per-session drivers, which they complement. Translation: `.cursor/skills/` → `.claude/skills/`, drop `disable-model-invocation` (command-paired), add command trampolines and platform notes.
+
+**Content refinements (#155, #156), applied over the port's existing Cursor→Claude translation.** The perf playbook's eight strategy families; `interrogate` "four-model" → "multi-model"; the `hillclimb` ground-the-workload-first rewrite; rationale one-liners across five playbooks; `typescript-best-practices` real-tests and structured-telemetry rows; the `why` databricks source `SHOW TABLES` note.
+
+**Model strategy (#143, #156).** `poteto-mode` now tiers code delegates by difficulty — hardest changes to the strongest judgment model (`claude-fable-5`) or the strongest instruction follower, trivial edits to a fast code model, everything else `claude-opus-4-8`. `setup-pstack` gains the configurable `arena cross-judge pool` row. The upstream `grok`/`gpt` slugs stay substituted with `claude-*`.
+
+**Deliberately not ported.** Sticky mode (#144) is Cursor-only frontmatter (`mode`/`icon`/`color`/`reminder`) with no Claude Code equivalent; the port's 0.9.5 SessionStart hook already auto-fires `poteto-mode` with the same non-trivial/trivial/opt-out logic. Benny (#137) remains out, per the earlier review.
+
 ## 0.9.9 — principle leaves hide from the slash menu
 
 0.9.8 kept `disable-model-invocation: true` on the 20 `principle-*` leaves, on the reasoning that they have no command and are read by path from `poteto-mode`. But that flag only blocks *model* invocation. It does not hide a skill from the user `/` menu, so all 20 surfaced as bare `/principle-*` slash commands in every session (confirmed across projects on the desktop app). They are internal references; users should never invoke them.
@@ -34,7 +50,7 @@ A strict maintainability review of the 0.9.3–0.9.5 range drove these:
 
 ## Upstream review through `0452e08` (v0.10.0), 2026-07-01
 
-One upstream pstack commit landed after the `e46364b` sync: `0452e08` adds the dormant `automations/benny/` pack (Slack issue triage plus reproduce-and-fix, built on Cursor's event-triggered automations) and bumps upstream to 0.10.0. Deliberately not ported — rationale and revisit criteria in README → What's deliberately not ported. `cursor-team-kit` has no commits since the sync point (its latest, `679fdaf`, 2026-05-28, predates `e46364b`). The port's skill tree therefore matches upstream HEAD for every registered skill.
+One upstream pstack commit landed after the `e46364b` sync: `0452e08` adds the dormant `automations/benny/` pack (Slack issue triage plus reproduce-and-fix, built on Cursor's event-triggered automations) and bumps upstream to 0.10.0. Deliberately not ported — rationale and revisit criteria in README → What's deliberately not ported. `cursor-team-kit` has no commits since the sync point (its latest, `679fdaf`, 2026-05-28, predates `e46364b`). The port's skill tree was current with upstream HEAD as of this note; the later 0.9.10 sync carries it forward to v0.11.3 (see above).
 
 ## 0.9.5 — poteto-mode auto-fires via SessionStart hook
 

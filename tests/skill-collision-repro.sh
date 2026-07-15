@@ -6,7 +6,12 @@
 # command flips resolution to the skill. That precedence is UNDOCUMENTED
 # upstream, so re-run this after Claude Code upgrades. Last verified on 2.1.195.
 #
-# Manual test: needs the claude CLI and API access; makes four haiku calls.
+# Beyond the collision repro, this enforces the static maintenance invariants from
+# CHANGES.md: the command/skill/leaf flags, version parity across the three manifests,
+# and the default model quad's identity across the panel skills and setup-pstack. The
+# static checks need no CLI; only the behavioral legs below do.
+#
+# Manual test: the behavioral legs need the claude CLI and API access; four haiku calls.
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
@@ -60,6 +65,55 @@ if [ -n "$bad_principle" ]; then
   fail=1
 else
   note "ok: all principle-* leaves carry user-invocable: false"
+fi
+
+# Static invariant (CHANGES maintenance note): the plugin version string is
+# duplicated across three manifests and must move together on a bump.
+verof() { grep -m1 '"version"' "$1" | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/'; }
+vc="$(verof "$repo/plugins/pstack/.claude-plugin/plugin.json")"
+vx="$(verof "$repo/plugins/pstack/.codex-plugin/plugin.json")"
+vm="$(verof "$repo/.claude-plugin/marketplace.json")"
+if [ -n "$vc" ] && [ "$vc" = "$vx" ] && [ "$vc" = "$vm" ]; then
+  note "ok: plugin version matches across the 3 manifests ($vc)"
+else
+  note "FAIL: plugin version differs across manifests: claude-plugin=$vc codex-plugin=$vx marketplace=$vm"
+  fail=1
+fi
+
+# Static invariant (CHANGES maintenance note): the default model quad is duplicated
+# verbatim across the four panel skills and the setup-pstack sheet, "kept grep-identical
+# when models change." Derive the canonical ordered quad from setup-pstack's arena-runners
+# row and assert every other copy matches, so a partial model bump fails here instead of
+# drifting silently. (This copy in the test is the assertion anchor; a single generated
+# source for the quad would retire all of them, this check included.)
+setup="$repo/plugins/pstack/skills/setup-pstack/SKILL.md"
+quad_of() { grep -oE 'claude-[a-z0-9-]+' | tr '\n' ' ' | sed 's/ $//'; }
+canon_quad="$(grep -m1 '^arena runners:' "$setup" | quad_of)"
+quad_bad=""
+[ -n "$canon_quad" ] || quad_bad="could not read the canonical quad from $setup (arena runners row)"$'\n'
+# Each panel skill states the quad on its one line naming the fourth slug.
+for name in arena architect how interrogate; do
+  skill="$repo/plugins/pstack/skills/$name/SKILL.md"
+  n="$(grep -Fc 'claude-sonnet-4-6' "$skill")"
+  if [ "$n" != "1" ]; then
+    quad_bad="$quad_bad$skill: expected exactly 1 default-quad line, found $n"$'\n'
+    continue
+  fi
+  got="$(grep -F 'claude-sonnet-4-6' "$skill" | quad_of)"
+  [ "$got" = "$canon_quad" ] || quad_bad="$quad_bad$skill: [$got] != [$canon_quad]"$'\n'
+done
+# The setup-pstack role rows must all carry the same quad (excludes the line 24
+# "currently available" enumeration, which is a different, longer list by design).
+while IFS= read -r line; do
+  got="$(printf '%s\n' "$line" | quad_of)"
+  [ "$got" = "$canon_quad" ] || quad_bad="$quad_bad$setup role row: [$got] != [$canon_quad]"$'\n'
+done < <(grep -E '^(arena runners|architect runners|interrogate reviewers|how critics):' "$setup")
+if [ -n "$quad_bad" ]; then
+  note "FAIL: the default model quad is not identical across the panel skills and setup-pstack:"
+  note "$quad_bad"
+  fail=1
+else
+  note "ok: default model quad identical across 4 panel skills + setup-pstack ($canon_quad)"
 fi
 
 # Behavioral checks against a minimal colliding plugin.

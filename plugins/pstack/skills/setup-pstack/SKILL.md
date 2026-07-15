@@ -29,7 +29,7 @@ The default role-to-model mapping is the rule shape shown in step 5 below. If `~
 
 ### 3. Map and confirm
 
-Show every role with its current model, marking any whose model is not in the detected set as needing a choice. Ask whether to accept as-is or change specific roles, offering the detected models as the options. Prefer `AskUserQuestion` over free text. For panel roles (how critics, arena runners, architect runners, interrogate reviewers) the value is a list, and one subagent runs per model, so the list length sets the count.
+Show every role with its current model, marking any whose model is not in the detected set as needing a choice. Ask whether to accept as-is or change specific roles, offering the detected models as the options. Prefer `AskUserQuestion` over free text. For panel roles (how critics, arena runners, architect runners, interrogate reviewers) the value is a list, and one subagent runs per model, so the list length sets the count. `arena cross-judge pool` is also a list, but Arena selects one model from it whose family differs from the parent's when possible.
 
 ### 4. Validate
 
@@ -57,6 +57,7 @@ why synthesizer: claude-opus-4-8
 reflect tooling: claude-opus-4-8
 reflect judgment, divergent, synthesizer: claude-opus-4-8
 arena runners: claude-opus-4-8, claude-sonnet-5, claude-opus-4-6, claude-sonnet-4-6
+arena cross-judge pool: claude-opus-4-8, claude-sonnet-5, claude-opus-4-6
 architect runners: claude-opus-4-8, claude-sonnet-5, claude-opus-4-6, claude-sonnet-4-6
 interrogate reviewers: claude-opus-4-8, claude-sonnet-5, claude-opus-4-6, claude-sonnet-4-6
 ```

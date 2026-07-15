@@ -27,7 +27,7 @@ fi
 # Mirror invariant (CHANGES 0.9.8): no skill that has a same-named command may
 # carry the flag. Every command body is "invoke the skill", so a flagged skill
 # makes the Skill tool refuse both the model path and the user-typed /command.
-# principle-* leaves have no commands and keep the flag (read by path).
+# The command-less principle-* leaves use user-invocable: false instead (0.9.9).
 flagged=""
 for cmd in "$repo"/plugins/pstack/commands/*.md; do
   skill="$repo/plugins/pstack/skills/$(basename "$cmd" .md)/SKILL.md"
@@ -43,6 +43,23 @@ if [ -n "$flagged" ]; then
   fail=1
 else
   note "ok: no command-paired skill carries disable-model-invocation: true"
+fi
+
+# Principle invariant (CHANGES 0.9.9): every command-less principle-* leaf carries
+# user-invocable: false (hidden from the / menu, read by path from poteto-mode) and
+# NOT disable-model-invocation (the pair cancels to a dead skill).
+bad_principle=""
+for skill in "$repo"/plugins/pstack/skills/principle-*/SKILL.md; do
+  front="$(sed -n '2,/^---$/p' "$skill")"
+  printf '%s\n' "$front" | grep -q '^user-invocable: false$' || bad_principle="$bad_principle$skill (missing user-invocable: false)"$'\n'
+  printf '%s\n' "$front" | grep -q '^disable-model-invocation: true$' && bad_principle="$bad_principle$skill (still carries disable-model-invocation)"$'\n'
+done
+if [ -n "$bad_principle" ]; then
+  note "FAIL: principle-* leaves must carry user-invocable: false and not disable-model-invocation:"
+  note "$bad_principle"
+  fail=1
+else
+  note "ok: all principle-* leaves carry user-invocable: false"
 fi
 
 # Behavioral checks against a minimal colliding plugin.

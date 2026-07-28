@@ -21,7 +21,7 @@ so the file is loaded as context for every session.
 
 ### 1. Detect available models
 
-Enumerate the model slugs you can pass to an `Agent` subagent in this session — that is the dependable source. Claude family currently available: Opus 5 (`claude-opus-5`), Opus 4.8 (`claude-opus-4-8`), Opus 4.6 (`claude-opus-4-6`), Fable 5 (`claude-fable-5`), Sonnet 5 (`claude-sonnet-5`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`). The default panels run three opus generations (`5`, `4-8`, `4-6`) and Sonnet 5 (`claude-sonnet-5`) for cross-generation, cross-tier diversity. Ask the user to confirm or paste any additional slugs they want available. Never write a slug you have not confirmed is available.
+Enumerate the model slugs you can pass to an `Agent` subagent in this session — that is the dependable source. Claude family currently available: Opus 5 (`claude-opus-5`), Opus 4.8 (`claude-opus-4-8`), Opus 4.6 (`claude-opus-4-6`), Fable 5 (`claude-fable-5`), Sonnet 5 (`claude-sonnet-5`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`). The default panels run Opus 5 (`claude-opus-5`), Fable 5 (`claude-fable-5`), Opus 4.6 (`claude-opus-4-6`), and Sonnet 5 (`claude-sonnet-5`) for cross-family, cross-tier diversity. Opus 4.8 stays out of the panels because it is already the single-role default across the skills. Ask the user to confirm or paste any additional slugs they want available. Never write a slug you have not confirmed is available.
 
 ### 2. Load current state
 
@@ -51,15 +51,15 @@ hillclimb: claude-opus-4-8
 judgment and prose: claude-opus-4-8
 how explorer: claude-opus-4-8
 how explainer: claude-opus-4-8
-how critics: claude-opus-5, claude-opus-4-8, claude-opus-4-6, claude-sonnet-5
+how critics: claude-opus-5, claude-fable-5, claude-opus-4-6, claude-sonnet-5
 why investigators: claude-opus-4-8
 why synthesizer: claude-opus-4-8
 reflect tooling: claude-opus-4-8
 reflect judgment, divergent, synthesizer: claude-opus-4-8
-arena runners: claude-opus-5, claude-opus-4-8, claude-opus-4-6, claude-sonnet-5
-arena cross-judge pool: claude-opus-5, claude-opus-4-8, claude-sonnet-5
-architect runners: claude-opus-5, claude-opus-4-8, claude-opus-4-6, claude-sonnet-5
-interrogate reviewers: claude-opus-5, claude-opus-4-8, claude-opus-4-6, claude-sonnet-5
+arena runners: claude-opus-5, claude-fable-5, claude-opus-4-6, claude-sonnet-5
+arena cross-judge pool: claude-opus-5, claude-fable-5, claude-sonnet-5
+architect runners: claude-opus-5, claude-fable-5, claude-opus-4-6, claude-sonnet-5
+interrogate reviewers: claude-opus-5, claude-fable-5, claude-opus-4-6, claude-sonnet-5
 ```
 
 ### 6. Wire it in

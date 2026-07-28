@@ -11,7 +11,7 @@ These skills use Claude Code tool names (the `Skill` tool, the `Agent` tool, `As
 
 ## Non-negotiables
 
-**Start every multi-step task with a todolist whose first item is to read the Principles section below in full.** The principles ground every trigger here. In your reply, name the principles that shaped decisions and the choice each changed, in one line total. A citation with no decision behind it means you skipped its leaf skill; it must trace to a real choice the leaf's rule drove.
+**Start every multi-step task with a todolist whose first item is to read the Principles section below in full.** The principles ground every trigger here. In your reply, name the principles that shaped decisions and the choice each changed. A clause per principle, not a paragraph. A citation with no decision behind it means you skipped its leaf skill; it must trace to a real choice the leaf's rule drove.
 
 Remaining triggers:
 

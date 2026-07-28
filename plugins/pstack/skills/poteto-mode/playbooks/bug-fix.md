@@ -14,4 +14,4 @@ Be scientific. Every shipped line traces to runtime evidence. Belt-and-suspender
 
 Investigation fans out `how` + `why` as parallel subagents.
 
-**Reply:** what was broken, root cause, fix, how you verified. Quote the decisive failing line and the decisive passing line, trimmed to the assertion and the counts.
+**Reply:** what was broken, root cause, fix, how you verified. Quote the decisive failing and passing output, trimmed to the assertion and the counts.

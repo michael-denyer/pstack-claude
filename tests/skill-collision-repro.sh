@@ -10,6 +10,7 @@
 # CHANGES.md: the command/skill/leaf flags, version parity across the three manifests,
 # and the default model quad's identity across the panel skills and setup-pstack. The
 # static checks need no CLI; only the behavioral legs below do.
+# Set PSTACK_STATIC_ONLY=1 to stop after the static checks.
 #
 # Manual test: the behavioral legs need the claude CLI and API access; four haiku calls.
 set -euo pipefail

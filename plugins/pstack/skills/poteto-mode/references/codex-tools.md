@@ -37,14 +37,14 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 - `spawn_agent` calls already run concurrently with your turn, so `run_in_background: true` has no separate flag. Issue the dispatch and continue.
 - Keep the rest of the policy unchanged. Pass file pointers not inlined context, give each worker its own worktree or branch when they write, review every subagent's diff yourself.
 
-## Model names
+## Model routing
 
-Skills name Claude defaults (`claude-opus-4-8` for code/prose/judgment; a four-model quad for diverse-model panels, enumerated in the panel skills). These slugs do not resolve on Codex. Substitute your configured Codex models:
+Skills name Claude defaults. Those slugs do not resolve on Codex. For each configured `(role, model)`, choose one callable route from the current `spawn_agent` declaration:
 
-- Single-model roles: your primary Codex model (for example `gpt-5.6-sol`).
-- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial signal comes from model diversity, so use the distinct Codex models available to you. A good default quad on ChatGPT is `gpt-5.6-sol`, `gpt-5.5`, `gpt-5.4`, `gpt-5.6-luna`. If only one model family is reachable, vary reasoning effort and note in the verdict that diversity was reduced.
+- **Generic explicit model overrides.** Use this route only when `model` is explicitly allowed by the current `spawn_agent` tool. Pass `model` and, when needed, `reasoning_effort`.
+- **Fixed profiles.** `/setup-pstack` may record an optional `(role, model) -> agent_type` exception for a fixed-model custom `agent_type` profile that the current runtime exposes. Set `agent_type`, set `fork_turns="none"`, and omit `model` and `reasoning_effort`. The profile owns both settings.
 
-`/setup-pstack` writes the configured model list. On Codex, set it to your Codex model slugs.
+If neither route exists, mark a single-model role unresolved. For a panel, report the panel dropout and do not silently substitute another model or profile. `/setup-pstack` discovers and validates the routes, but this file is the only dispatch contract.
 
 ## Claude built-in skills pstack references
 

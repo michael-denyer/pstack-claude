@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## Unreleased
+
+Codex model dispatch now distinguishes generic explicit model overrides from fixed custom profiles. `codex-tools.md` is the single dispatch contract. `/setup-pstack` discovers callable routes, preserves model-only rows, adds optional `(role, model) -> agent_type` exceptions, and replaces a managed block in `~/.codex/AGENTS.md`. Start a fresh task after profile changes.
+
 ## 0.9.10 — sync to upstream v0.11.3
 
 Catches the port up with upstream `cursor/plugins/pstack` from `0452e08` (v0.10.0) to `3fe2823` (v0.11.3). Skill count 44 → 48, commands 24 → 27.

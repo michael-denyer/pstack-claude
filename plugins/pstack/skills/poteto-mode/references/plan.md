@@ -25,7 +25,7 @@ Resolve what is in scope vs explicitly out, technical or platform constraints, p
 Delegate codebase exploration (the **guard-the-context-window** principle skill).
 
 - Prefer `subagent_type: "poteto-agent"`. `general-purpose` is the fallback. Never use Claude Code's built-in `Plan` agent; it ignores this skill.
-- Pass `model:` explicitly per the configured roles (default `claude-opus-4-8` for code-writing delegations and judgment; multi-model panels run the configured quad — defaults in the panel skills, overridden via `/setup-pstack`).
+- Pass `model:` explicitly per the configured roles (default `claude-opus-4-8` for code-writing delegations and judgment; multi-model panels run the configured quad — defaults in the panel skills, overridden via `/setup-pstack`). On Codex, fixed-model custom profiles defer to [`codex-tools.md`](codex-tools.md); generic routes still pass `model`.
 
 Each explorer returns file pointers, conventions, dependencies, test infrastructure, and entry points. No inlined dumps.
 

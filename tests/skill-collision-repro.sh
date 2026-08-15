@@ -117,6 +117,33 @@ else
   note "ok: default model quad identical across 4 panel skills + setup-pstack ($canon_quad)"
 fi
 
+# Static invariant: fixed-model Codex agent profiles own their dispatch settings.
+codex_tools="$repo/plugins/pstack/skills/poteto-mode/references/codex-tools.md"
+plan="$repo/plugins/pstack/skills/poteto-mode/references/plan.md"
+fixed_dispatch_bad=""
+fixed_check() { grep -Fq "$2" "$1" || fixed_dispatch_bad="$fixed_dispatch_bad$3"$'\n'; }
+fixed_line_check() { grep -F "$2" "$1" | grep -Fq "$3" || fixed_dispatch_bad="$fixed_dispatch_bad$4"$'\n'; }
+fixed_check "$codex_tools" 'Generic explicit model overrides' "$codex_tools: generic overrides are not distinguished"
+fixed_check "$codex_tools" 'fixed-model custom' "$codex_tools: fixed-model custom agent_type profiles are not documented"
+fixed_check "$codex_tools" 'fork_turns="none"' "$codex_tools: fixed profiles must set fork_turns=none"
+fixed_check "$codex_tools" 'omit `model` and `reasoning_effort`' "$codex_tools: fixed profiles must omit model and reasoning_effort"
+fixed_check "$setup" 'callable routes' "$setup: callable routes are not validated"
+fixed_check "$setup" '<!-- BEGIN PSTACK MODEL CONFIG' "$setup: missing managed AGENTS block start marker"
+fixed_check "$setup" '<!-- END PSTACK MODEL CONFIG -->' "$setup: missing managed AGENTS block end marker"
+fixed_check "$setup" '| Role | Model | Agent type |' "$setup: missing (role, model) -> agent_type fixed-route table"
+fixed_line_check "$plan" 'fixed-model' 'codex-tools.md' "$plan: fixed-model profile dispatch must defer to codex-tools.md"
+if [ -n "$fixed_dispatch_bad" ]; then
+  note "FAIL: fixed-model Codex dispatch contract missing:"
+  note "$fixed_dispatch_bad"
+  fail=1
+else
+  note "ok: fixed-model Codex dispatch contract is documented"
+fi
+
+if [ "${PSTACK_STATIC_ONLY:-0}" = 1 ]; then
+  exit "$fail"
+fi
+
 # Behavioral checks against a minimal colliding plugin.
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT

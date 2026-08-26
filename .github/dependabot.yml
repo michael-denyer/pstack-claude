@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # Pinned action SHAs go stale silently; this is what keeps them current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: npm
+    directory: /plugins/pstack/skills/poteto-mode/scripts
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps

@@ -63,6 +63,7 @@ Unverified relative to Codex: the Codex path above is confirmed on a live sessio
 
 ```text
 .
+├── .github/workflows/               # CI: invariants, bun tooling, shellcheck, OSV scan
 ├── .claude-plugin/marketplace.json   # Claude Code marketplace manifest (repo root)
 ├── .agents/plugins/marketplace.json  # Codex marketplace manifest (repo root)
 ├── plugins/pstack/                   # the plugin itself
@@ -97,6 +98,16 @@ The Codex build shares one `skills/` tree with the Claude Code build. Nothing is
 - **Models.** The `claude-*` slugs in skills are Claude defaults. On Codex substitute your configured Codex models, keeping multi-model panels genuinely diverse. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`) with Codex slugs instead of `~/.claude/pstack-models.md`.
 
 Verified on a live Codex session installed via the symlinks: the user-facing skills are discovered and namespaced under `pstack` (`pstack:poteto-mode`, `pstack:interrogate`, and so on). The `principle-*` leaf skills carry `user-invocable: false` and no command, so Codex does not surface them in the picker, the same as Claude Code. They stay installed for `poteto-mode` to read by path. The deeper behaviors (mapping resolution mid-task, `spawn_agent` fan-out) follow the proven `superpowers` pattern and are worth confirming in your own session.
+
+## CI
+
+Two workflows run on every pull request and push to `main`.
+
+`ci.yml` runs three jobs: the static plugin invariants (`tests/skill-collision-repro.sh` under `SKIP_BEHAVIORAL=1`, since the behavioral leg needs the `claude` CLI and API access), the vendored bun tooling (`bun install --frozen-lockfile`, `bun run typecheck`, `bun test orch watch-pr`), and `shellcheck` over every `.sh` file.
+
+`security.yml` runs `osv-scanner` against the lockfiles and fails the build if no lockfile was found, because an empty scan reads exactly like a clean one. It also rejects any action reference not pinned to a full 40-character commit SHA. It runs weekly on top of the per-PR trigger, so a CVE published after a merge still surfaces. Dependabot keeps the pinned SHAs and the bun dependencies current.
+
+Before a release, run the full `tests/skill-collision-repro.sh` locally (without `SKIP_BEHAVIORAL`) to exercise the behavioral leg CI cannot.
 
 ## Dependencies
 

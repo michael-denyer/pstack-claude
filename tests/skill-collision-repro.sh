@@ -139,6 +139,14 @@ fi
 # via the skill alone. This is the assumption that lets pstack live without
 # trampolines; if it fails, upstream changed slash resolution — re-read #22 and
 # CHANGES 0.9.13 before reintroducing commands/. Last verified on 2.1.245.
+#
+# Needs the claude CLI and API access, so CI sets SKIP_BEHAVIORAL=1 and runs the
+# static invariants only. Run it locally before a release.
+if [ -n "${SKIP_BEHAVIORAL:-}" ]; then
+  note "skip: behavioral leg (SKIP_BEHAVIORAL set); static invariants only"
+  exit "$fail"
+fi
+
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 mkdir -p "$scratch/.claude-plugin" "$scratch/skills/foo"

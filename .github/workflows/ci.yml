@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  invariants:
+    name: Plugin invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The behavioral leg needs the claude CLI and API access, so it is skipped
+      # here; SKIP_BEHAVIORAL keeps the static invariants running.
+      - name: Run static invariants
+        env:
+          SKIP_BEHAVIORAL: "1"
+        run: bash tests/skill-collision-repro.sh
+
+  scripts:
+    name: Vendored bun tooling
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/pstack/skills/poteto-mode/scripts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          # Match the version the invariants were last verified against locally.
+          bun-version: "1.3.14"
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Test
+        run: bun test orch watch-pr
+
+  shellcheck:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run shellcheck
+        run: |
+          shellcheck --version
+          find . -path ./.git -prune -o -name '*.sh' -print0 \
+            | xargs -0 shellcheck --severity=warning

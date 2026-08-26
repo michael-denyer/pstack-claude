@@ -1,10 +1,16 @@
 version: 2
 updates:
   # Pinned action SHAs go stale silently; this is what keeps them current.
+  #
+  # cooldown holds each update for 7 days after release. Without it Dependabot
+  # opens a PR the moment a version ships, which is exactly the window a
+  # compromised release is still unreported.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: ci
 
@@ -12,5 +18,7 @@ updates:
     directory: /plugins/pstack/skills/poteto-mode/scripts
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: deps

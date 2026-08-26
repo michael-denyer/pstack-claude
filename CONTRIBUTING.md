@@ -37,8 +37,10 @@ bun test orch watch-pr
 If you touched a workflow, audit it before pushing:
 
 ```shell
-uvx zizmor@1.29.0 --persona pedantic --min-severity low .github/workflows/
+uvx zizmor@1.29.0 --persona pedantic --min-severity low --collect all -- .
 ```
+
+`--collect all` matches what CI scans. Pointing zizmor at `.github/workflows/` alone skips `dependabot.yml`, so the local run comes back clean on findings CI will fail on.
 
 ## Things that will fail CI
 
@@ -46,6 +48,14 @@ uvx zizmor@1.29.0 --persona pedantic --min-severity low .github/workflows/
 - **`disable-model-invocation` in a skill's frontmatter.** On a skill it makes the Skill tool refuse the invocation outright, which breaks the SessionStart mandate. The `principle-*` leaves use `user-invocable: false` instead.
 - **A version bump in only some manifests.** The version string is duplicated in `plugins/pstack/.claude-plugin/plugin.json`, `plugins/pstack/.codex-plugin/plugin.json`, and `.claude-plugin/marketplace.json`. All three move together.
 - **An action pinned to a tag.** Use the full 40-character commit SHA with a version comment. A mutable tag can be force-pushed into our runners.
+
+## Dependency updates
+
+Dependabot updates `package.json` but cannot regenerate `bun.lock`, so a bun dependency PR arrives with the two out of sync and fails `bun install --frozen-lockfile`. The `Dependabot lockfile` workflow regenerates the lockfile and pushes it back to the PR branch, so those PRs go green on their own.
+
+It only runs for PRs authored by `dependabot[bot]`, checked via `github.event.pull_request.user.login` rather than `github.actor`, which is spoofable. It is the one job in this repo with `contents: write`.
+
+If you bump a dependency by hand, run `bun install` and commit the resulting `bun.lock` in the same change.
 
 ## Releasing
 

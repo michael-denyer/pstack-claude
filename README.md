@@ -106,7 +106,9 @@ Two workflows run on every pull request and push to `main`.
 
 `ci.yml` runs three jobs: the static plugin invariants (`tests/skill-collision-repro.sh` under `SKIP_BEHAVIORAL=1`, since the behavioral leg needs the `claude` CLI and API access), the vendored bun tooling (`bun install --frozen-lockfile`, `bun run typecheck`, `bun test orch watch-pr`), and `shellcheck` over every `.sh` file.
 
-`security.yml` runs `osv-scanner` against the lockfiles and fails the build if no lockfile was found, because an empty scan reads exactly like a clean one. It also rejects any action reference not pinned to a full 40-character commit SHA. It runs weekly on top of the per-PR trigger, so a CVE published after a merge still surfaces. Dependabot keeps the pinned SHAs and the bun dependencies current.
+`security.yml` runs `osv-scanner` against the lockfiles and fails the build if no lockfile was found, because an empty scan reads exactly like a clean one. It also rejects any action reference not pinned to a full 40-character commit SHA. It runs weekly on top of the per-PR trigger, so a CVE published after a merge still surfaces. `zizmor` audits the workflows themselves for template injection, over-broad permissions, and credential persistence.
+
+Dependabot keeps the pinned SHAs and the bun dependencies current, on a 7-day cooldown so a compromised release has time to be reported before a PR opens. Because Dependabot cannot regenerate `bun.lock`, `dependabot-lockfile.yml` does it for its PRs and pushes the result back to the branch.
 
 Before a release, run the full `tests/skill-collision-repro.sh` locally (without `SKIP_BEHAVIORAL`) to exercise the behavioral leg CI cannot.
 

@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Repro and regression check for the command/skill name-collision fix (CHANGES 0.9.7).
+# Regression checks for the pstack plugin layout (CHANGES 0.9.7-0.9.13).
 #
-# The Skill tool resolves a name shared by commands/<name>.md and
-# skills/<name>/SKILL.md to the command; disable-model-invocation: true on the
-# command flips resolution to the skill. That precedence is UNDOCUMENTED
-# upstream, so re-run this after Claude Code upgrades. Last verified on 2.1.195.
+# Claude Code renders a plugin's commands AND its user-invocable skills in the
+# slash menu, so a command trampoline paired with a same-named skill shows the
+# entry twice (#22). 0.9.13 moved the trampolines to .codex-plugin/prompts/,
+# where only the Codex symlink path reads them. The invariant here keeps a
+# future upstream sync from reintroducing plugins/pstack/commands/.
 #
-# Beyond the collision repro, this enforces the static maintenance invariants from
-# CHANGES.md: the command/skill/leaf flags, version parity across the three manifests,
-# and the default model quad's identity across the panel skills and setup-pstack. The
-# static checks need no CLI; only the behavioral legs below do.
+# This also enforces the static maintenance invariants from CHANGES.md: the
+# principle-* leaf flags, version parity across the three manifests, and the
+# default model quad's identity across the panel skills and setup-pstack. The
+# static checks need no CLI; only the behavioral leg below does.
 #
-# Manual test: the behavioral legs need the claude CLI and API access; four haiku calls.
+# Manual test: the behavioral leg needs the claude CLI and API access; one haiku call.
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
@@ -19,35 +20,46 @@ fail=0
 
 note() { printf '%s\n' "$*"; }
 
-# Static invariant: every command trampoline carries the flag.
-missing="$(grep -L 'disable-model-invocation: true' "$repo"/plugins/pstack/commands/*.md || true)"
-if [ -n "$missing" ]; then
-  note "FAIL: commands missing 'disable-model-invocation: true':"
-  note "$missing"
+# Static invariant (0.9.13, #22): the Claude Code plugin ships no commands/.
+# Every /pstack:<name> is served by the skill itself; a commands/ directory
+# reappearing (typically via an upstream sync) duplicates every slash-menu row.
+if [ -e "$repo/plugins/pstack/commands" ]; then
+  note "FAIL: plugins/pstack/commands/ exists; trampolines belong in .codex-plugin/prompts/ (see CHANGES 0.9.13)"
   fail=1
 else
-  note "ok: all commands carry disable-model-invocation: true"
+  note "ok: no plugins/pstack/commands/ directory"
 fi
 
-# Mirror invariant (CHANGES 0.9.8): no skill that has a same-named command may
-# carry the flag. Every command body is "invoke the skill", so a flagged skill
-# makes the Skill tool refuse both the model path and the user-typed /command.
-# The command-less principle-* leaves use user-invocable: false instead (0.9.9).
-flagged=""
-for cmd in "$repo"/plugins/pstack/commands/*.md; do
+# Codex prompts are the relocated trampolines; each must still point at a real skill.
+orphan=""
+for cmd in "$repo"/plugins/pstack/.codex-plugin/prompts/*.md; do
   skill="$repo/plugins/pstack/skills/$(basename "$cmd" .md)/SKILL.md"
-  # Frontmatter only (lines between the opening and closing ---): skill bodies
-  # may legitimately mention the flag in prose (automate-me does).
-  if [ -f "$skill" ] && sed -n '2,/^---$/p' "$skill" | grep -q '^disable-model-invocation: true$'; then
+  [ -f "$skill" ] || orphan="$orphan$cmd"$'\n'
+done
+if [ -n "$orphan" ]; then
+  note "FAIL: Codex prompts without a matching skill:"
+  note "$orphan"
+  fail=1
+else
+  note "ok: every Codex prompt has a matching skill"
+fi
+
+# Flag invariant (CHANGES 0.9.8): no skill may carry disable-model-invocation —
+# on a skill the flag makes the Skill tool refuse the invocation outright, which
+# breaks the SessionStart mandate and model-initiated entry. Frontmatter only:
+# skill bodies may mention the flag in prose (automate-me does).
+flagged=""
+for skill in "$repo"/plugins/pstack/skills/*/SKILL.md; do
+  if sed -n '2,/^---$/p' "$skill" | grep -q '^disable-model-invocation: true$'; then
     flagged="$flagged$skill"$'\n'
   fi
 done
 if [ -n "$flagged" ]; then
-  note "FAIL: skills with a same-named command must not carry 'disable-model-invocation: true':"
+  note "FAIL: skills must not carry 'disable-model-invocation: true':"
   note "$flagged"
   fail=1
 else
-  note "ok: no command-paired skill carries disable-model-invocation: true"
+  note "ok: no skill carries disable-model-invocation: true"
 fi
 
 # Principle invariant (CHANGES 0.9.9): every command-less principle-* leaf carries
@@ -123,76 +135,31 @@ else
   note "ok: default model quad identical across 4 panel skills + setup-pstack ($canon_quad)"
 fi
 
-# Behavioral checks against a minimal colliding plugin.
+# Behavioral leg: a command-less plugin still serves the user-typed /plugin:name
+# via the skill alone. This is the assumption that lets pstack live without
+# trampolines; if it fails, upstream changed slash resolution — re-read #22 and
+# CHANGES 0.9.13 before reintroducing commands/. Last verified on 2.1.245.
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
-mkdir -p "$scratch/.claude-plugin" "$scratch/commands" "$scratch/skills/foo"
-printf '%s\n' '{"name": "testplug", "version": "0.0.1", "description": "collision repro"}' \
+mkdir -p "$scratch/.claude-plugin" "$scratch/skills/foo"
+printf '%s\n' '{"name": "testplug", "version": "0.0.1", "description": "skill-only slash repro"}' \
   > "$scratch/.claude-plugin/plugin.json"
 cat > "$scratch/skills/foo/SKILL.md" <<'EOF'
 ---
 name: foo
-description: collision test skill
+description: skill-only slash test
 ---
 
 Say exactly: SKILL-RAN
 Then stop. Do not invoke any skill or tool.
 EOF
 
-write_command() { # $1 = extra frontmatter line ("" for none)
-  {
-    printf -- '---\nname: foo\ndescription: collision test command\n'
-    [ -n "$1" ] && printf '%s\n' "$1"
-    printf -- '---\n\nSay exactly: CMD-RAN\nThen stop. Do not invoke any skill or tool.\n'
-  } > "$scratch/commands/foo.md"
-}
-
-run() {
-  claude -p --plugin-dir "$scratch" --model haiku --max-turns 3 "$1" < /dev/null 2>&1
-}
-
-check() { # $1 label, $2 expected marker, $3 output
-  if printf '%s' "$3" | grep -q "$2"; then
-    note "ok: $1 -> $2"
-  else
-    note "FAIL: $1 expected $2, got: $3"
-    fail=1
-  fi
-}
-
-invoke='Call the Skill tool with skill "testplug:foo" exactly once and follow what it says.'
-
-# Precedence detector: without the flag, the command wins. If this check ever
-# fails, upstream changed the (undocumented) resolution order — revisit whether
-# the flag is still needed rather than treating the fix as broken.
-write_command ""
-check "collision without flag: Skill tool resolves to command" "CMD-RAN" "$(run "$invoke")"
-
-# The fix: with the flag, the Skill tool reaches the skill...
-write_command "disable-model-invocation: true"
-check "collision with flag: Skill tool resolves to skill" "SKILL-RAN" "$(run "$invoke")"
-
-# ...and the user-typed command still runs.
-check "collision with flag: /command still runs the command" "CMD-RAN" "$(run '/testplug:foo')"
-
-# The 0.9.8 regression: the flag on the SKILL blocks the Skill tool outright,
-# so a flagged skill is unreachable even once the command stops shadowing it.
-cat > "$scratch/skills/foo/SKILL.md" <<'EOF'
----
-name: foo
-description: collision test skill
-disable-model-invocation: true
----
-
-Say exactly: SKILL-RAN
-Then stop. Do not invoke any skill or tool.
-EOF
-out="$(run "$invoke")"
+out="$(claude -p --plugin-dir "$scratch" --model haiku --max-turns 3 '/testplug:foo' < /dev/null 2>&1)"
 if printf '%s' "$out" | grep -q 'SKILL-RAN'; then
-  note "FAIL: flagged skill unexpectedly ran via Skill tool: $out"
-  fail=1
+  note "ok: user-typed /plugin:name reaches the skill with no commands/ present"
 else
-  note "ok: flag on the skill blocks Skill-tool invocation (0.9.8 regression guard)"
+  note "FAIL: /testplug:foo did not run the skill, got: $out"
+  fail=1
 fi
 
 exit "$fail"

@@ -35,7 +35,7 @@ export interface Unit {
   readonly brief: string;
 }
 
-export interface LedgerEntry {
+interface LedgerEntry {
   readonly pr: string;
   readonly sha: string;
   readonly verdict: Verdict;
@@ -52,7 +52,7 @@ export interface InboxPointer {
   readonly report: string;
 }
 
-export interface InboxPushResult {
+interface InboxPushResult {
   readonly pointer: InboxPointer;
   readonly filename: string;
 }
@@ -65,7 +65,7 @@ export interface OpenGate {
   readonly defaultAnswer: string;
 }
 
-export interface ResolvedGate {
+interface ResolvedGate {
   readonly kind: "resolved";
   readonly id: string;
   readonly question: string;
@@ -76,9 +76,9 @@ export interface ResolvedGate {
 
 export type Gate = OpenGate | ResolvedGate;
 
-export type FrontierPrState = "OPEN" | "MERGED" | "CLOSED";
+type FrontierPrState = "OPEN" | "MERGED" | "CLOSED";
 
-export interface FrontierPr {
+interface FrontierPr {
   readonly pr: number;
   readonly branches: string;
   readonly sha: string;
@@ -98,7 +98,7 @@ export interface StandingLine {
 
 export type Counts = Readonly<Record<string, number>>;
 
-export interface StatusSummary {
+interface StatusSummary {
   readonly unitStates: Counts;
   readonly ledgerVerdicts: Counts;
   readonly frontierGeneration: number;
@@ -114,13 +114,13 @@ export interface StatusReport {
   readonly changed: string;
 }
 
-export interface AddUnitParams {
+interface AddUnitParams {
   readonly id: string;
   readonly track: string;
   readonly brief?: string;
 }
 
-export interface SetUnitParams {
+interface SetUnitParams {
   readonly id: string;
   readonly state: string;
   readonly branch?: string;
@@ -128,12 +128,12 @@ export interface SetUnitParams {
   readonly sha?: string;
 }
 
-export interface ListUnitsParams {
+interface ListUnitsParams {
   readonly state?: string;
   readonly track?: string;
 }
 
-export interface RecordLedgerParams {
+interface RecordLedgerParams {
   readonly pr: number;
   readonly sha: string;
   readonly verdict: Verdict;
@@ -141,36 +141,36 @@ export interface RecordLedgerParams {
   readonly verifier?: string;
 }
 
-export interface CheckLedgerParams {
+interface CheckLedgerParams {
   readonly pr: number;
   readonly sha: string;
 }
 
-export interface PushInboxParams {
+interface PushInboxParams {
   readonly agent: string;
   readonly unit: string;
   readonly status: string;
   readonly report?: string;
 }
 
-export interface ParkGateParams {
+interface ParkGateParams {
   readonly id: string;
   readonly question: string;
   readonly options: string;
   readonly defaultAnswer: string;
 }
 
-export interface ResolveGateParams {
+interface ResolveGateParams {
   readonly id: string;
   readonly answer: string;
 }
 
-export interface SetFrontierParams {
+interface SetFrontierParams {
   readonly repo: string;
   readonly prs?: readonly number[];
 }
 
-export interface AddStandingParams {
+interface AddStandingParams {
   readonly line: string;
 }
 
@@ -219,7 +219,7 @@ export interface Store {
   readonly close: () => Promise<void>;
 }
 
-export interface NotFoundOutput {
+interface NotFoundOutput {
   readonly compact: string;
   readonly json: unknown;
 }
@@ -1285,7 +1285,7 @@ export function openStore(
         const rows = [...(await readUnits(store))];
         const index = rows.findIndex((unit) => unit.id === id);
         const old = rows[index];
-        if (index < 0 || old === undefined) {
+        if (old === undefined) {
           throw new NotFoundError(`unit ${id} not found`);
         }
         const row: Unit = {
@@ -1478,7 +1478,7 @@ export function openStore(
         const rows = [...(await readGates(store))];
         const index = rows.findIndex((gate) => gate.id === id);
         const old = rows[index];
-        if (index < 0 || old === undefined) {
+        if (old === undefined) {
           throw new NotFoundError(`gate ${id} not found`);
         }
         const gate: ResolvedGate = {

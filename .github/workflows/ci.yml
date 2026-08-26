@@ -17,7 +17,11 @@ jobs:
     name: Plugin invariants
     runs-on: ubuntu-latest
     steps:
+      # persist-credentials: false on every checkout — nothing here needs git
+      # auth after the clone, and a stored token can leak via artifacts.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # The behavioral leg needs the claude CLI and API access, so it is skipped
       # here; SKIP_BEHAVIORAL keeps the static invariants running.
       - name: Run static invariants
@@ -33,6 +37,8 @@ jobs:
         working-directory: plugins/pstack/skills/poteto-mode/scripts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           # Match the version the invariants were last verified against locally.
@@ -49,6 +55,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Run shellcheck
         run: |
           shellcheck --version

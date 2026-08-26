@@ -79,6 +79,7 @@ Unverified relative to Codex: the Codex path above is confirmed on a live sessio
 ├── LICENSE                           # pstack upstream MIT
 ├── LICENSE-cursor-team-kit           # cursor-team-kit upstream MIT
 ├── LICENSE-superpowers               # superpowers upstream MIT (hook runner)
+├── CONTRIBUTING.md                   # sync boundary, local checks, release rules
 ├── NOTICE.md                         # attribution table
 ├── CHANGES.md                        # per-skill substitution audit
 └── README.md                         # this file
@@ -108,6 +109,8 @@ Two workflows run on every pull request and push to `main`.
 `security.yml` runs `osv-scanner` against the lockfiles and fails the build if no lockfile was found, because an empty scan reads exactly like a clean one. It also rejects any action reference not pinned to a full 40-character commit SHA. It runs weekly on top of the per-PR trigger, so a CVE published after a merge still surfaces. Dependabot keeps the pinned SHAs and the bun dependencies current.
 
 Before a release, run the full `tests/skill-collision-repro.sh` locally (without `SKIP_BEHAVIORAL`) to exercise the behavioral leg CI cannot.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the sync boundary, the local checks to run, and the release rules.
 
 ## Dependencies
 

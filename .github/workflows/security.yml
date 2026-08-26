@@ -20,7 +20,11 @@ jobs:
     name: OSV vulnerability scan
     runs-on: ubuntu-latest
     steps:
+      # persist-credentials: false on every checkout — nothing here needs git
+      # auth after the clone, and a stored token can leak via artifacts.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # Pinned to the image rather than google/osv-scanner-action, whose own
       # README warns its behavior can change in a patch release.
       #
@@ -38,12 +42,38 @@ jobs:
             exit 1
           fi
 
+  zizmor:
+    name: Workflow static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Audits the workflows themselves: template injection, over-broad
+      # permissions, unpinned actions, credential persistence.
+      #
+      # advanced-security defaults to true and needs GitHub Advanced Security,
+      # which this repo does not have; annotations put findings on the diff
+      # instead. version defaults to "latest" — pinned so a zizmor release
+      # cannot change what this gate means.
+      - uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        with:
+          version: "1.29.0"
+          advanced-security: false
+          annotations: true
+          persona: pedantic
+          min-severity: low
+
   actions-pinned:
     name: Actions pinned to SHAs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # A mutable tag (@v7) can be force-pushed to inject code into our runners.
+        with:
+          persist-credentials: false
+      # zizmor's unpinned-uses audit covers this too, but only for files it
+      # parses as workflows. This is a cheap belt-and-braces grep that also
+      # catches a malformed workflow zizmor skips.
       - name: Reject unpinned action references
         run: |
           unpinned="$(grep -rnE '^\s*(- )?uses:' .github/workflows \

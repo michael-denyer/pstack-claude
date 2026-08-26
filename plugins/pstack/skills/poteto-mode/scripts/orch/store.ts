@@ -342,7 +342,8 @@ async function atomicWrite(path: string, contents: string): Promise<void> {
     await writeFile(temporary, contents, { flag: "wx" });
     await rename(temporary, path);
   } finally {
-    await rm(temporary, { force: true });
+    // Best-effort cleanup: a throw here would replace the write's own error.
+    await rm(temporary, { force: true }).catch(() => {});
   }
 }
 
@@ -881,7 +882,10 @@ function changed(before: StatusSummary | null, after: StatusSummary): string {
 }
 
 function markdown(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+  return value
+    .replace(/[\t\n\r]/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|");
 }
 
 function table(
@@ -1010,7 +1014,7 @@ function parseGtPullRequest({
   detail: string;
 }): GtPullRequest {
   const match =
-    /^(?:\[origin\] )?PR #([1-9]\d*)(?: \(([^)\r\n]+)\))?(?: .+)?$/.exec(
+    /^(?:\[origin\] )?PR #([1-9]\d*)(?: \(([^)\r\n]+)\))?( .+)?$/.exec(
       detail
     );
   const pr = Number(match?.[1] ?? 0);
@@ -1020,6 +1024,14 @@ function parseGtPullRequest({
     );
   }
   const status = match[2];
+  // A "(" right after the PR number that the status group did not capture
+  // means a nested-paren status like "Needs approvals (2)"; treating it as
+  // no-status would silently report the PR as OPEN.
+  if (status === undefined && (match[3] ?? "").startsWith(" (")) {
+    throw new UserError(
+      `gt info output has an invalid PR row for branch ${branch}: ${detail}`
+    );
+  }
   if (status === "Merged") {
     return { pr, state: "MERGED" };
   }
@@ -1041,8 +1053,10 @@ function parseGtBranches(raw: string): readonly string[] {
     if (line.length === 0) {
       continue;
     }
+    // (?!-) rejects leading-dash names, which git and gt would parse as
+    // options when the branch is later passed to them as an argument.
     const branchMatch =
-      /^(?:│ )*[◯◉] +([^\s]+)((?: \([^()\r\n]*\))*)$/.exec(line);
+      /^(?:│ )*[◯◉] +((?!-)[^\s]+)((?: \([^()\r\n]*\))*)$/.exec(line);
     if (branchMatch === null) {
       throw new UserError(
         `gt log short output has an unparseable line ${index + 1}: ${JSON.stringify(line)}`

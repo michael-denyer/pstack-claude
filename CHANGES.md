@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.12 — pin the thermo-nuclear report format
+
+The 0.9.11 swarm routing flattened thermo-nuclear reviews into one consolidated report, dropping the summary-plus-per-subsystem-file layout earlier reviews produced. `thermo-nuclear-code-quality-review` now carries a Report Format section that pins the layered deliverable (a ~200-line narrative summary plus one detail file per subsystem reviewer) and overrides swarm's aggregation rules for this review (#28).
+
 ## 0.9.11 — sync to upstream v0.14.2
 
 Catches the port up with upstream `cursor/plugins/pstack` from `3fe2823` (v0.11.3) to `4612556` (v0.14.2). Skills 48 → 52, commands 27 → 31, subagents 1 → 2, plus a vendored `scripts/` tree under `poteto-mode/`.

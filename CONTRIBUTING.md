@@ -37,8 +37,10 @@ bun test orch watch-pr
 If you touched a workflow, audit it before pushing:
 
 ```shell
-uvx zizmor@1.29.0 --persona pedantic --min-severity low .github/workflows/
+uvx zizmor@1.29.0 --persona pedantic --min-severity low --collect all -- .
 ```
+
+`--collect all` matches what CI scans. Pointing zizmor at `.github/workflows/` alone skips `dependabot.yml`, so the local run comes back clean on findings CI will fail on.
 
 ## Things that will fail CI
 

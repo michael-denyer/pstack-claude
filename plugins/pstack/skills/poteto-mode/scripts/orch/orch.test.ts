@@ -137,6 +137,9 @@ case "$*" in
   "--no-interactive info stack/open")
     printf 'stack/open\\nPR #11 (Needs approvals) open change\\n'
     ;;
+  "--no-interactive info stack/paren")
+    printf 'stack/paren\\nPR #14 (Needs approvals (2)) tricky change\\n'
+    ;;
   *)
     printf 'unexpected gt arguments: %s\\n' "$*" >&2
     exit 2
@@ -493,6 +496,56 @@ describe("Store", () => {
         );
       },
     });
+  });
+
+  it("rejects a parenthesized gt PR status instead of treating it as open", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+
+    await withFakeGt({
+      directory,
+      output: "◯ main\n◉ stack/paren\n",
+      operation: async () => {
+        await expect(
+          store.frontier.set({ repo: stack.repo })
+        ).rejects.toThrow(
+          "gt info output has an invalid PR row for branch stack/paren"
+        );
+      },
+    });
+  });
+
+  it("rejects a leading-dash branch name in gt log output", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+
+    await withFakeGt({
+      directory,
+      output: "◯ main\n◉ --upload-pack=/tmp/pwn\n",
+      operation: async () => {
+        await expect(
+          store.frontier.set({ repo: stack.repo })
+        ).rejects.toThrow("gt log short output has an unparseable line 2");
+      },
+    });
+  });
+
+  it("keeps status.md table cells single-line when frontier data carries control characters", async () => {
+    const { directory, store } = await initializedStore();
+
+    await writeFile(
+      join(directory, "frontier.json"),
+      `${JSON.stringify({
+        generation: 1,
+        prs: [
+          { pr: 7, branches: "a\nb|c", sha: "cafe\tf00d", state: "OPEN" },
+        ],
+        lowestUnmerged: 7,
+      })}\n`
+    );
+    await store.status.render();
+    const status = await readFile(join(directory, "status.md"), "utf8");
+    expect(status).toContain("| a b\\|c | 7 | cafe f00d | OPEN |");
   });
 
   it("rejects malformed TSV, verdict, frontier, and inbox data", async () => {

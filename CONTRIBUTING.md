@@ -49,6 +49,14 @@ uvx zizmor@1.29.0 --persona pedantic --min-severity low --collect all -- .
 - **A version bump in only some manifests.** The version string is duplicated in `plugins/pstack/.claude-plugin/plugin.json`, `plugins/pstack/.codex-plugin/plugin.json`, and `.claude-plugin/marketplace.json`. All three move together.
 - **An action pinned to a tag.** Use the full 40-character commit SHA with a version comment. A mutable tag can be force-pushed into our runners.
 
+## Dependency updates
+
+Dependabot updates `package.json` but cannot regenerate `bun.lock`, so a bun dependency PR arrives with the two out of sync and fails `bun install --frozen-lockfile`. The `Dependabot lockfile` workflow regenerates the lockfile and pushes it back to the PR branch, so those PRs go green on their own.
+
+It only runs for PRs authored by `dependabot[bot]`, checked via `github.event.pull_request.user.login` rather than `github.actor`, which is spoofable. It is the one job in this repo with `contents: write`.
+
+If you bump a dependency by hand, run `bun install` and commit the resulting `bun.lock` in the same change.
+
 ## Releasing
 
 Plugin auto-update installs **by version number**, not by tracking `main`. A skill fix merged without a version bump is inert on every installed copy, because the updater sees the same version it already has and does nothing.

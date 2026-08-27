@@ -46,6 +46,8 @@ jobs:
         run: |
           bun tools/generate.mjs
           git diff --exit-code
+      - name: Sync-tool fixture tests
+        run: bun test tests/
 
   scripts:
     name: Vendored bun tooling

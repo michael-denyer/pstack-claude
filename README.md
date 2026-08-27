@@ -4,7 +4,7 @@ Claude Code port of [poteto](https://x.com/poteto)'s [pstack](https://github.com
 
 > if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence.
 
-This is not a verbatim copy. Skill bodies have been edited so every Cursor-specific primitive resolves to its Claude Code equivalent — see [Differences from upstream](#differences-from-upstream) for the full list. The exhaustive per-skill audit lives in [CHANGES.md](CHANGES.md); license attribution lives in [NOTICE.md](NOTICE.md); the upstream README is preserved verbatim at [README-UPSTREAM.md](README-UPSTREAM.md).
+This is not a verbatim copy. Skill bodies have been edited so every Cursor-specific primitive resolves to its Claude Code equivalent — see [Differences from upstream](#differences-from-upstream) for the full list. The exhaustive per-skill audit lives in [CHANGES.md](CHANGES.md); license attribution and the upstream pins live in [NOTICE.md](NOTICE.md) and `tools/upstream.json`.
 
 ## Install
 
@@ -77,6 +77,9 @@ Unverified relative to Codex: the Codex path above is confirmed on a live sessio
 │   └── agents/                       # Claude subagents: poteto-agent, comment-sicko (Codex routes via codex-tools.md)
 ├── tests/skill-collision-repro.sh    # layout and flag invariants (needs claude CLI)
 ├── tools/generate.mjs                # stamps VERSION, model defaults, Codex prompts, and the command table
+├── tools/sync.mjs                    # syncs a component to a new upstream SHA, applying substitutions.json
+├── tools/upstream.json               # upstream remote + per-component pinned SHAs
+├── tools/substitutions.json          # mechanical Cursor→Claude rewrites + the denylist of manual-only Cursor-isms
 ├── VERSION                           # canonical plugin version (single source; manifests are stamped)
 ├── LICENSE                           # pstack upstream MIT
 ├── LICENSE-cursor-team-kit           # cursor-team-kit upstream MIT

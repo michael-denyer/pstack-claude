@@ -15,6 +15,14 @@ Local-only changes are fine when they're genuinely port-specific. Say so in the 
 
 Every substitution is recorded per-skill in [CHANGES.md](CHANGES.md). If you add one, record it there in the same PR.
 
+### Running a sync
+
+```shell
+bun tools/sync.mjs pstack <new-upstream-sha>
+```
+
+`tools/upstream.json` pins the current upstream SHA per component; `tools/substitutions.json` holds the mechanical Cursor-to-Claude rewrites and a denylist of Cursor-isms that need a rewritten sentence rather than a token swap. The tool fetches both upstream revisions, applies the substitutions, writes files whose only local differences came from upstream (new files included), and reports files carrying port-specific edits for manual merge. Any denylist token in a written file fails the run with the file, line, and hint — add a substitution rule or rewrite the sentence, then rerun. The pin advances only on success. Write the CHANGES.md entry from the printed report, then run the generator and the invariant script as usual.
+
 ## Before you open a PR
 
 Run the generator, then the invariant script:

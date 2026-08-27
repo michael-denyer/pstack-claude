@@ -11,5 +11,6 @@ Names for the concepts this repo's design discussions keep reaching for. Archite
 - **Generator** — `tools/generate.mjs`. Stamps facts from their single source into every committed copy and validates cross-file contracts. CI reruns it and fails on any diff.
 - **Generator-owned copy** — a committed value the generator writes (the `version` field in the three manifests, the prompt stubs, the README slash-command table, every Models section). Hand edits are reverted by the next regeneration and caught by CI.
 - **VERSION** — the repo-root file holding the canonical plugin version. Releases edit it, add the matching `CHANGES.md` heading, and regenerate; plugin auto-update installs by this number.
-- **Sync boundary** — the split between what upstream pstack owns (skill content) and what this port owns (Cursor-to-Claude-Code translation). Defined in [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Sync boundary** — the split between what upstream pstack owns (skill content) and what this port owns (Cursor-to-Claude-Code translation). Defined in [CONTRIBUTING.md](CONTRIBUTING.md); enforced by `tools/sync.mjs`, whose substitution table and denylist live in `tools/substitutions.json`.
+- **Upstream pin** — the per-component upstream SHA in `tools/upstream.json` that the port is synced to. `sync.mjs` advances it only when a sync completes without denylist hits.
 - **Invariant script** — `tests/skill-collision-repro.sh`. The repo's check seam: static layout/flag invariants plus a behavioral leg that needs the `claude` CLI.

@@ -1,0 +1,54 @@
+{
+  "substitutions": [
+    {
+      "pattern": "AskQuestion",
+      "replacement": "AskUserQuestion",
+      "rationale": "Claude Code's fixed-choice question tool; upstream Cursor names it AskQuestion"
+    },
+    {
+      "pattern": "the `Task` tool",
+      "replacement": "the `Agent` tool",
+      "rationale": "Claude Code dispatches subagents with the Agent tool; Cursor calls it Task"
+    },
+    {
+      "pattern": ".cursor/skills/",
+      "replacement": ".claude/skills/",
+      "rationale": "personal skills directory"
+    },
+    {
+      "pattern": ".cursor/rules/",
+      "replacement": "CLAUDE.md imports",
+      "rationale": "Claude Code has no auto-applied rules directory; inclusion is explicit via CLAUDE.md"
+    }
+  ],
+  "denylist": [
+    {
+      "token": "control-cli",
+      "hint": "Claude Code's `run` built-in drives CLIs/TUIs; rewrite the sentence, don't token-swap"
+    },
+    {
+      "token": "control-ui",
+      "hint": "Claude Code's `verify` built-in drives UIs; rewrite the sentence, don't token-swap"
+    },
+    {
+      "token": "AskQuestion",
+      "hint": "should have been substituted to AskUserQuestion; substitution rule failed to apply"
+    },
+    {
+      "token": ".cursor/",
+      "hint": "Cursor config path survived; map it to the Claude Code equivalent"
+    },
+    {
+      "token": "Cursor cloud agent",
+      "hint": "Claude Code runs subagents locally; the port isolates writers with worktrees"
+    },
+    {
+      "token": "cursor.com",
+      "hint": "Cursor product URL; check whether the sentence applies to Claude Code at all"
+    },
+    {
+      "token": "/goal",
+      "hint": "Cursor's /goal has no Claude Code equivalent; the autopilot playbooks keep the objective in standing orders"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "remote": "https://github.com/cursor/plugins",
+  "components": {
+    "pstack": {
+      "upstreamPath": "pstack",
+      "localPath": "plugins/pstack",
+      "sha": "4612556"
+    },
+    "cursor-team-kit": {
+      "upstreamPath": "cursor-team-kit/skills",
+      "localPath": "plugins/pstack/skills",
+      "sha": "e46364b8be46000b7df0f260550cd712afbb8d36"
+    }
+  }
+}

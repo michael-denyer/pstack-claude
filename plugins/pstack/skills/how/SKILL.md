@@ -140,6 +140,6 @@ Present the explanation first (from Step 1), then the critique verdict below it.
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- how explorer: `claude-opus-4-8`
-- how explainer: `claude-opus-4-8`
+- how explorer: `claude-opus-5`
+- how explainer: `claude-opus-5`
 - how critics: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5`

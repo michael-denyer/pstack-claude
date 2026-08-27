@@ -143,9 +143,9 @@ A large or cross-cutting effort (a migration across many call sites, an ambitiou
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- feature, refactoring: `claude-opus-4-8`
-- bug-fix: `claude-opus-4-8`
-- perf-issue: `claude-opus-4-8`
-- hillclimb: `claude-opus-4-8`
-- judgment and prose: `claude-opus-4-8`
+- feature, refactoring: `claude-opus-5`
+- bug-fix: `claude-fable-5`
+- perf-issue: `claude-fable-5`
+- hillclimb: `claude-fable-5`
+- judgment and prose: `claude-opus-5`
 - strongest judgment: `claude-fable-5`

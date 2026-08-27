@@ -45,22 +45,22 @@ Write `~/.claude/pstack-models.md` with the shape below. Overwrite the whole fil
 
 Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out.
 
-feature, refactoring: claude-opus-4-8
-bug-fix: claude-opus-4-8
-perf-issue: claude-opus-4-8
-hillclimb: claude-opus-4-8
-judgment and prose: claude-opus-4-8
+feature, refactoring: claude-opus-5
+bug-fix: claude-fable-5
+perf-issue: claude-fable-5
+hillclimb: claude-fable-5
+judgment and prose: claude-opus-5
 strongest judgment: claude-fable-5
-how explorer: claude-opus-4-8
-how explainer: claude-opus-4-8
+how explorer: claude-opus-5
+how explainer: claude-opus-5
 how critics: claude-opus-5, claude-fable-5, claude-sonnet-5, claude-haiku-4-5
-why investigators: claude-opus-4-8
-why synthesizer: claude-opus-4-8
-reflect tooling: claude-opus-4-8
-reflect judgment, divergent, synthesizer: claude-opus-4-8
+why investigators: claude-opus-5
+why synthesizer: claude-opus-5
+reflect tooling: claude-opus-5
+reflect judgment, divergent, synthesizer: claude-opus-5
 arena runners: claude-opus-5, claude-fable-5, claude-sonnet-5, claude-haiku-4-5
 arena cross-judge pool: claude-opus-5, claude-fable-5, claude-sonnet-5
-swarm workers: claude-opus-4-8
+swarm workers: claude-opus-5
 architect runners: claude-opus-5, claude-fable-5, claude-sonnet-5, claude-haiku-4-5
 interrogate reviewers: claude-opus-5, claude-fable-5, claude-sonnet-5, claude-haiku-4-5
 ```
@@ -79,4 +79,4 @@ Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs
 
 - Available Claude models: Opus 5 (`claude-opus-5`), Opus 4.8 (`claude-opus-4-8`), Opus 4.6 (`claude-opus-4-6`), Fable 5 (`claude-fable-5`), Sonnet 5 (`claude-sonnet-5`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`)
 - Default panel quad: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5`
-- Single-role default: `claude-opus-4-8`
+- Single-role default: `claude-opus-5`

@@ -218,9 +218,9 @@ The port is editorial, not mechanical. Anywhere upstream pstack assumed Cursor-s
 | The Cursor agent store (path in the system prompt) | `~/.claude/orchestrate/<project-slug>/`, which survives the session restarts a multi-day program expects |
 | Model rule `~/.cursor/rules/pstack-models.mdc` | Override sheet `~/.claude/pstack-models.md`, included from `CLAUDE.md` |
 | Model `composer-2.5-fast` (Cursor) | `claude-sonnet-4-6` |
-| Model `claude-opus-4-X-thinking-xhigh` (Cursor UI variant) | `claude-opus-4-8` (extended thinking configured separately) |
+| Model `claude-opus-4-X-thinking-xhigh` (Cursor UI variant) | `claude-opus-5` (extended thinking configured separately) |
 | Models `gpt-5.3-codex-high-fast`, `gpt-5.5-high-fast` (via Cursor) | `claude-sonnet-4-6`, `claude-haiku-4-5` (Claude family) |
-| Multi-model panels (arena, architect, interrogate, how-critics) | Default quad is `claude-opus-4-8` + `claude-sonnet-5` + `claude-fable-5` + `claude-sonnet-4-6` — four distinct models across three families (replaces the cross-vendor diversity lost in translation and restores upstream's four-way split). |
+| Multi-model panels (arena, architect, interrogate, how-critics) | Default quad is `claude-opus-5` + `claude-fable-5` + `claude-sonnet-5` + `claude-haiku-4-5` — four distinct models across three tiers (replaces the cross-vendor diversity lost in translation and restores upstream's four-way split). |
 
 ### What's lost in translation
 

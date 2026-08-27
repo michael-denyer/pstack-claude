@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.15 — retire Opus 4.8 from the model defaults
+
+`plugins/pstack/models.json` no longer names `claude-opus-4-8` as a default. Every single-model role that used it (`feature, refactoring`, `judgment and prose`, `how explorer`, `how explainer`, `why investigators`, `why synthesizer`, `reflect tooling`, `reflect judgment, divergent, synthesizer`, `swarm workers`, and the single-role default) now runs `claude-opus-5`. The three roles that carry the hardest code changes (`bug-fix`, `perf-issue`, `hillclimb`) move to `claude-fable-5`, matching the existing `strongest judgment` row. Panel quads are unchanged. The generator restamped the six `## Models` sections; the README substitution table rows for the Cursor `claude-opus-4-X-thinking-xhigh` variant and the panel quad now state the current defaults. Opus 4.8 stays in the available-model list for `/setup-pstack` overrides.
+
 ## 0.9.14 — single-source the duplicated facts behind a generator
 
 Four PRs (#36, #37, #40, #39) moved every convention-held duplication behind `tools/generate.mjs`, which stamps each fact from one source and fails CI on any diff after regeneration.

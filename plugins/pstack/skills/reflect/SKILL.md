@@ -40,15 +40,15 @@ One message, three `Agent` calls, `subagent_type: "general-purpose"`, explicit `
 
 | Lens | `model` | Prompt template |
 |---|---|---|
-| Judgment | your configured reflect-judgment model (default `claude-opus-4-8`) | `references/judgment-reviewer.md` |
-| Tooling | your configured reflect-tooling model (default `claude-opus-4-8`) | `references/tooling-reviewer.md` |
-| Divergent | your configured reflect-judgment model (default `claude-opus-4-8`) | `references/divergent-reviewer.md` |
+| Judgment | your configured reflect-judgment model (default in [Models](#models)) | `references/judgment-reviewer.md` |
+| Tooling | your configured reflect-tooling model (default in [Models](#models)) | `references/tooling-reviewer.md` |
+| Divergent | your configured reflect-judgment model (default in [Models](#models)) | `references/divergent-reviewer.md` |
 
 Pass each template verbatim, substituting the transcript path or digest where marked. Reviewers return findings in the `Agent` response body.
 
 ### 3. Synthesize
 
-One `Agent` call, `subagent_type: "general-purpose"`, using your configured reflect-judgment model (default `claude-opus-4-8`). Pick a subagent_type that retains MCP access — the synthesizer's quality check includes spot-verifying citations, which can require MCP access. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
+One `Agent` call, `subagent_type: "general-purpose"`, using your configured reflect-judgment model (default in [Models](#models)). Pick a subagent_type that retains MCP access — the synthesizer's quality check includes spot-verifying citations, which can require MCP access. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
 
 ### 4. Structural enforcement check
 
@@ -77,3 +77,10 @@ Short list, no preamble:
 - New skills created: `<skill path>`. One line each (rare).
 - Backlog filed to the devex tracker: `<issue title>` (`<tags>`). One line each.
 - Dropped: one line per rejected finding + reason from the synthesizer.
+
+## Models
+
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+
+- reflect tooling: `claude-opus-4-8`
+- reflect judgment, divergent, synthesizer: `claude-opus-4-8`

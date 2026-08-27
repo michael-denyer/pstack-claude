@@ -24,9 +24,9 @@ bun tools/generate.mjs
 bash tests/skill-collision-repro.sh
 ```
 
-The generator stamps the root `VERSION` into the three plugin manifests, emits one Codex prompt stub per public skill from its `menu-description` frontmatter (removing orphans), rewrites the README slash-command table, asserts `CHANGES.md` has a heading for that version, and validates the Codex marketplace pointer. CI reruns it and fails on any resulting diff, so commit whatever it changes. Adding a skill means giving it a `menu-description` and adding its name to `README_COMMAND_ORDER` in `tools/generate.mjs`; the generator fails by name if either is missing.
+The generator stamps the root `VERSION` into the three plugin manifests, emits one Codex prompt stub per public skill from its `menu-description` frontmatter (removing orphans), rewrites the README slash-command table, stamps the model defaults from `plugins/pstack/models.json` into each skill's Models section (plus setup-pstack's override sheet, interrogate's reviewer table, and codex-tools' Model names section), asserts `CHANGES.md` has a heading for that version, and validates the Codex marketplace pointer. CI reruns it and fails on any resulting diff, so commit whatever it changes. Adding a skill means giving it a `menu-description` and adding its name to `README_COMMAND_ORDER` in `tools/generate.mjs`; the generator fails by name if either is missing. Changing a model default means editing `models.json`, never a skill body: a `claude-*` slug in skill prose outside a stamped region fails the generator with the file and line.
 
-The invariant script checks plugin layout, frontmatter flags, and that the default model quad is identical everywhere it appears. The last check is behavioral: it needs the `claude` CLI and API access and makes one haiku call. CI runs everything except that leg via `SKIP_BEHAVIORAL=1`, so run it unflagged at least once before a release.
+The invariant script checks plugin layout and frontmatter flags. The last check is behavioral: it needs the `claude` CLI and API access and makes one haiku call. CI runs everything except that leg via `SKIP_BEHAVIORAL=1`, so run it unflagged at least once before a release.
 
 If you touched `skills/poteto-mode/scripts/`:
 

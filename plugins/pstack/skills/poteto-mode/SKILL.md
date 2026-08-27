@@ -8,7 +8,7 @@ menu-description: default entry point for any non-trivial task
 
 ## Platform Adaptation
 
-These skills use Claude Code tool names (the `Skill` tool, the `Agent` tool, `AskUserQuestion`) and Claude model slugs (`claude-opus-4-8`). On Claude Code they work as written. On Codex and other runtimes, the skills are the same files; only the tool, model, and built-in-skill names resolve differently. When a skill names a Claude tool, a `claude-*` model, or a Claude built-in skill (`run`, `verify`, `plugin-dev:skill-development`), read [`references/codex-tools.md`](references/codex-tools.md) for the Codex equivalent.
+These skills use Claude Code tool names (the `Skill` tool, the `Agent` tool, `AskUserQuestion`) and Claude model slugs (`claude-*`). On Claude Code they work as written. On Codex and other runtimes, the skills are the same files; only the tool, model, and built-in-skill names resolve differently. When a skill names a Claude tool, a `claude-*` model, or a Claude built-in skill (`run`, `verify`, `plugin-dev:skill-development`), read [`references/codex-tools.md`](references/codex-tools.md) for the Codex equivalent.
 
 ## Non-negotiables
 
@@ -88,7 +88,7 @@ Read the leaf skill in full for any principle you apply. Each entry names when i
 
 **Use `subagent_type: "poteto-agent"` for any subagent you spawn inside a playbook step** (code-writing delegates, ad-hoc helpers). `/poteto-mode` and `poteto-agent` route through the same wrapper. Routed workflow skills (`how`, `why`, `interrogate`, `reflect`, `swarm`) set their own `subagent_type` for diverse-model review; respect what the skill prescribes, don't override to `poteto-agent`.
 
-**Defaults for every `Agent` call.** `run_in_background: true`, full tool access (do not pick a subagent_type that strips MCP), file pointers not inlined context, explicit model per role (configurable via `/setup-pstack`; default `claude-opus-4-8` for prose and judgment). Code delegates tier by difficulty. The hardest changes (cross-cutting design, gnarly concurrency, subtle algorithms) go to your strongest judgment model (`claude-fable-5`) when the task needs judgment or the intent is vague, and to your strongest instruction-following model when the work is a precisely specified sequence of steps to execute to the letter; trivial mechanical edits go to your fast code model; everything else defaults to `claude-opus-4-8`. Multi-model panels run the configured four-model quad for diversity — defaults enumerated in the panel skills (`arena`, `architect`, `interrogate`, `how`). Per-role `/setup-pstack` lines override these defaults and the model choices in the routed skills (`how`, `why`, `arena`, `swarm`, `architect`, `interrogate`, `reflect`); a role with no line keeps its default, and a role line of `inherit-parent` or `auto` runs that role on the parent session's model (omit `model` on the `Agent` call).
+**Defaults for every `Agent` call.** `run_in_background: true`, full tool access (do not pick a subagent_type that strips MCP), file pointers not inlined context, explicit model per role (configurable via `/setup-pstack`; role defaults in [Models](#models), with "judgment and prose" covering prose and judgment). Code delegates tier by difficulty. The hardest changes (cross-cutting design, gnarly concurrency, subtle algorithms) go to your strongest-judgment model (default in [Models](#models)) when the task needs judgment or the intent is vague, and to your strongest instruction-following model when the work is a precisely specified sequence of steps to execute to the letter; trivial mechanical edits go to your fast code model; everything else uses the single-role default. Multi-model panels run the configured four-model quad for diversity — defaults enumerated in each panel skill's Models section (`arena`, `architect`, `interrogate`, `how`). Per-role `/setup-pstack` lines override these defaults and the model choices in the routed skills (`how`, `why`, `arena`, `swarm`, `architect`, `interrogate`, `reflect`); a role with no line keeps its default, and a role line of `inherit-parent` or `auto` runs that role on the parent session's model (omit `model` on the `Agent` call).
 
 You own every subagent's work. Review the diff and write your own summary, don't pass through what it said. Interrupt-chained resumes silently drop directives, so fire a fresh subagent with consolidated scope rather than trusting a "done" summary. A second opinion is the same prompt against a different model. Agreement is high-signal.
 
@@ -138,3 +138,14 @@ A large or cross-cutting effort (a migration across many call sites, an ambitiou
 - **Multi-phase or multi-PR plan.** Work that spans phases or stacked PRs. `playbooks/multi-phase-plan.md`.
 - **Worktree and simulator cleanup.** Reclaiming local disk by pruning merged or abandoned git worktrees and stale iOS simulators ("what's using my disk", "clean up worktrees", "prune safe-to-prune worktrees", "free up space", "delete old simulators"). `playbooks/worktree-cleanup.md`.
 - **Opening a PR.** Invoked at the end of every other playbook. `playbooks/opening-a-pr.md`.
+
+## Models
+
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+
+- feature, refactoring: `claude-opus-4-8`
+- bug-fix: `claude-opus-4-8`
+- perf-issue: `claude-opus-4-8`
+- hillclimb: `claude-opus-4-8`
+- judgment and prose: `claude-opus-4-8`
+- strongest judgment: `claude-fable-5`

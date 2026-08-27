@@ -24,7 +24,7 @@ Open a todolist with one entry per phase before launching anything.
 1. State the done predicate and the artifact or report the swarm must return.
 2. Choose the shape. Partition into slices, race N workers on identical briefs, or mix both. For a race or mixed shape, declare `first pass`, `rank all`, or `best-of` before spawning.
 3. Set N from the user or derive it from the shape. N is total workers, not the number that run at once.
-4. Pick the worker model from `swarm workers` in `~/.claude/pstack-models.md` when present. Otherwise use `claude-opus-4-8`. For a model race, name each arm's model up front.
+4. Pick the worker model from `swarm workers` in `~/.claude/pstack-models.md` when present. Otherwise use the default in [Models](#models). For a model race, name each arm's model up front.
 5. Give each worker its own writable output when it writes. Use a worktree, branch, or `/tmp/swarm-<slug>/worker-<n>/`.
 
 ## Phase B: Fan out
@@ -46,3 +46,9 @@ Keep a compact result table, one-line evidenced issues, and explicit gaps or dro
 ## Phase D: Report
 
 Return one consolidated in-chat report with the table, issue one-liners, gaps or dropouts, and the race rule when used.
+
+## Models
+
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+
+- swarm workers: `claude-opus-4-8`

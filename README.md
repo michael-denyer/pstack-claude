@@ -75,8 +75,8 @@ Unverified relative to Codex: the Codex path above is confirmed on a live sessio
 │   ├── .codex-plugin/prompts/        # 31 slash command stubs, generated (Codex only; link into ~/.codex/prompts)
 │   ├── hooks/                        # SessionStart auto-fire: injects the poteto-mode mandate (Claude Code only)
 │   └── agents/                       # Claude subagents: poteto-agent, comment-sicko (Codex routes via codex-tools.md)
-├── tests/skill-collision-repro.sh    # layout, flag, and quad invariants (needs claude CLI)
-├── tools/generate.mjs                # stamps VERSION, Codex prompts, and the command table from their sources
+├── tests/skill-collision-repro.sh    # layout and flag invariants (needs claude CLI)
+├── tools/generate.mjs                # stamps VERSION, model defaults, Codex prompts, and the command table
 ├── VERSION                           # canonical plugin version (single source; manifests are stamped)
 ├── LICENSE                           # pstack upstream MIT
 ├── LICENSE-cursor-team-kit           # cursor-team-kit upstream MIT
@@ -98,7 +98,7 @@ The Codex build shares one `skills/` tree with the Claude Code build. Nothing is
 - **Tool, model, and built-in mapping.** When a skill names a Claude tool (the `Agent` tool, `AskUserQuestion`), a `claude-*` model slug, or a Claude built-in skill (`run`, `verify`, `loop`, `plugin-dev:skill-development`), it resolves through [`skills/poteto-mode/references/codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md). `poteto-mode` and every skill that names one of those carries a one-line **Platform note** pointing there.
 - **Subagents.** The `Agent` tool maps to Codex `spawn_agent` / `wait_agent` / `close_agent`, enabled by `multi_agent = true`. Parallel fan-out is multiple `spawn_agent` calls in one turn. Without the flag, `interrogate`, `arena`, `how`, `why`, `reflect`, and `architect` degrade to a single sequential pass. There is no `poteto-agent` subagent type on Codex; route ad-hoc subagents by dispatching a `spawn_agent` told to read `poteto-mode` first.
 - **Auto-fire.** The `hooks/` SessionStart injection is Claude Code-only; Codex has no plugin hook runtime. Enter `pstack:poteto-mode` by name, or add a standing instruction to `~/.codex/AGENTS.md` if you want the same always-on routing.
-- **Models.** The `claude-*` slugs in skills are Claude defaults. On Codex substitute your configured Codex models, keeping multi-model panels genuinely diverse. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`) with Codex slugs instead of `~/.claude/pstack-models.md`.
+- **Models.** The `claude-*` slugs in skills are Claude defaults, stamped into each skill's Models section from `plugins/pstack/models.json`. On Codex substitute your configured Codex models, keeping multi-model panels genuinely diverse. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`) with Codex slugs instead of `~/.claude/pstack-models.md`.
 
 Verified on a live Codex session installed via the symlinks: the user-facing skills are discovered and namespaced under `pstack` (`pstack:poteto-mode`, `pstack:interrogate`, and so on). The `principle-*` leaf skills carry `user-invocable: false` and no command, so Codex does not surface them in the picker, the same as Claude Code. They stay installed for `poteto-mode` to read by path. The deeper behaviors (mapping resolution mid-task, `spawn_agent` fan-out) follow the proven `superpowers` pattern and are worth confirming in your own session.
 

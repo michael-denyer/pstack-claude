@@ -27,7 +27,7 @@ The N candidates will receive the same prompt, so the prompt is the contract. Ge
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric. State what success looks like for *this* task, then turn it into 3-6 concrete gradeable criteria. Concrete: `Adds a --dry-run flag that skips writes`. Vague: `code is correct`. The rubric is the picker's tool in Phase D; candidates only see the task.
-3. Pick the runners. Use `arena runners` from `~/.claude/pstack-models.md` when present. Otherwise default to one each on `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5`. Spawn more when the arena covers multiple design directions. Same model N times when the work is generation-bound rather than judgment-sensitive.
+3. Pick the runners. Use `arena runners` from `~/.claude/pstack-models.md` when present. Otherwise run one each on the defaults in [Models](#models). Spawn more when the arena covers multiple design directions. Same model N times when the work is generation-bound rather than judgment-sensitive.
 4. Assign output paths. Each candidate writes to its own location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`). N candidates writing to the same path is shared mutable state and fails the the **separate-before-serializing-shared-state** principle skill test.
 
 ## Phase B: Fan out
@@ -71,3 +71,10 @@ If verification surfaces a problem the arena did not catch, either Phase A was w
 ## Outputs
 
 One synthesized artifact. One short synthesis note alongside, naming the base, the grafts (with source candidate), the rejections, the dropouts if any, and the verification result.
+
+## Models
+
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+
+- arena runners: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5`
+- arena cross-judge pool: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`

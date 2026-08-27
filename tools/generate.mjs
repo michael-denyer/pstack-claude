@@ -10,6 +10,12 @@
 //   each public skill's frontmatter (name + menu-description)
 //     -> its Codex prompt stub in plugins/pstack/.codex-plugin/prompts/
 //     -> its row in README.md's "Slash commands" table
+//   plugins/pstack/models.json (the model policy: role defaults, panel quad,
+//   available slugs, Codex equivalents)
+//     -> each model-consuming skill's "## Models" section
+//     -> setup-pstack's override-sheet block and interrogate's reviewer table
+//     -> the "## Model names" section of poteto-mode/references/codex-tools.md
+//   No other claude-* slug may appear in skill prose; the scan below fails on strays.
 //
 // Also validated: .agents/plugins/marketplace.json points at a real plugin
 // directory whose Codex manifest name matches (it carries no version; Codex
@@ -101,6 +107,136 @@ export function promptStub({ name, menu }) {
   return `---\nname: ${name}\ndescription: ${menu}\ndisable-model-invocation: true\n---\n\nInvoke the \`${name}\` skill and follow it.\n`;
 }
 
+const code = (s) => `\`${s}\``;
+const codeList = (models) => models.map(code).join(", ");
+
+// Replace the body of a "## <title>" section (everything up to the next "## "
+// heading or EOF). Throws when the heading is absent — a Models section is a
+// structural anchor, not an optional nicety.
+export function replaceSection(text, title, body, file) {
+  const lines = text.split("\n");
+  const start = lines.indexOf(`## ${title}`);
+  if (start === -1) throw new Error(`${file}: no "## ${title}" section to stamp`);
+  let end = start + 1;
+  while (end < lines.length && !lines[end].startsWith("## ")) end++;
+  lines.splice(start + 1, end - start - 1, "", ...body.split("\n"), "");
+  return lines.join("\n");
+}
+
+export function modelsSection(roles) {
+  const bullets = roles.map((r) => `- ${r.role}: ${codeList(r.models)}`).join("\n");
+  return (
+    "Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). " +
+    "A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.\n\n" +
+    bullets
+  );
+}
+
+export function setupModelsSection(models) {
+  const avail = models.available.map((m) => `${m.label} (${code(m.slug)})`).join(", ");
+  return (
+    "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
+    `- Available Claude models: ${avail}\n` +
+    `- Default panel quad: ${codeList(models.panelQuad)}\n` +
+    `- Single-role default: ${code(models.singleRoleDefault)}`
+  );
+}
+
+// The override sheet the setup skill writes for users. The preamble is fixed;
+// the role rows come from models.json.
+export function overrideSheetBlock(models) {
+  const rows = models.roles.map((r) => `${r.role}: ${r.models.join(", ")}`).join("\n");
+  return (
+    "# pstack model configuration\n\n" +
+    "Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; " +
+    "the values here override those defaults. Delete a line to fall back to the skill default. " +
+    "A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); " +
+    "an alias entry in a panel list still counts toward that panel's fan-out.\n\n" +
+    rows
+  );
+}
+
+export function stampOverrideSheet(text, models, file) {
+  const lines = text.split("\n");
+  const step = lines.findIndex((l) => l.startsWith("### 5. Write the override sheet"));
+  if (step === -1) throw new Error(`${file}: no "### 5. Write the override sheet" heading`);
+  const open = lines.indexOf("```markdown", step);
+  if (open === -1) throw new Error(`${file}: no \`\`\`markdown fence under step 5`);
+  const close = lines.indexOf("```", open + 1);
+  if (close === -1) throw new Error(`${file}: unclosed fence under step 5`);
+  lines.splice(open + 1, close - open - 1, overrideSheetBlock(models));
+  return lines.join("\n");
+}
+
+export function stampReviewerTable(text, models, file) {
+  const lines = text.split("\n");
+  const header = lines.indexOf("| Subagent | Default model |");
+  if (header === -1) throw new Error(`${file}: no reviewer table header`);
+  let end = header + 2;
+  while (end < lines.length && lines[end].startsWith("| Reviewer ")) end++;
+  const reviewers = models.roles.find((r) => r.role === "interrogate reviewers").models;
+  const rows = reviewers.map((m, i) => `| Reviewer ${String.fromCharCode(65 + i)} | ${code(m)} |`);
+  lines.splice(header + 2, end - header - 2, ...rows);
+  return lines.join("\n");
+}
+
+export function codexModelNamesSection(models) {
+  return (
+    "Skills name Claude defaults (a single-role default for code/prose/judgment plus a four-model quad for " +
+    "diverse-model panels; each model-consuming skill lists its own in a Models section). These slugs do not " +
+    "resolve on Codex. Substitute your configured Codex models:\n\n" +
+    `- Single-model roles: your primary Codex model (for example ${code(models.codex.singleRoleExample)}).\n` +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
+    "signal comes from model diversity, so use the distinct Codex models available to you. A good default quad " +
+    `on ChatGPT is ${codeList(models.codex.panelQuad)}. If only one model family is reachable, vary reasoning ` +
+    "effort and note in the verdict that diversity was reduced.\n\n" +
+    "`/setup-pstack` writes the configured model list. On Codex, set it to your Codex model slugs."
+  );
+}
+
+// After stamping, no claude-* model slug may survive in skill prose outside
+// the generator-owned regions. The scan blanks each owned line range (keeping
+// line numbers stable) and reports whatever still matches.
+const SLUG_RE = /claude-(?:opus|fable|sonnet|haiku)[0-9a-z.-]*/;
+
+// [start, end) line ranges of every generator-owned region in this file.
+export function ownedRanges(lines) {
+  const ranges = [];
+  const sectionStarts = ["## Models", "## Model names"];
+  for (const heading of sectionStarts) {
+    const start = lines.indexOf(heading);
+    if (start === -1) continue;
+    let end = start + 1;
+    while (end < lines.length && !lines[end].startsWith("## ")) end++;
+    ranges.push([start + 1, end]);
+  }
+  const step = lines.findIndex((l) => l.startsWith("### 5. Write the override sheet"));
+  if (step !== -1) {
+    const open = lines.indexOf("```markdown", step);
+    const close = open === -1 ? -1 : lines.indexOf("```", open + 1);
+    if (close !== -1) ranges.push([open + 1, close]);
+  }
+  const table = lines.indexOf("| Subagent | Default model |");
+  if (table !== -1) {
+    let end = table + 2;
+    while (end < lines.length && lines[end].startsWith("| Reviewer ")) end++;
+    ranges.push([table + 2, end]);
+  }
+  return ranges;
+}
+
+export function strayModelSlugs(path, text) {
+  const lines = text.split("\n");
+  const owned = ownedRanges(lines);
+  const strays = [];
+  lines.forEach((line, i) => {
+    if (!SLUG_RE.test(line)) return;
+    if (owned.some(([s, e]) => i >= s && i < e)) return;
+    strays.push(`${path}:${i + 1}: ${line.trim()}`);
+  });
+  return strays;
+}
+
 // Editorial ordering of the README "Slash commands" table. Set-checked against
 // the public skills on every run: adding or retiring a skill without updating
 // this list fails here by name.
@@ -156,7 +292,67 @@ function main() {
     }
   }
 
-  const skills = publicSkills(join(repo, "plugins/pstack/skills"));
+  const models = JSON.parse(readFileSync(join(repo, "plugins/pstack/models.json"), "utf8"));
+  const skillsDir = join(repo, "plugins/pstack/skills");
+
+  const bySkill = new Map();
+  for (const r of models.roles) {
+    if (!bySkill.has(r.skill)) bySkill.set(r.skill, []);
+    bySkill.get(r.skill).push(r);
+  }
+  const stampFile = (path, next, label) => {
+    if (readFileSync(path, "utf8") === next) return false;
+    writeFileSync(path, next);
+    console.log(`stamped: ${label}`);
+    return true;
+  };
+  let modelStamps = 0;
+  for (const [skill, roles] of bySkill) {
+    const path = join(skillsDir, skill, "SKILL.md");
+    let text = readFileSync(path, "utf8");
+    if (skill === "interrogate") {
+      text = stampReviewerTable(text, models, path);
+    } else {
+      text = replaceSection(text, "Models", modelsSection(roles), path);
+    }
+    if (stampFile(path, text, `skills/${skill}/SKILL.md (models)`)) modelStamps++;
+  }
+  {
+    const path = join(skillsDir, "setup-pstack/SKILL.md");
+    let text = readFileSync(path, "utf8");
+    text = replaceSection(text, "Models", setupModelsSection(models), path);
+    text = stampOverrideSheet(text, models, path);
+    if (stampFile(path, text, "skills/setup-pstack/SKILL.md (models)")) modelStamps++;
+  }
+  {
+    const path = join(skillsDir, "poteto-mode/references/codex-tools.md");
+    const text = readFileSync(path, "utf8");
+    const next = replaceSection(text, "Model names", codexModelNamesSection(models), path);
+    if (stampFile(path, next, "poteto-mode/references/codex-tools.md (models)")) modelStamps++;
+  }
+  if (modelStamps === 0) console.log("ok: model-policy sections current");
+
+  const strays = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir)) {
+      if (entry === "node_modules" || entry === "scripts") continue;
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (entry.endsWith(".md")) {
+        strays.push(...strayModelSlugs(full.slice(repo.length + 1), readFileSync(full, "utf8")));
+      }
+    }
+  };
+  walk(skillsDir);
+  if (strays.length) {
+    throw new Error(
+      `claude-* model slugs outside generator-owned regions (move the fact into models.json or reference the role):\n` +
+        strays.join("\n"),
+    );
+  }
+  console.log("ok: no stray model slugs in skill prose");
+
+  const skills = publicSkills(skillsDir);
 
   const promptsDir = join(repo, "plugins/pstack/.codex-plugin/prompts");
   let promptsChanged = 0;

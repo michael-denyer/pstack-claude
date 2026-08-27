@@ -32,7 +32,7 @@ Skip Phase A only when the work is genuinely greenfield with no surrounding syst
 
 Run the **arena** skill with the design-sketch task and the Phase A grounding artifacts. Pass `references/runner-prompt.md` as each runner's prompt. Each candidate produces a design package shaped per `references/rationale-template.md`: the caller's usage written first, then the type sketch, function signatures, module map, and prose rationale derived from it.
 
-Use your configured architect runners (defaults `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5`).
+Use your configured architect runners (defaults in [Models](#models)).
 
 Design it twice. Require at least two structurally distinct candidates before synthesis, even when the first looks sufficient. This is the **exhaust-the-design-space** principle skill made concrete. Whole-shape alternatives, not point fixes inside one shape.
 
@@ -83,3 +83,9 @@ When you scrap:
 ## Outputs
 
 The caller's usage is written first and the type sketch derived from it. One file with new types and signatures for small changes; module map plus type definitions for larger work. The rationale ships alongside, shaped per `references/rationale-template.md`, including the usage sketch and the synthesis decision.
+
+## Models
+
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+
+- architect runners: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5`

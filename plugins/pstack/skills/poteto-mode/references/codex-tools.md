@@ -1,6 +1,6 @@
 # Codex tool mapping for pstack
 
-pstack skills are written in Claude Code tool language (the `Skill` tool, the `Agent` tool, `AskUserQuestion`, model slugs like `claude-opus-4-8`). On Codex the skills are the same files; only the tool names resolve differently. Read this when a pstack skill names a Claude tool, a Claude built-in skill, or a `claude-*` model.
+pstack skills are written in Claude Code tool language (the `Skill` tool, the `Agent` tool, `AskUserQuestion`, `claude-*` model slugs). On Codex the skills are the same files; only the tool names resolve differently. Read this when a pstack skill names a Claude tool, a Claude built-in skill, or a `claude-*` model.
 
 ## Tool actions
 
@@ -41,7 +41,7 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 
 ## Model names
 
-Skills name Claude defaults (`claude-opus-4-8` for code/prose/judgment; a four-model quad for diverse-model panels, enumerated in the panel skills). These slugs do not resolve on Codex. Substitute your configured Codex models:
+Skills name Claude defaults (a single-role default for code/prose/judgment plus a four-model quad for diverse-model panels; each model-consuming skill lists its own in a Models section). These slugs do not resolve on Codex. Substitute your configured Codex models:
 
 - Single-model roles: your primary Codex model (for example `gpt-5.6-sol`).
 - Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial signal comes from model diversity, so use the distinct Codex models available to you. A good default quad on ChatGPT is `gpt-5.6-sol`, `gpt-5.5`, `gpt-5.4`, `gpt-5.6-luna`. If only one model family is reachable, vary reasoning effort and note in the verdict that diversity was reduced.

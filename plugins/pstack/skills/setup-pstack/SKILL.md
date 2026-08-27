@@ -1,6 +1,7 @@
 ---
 name: setup-pstack
 description: Configure which models pstack uses per role. Detects your available Claude models and writes a per-role override file that the user can include from their CLAUDE.md. Use for /setup-pstack, "configure pstack models", or changing pstack's model choices.
+menu-description: configure pstack per-role model choices
 ---
 
 # Setup pstack

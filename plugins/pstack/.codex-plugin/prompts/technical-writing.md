@@ -1,6 +1,6 @@
 ---
 name: technical-writing
-description: apply the layered technical-writing standard to docs, RFCs, readmes, PR descriptions, and commit messages
+description: write docs, RFCs, readmes, PR descriptions, and commit messages to one layered standard
 disable-model-invocation: true
 ---
 

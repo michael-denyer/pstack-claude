@@ -6,9 +6,10 @@ Names for the concepts this repo's design discussions keep reaching for. Archite
 - **Model policy** — the mapping from roles to model slugs. Defaults are named inline in skills; the user's override sheet (`~/.claude/pstack-models.md`, written by `setup-pstack`) is the layer that adapts them.
 - **Role** — a named unit of delegated work with its own model choice (`arena runners`, `how critics`, `swarm workers`). The role vocabulary lives in `setup-pstack`'s sheet.
 - **Panel quad** — the four-model diverse panel the multi-model skills (`arena`, `architect`, `interrogate`, `how`) run by default. Kept identical everywhere it appears; the invariant script checks it.
-- **Prompt stub** (or trampoline) — a file under `.codex-plugin/prompts/` whose body invokes its skill. Codex-only; the Claude Code build serves slash commands from skills directly.
+- **Prompt stub** (or trampoline) — a file under `.codex-plugin/prompts/` whose body invokes its skill. Codex-only, generated from the skill's `menu-description`; the Claude Code build serves slash commands from skills directly.
+- **Menu description** — the `menu-description:` frontmatter one-liner every public skill carries. Renders as the Codex slash-menu text and the README command-table row; the long `description:` stays the trigger-matching prose.
 - **Generator** — `tools/generate.mjs`. Stamps facts from their single source into every committed copy and validates cross-file contracts. CI reruns it and fails on any diff.
-- **Generator-owned copy** — a committed value the generator writes (today: the `version` field in the three manifests). Hand edits are reverted by the next regeneration and caught by CI.
+- **Generator-owned copy** — a committed value the generator writes (the `version` field in the three manifests, the prompt stubs, the README slash-command table). Hand edits are reverted by the next regeneration and caught by CI.
 - **VERSION** — the repo-root file holding the canonical plugin version. Releases edit it, add the matching `CHANGES.md` heading, and regenerate; plugin auto-update installs by this number.
 - **Sync boundary** — the split between what upstream pstack owns (skill content) and what this port owns (Cursor-to-Claude-Code translation). Defined in [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Invariant script** — `tests/skill-collision-repro.sh`. The repo's check seam: static layout/flag/quad invariants plus a behavioral leg that needs the `claude` CLI.

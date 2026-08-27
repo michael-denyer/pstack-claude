@@ -1,6 +1,6 @@
 ---
 name: maintain-verification-skill
-description: audit and refresh a project's verification skill and feature map
+description: re-sync a drifted verification skill and its feature map
 disable-model-invocation: true
 ---
 

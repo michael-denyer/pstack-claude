@@ -1,6 +1,6 @@
 ---
 name: create-verification-skill
-description: generate a project-local skill that drives your app to prove behavior
+description: generate a project-local verification skill and feature map
 disable-model-invocation: true
 ---
 

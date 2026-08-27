@@ -77,8 +77,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Select by extension OR shebang. The hook scripts are deliberately
+      # extensionless (Claude Code's Windows auto-detection prepends "bash" to
+      # any command containing ".sh"), so an extension-only glob skipped the
+      # one script that runs at every user's session start.
       - name: Run shellcheck
         run: |
           shellcheck --version
-          find . -path ./.git -prune -o -name '*.sh' -print0 \
-            | xargs -0 shellcheck --severity=warning
+          {
+            find . -path ./.git -prune -o -path '*/node_modules' -prune -o -name '*.sh' -print
+            grep -rlE --exclude-dir=.git --exclude-dir=node_modules '^#!/(usr/bin/env )?(ba)?sh' .
+          } | sed 's#^\./##' | sort -u | tee /dev/stderr | xargs shellcheck --severity=warning

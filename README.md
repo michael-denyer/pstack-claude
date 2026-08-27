@@ -109,7 +109,7 @@ Verified on a live Codex session installed via the symlinks: the user-facing ski
 
 Two workflows run on every pull request and push to `main`.
 
-`ci.yml` runs four jobs: the static plugin invariants (`tests/skill-collision-repro.sh` under `SKIP_BEHAVIORAL=1`, since the behavioral leg needs the `claude` CLI and API access), a generated-files check (`bun tools/generate.mjs` followed by `git diff --exit-code`, so a `VERSION` bump that skips regeneration or the `CHANGES.md` entry fails the build), the vendored bun tooling (`bun install --frozen-lockfile`, `bun run typecheck`, `bun test orch watch-pr`), and `shellcheck` over every `.sh` file.
+`ci.yml` runs four jobs: the static plugin invariants (`tests/skill-collision-repro.sh` under `SKIP_BEHAVIORAL=1`, since the behavioral leg needs the `claude` CLI and API access), a generated-files check (`bun tools/generate.mjs` followed by `git diff --exit-code`, so a `VERSION` bump that skips regeneration or the `CHANGES.md` entry fails the build), the vendored bun tooling (`bun install --frozen-lockfile`, `bun run typecheck`, `bun test orch watch-pr`), and `shellcheck` over every shell script, selected by `.sh` extension or by shebang so the extensionless hook scripts are covered.
 
 `security.yml` runs `osv-scanner` against the lockfiles and fails the build if no lockfile was found, because an empty scan reads exactly like a clean one. It also rejects any action reference not pinned to a full 40-character commit SHA. It runs weekly on top of the per-PR trigger, so a CVE published after a merge still surfaces. `zizmor` audits the workflows themselves for template injection, over-broad permissions, and credential persistence.
 

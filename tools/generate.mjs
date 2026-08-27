@@ -271,6 +271,32 @@ export function renderReadmeTable(readme, skills) {
   return lines.join("\n");
 }
 
+// hooks.json names commands as "${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd <script>";
+// both the runner and the named script must exist in the plugin and be
+// executable, or the SessionStart hook fails silently for every user.
+export function validateHooks(hooksJson, { statOf }) {
+  const problems = [];
+  for (const [event, groups] of Object.entries(JSON.parse(hooksJson).hooks ?? {})) {
+    for (const group of groups) {
+      for (const hook of group.hooks ?? []) {
+        const m = hook.command?.match(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)"?(?:\s+(\S+))?/);
+        if (!m) {
+          problems.push(`${event}: command does not reference \${CLAUDE_PLUGIN_ROOT}: ${hook.command}`);
+          continue;
+        }
+        const targets = [m[1]];
+        if (m[1].endsWith("run-hook.cmd") && m[2]) targets.push(`hooks/${m[2]}`);
+        for (const t of targets) {
+          const st = statOf(t);
+          if (!st) problems.push(`${event}: ${t} does not exist`);
+          else if (!(st.mode & 0o111)) problems.push(`${event}: ${t} is not executable`);
+        }
+      }
+    }
+  }
+  if (problems.length) throw new Error(`hooks.json:\n  ${problems.join("\n  ")}`);
+}
+
 function main() {
   const version = readFileSync(join(repo, "VERSION"), "utf8").trim();
   if (!/^\d+\.\d+\.\d+$/.test(version)) {
@@ -390,6 +416,12 @@ function main() {
     pathExists: (p) => existsSync(join(repo, p)),
   });
   console.log("ok: .agents/plugins/marketplace.json names the plugin and points at a real path");
+
+  const pluginRoot = join(repo, "plugins/pstack");
+  validateHooks(readFileSync(join(pluginRoot, "hooks/hooks.json"), "utf8"), {
+    statOf: (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null),
+  });
+  console.log("ok: hooks.json commands point at existing, executable scripts");
 }
 
 try {

@@ -9,72 +9,76 @@
 #
 # This also enforces the static maintenance invariants from CHANGES.md: the
 # principle-* leaf flags. The static checks need no CLI; only the behavioral
-# leg below does. (Version parity and the model quad are no longer checked
-# here: tools/generate.mjs stamps both from their source files, VERSION and
-# plugins/pstack/models.json, and CI regenerates and diffs, so a partial bump
-# cannot exist on a green build.)
+# leg below does. (Version parity, the model quad, and prompt<->skill
+# correspondence are no longer checked here: tools/generate.mjs stamps each
+# from its source file and CI regenerates and diffs, so none can drift on a
+# green build.)
+#
+# Each static check is a function that prints one finding per line; empty
+# output is a pass. `check` names it in the report. tests/invariants.test.mjs
+# runs this script against fixture trees (via PSTACK_REPO) to prove every
+# check still fails when it should.
 #
 # Manual test: the behavioral leg needs the claude CLI and API access; one haiku call.
 set -euo pipefail
 
-repo="$(cd "$(dirname "$0")/.." && pwd)"
+repo="${PSTACK_REPO:-$(cd "$(dirname "$0")/.." && pwd)}"
 fail=0
 
 note() { printf '%s\n' "$*"; }
+frontmatter_of() { sed -n '2,/^---$/p' "$1"; }
 
-# Static invariant (0.9.13, #22): the Claude Code plugin ships no commands/.
-# Every /pstack:<name> is served by the skill itself; a commands/ directory
-# reappearing (typically via an upstream sync) duplicates every slash-menu row.
-if [ -e "$repo/plugins/pstack/commands" ]; then
-  note "FAIL: plugins/pstack/commands/ exists; trampolines belong in .codex-plugin/prompts/ (see CHANGES 0.9.13)"
-  fail=1
-else
-  note "ok: no plugins/pstack/commands/ directory"
-fi
-
-# (Codex prompt <-> skill correspondence is no longer checked here:
-# tools/generate.mjs emits one prompt per public skill and removes orphans,
-# and CI regenerates and diffs, so a mismatch cannot exist on a green build.)
-
-# Flag invariant (CHANGES 0.9.8): no skill may carry disable-model-invocation —
-# on a skill the flag makes the Skill tool refuse the invocation outright, which
-# breaks the SessionStart mandate and model-initiated entry. Frontmatter only:
-# skill bodies may mention the flag in prose (automate-me does).
-flagged=""
-for skill in "$repo"/plugins/pstack/skills/*/SKILL.md; do
-  if sed -n '2,/^---$/p' "$skill" | grep -q '^disable-model-invocation: true$'; then
-    flagged="$flagged$skill"$'\n'
+# check <name> <fn>: run fn, report ok/FAIL under name, indent its findings.
+check() {
+  local name="$1" fn="$2" out
+  out="$("$fn")"
+  if [ -n "$out" ]; then
+    note "FAIL: $name"
+    printf '%s\n' "$out" | sed 's/^/  /'
+    fail=1
+  else
+    note "ok: $name"
   fi
-done
-if [ -n "$flagged" ]; then
-  note "FAIL: skills must not carry 'disable-model-invocation: true':"
-  note "$flagged"
-  fail=1
-else
-  note "ok: no skill carries disable-model-invocation: true"
-fi
+}
 
-# Principle invariant (CHANGES 0.9.9): every command-less principle-* leaf carries
-# user-invocable: false (hidden from the / menu, read by path from poteto-mode) and
-# NOT disable-model-invocation (the pair cancels to a dead skill).
-bad_principle=""
-for skill in "$repo"/plugins/pstack/skills/principle-*/SKILL.md; do
-  front="$(sed -n '2,/^---$/p' "$skill")"
-  printf '%s\n' "$front" | grep -q '^user-invocable: false$' || bad_principle="$bad_principle$skill (missing user-invocable: false)"$'\n'
-  printf '%s\n' "$front" | grep -q '^disable-model-invocation: true$' && bad_principle="$bad_principle$skill (still carries disable-model-invocation)"$'\n'
-done
-if [ -n "$bad_principle" ]; then
-  note "FAIL: principle-* leaves must carry user-invocable: false and not disable-model-invocation:"
-  note "$bad_principle"
-  fail=1
-else
-  note "ok: all principle-* leaves carry user-invocable: false"
-fi
+# (0.9.13, #22): the Claude Code plugin ships no commands/. Every /pstack:<name>
+# is served by the skill itself; a commands/ directory reappearing (typically
+# via an upstream sync) duplicates every slash-menu row.
+no_commands_dir() {
+  [ -e "$repo/plugins/pstack/commands" ] &&
+    echo "plugins/pstack/commands/ exists; trampolines belong in .codex-plugin/prompts/ (see CHANGES 0.9.13)"
+  return 0
+}
 
-# (The default model quad is no longer checked here: model defaults live in
-# plugins/pstack/models.json, tools/generate.mjs stamps them into every copy
-# and fails on any claude-* slug outside a stamped region, and CI regenerates
-# and diffs, so a partial model bump cannot exist on a green build.)
+# (CHANGES 0.9.8): no skill may carry disable-model-invocation. On a skill the
+# flag makes the Skill tool refuse the invocation outright, which breaks the
+# SessionStart mandate and model-initiated entry. Frontmatter only: skill
+# bodies may mention the flag in prose (automate-me does).
+no_disable_model_invocation() {
+  local skill
+  for skill in "$repo"/plugins/pstack/skills/*/SKILL.md; do
+    frontmatter_of "$skill" | grep -q '^disable-model-invocation: true$' && echo "$skill"
+  done
+  return 0
+}
+
+# (CHANGES 0.9.9): every command-less principle-* leaf carries
+# user-invocable: false (hidden from the / menu, read by path from poteto-mode)
+# and NOT disable-model-invocation (the pair cancels to a dead skill).
+principle_leaves_hidden() {
+  local skill front
+  for skill in "$repo"/plugins/pstack/skills/principle-*/SKILL.md; do
+    [ -f "$skill" ] || continue
+    front="$(frontmatter_of "$skill")"
+    printf '%s\n' "$front" | grep -q '^user-invocable: false$' || echo "$skill (missing user-invocable: false)"
+    printf '%s\n' "$front" | grep -q '^disable-model-invocation: true$' && echo "$skill (still carries disable-model-invocation)"
+  done
+  return 0
+}
+
+check "no plugins/pstack/commands/ directory" no_commands_dir
+check "no skill carries disable-model-invocation: true" no_disable_model_invocation
+check "principle-* leaves carry user-invocable: false and not disable-model-invocation" principle_leaves_hidden
 
 # Behavioral leg: a command-less plugin still serves the user-typed /plugin:name
 # via the skill alone. This is the assumption that lets pstack live without

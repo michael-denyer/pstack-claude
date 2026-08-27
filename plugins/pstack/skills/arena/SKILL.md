@@ -76,5 +76,5 @@ One synthesized artifact. One short synthesis note alongside, naming the base, t
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- arena runners: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5`
+- arena runners: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`
 - arena cross-judge pool: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`

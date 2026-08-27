@@ -10,7 +10,7 @@
 //   each public skill's frontmatter (name + menu-description)
 //     -> its Codex prompt stub in plugins/pstack/.codex-plugin/prompts/
 //     -> its row in README.md's "Slash commands" table
-//   plugins/pstack/models.json (the model policy: role defaults, panel quad,
+//   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
 //   available slugs, Codex equivalents)
 //     -> each model-consuming skill's "## Models" section
 //     -> setup-pstack's override-sheet block and interrogate's reviewer table
@@ -137,7 +137,7 @@ export function setupModelsSection(models) {
   return (
     "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
     `- Available Claude models: ${avail}\n` +
-    `- Default panel quad: ${codeList(models.panelQuad)}\n` +
+    `- Default panel: ${codeList(models.panel)}\n` +
     `- Single-role default: ${code(models.singleRoleDefault)}`
   );
 }
@@ -182,7 +182,7 @@ export function stampReviewerTable(text, models, file) {
 
 export function codexModelNamesSection(models) {
   return (
-    "Skills name Claude defaults (a single-role default for code/prose/judgment plus a four-model quad for " +
+    "Skills name Claude defaults (a single-role default for code/prose/judgment plus a diverse-model panel for " +
     "diverse-model panels; each model-consuming skill lists its own in a Models section). These slugs do not " +
     "resolve on Codex. Substitute your configured Codex models:\n\n" +
     `- Single-model roles: your primary Codex model (for example ${code(models.codex.singleRoleExample)}).\n` +

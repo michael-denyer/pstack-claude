@@ -151,7 +151,7 @@ No third-party plugins. The harsher-critique escape hatch lives in the bundled `
 | `/why` | investigate why something was built this way (parallel multi-MCP evidence) |
 | `/architect` | settle types and module shape before writing code that crosses a function boundary |
 | `/arena` | run N parallel attempts at the same task and pick the best parts |
-| `/interrogate` | have four different models try to break a diff |
+| `/interrogate` | have three different models try to break a diff |
 | `/automate-me` | draft your own personal -mode skill from recent transcripts |
 | `/reflect` | capture a long task's lessons as a skill edit |
 | `/tdd` | fix a bug by writing the failing test first, then the fix |
@@ -220,11 +220,11 @@ The port is editorial, not mechanical. Anywhere upstream pstack assumed Cursor-s
 | Model `composer-2.5-fast` (Cursor) | `claude-sonnet-4-6` |
 | Model `claude-opus-4-X-thinking-xhigh` (Cursor UI variant) | `claude-opus-5` (extended thinking configured separately) |
 | Models `gpt-5.3-codex-high-fast`, `gpt-5.5-high-fast` (via Cursor) | `claude-sonnet-4-6`, `claude-haiku-4-5` (Claude family) |
-| Multi-model panels (arena, architect, interrogate, how-critics) | Default quad is `claude-opus-5` + `claude-fable-5` + `claude-sonnet-5` + `claude-haiku-4-5` — four distinct models across three tiers (replaces the cross-vendor diversity lost in translation and restores upstream's four-way split). |
+| Multi-model panels (arena, architect, interrogate, how-critics) | Default panel is `claude-opus-5` + `claude-fable-5` + `claude-sonnet-5` — three distinct models across three tiers (replaces the cross-vendor diversity lost in translation). |
 
 ### What's lost in translation
 
-**Cross-vendor model diversity.** `arena`, `interrogate`, `architect`, and `how` all rely on stress-testing a design against four *different* model families. Claude Code is single-vendor, so the four-way split collapses to four Claude variants by tier and thinking budget. Instead of bridging to an external CLI for that diversity, the rewiring routes the "harsher pass" to the bundled `thermo-nuclear-code-quality-review` skill — different style of pressure (strict maintainability rubric), not vendor diversity, but it lives in-plugin with no extra installs.
+**Cross-vendor model diversity.** `arena`, `interrogate`, `architect`, and `how` all rely on stress-testing a design against several *different* model families. Claude Code is single-vendor, so the split collapses to three Claude variants by tier. Instead of bridging to an external CLI for that diversity, the rewiring routes the "harsher pass" to the bundled `thermo-nuclear-code-quality-review` skill — different style of pressure (strict maintainability rubric), not vendor diversity, but it lives in-plugin with no extra installs.
 
 ### What's deliberately kept
 

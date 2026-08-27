@@ -142,4 +142,4 @@ Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `too
 
 - how explorer: `claude-opus-5`
 - how explainer: `claude-opus-5`
-- how critics: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5`
+- how critics: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`

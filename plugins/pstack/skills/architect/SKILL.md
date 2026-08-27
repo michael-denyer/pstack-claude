@@ -88,4 +88,4 @@ The caller's usage is written first and the type sketch derived from it. One fil
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- architect runners: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5`
+- architect runners: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`

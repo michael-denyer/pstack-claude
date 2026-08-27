@@ -22,7 +22,7 @@ so the file is loaded as context for every session.
 
 ### 1. Detect available models
 
-Enumerate the model slugs you can pass to an `Agent` subagent in this session — that is the dependable source. The currently available Claude models and the default panel quad are listed in [Models](#models) below; the quad is chosen for cross-family, cross-tier diversity, and the single-role default stays out of the panels because it already covers the single-model roles. Ask the user to confirm or paste any additional slugs they want available. Never write a real slug you have not confirmed is available. The aliases `inherit-parent` and `auto` are always valid even though they are not detected slugs; both mean the role runs on the parent session's model, which the `Agent` call expresses by omitting `model`.
+Enumerate the model slugs you can pass to an `Agent` subagent in this session — that is the dependable source. The currently available Claude models and the default panel are listed in [Models](#models) below; the quad is chosen for cross-family, cross-tier diversity, and the single-role default stays out of the panels because it already covers the single-model roles. Ask the user to confirm or paste any additional slugs they want available. Never write a real slug you have not confirmed is available. The aliases `inherit-parent` and `auto` are always valid even though they are not detected slugs; both mean the role runs on the parent session's model, which the `Agent` call expresses by omitting `model`.
 
 ### 2. Load current state
 
@@ -53,16 +53,16 @@ judgment and prose: claude-opus-5
 strongest judgment: claude-fable-5
 how explorer: claude-opus-5
 how explainer: claude-opus-5
-how critics: claude-opus-5, claude-fable-5, claude-sonnet-5, claude-haiku-4-5
+how critics: claude-opus-5, claude-fable-5, claude-sonnet-5
 why investigators: claude-opus-5
 why synthesizer: claude-opus-5
 reflect tooling: claude-opus-5
 reflect judgment, divergent, synthesizer: claude-opus-5
-arena runners: claude-opus-5, claude-fable-5, claude-sonnet-5, claude-haiku-4-5
+arena runners: claude-opus-5, claude-fable-5, claude-sonnet-5
 arena cross-judge pool: claude-opus-5, claude-fable-5, claude-sonnet-5
 swarm workers: claude-opus-5
-architect runners: claude-opus-5, claude-fable-5, claude-sonnet-5, claude-haiku-4-5
-interrogate reviewers: claude-opus-5, claude-fable-5, claude-sonnet-5, claude-haiku-4-5
+architect runners: claude-opus-5, claude-fable-5, claude-sonnet-5
+interrogate reviewers: claude-opus-5, claude-fable-5, claude-sonnet-5
 ```
 
 ### 6. Wire it in
@@ -78,5 +78,5 @@ Tell the user where the override was written and how it loads (via the `@` inclu
 Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).
 
 - Available Claude models: Opus 5 (`claude-opus-5`), Opus 4.8 (`claude-opus-4-8`), Opus 4.6 (`claude-opus-4-6`), Fable 5 (`claude-fable-5`), Sonnet 5 (`claude-sonnet-5`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`)
-- Default panel quad: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5`
+- Default panel: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`
 - Single-role default: `claude-opus-5`

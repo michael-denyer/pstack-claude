@@ -1,6 +1,6 @@
 {
   "singleRoleDefault": "claude-opus-5",
-  "panelQuad": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5", "claude-haiku-4-5"],
+  "panel": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5"],
   "available": [
     { "label": "Opus 5", "slug": "claude-opus-5" },
     { "label": "Opus 4.8", "slug": "claude-opus-4-8" },
@@ -19,16 +19,16 @@
     { "role": "strongest judgment", "models": ["claude-fable-5"], "skill": "poteto-mode" },
     { "role": "how explorer", "models": ["claude-opus-5"], "skill": "how" },
     { "role": "how explainer", "models": ["claude-opus-5"], "skill": "how" },
-    { "role": "how critics", "models": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5", "claude-haiku-4-5"], "skill": "how" },
+    { "role": "how critics", "models": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5"], "skill": "how" },
     { "role": "why investigators", "models": ["claude-opus-5"], "skill": "why" },
     { "role": "why synthesizer", "models": ["claude-opus-5"], "skill": "why" },
     { "role": "reflect tooling", "models": ["claude-opus-5"], "skill": "reflect" },
     { "role": "reflect judgment, divergent, synthesizer", "models": ["claude-opus-5"], "skill": "reflect" },
-    { "role": "arena runners", "models": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5", "claude-haiku-4-5"], "skill": "arena" },
+    { "role": "arena runners", "models": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5"], "skill": "arena" },
     { "role": "arena cross-judge pool", "models": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5"], "skill": "arena" },
     { "role": "swarm workers", "models": ["claude-opus-5"], "skill": "swarm" },
-    { "role": "architect runners", "models": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5", "claude-haiku-4-5"], "skill": "architect" },
-    { "role": "interrogate reviewers", "models": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5", "claude-haiku-4-5"], "skill": "interrogate" }
+    { "role": "architect runners", "models": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5"], "skill": "architect" },
+    { "role": "interrogate reviewers", "models": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5"], "skill": "interrogate" }
   ],
   "codex": {
     "singleRoleExample": "gpt-5.6-sol",

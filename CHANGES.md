@@ -2,6 +2,17 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.14 — single-source the duplicated facts behind a generator
+
+Four PRs (#36, #37, #40, #39) moved every convention-held duplication behind `tools/generate.mjs`, which stamps each fact from one source and fails CI on any diff after regeneration.
+
+- **Version**: the root `VERSION` file stamps the three manifests. The generator refuses to run without a matching `CHANGES.md` heading, so a bump without release notes (or notes without a bump) fails CI. The invariant script's parity check retired.
+- **Codex prompt stubs and the README command table**: generated from each public skill's new `menu-description:` frontmatter one-liner. 7 of 31 stub descriptions had already drifted from their README rows; both now render the same string. Orphan stubs are removed; a skill missing a `menu-description` or a `README_COMMAND_ORDER` entry fails by name. The invariant script's one-way orphan check retired.
+- **Model policy**: `plugins/pstack/models.json` holds the role vocabulary, per-role defaults, the panel quad, and the Codex equivalents. The generator stamps each model-consuming skill's `## Models` section, setup-pstack's override sheet, interrogate's reviewer table, and codex-tools' Model names section, and fails with file and line on any `claude-*` slug in skill prose outside a stamped region. Skill prose now names roles, not slugs. The override sheet gains a `strongest judgment` row (`claude-fable-5`), previously an unnamed fact in poteto-mode prose. The invariant script's sampled quad check retired.
+- **Upstream sync**: `tools/sync.mjs` syncs a component to a new upstream SHA using pins in `tools/upstream.json` and the substitution table plus Cursor-ism denylist in `tools/substitutions.json`, reporting clean updates, new files, and port-edited files needing manual merge. Five fixture tests run in CI. `README-UPSTREAM.md` deleted; NOTICE.md and the pins answer "which upstream, which SHA".
+
+No skill workflow changes; the skill-body edits replace inline model slugs with role references resolved one section down in the same file. This bump exists to ship those prose changes to installed copies.
+
 ## 0.9.13 — drop the Claude Code command trampolines
 
 Claude Code renders a plugin's commands and its user-invocable skills in the same slash menu, so every one of the 31 trampolines showed `/pstack:<name>` twice (#22, reported by @razvangirgiz). The trampolines existed for Codex, which has no skill picker of its own; on Claude Code they only shadowed the skill, which is what 0.9.7 and 0.9.8 spent two releases working around.

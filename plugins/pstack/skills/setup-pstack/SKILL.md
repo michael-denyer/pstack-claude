@@ -22,7 +22,7 @@ so the file is loaded as context for every session.
 
 ### 1. Detect available models
 
-Enumerate the model slugs you can pass to an `Agent` subagent in this session — that is the dependable source. Claude family currently available: Opus 5 (`claude-opus-5`), Opus 4.8 (`claude-opus-4-8`), Opus 4.6 (`claude-opus-4-6`), Fable 5 (`claude-fable-5`), Sonnet 5 (`claude-sonnet-5`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`). The default panels run Opus 5 (`claude-opus-5`), Fable 5 (`claude-fable-5`), Sonnet 5 (`claude-sonnet-5`), and Haiku 4.5 (`claude-haiku-4-5`) for cross-family, cross-tier diversity. Opus 4.8 stays out of the panels because it is already the single-role default across the skills. Ask the user to confirm or paste any additional slugs they want available. Never write a real slug you have not confirmed is available. The aliases `inherit-parent` and `auto` are always valid even though they are not detected slugs; both mean the role runs on the parent session's model, which the `Agent` call expresses by omitting `model`.
+Enumerate the model slugs you can pass to an `Agent` subagent in this session — that is the dependable source. The currently available Claude models and the default panel quad are listed in [Models](#models) below; the quad is chosen for cross-family, cross-tier diversity, and the single-role default stays out of the panels because it already covers the single-model roles. Ask the user to confirm or paste any additional slugs they want available. Never write a real slug you have not confirmed is available. The aliases `inherit-parent` and `auto` are always valid even though they are not detected slugs; both mean the role runs on the parent session's model, which the `Agent` call expresses by omitting `model`.
 
 ### 2. Load current state
 
@@ -43,13 +43,14 @@ Write `~/.claude/pstack-models.md` with the shape below. Overwrite the whole fil
 ```markdown
 # pstack model configuration
 
-Per-role model overrides for pstack skills. Each pstack SKILL.md names a default model inline; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out.
+Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out.
 
 feature, refactoring: claude-opus-4-8
 bug-fix: claude-opus-4-8
 perf-issue: claude-opus-4-8
 hillclimb: claude-opus-4-8
 judgment and prose: claude-opus-4-8
+strongest judgment: claude-fable-5
 how explorer: claude-opus-4-8
 how explainer: claude-opus-4-8
 how critics: claude-opus-5, claude-fable-5, claude-sonnet-5, claude-haiku-4-5
@@ -71,3 +72,11 @@ If `~/.claude/CLAUDE.md` does not already include `~/.claude/pstack-models.md`, 
 ### 7. Confirm
 
 Tell the user where the override was written and how it loads (via the `@` include in CLAUDE.md). Re-running this skill updates the override sheet.
+
+## Models
+
+Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).
+
+- Available Claude models: Opus 5 (`claude-opus-5`), Opus 4.8 (`claude-opus-4-8`), Opus 4.6 (`claude-opus-4-6`), Fable 5 (`claude-fable-5`), Sonnet 5 (`claude-sonnet-5`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`)
+- Default panel quad: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`, `claude-haiku-4-5`
+- Single-role default: `claude-opus-4-8`

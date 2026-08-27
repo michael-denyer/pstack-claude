@@ -24,7 +24,7 @@ bun tools/generate.mjs
 bash tests/skill-collision-repro.sh
 ```
 
-The generator stamps the root `VERSION` into the three plugin manifests, asserts `CHANGES.md` has a heading for that version, and validates the Codex marketplace pointer. CI reruns it and fails on any resulting diff, so commit whatever it changes.
+The generator stamps the root `VERSION` into the three plugin manifests, emits one Codex prompt stub per public skill from its `menu-description` frontmatter (removing orphans), rewrites the README slash-command table, asserts `CHANGES.md` has a heading for that version, and validates the Codex marketplace pointer. CI reruns it and fails on any resulting diff, so commit whatever it changes. Adding a skill means giving it a `menu-description` and adding its name to `README_COMMAND_ORDER` in `tools/generate.mjs`; the generator fails by name if either is missing.
 
 The invariant script checks plugin layout, frontmatter flags, and that the default model quad is identical everywhere it appears. The last check is behavioral: it needs the `claude` CLI and API access and makes one haiku call. CI runs everything except that leg via `SKIP_BEHAVIORAL=1`, so run it unflagged at least once before a release.
 

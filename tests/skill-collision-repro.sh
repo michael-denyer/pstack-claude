@@ -32,19 +32,9 @@ else
   note "ok: no plugins/pstack/commands/ directory"
 fi
 
-# Codex prompts are the relocated trampolines; each must still point at a real skill.
-orphan=""
-for cmd in "$repo"/plugins/pstack/.codex-plugin/prompts/*.md; do
-  skill="$repo/plugins/pstack/skills/$(basename "$cmd" .md)/SKILL.md"
-  [ -f "$skill" ] || orphan="$orphan$cmd"$'\n'
-done
-if [ -n "$orphan" ]; then
-  note "FAIL: Codex prompts without a matching skill:"
-  note "$orphan"
-  fail=1
-else
-  note "ok: every Codex prompt has a matching skill"
-fi
+# (Codex prompt <-> skill correspondence is no longer checked here:
+# tools/generate.mjs emits one prompt per public skill and removes orphans,
+# and CI regenerates and diffs, so a mismatch cannot exist on a green build.)
 
 # Flag invariant (CHANGES 0.9.8): no skill may carry disable-model-invocation —
 # on a skill the flag makes the Skill tool refuse the invocation outright, which

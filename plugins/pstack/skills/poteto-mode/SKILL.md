@@ -1,6 +1,7 @@
 ---
 name: poteto-mode
 description: poteto's agent style for concise, detailed responses, deliberate subagents, unslopped prose, simple code, and verified work. Use for poteto, /poteto-mode, or requests to work in this style.
+menu-description: default entry point for any non-trivial task
 ---
 
 # Poteto mode

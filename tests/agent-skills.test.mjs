@@ -68,11 +68,14 @@ describe("shared Agent Skills tree", () => {
     try {
       const skill = join(root, "example");
       mkdirSync(skill, { recursive: true });
-      writeFileSync(
-        join(skill, "SKILL.md"),
-        "# Example\n\nRead `agents/comment-sicko.md` in full first.\n",
-      );
-      expect(() => validateProsePaths(root)).toThrow("example/SKILL.md -> agents/comment-sicko.md");
+      for (const prose of [
+        "Read `agents/comment-sicko.md` in full first.",
+        "Read `./agents/comment-sicko.md` in full first.",
+        "Read the following file:\n`agents/comment-sicko.md`",
+      ]) {
+        writeFileSync(join(skill, "SKILL.md"), `# Example\n\n${prose}\n`);
+        expect(() => validateProsePaths(root)).toThrow("example/SKILL.md -> agents/comment-sicko.md");
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -85,7 +88,12 @@ describe("shared Agent Skills tree", () => {
       mkdirSync(skill, { recursive: true });
       writeFileSync(
         join(skill, "SKILL.md"),
-        "# Example\n\nThe `hooks/` directory is Claude Code only and ships with the plugin.\n",
+        [
+          "# Example",
+          "",
+          "The `hooks/` directory is Claude Code only and ships with the plugin.",
+          "Read this section before noting that `agents/comment-sicko.md` ships only with the plugin.",
+        ].join("\n"),
       );
       expect(() => validateProsePaths(root)).not.toThrow();
     } finally {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 function markdownFiles(dir) {
@@ -53,20 +53,20 @@ export function pathIsInside(root, path) {
 // open agents/comment-sicko.md.
 const UNREACHABLE_PREFIXES = ["agents/", "hooks/", "commands/", ".codex-plugin/", ".claude-plugin/"];
 
-// Only an instruction to open the path is a defect. Skills legitimately mention
-// these directories to explain what a runtime ships.
-const READ_VERBS = /\b(reads?|opens?|loads?|see|consult|follow|inspect)\b/i;
+// Only a direct instruction to open the path is a defect. Skills legitimately
+// mention these directories to explain what a runtime ships.
+const READ_INSTRUCTION =
+  /\b(?:read|open|load|see|consult|follow|inspect)\b(?:\s+(?:the\s+)?(?:following\s+)?(?:file|path)(?:\s+at)?)?\s*:?\s*$/i;
 
-export function prosePathProblems(file, text, label) {
+function prosePathProblems(text, label) {
   const problems = [];
-  for (const line of text.split("\n")) {
-    for (const [, path] of line.matchAll(/`([^`\n]+)`/g)) {
-      const escapes = path.startsWith("../../");
-      const unreachable = UNREACHABLE_PREFIXES.some((prefix) => path.startsWith(prefix));
-      if (!escapes && !unreachable) continue;
-      if (!READ_VERBS.test(line)) continue;
-      problems.push(`${label} -> ${path} (not installed with the skills tree)`);
-    }
+  for (const match of text.matchAll(/`([^`\n]+)`/g)) {
+    const path = posix.normalize(match[1]);
+    const escapes = path === ".." || path.startsWith("../");
+    const unreachable = UNREACHABLE_PREFIXES.some((prefix) => path.startsWith(prefix));
+    if (!escapes && !unreachable) continue;
+    if (!READ_INSTRUCTION.test(text.slice(0, match.index))) continue;
+    problems.push(`${label} -> ${path} (not installed with the skills tree)`);
   }
   return problems;
 }
@@ -75,9 +75,7 @@ export function validateProsePaths(skillsDir) {
   const root = resolve(skillsDir);
   const problems = [];
   for (const file of markdownFiles(root)) {
-    problems.push(
-      ...prosePathProblems(file, readFileSync(file, "utf8"), relative(root, file)),
-    );
+    problems.push(...prosePathProblems(readFileSync(file, "utf8"), relative(root, file)));
   }
   if (problems.length) {
     throw new Error(`prose names paths outside the skills tree:\n${problems.join("\n")}`);

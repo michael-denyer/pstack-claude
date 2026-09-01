@@ -1,0 +1,2 @@
+description = "draft your own personal -mode skill from recent transcripts"
+prompt = "Read plugins/pstack/skills/automate-me/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

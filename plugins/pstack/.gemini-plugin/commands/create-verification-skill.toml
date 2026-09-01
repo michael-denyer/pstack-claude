@@ -1,0 +1,2 @@
+description = "generate a project-local verification skill and feature map"
+prompt = "Read plugins/pstack/skills/create-verification-skill/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

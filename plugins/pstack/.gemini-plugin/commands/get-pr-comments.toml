@@ -1,0 +1,2 @@
+description = "fetch and summarize review comments from the active PR"
+prompt = "Read plugins/pstack/skills/get-pr-comments/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

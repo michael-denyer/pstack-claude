@@ -1,0 +1,2 @@
+description = "ground type-system discipline in TypeScript syntax"
+prompt = "Read plugins/pstack/skills/typescript-best-practices/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

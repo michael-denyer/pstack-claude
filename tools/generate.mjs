@@ -8,7 +8,8 @@
 //   VERSION  -> the "version" field in the three plugin manifests
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
 //   each public skill's frontmatter (name + menu-description)
-//     -> its Codex prompt stub in plugins/pstack/.codex-plugin/prompts/
+//     -> a command stub per runtime in STUB_TARGETS (Codex prompts, Gemini
+//        CLI TOML commands). opencode reads skills/ natively and needs none.
 //     -> its row in README.md's "Slash commands" table
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
 //   available slugs, Codex equivalents)
@@ -21,9 +22,17 @@
 // directory whose Codex manifest name matches (it carries no version; Codex
 // reads the version from .codex-plugin/plugin.json).
 
-import { existsSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -106,6 +115,26 @@ export function publicSkills(skillsDir) {
 export function promptStub({ name, menu }) {
   return `---\nname: ${name}\ndescription: ${menu}\ndisable-model-invocation: true\n---\n\nInvoke the \`${name}\` skill and follow it.\n`;
 }
+
+// Gemini CLI has no skills concept, so the stub points at the SKILL.md path
+// rather than naming a skill the runtime could resolve.
+export function geminiStub({ name, menu }) {
+  const body = [
+    `Read plugins/pstack/skills/${name}/SKILL.md in full, then follow it.`,
+    "",
+    "Tool and model names in that file are Claude Code's. Resolve them via",
+    "plugins/pstack/skills/poteto-mode/references/codex-tools.md.",
+  ].join("\n");
+  return `description = ${JSON.stringify(menu)}\nprompt = ${JSON.stringify(body)}\n`;
+}
+
+// One row per runtime that needs generated command stubs. opencode is absent
+// on purpose: it reads plugins/pstack/skills/ natively via the Agent Skills
+// spec, so generating stubs for it would duplicate files it already loads.
+export const STUB_TARGETS = [
+  { dir: "plugins/pstack/.codex-plugin/prompts", ext: ".md", render: promptStub },
+  { dir: "plugins/pstack/.gemini-plugin/commands", ext: ".toml", render: geminiStub },
+];
 
 const code = (s) => `\`${s}\``;
 const codeList = (models) => models.map(code).join(", ");
@@ -380,23 +409,26 @@ function main() {
 
   const skills = publicSkills(skillsDir);
 
-  const promptsDir = join(repo, "plugins/pstack/.codex-plugin/prompts");
-  let promptsChanged = 0;
-  for (const skill of skills) {
-    const path = join(promptsDir, `${skill.name}.md`);
-    const next = promptStub(skill);
-    if (existsSync(path) && readFileSync(path, "utf8") === next) continue;
-    writeFileSync(path, next);
-    promptsChanged++;
-    console.log(`stamped: .codex-plugin/prompts/${skill.name}.md`);
+  for (const { dir, ext, render } of STUB_TARGETS) {
+    const stubsDir = join(repo, dir);
+    mkdirSync(stubsDir, { recursive: true });
+    let changed = 0;
+    for (const skill of skills) {
+      const path = join(stubsDir, `${skill.name}${ext}`);
+      const next = render(skill);
+      if (existsSync(path) && readFileSync(path, "utf8") === next) continue;
+      writeFileSync(path, next);
+      changed++;
+      console.log(`stamped: ${dir}/${skill.name}${ext}`);
+    }
+    const expected = new Set(skills.map((s) => `${s.name}${ext}`));
+    for (const file of readdirSync(stubsDir)) {
+      if (!file.endsWith(ext) || expected.has(file)) continue;
+      unlinkSync(join(stubsDir, file));
+      console.log(`removed orphan: ${dir}/${file}`);
+    }
+    if (changed === 0) console.log(`ok: ${skills.length} stubs current in ${dir}`);
   }
-  const expected = new Set(skills.map((s) => `${s.name}.md`));
-  for (const file of readdirSync(promptsDir)) {
-    if (!file.endsWith(".md") || expected.has(file)) continue;
-    unlinkSync(join(promptsDir, file));
-    console.log(`removed orphan: .codex-plugin/prompts/${file}`);
-  }
-  if (promptsChanged === 0) console.log(`ok: ${skills.length} Codex prompts current`);
 
   const readmePath = join(repo, "README.md");
   const readme = readFileSync(readmePath, "utf8");
@@ -424,9 +456,13 @@ function main() {
   console.log("ok: hooks.json commands point at existing, executable scripts");
 }
 
-try {
-  main();
-} catch (err) {
-  console.error(`FAIL: ${err.message}`);
-  process.exit(1);
+// Guarded so importing this module for its exports (the stub renderers, the
+// section builders) does not regenerate the repo as a side effect.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    main();
+  } catch (err) {
+    console.error(`FAIL: ${err.message}`);
+    process.exit(1);
+  }
 }

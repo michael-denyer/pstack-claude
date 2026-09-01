@@ -1,0 +1,2 @@
+description = "explain a subsystem plainly by composing how + why"
+prompt = "Read plugins/pstack/skills/teach/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

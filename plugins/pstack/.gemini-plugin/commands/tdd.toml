@@ -1,0 +1,2 @@
+description = "fix a bug by writing the failing test first, then the fix"
+prompt = "Read plugins/pstack/skills/tdd/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

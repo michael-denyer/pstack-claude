@@ -1,0 +1,2 @@
+description = "find failing PR checks, inspect logs, apply focused fixes"
+prompt = "Read plugins/pstack/skills/fix-ci/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

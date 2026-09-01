@@ -34,6 +34,16 @@ The loop links all 52 skill directories. Thirty-one are public workflows and 21 
 
 Removing a link from `~/.agents/skills/` removes that skill from every runtime using the shared directory. Teardown is `rm ~/.agents/skills/<name>`.
 
+The [`skills` CLI](https://github.com/vercel-labs/skills) installs the same tree without a clone, resolving `plugins/pstack/skills` as a subtree URL:
+
+```shell
+npx skills add https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills --skill "*" --agent "*" --yes
+```
+
+`plugins/pstack/skills` is a supported installation boundary. Everything a skill reads at runtime lives inside it, including the `poteto-agent` and `comment-sicko` definitions under `poteto-mode/references/agents/` and the MIT terms under `poteto-mode/references/licenses/`. Both directories sit inside a skill because the CLI installs skill directories and drops loose files at the tree root. `tests/agent-skills.test.mjs` fails the build if a skill grows a link that points outside the tree, and the `Skills-only install` CI job installs the tree with the CLI on every PR.
+
+Three plugin features do not survive a skills-only install, because they belong to a specific runtime rather than to the skills. Claude Code's `SessionStart` auto-fire lives in `hooks/`, the Codex slash-command stubs live in `.codex-plugin/prompts/`, and Claude Code's native subagent registration reads `agents/`. On a skills-only install, dispatch `comment-sicko` by pointing the runtime's agent primitive at `poteto-mode/references/agents/comment-sicko.md`.
+
 ### Codex
 
 The same plugin carries a `.codex-plugin/plugin.json` manifest and a root `.agents/plugins/marketplace.json`. Use the [shared Agent Skills install](#shared-agent-skills-install). This path is verified on a live Codex session.
@@ -88,8 +98,10 @@ Discovery is not a promise that Claude-specific execution details translate auto
 ├── plugins/pstack/                   # the plugin itself
 │   ├── .claude-plugin/plugin.json    # Claude Code manifest
 │   ├── .codex-plugin/plugin.json     # Codex manifest (skills: ./skills/)
-│   ├── skills/                       # 52 Agent Skills (shared by all five runtimes)
+│   ├── skills/                       # 52 Agent Skills (shared by all five runtimes; the skills-only install boundary)
+│   │   ├── poteto-mode/references/licenses/  # generated copies of the MIT terms, so they travel with the tree
 │   │   ├── poteto-mode/references/codex-tools.md  # Claude→Codex tool/model/skill map
+│   │   ├── poteto-mode/references/agents/  # generated copies of agents/, for runtimes that install only skills
 │   │   └── poteto-mode/scripts/      # vendored bun/bash tooling: watch-pr, orch, worktree-audit.sh
 │   ├── .codex-plugin/prompts/        # 31 slash command stubs, generated (Codex only; link into ~/.codex/prompts)
 │   ├── hooks/                        # SessionStart auto-fire: injects the poteto-mode mandate (Claude Code only)

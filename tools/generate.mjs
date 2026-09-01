@@ -25,6 +25,7 @@
 
 import {
   existsSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
   statSync,
@@ -360,7 +361,7 @@ function main() {
     bySkill.get(r.skill).push(r);
   }
   const stampFile = (path, next, label) => {
-    if (readFileSync(path, "utf8") === next) return false;
+    if (existsSync(path) && readFileSync(path, "utf8") === next) return false;
     writeFileSync(path, next);
     console.log(`stamped: ${label}`);
     return true;
@@ -439,6 +440,46 @@ function main() {
   } else {
     writeFileSync(readmePath, nextReadme);
     console.log("stamped: README.md slash-command table");
+  }
+
+  // Claude Code loads subagents from plugins/pstack/agents/, which sits outside
+  // the skills tree every other runtime installs. Mirror them inside the
+  // boundary so a skills-only install still carries the definitions that
+  // no-comments and poteto-mode dispatch by name.
+  const agentsDir = join(repo, "plugins/pstack/agents");
+  const vendoredDir = join(skillsDir, "poteto-mode/references/agents");
+  mkdirSync(vendoredDir, { recursive: true });
+  let agentStamps = 0;
+  const vendored = new Set();
+  for (const file of readdirSync(agentsDir).filter((f) => f.endsWith(".md"))) {
+    vendored.add(file);
+    const source = readFileSync(join(agentsDir, file), "utf8");
+    if (stampFile(join(vendoredDir, file), source, `poteto-mode/references/agents/${file}`)) {
+      agentStamps += 1;
+    }
+  }
+  for (const file of readdirSync(vendoredDir)) {
+    if (vendored.has(file)) continue;
+    unlinkSync(join(vendoredDir, file));
+    console.log(`removed orphan: poteto-mode/references/agents/${file}`);
+  }
+  if (agentStamps === 0) console.log(`ok: ${vendored.size} vendored agent definitions current`);
+
+  // The skills CLI installs skill directories, so a file at the root of the
+  // skills tree never reaches the user. The MIT terms covering the vendored
+  // upstream prose ride inside poteto-mode instead. superpowers is excluded:
+  // it covers the hook runner, which stays in hooks/.
+  const LICENSE_FILES = ["LICENSE", "LICENSE-cursor-team-kit", "NOTICE.md"];
+  const licenseDir = join(skillsDir, "poteto-mode/references/licenses");
+  mkdirSync(licenseDir, { recursive: true });
+  let licenseStamps = 0;
+  for (const file of LICENSE_FILES) {
+    const source = readFileSync(join(repo, file), "utf8");
+    const label = `poteto-mode/references/licenses/${file}`;
+    if (stampFile(join(licenseDir, file), source, label)) licenseStamps += 1;
+  }
+  if (licenseStamps === 0) {
+    console.log(`ok: ${LICENSE_FILES.length} license files current in the skills tree`);
   }
 
   const codexName = JSON.parse(

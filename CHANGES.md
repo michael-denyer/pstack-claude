@@ -2,6 +2,18 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.17 — a self-contained skills-only install
+
+`plugins/pstack/skills/` is a supported installation boundary. The [`skills` CLI](https://github.com/vercel-labs/skills) resolves it as a subtree URL, so a skills-only install needs no clone and no second maintained copy of the tree.
+
+Two dependencies previously escaped that boundary. The `poteto-agent` and `comment-sicko` subagent definitions live in `plugins/pstack/agents/`, which Claude Code loads as a plugin directory and no other runtime installs; `no-comments` and every `poteto-mode` playbook delegate dispatch them by name. The MIT terms covering the vendored upstream prose lived only at the repository root. The generator now stamps both into `poteto-mode/references/`, keeping `agents/` and the root license files the single sources. Those copies sit inside a skill directory because the CLI installs skill directories and drops loose files at the root of the tree.
+
+`codex-tools.md` pointed at `agents/comment-sicko.md`, a path that does not exist in a skills-only install. It now names the vendored copy.
+
+Two checks keep the boundary honest. `tests/agent-skills.test.mjs` fails on any markdown link that resolves outside the skills tree or points at a missing file. A `Skills-only install` CI job installs the tree with the `skills` CLI on every pull request and asserts the installed skill count matches the source, with the vendored agent and license files present.
+
+The `SessionStart` auto-fire hook, the Codex prompt stubs, and Claude Code's native subagent registration remain runtime-specific and outside the boundary by design. The README records what a skills-only install does not carry.
+
 ## 0.9.16 — native Agent Skills paths for opencode and Gemini CLI
 
 opencode and Gemini CLI both discover the shared `plugins/pstack/skills/` tree natively. They support the same `~/.agents/skills/` user directory already used by the Codex and Prime installs, so one symlink loop now installs all four Agent Skills runtimes. Neither new runtime gets generated command files. The generator keeps its single Codex-only prompt adapter.

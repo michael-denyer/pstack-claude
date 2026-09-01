@@ -47,6 +47,43 @@ export function pathIsInside(root, path) {
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
+// Plugin directories that sit beside skills/ and never reach a skills-only
+// install. A markdown link to one is caught by validateSkillsTree; a backticked
+// path in prose is not, which is how codex-tools.md came to tell the reader to
+// open agents/comment-sicko.md.
+const UNREACHABLE_PREFIXES = ["agents/", "hooks/", "commands/", ".codex-plugin/", ".claude-plugin/"];
+
+// Only an instruction to open the path is a defect. Skills legitimately mention
+// these directories to explain what a runtime ships.
+const READ_VERBS = /\b(reads?|opens?|loads?|see|consult|follow|inspect)\b/i;
+
+export function prosePathProblems(file, text, label) {
+  const problems = [];
+  for (const line of text.split("\n")) {
+    for (const [, path] of line.matchAll(/`([^`\n]+)`/g)) {
+      const escapes = path.startsWith("../../");
+      const unreachable = UNREACHABLE_PREFIXES.some((prefix) => path.startsWith(prefix));
+      if (!escapes && !unreachable) continue;
+      if (!READ_VERBS.test(line)) continue;
+      problems.push(`${label} -> ${path} (not installed with the skills tree)`);
+    }
+  }
+  return problems;
+}
+
+export function validateProsePaths(skillsDir) {
+  const root = resolve(skillsDir);
+  const problems = [];
+  for (const file of markdownFiles(root)) {
+    problems.push(
+      ...prosePathProblems(file, readFileSync(file, "utf8"), relative(root, file)),
+    );
+  }
+  if (problems.length) {
+    throw new Error(`prose names paths outside the skills tree:\n${problems.join("\n")}`);
+  }
+}
+
 export function validateSkillsTree(skillsDir) {
   const root = resolve(skillsDir);
   const realRoot = realpathSync(root);
@@ -89,6 +126,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   try {
     validateSkillsTree(resolve(skillsDir));
     console.log(`ok: local markdown links stay inside ${skillsDir}`);
+    validateProsePaths(resolve(skillsDir));
+    console.log(`ok: no prose in ${skillsDir} points at a path outside it`);
   } catch (error) {
     console.error(`FAIL: ${error.message}`);
     process.exit(1);

@@ -109,7 +109,7 @@ Discovery is not a promise that Claude-specific execution details translate auto
 ├── tests/skill-collision-repro.sh    # layout and flag invariants (needs claude CLI)
 ├── tests/agent-skills.test.mjs       # shared metadata, portable assets, link checks, and Codex prompt boundary
 ├── tools/generate.mjs                # stamps versioned, model, prompt, README, and portable-asset copies
-├── tools/validate-skills.mjs         # rejects missing or escaping local Markdown links
+├── tools/validate-skills.mjs         # rejects escaping Markdown links and prose that opens unreachable paths
 ├── tools/sync.mjs                    # syncs a component to a new upstream SHA, applying substitutions.json
 ├── tools/upstream.json               # upstream remote + per-component pinned SHAs
 ├── tools/substitutions.json          # mechanical Cursor→Claude rewrites + the denylist of manual-only Cursor-isms

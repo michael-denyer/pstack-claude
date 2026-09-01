@@ -10,6 +10,8 @@ Two dependencies previously escaped that boundary. The `poteto-agent` and `comme
 
 `codex-tools.md` pointed at `agents/comment-sicko.md`, a path that does not exist in a skills-only install. It now names the vendored copy.
 
+A skill can also name an unreachable path in prose rather than in a Markdown link, which is how `codex-tools.md` came to tell the reader to open `agents/comment-sicko.md`. The link check does not see backticked paths, so `validateProsePaths` scans them separately and fails when the sentence instructs the reader to read or open something under `agents/`, `hooks/`, `commands/`, `.codex-plugin/`, `.claude-plugin/`, or `../../`. Mentioning a directory to explain what a runtime ships stays legal.
+
 Two checks keep the boundary honest. `tools/validate-skills.mjs` resolves bare, dotted, and reference-style local Markdown targets and rejects missing files, lexical escapes, and symlink escapes. The placeholder link in `why/references/synthesizer-prompt.md` now uses an explicit example URL so it cannot masquerade as a local file. A `Skills-only install` CI job installs the tree with the `skills` CLI on every pull request, compares every copied file with the source tree, and runs the same validator against the installed artifact.
 
 The `SessionStart` auto-fire hook, the Codex prompt stubs, and Claude Code's native subagent registration remain runtime-specific and outside the boundary by design. The README records what a skills-only install does not carry.

@@ -41,7 +41,7 @@ import {
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { pathIsInside, validateSkillsTree } from "./validate-skills.mjs";
+import { pathIsInside, validateProsePaths, validateSkillsTree } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -538,6 +538,8 @@ function main() {
   }
   validateSkillsTree(skillsDir);
   console.log("ok: local markdown links stay inside the skills tree");
+  validateProsePaths(skillsDir);
+  console.log("ok: no skill prose points at a path outside the skills tree");
 
   const codexName = JSON.parse(
     readFileSync(join(repo, "plugins/pstack/.codex-plugin/plugin.json"), "utf8"),

@@ -4,27 +4,33 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   rmSync,
   symlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { agentSkills, promptStub, publicSkills } from "../tools/generate.mjs";
+import {
+  agentSkills,
+  PORTABLE_ASSETS,
+  promptStub,
+  publicSkills,
+  syncPortableAssets,
+} from "../tools/generate.mjs";
+import { validateSkillsTree } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const skillsDir = join(repoRoot, "plugins/pstack/skills");
 const agentsDir = join(repoRoot, "plugins/pstack/agents");
-
-function markdownFiles(dir) {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) return markdownFiles(path);
-    return entry.name.endsWith(".md") ? [path] : [];
-  });
-}
+const requiredPortableFiles = [
+  "poteto-mode/references/agents/comment-sicko.md",
+  "poteto-mode/references/agents/poteto-agent.md",
+  "poteto-mode/references/licenses/LICENSE",
+  "poteto-mode/references/licenses/LICENSE-cursor-team-kit",
+  "poteto-mode/references/licenses/NOTICE.md",
+];
 
 describe("shared Agent Skills tree", () => {
   test("every skill satisfies the portable name and description boundary", () => {
@@ -50,21 +56,82 @@ describe("shared Agent Skills tree", () => {
   });
 
   test("no markdown link escapes the skills tree", () => {
-    const offenders = [];
-    for (const file of markdownFiles(skillsDir)) {
-      for (const [, target] of readFileSync(file, "utf8").matchAll(/\]\(([^)]+)\)/g)) {
-        const path = target.trim().split("#")[0];
-        if (!path || !/^\.{0,2}\//.test(path)) continue;
-        const resolved = resolve(dirname(file), path);
-        if (relative(skillsDir, resolved).startsWith("..")) {
-          offenders.push(`${relative(skillsDir, file)} -> ${path}`);
-        }
-        if (!existsSync(resolved)) {
-          offenders.push(`${relative(skillsDir, file)} -> ${path} (missing)`);
-        }
-      }
+    expect(() => validateSkillsTree(skillsDir)).not.toThrow();
+  });
+
+  test("a bare missing markdown target fails the boundary check", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-skills-links-"));
+    const skill = join(root, "example");
+    mkdirSync(skill);
+    writeFileSync(
+      join(skill, "SKILL.md"),
+      "[missing](missing.md)\n[external](https://example.com/reference)\n",
+    );
+
+    try {
+      expect(() => validateSkillsTree(root)).toThrow("example/SKILL.md -> missing.md (missing)");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
-    expect(offenders).toEqual([]);
+  });
+
+  test("bare, dotted, and reference-style local links resolve inside the boundary", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-skills-links-"));
+    const skill = join(root, "example");
+    const references = join(skill, "references");
+    mkdirSync(references, { recursive: true });
+    writeFileSync(join(references, "guide.md"), "# Guide\n");
+    writeFileSync(
+      join(skill, "SKILL.md"),
+      [
+        "[bare](references/guide.md)",
+        "[dotted](./references/guide.md#section)",
+        "[reference][guide]",
+        "[external](https://example.com/reference)",
+        "[guide]: references/guide.md",
+        "[^note]: explanatory footnote text is not a link target",
+      ].join("\n"),
+    );
+
+    try {
+      expect(() => validateSkillsTree(root)).not.toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("an escaping markdown target fails the boundary check", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-skills-links-"));
+    const skill = join(root, "example");
+    mkdirSync(skill);
+    writeFileSync(join(skill, "SKILL.md"), "[escape](../../outside.md)\n");
+
+    try {
+      expect(() => validateSkillsTree(root)).toThrow(
+        "example/SKILL.md -> ../../outside.md (escapes skills tree)",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a markdown symlink target cannot escape the boundary", () => {
+    const parent = mkdtempSync(join(tmpdir(), "pstack-skills-links-"));
+    const root = join(parent, "skills");
+    const skill = join(root, "example");
+    const outside = join(parent, "outside.md");
+    mkdirSync(skill, { recursive: true });
+    writeFileSync(outside, "outside\n");
+    symlinkSync(outside, join(skill, "linked.md"));
+    writeFileSync(join(skill, "SKILL.md"), "[escape](linked.md)\n");
+
+    try {
+      expect(() => validateSkillsTree(root)).toThrow(
+        "example/SKILL.md -> linked.md (escapes skills tree through symlink)",
+      );
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
   });
 
   test("the subagent definitions dispatched by name install with the skills", () => {
@@ -76,11 +143,91 @@ describe("shared Agent Skills tree", () => {
     }
   });
 
-  test("the MIT terms covering the vendored prose travel with the skills tree", () => {
-    for (const file of ["LICENSE", "LICENSE-cursor-team-kit", "NOTICE.md"]) {
-      expect(readFileSync(join(skillsDir, "poteto-mode/references/licenses", file), "utf8")).toBe(
-        readFileSync(join(repoRoot, file), "utf8"),
+  test("every required portable asset lives inside the skills tree", () => {
+    for (const file of requiredPortableFiles) {
+      expect(existsSync(join(skillsDir, file))).toBe(true);
+    }
+    for (const { source, target } of PORTABLE_ASSETS) {
+      expect(readFileSync(join(skillsDir, target), "utf8")).toBe(
+        readFileSync(join(repoRoot, source), "utf8"),
       );
+    }
+  });
+
+  test("portable asset sync creates, updates, and removes generated files", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-portable-assets-"));
+    const fixtureRepo = join(root, "repo");
+    const fixtureSkills = join(fixtureRepo, "plugins/pstack/skills");
+    const generatedDirs = new Set(PORTABLE_ASSETS.map(({ target }) => dirname(target)));
+
+    try {
+      for (const { source } of PORTABLE_ASSETS) {
+        const path = join(fixtureRepo, source);
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, `source: ${source}\n`);
+      }
+      for (const dir of generatedDirs) {
+        const output = join(fixtureSkills, dir);
+        mkdirSync(output, { recursive: true });
+        writeFileSync(join(output, "stale.md"), "stale\n");
+      }
+
+      expect(syncPortableAssets(fixtureRepo, fixtureSkills, { log() {} })).toEqual({
+        stamped: PORTABLE_ASSETS.length,
+        removed: generatedDirs.size,
+        total: PORTABLE_ASSETS.length,
+      });
+      for (const { source, target } of PORTABLE_ASSETS) {
+        expect(readFileSync(join(fixtureSkills, target), "utf8")).toBe(
+          readFileSync(join(fixtureRepo, source), "utf8"),
+        );
+      }
+      for (const dir of generatedDirs) {
+        expect(existsSync(join(fixtureSkills, dir, "stale.md"))).toBe(false);
+      }
+
+      expect(syncPortableAssets(fixtureRepo, fixtureSkills, { log() {} })).toEqual({
+        stamped: 0,
+        removed: 0,
+        total: PORTABLE_ASSETS.length,
+      });
+
+      const changed = PORTABLE_ASSETS[0];
+      writeFileSync(join(fixtureRepo, changed.source), "changed\n");
+      expect(syncPortableAssets(fixtureRepo, fixtureSkills, { log() {} })).toEqual({
+        stamped: 1,
+        removed: 0,
+        total: PORTABLE_ASSETS.length,
+      });
+      expect(readFileSync(join(fixtureSkills, changed.target), "utf8")).toBe("changed\n");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("portable asset sync refuses an output directory symlink escape", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-portable-assets-"));
+    const fixtureRepo = join(root, "repo");
+    const fixtureSkills = join(fixtureRepo, "plugins/pstack/skills");
+    const agentsOutput = join(fixtureSkills, "poteto-mode/references/agents");
+    const outside = join(root, "outside");
+
+    try {
+      for (const { source } of PORTABLE_ASSETS) {
+        const path = join(fixtureRepo, source);
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, `source: ${source}\n`);
+      }
+      mkdirSync(dirname(agentsOutput), { recursive: true });
+      mkdirSync(outside);
+      symlinkSync(outside, agentsOutput, "dir");
+
+      expect(() => syncPortableAssets(fixtureRepo, fixtureSkills, { log() {} })).toThrow(
+        "poteto-mode/references/agents resolves outside the skills tree through a symlink",
+      );
+      expect(existsSync(join(outside, "poteto-agent.md"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 

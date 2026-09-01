@@ -62,7 +62,7 @@ File paths, line ranges, key symbols. Two or three lines to orient a reader who 
 
 **Claims with direct evidence**, one per bullet. Quote or paraphrase the source and cite precisely. Format each finding like:
 
-- **[Direct]** {Claim}. Source: [PR #123](url) / ticket ID / file:line. {Brief quote or paraphrase.}
+- **[Direct]** {Claim}. Source: [PR #123](https://example.com/pr/123) / ticket ID / file:line. {Brief quote or paraphrase.}
 - **[Supported]** {Claim}. Evidence: {list of items and what each contributes}.
 
 Use `[Direct]` for single-source, explicit evidence. Use `[Supported]` when multiple indirect items converge on a conclusion.

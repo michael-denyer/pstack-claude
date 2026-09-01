@@ -17,6 +17,9 @@
 //     -> each model-consuming skill's "## Models" section
 //     -> setup-pstack's override-sheet block and interrogate's reviewer table
 //     -> the "## Model names" section of poteto-mode/references/codex-tools.md
+//   plugins/pstack/agents/{poteto-agent,comment-sicko}.md, LICENSE,
+//   LICENSE-cursor-team-kit, and NOTICE-skills.md
+//     -> portable copies under poteto-mode/references/{agents,licenses}/
 //   No other claude-* slug may appear in skill prose; the scan below fails on strays.
 //
 // Also validated: .agents/plugins/marketplace.json points at a real plugin
@@ -25,15 +28,20 @@
 
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
+  rmSync,
   statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { pathIsInside, validateSkillsTree } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -42,6 +50,88 @@ const VERSIONED_MANIFESTS = [
   "plugins/pstack/.claude-plugin/plugin.json",
   "plugins/pstack/.codex-plugin/plugin.json",
 ];
+
+export const PORTABLE_ASSETS = [
+  {
+    source: "plugins/pstack/agents/poteto-agent.md",
+    target: "poteto-mode/references/agents/poteto-agent.md",
+  },
+  {
+    source: "plugins/pstack/agents/comment-sicko.md",
+    target: "poteto-mode/references/agents/comment-sicko.md",
+  },
+  { source: "LICENSE", target: "poteto-mode/references/licenses/LICENSE" },
+  {
+    source: "LICENSE-cursor-team-kit",
+    target: "poteto-mode/references/licenses/LICENSE-cursor-team-kit",
+  },
+  { source: "NOTICE-skills.md", target: "poteto-mode/references/licenses/NOTICE.md" },
+];
+
+const PORTABLE_OUTPUT_DIRS = [
+  "poteto-mode/references/agents",
+  "poteto-mode/references/licenses",
+];
+
+function resolveWithin(root, path) {
+  const base = resolve(root);
+  const resolved = resolve(base, path);
+  if (!pathIsInside(base, resolved)) {
+    throw new Error(`${path} resolves outside ${base}`);
+  }
+  return resolved;
+}
+
+export function syncPortableAssets(repoRoot, skillsRoot, { log = console.log } = {}) {
+  mkdirSync(skillsRoot, { recursive: true });
+  const realRepoRoot = realpathSync(repoRoot);
+  const realSkillsRoot = realpathSync(skillsRoot);
+  const expectedByDir = new Map(
+    PORTABLE_OUTPUT_DIRS.map((dir) => [resolveWithin(skillsRoot, dir), new Set()]),
+  );
+  for (const dir of expectedByDir.keys()) {
+    mkdirSync(dir, { recursive: true });
+    if (!pathIsInside(realSkillsRoot, realpathSync(dir))) {
+      throw new Error(`${relative(skillsRoot, dir)} resolves outside the skills tree through a symlink`);
+    }
+  }
+
+  const prepared = PORTABLE_ASSETS.map((asset) => {
+    const source = resolveWithin(repoRoot, asset.source);
+    const target = resolveWithin(skillsRoot, asset.target);
+    const targetDir = dirname(target);
+    if (!pathIsInside(realRepoRoot, realpathSync(source))) {
+      throw new Error(`${asset.source} resolves outside the repository through a symlink`);
+    }
+    const expected = expectedByDir.get(targetDir);
+    if (!expected) throw new Error(`${asset.target} has no declared generated output directory`);
+    expected.add(basename(target));
+    if (existsSync(target) && lstatSync(target).isSymbolicLink()) {
+      throw new Error(`${asset.target} is a symlink; refusing to overwrite it`);
+    }
+    return { label: asset.target, target, next: readFileSync(source, "utf8") };
+  });
+
+  let stamped = 0;
+  let removed = 0;
+  for (const { label, target, next } of prepared) {
+    if (existsSync(target) && readFileSync(target, "utf8") === next) continue;
+    writeFileSync(target, next);
+    stamped += 1;
+    log(`stamped: ${label}`);
+  }
+
+  for (const [dir, expected] of expectedByDir) {
+    for (const entry of readdirSync(dir)) {
+      if (expected.has(entry)) continue;
+      rmSync(join(dir, entry), { recursive: true, force: true });
+      removed += 1;
+      log(`removed orphan: ${relative(skillsRoot, join(dir, entry))}`);
+    }
+  }
+
+  return { stamped, removed, total: PORTABLE_ASSETS.length };
+}
 
 // Replace the manifest's single "version" value, preserving all formatting.
 // Exactly one "version" field per manifest is a precondition: a second one
@@ -442,45 +532,12 @@ function main() {
     console.log("stamped: README.md slash-command table");
   }
 
-  // Claude Code loads subagents from plugins/pstack/agents/, which sits outside
-  // the skills tree every other runtime installs. Mirror them inside the
-  // boundary so a skills-only install still carries the definitions that
-  // no-comments and poteto-mode dispatch by name.
-  const agentsDir = join(repo, "plugins/pstack/agents");
-  const vendoredDir = join(skillsDir, "poteto-mode/references/agents");
-  mkdirSync(vendoredDir, { recursive: true });
-  let agentStamps = 0;
-  const vendored = new Set();
-  for (const file of readdirSync(agentsDir).filter((f) => f.endsWith(".md"))) {
-    vendored.add(file);
-    const source = readFileSync(join(agentsDir, file), "utf8");
-    if (stampFile(join(vendoredDir, file), source, `poteto-mode/references/agents/${file}`)) {
-      agentStamps += 1;
-    }
+  const portable = syncPortableAssets(repo, skillsDir);
+  if (portable.stamped === 0 && portable.removed === 0) {
+    console.log(`ok: ${portable.total} portable assets current`);
   }
-  for (const file of readdirSync(vendoredDir)) {
-    if (vendored.has(file)) continue;
-    unlinkSync(join(vendoredDir, file));
-    console.log(`removed orphan: poteto-mode/references/agents/${file}`);
-  }
-  if (agentStamps === 0) console.log(`ok: ${vendored.size} vendored agent definitions current`);
-
-  // The skills CLI installs skill directories, so a file at the root of the
-  // skills tree never reaches the user. The MIT terms covering the vendored
-  // upstream prose ride inside poteto-mode instead. superpowers is excluded:
-  // it covers the hook runner, which stays in hooks/.
-  const LICENSE_FILES = ["LICENSE", "LICENSE-cursor-team-kit", "NOTICE.md"];
-  const licenseDir = join(skillsDir, "poteto-mode/references/licenses");
-  mkdirSync(licenseDir, { recursive: true });
-  let licenseStamps = 0;
-  for (const file of LICENSE_FILES) {
-    const source = readFileSync(join(repo, file), "utf8");
-    const label = `poteto-mode/references/licenses/${file}`;
-    if (stampFile(join(licenseDir, file), source, label)) licenseStamps += 1;
-  }
-  if (licenseStamps === 0) {
-    console.log(`ok: ${LICENSE_FILES.length} license files current in the skills tree`);
-  }
+  validateSkillsTree(skillsDir);
+  console.log("ok: local markdown links stay inside the skills tree");
 
   const codexName = JSON.parse(
     readFileSync(join(repo, "plugins/pstack/.codex-plugin/plugin.json"), "utf8"),

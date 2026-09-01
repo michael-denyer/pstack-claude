@@ -40,7 +40,7 @@ The [`skills` CLI](https://github.com/vercel-labs/skills) installs the same tree
 npx skills add https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills --skill "*" --agent "*" --yes
 ```
 
-`plugins/pstack/skills` is a supported installation boundary. Everything a skill reads at runtime lives inside it, including the `poteto-agent` and `comment-sicko` definitions under `poteto-mode/references/agents/` and the MIT terms under `poteto-mode/references/licenses/`. Both directories sit inside a skill because the CLI installs skill directories and drops loose files at the tree root. `tests/agent-skills.test.mjs` fails the build if a skill grows a link that points outside the tree, and the `Skills-only install` CI job installs the tree with the CLI on every PR.
+`plugins/pstack/skills` is a supported installation boundary. Everything a skill reads at runtime lives inside it, including the `poteto-agent` and `comment-sicko` definitions under `poteto-mode/references/agents/` and the MIT terms under `poteto-mode/references/licenses/`. Both directories sit inside a skill because the CLI installs skill directories and drops loose files at the tree root. The generator stamps exactly five portable assets from the sources declared in `PORTABLE_ASSETS`, removes stale output from those two generated directories, and validates every local Markdown target. The `Skills-only install` CI job copies the tree with the CLI, compares every installed file with the source, and validates the installed tree again.
 
 Three plugin features do not survive a skills-only install, because they belong to a specific runtime rather than to the skills. Claude Code's `SessionStart` auto-fire lives in `hooks/`, the Codex slash-command stubs live in `.codex-plugin/prompts/`, and Claude Code's native subagent registration reads `agents/`. On a skills-only install, dispatch `comment-sicko` by pointing the runtime's agent primitive at `poteto-mode/references/agents/comment-sicko.md`.
 
@@ -99,7 +99,7 @@ Discovery is not a promise that Claude-specific execution details translate auto
 │   ├── .claude-plugin/plugin.json    # Claude Code manifest
 │   ├── .codex-plugin/plugin.json     # Codex manifest (skills: ./skills/)
 │   ├── skills/                       # 52 Agent Skills (shared by all five runtimes; the skills-only install boundary)
-│   │   ├── poteto-mode/references/licenses/  # generated copies of the MIT terms, so they travel with the tree
+│   │   ├── poteto-mode/references/licenses/  # generated license texts and skills-scoped notice
 │   │   ├── poteto-mode/references/codex-tools.md  # Claude→Codex tool/model/skill map
 │   │   ├── poteto-mode/references/agents/  # generated copies of agents/, for runtimes that install only skills
 │   │   └── poteto-mode/scripts/      # vendored bun/bash tooling: watch-pr, orch, worktree-audit.sh
@@ -107,8 +107,9 @@ Discovery is not a promise that Claude-specific execution details translate auto
 │   ├── hooks/                        # SessionStart auto-fire: injects the poteto-mode mandate (Claude Code only)
 │   └── agents/                       # Claude subagents: poteto-agent, comment-sicko (Codex routes via codex-tools.md)
 ├── tests/skill-collision-repro.sh    # layout and flag invariants (needs claude CLI)
-├── tests/agent-skills.test.mjs       # shared Agent Skills metadata + Codex prompt boundary
-├── tools/generate.mjs                # stamps VERSION, model defaults, Codex prompts, and the command table
+├── tests/agent-skills.test.mjs       # shared metadata, portable assets, link checks, and Codex prompt boundary
+├── tools/generate.mjs                # stamps versioned, model, prompt, README, and portable-asset copies
+├── tools/validate-skills.mjs         # rejects missing or escaping local Markdown links
 ├── tools/sync.mjs                    # syncs a component to a new upstream SHA, applying substitutions.json
 ├── tools/upstream.json               # upstream remote + per-component pinned SHAs
 ├── tools/substitutions.json          # mechanical Cursor→Claude rewrites + the denylist of manual-only Cursor-isms
@@ -141,7 +142,7 @@ Verified on a live Codex session installed via the symlinks: the user-facing ski
 
 Two workflows run on every pull request and push to `main`.
 
-`ci.yml` runs four jobs: the static plugin invariants (`tests/skill-collision-repro.sh` under `SKIP_BEHAVIORAL=1`, since the behavioral leg needs the `claude` CLI and API access), a generated-files check (`bun tools/generate.mjs` followed by `git diff --exit-code`, so a `VERSION` bump that skips regeneration or the `CHANGES.md` entry fails the build), the vendored bun tooling (`bun install --frozen-lockfile`, `bun run typecheck`, `bun test orch watch-pr`), and `shellcheck` over every shell script, selected by `.sh` extension or by shebang so the extensionless hook scripts are covered.
+`ci.yml` runs five jobs. The static plugin invariants run `tests/skill-collision-repro.sh` under `SKIP_BEHAVIORAL=1`, since the behavioral leg needs the `claude` CLI and API access. The generated-files job runs `bun tools/generate.mjs`, rejects a resulting diff, and runs the Bun tests. The skills-only job installs through the `skills` CLI, compares the copied tree with the source, and checks its local Markdown links. The other jobs test the vendored Bun tooling and run `shellcheck` over scripts selected by extension or shebang, so the extensionless hook scripts are covered.
 
 `security.yml` runs `osv-scanner` against the lockfiles and fails the build if no lockfile was found, because an empty scan reads exactly like a clean one. It also rejects any action reference not pinned to a full 40-character commit SHA. It runs weekly on top of the per-PR trigger, so a CVE published after a merge still surfaces. `zizmor` audits the workflows themselves for template injection, over-broad permissions, and credential persistence.
 
@@ -284,3 +285,5 @@ MIT. Three upstream LICENSE files are preserved:
 - [LICENSE](LICENSE) — pstack (Lauren Tan)
 - [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) — Cursor (covers the `deslop` and `thermo-nuclear-code-quality-review` skills)
 - [LICENSE-superpowers](LICENSE-superpowers) — superpowers, Jesse Vincent (covers the vendored `hooks/run-hook.cmd`)
+
+[NOTICE-skills.md](NOTICE-skills.md) is the scoped notice copied into skills-only installations. The root [NOTICE.md](NOTICE.md) covers the full plugin, including runtime-specific files.

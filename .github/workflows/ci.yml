@@ -62,14 +62,10 @@ jobs:
         run: |
           npx --yes skills@1.5.23 add "$PWD/plugins/pstack/skills" \
             --skill '*' --agent '*' --yes --copy
-      - name: Assert every skill installed with its resources
+      - name: Compare and validate the installed skills tree
         run: |
-          installed=$(find .agents/skills -maxdepth 1 -mindepth 1 -type d | wc -l)
-          expected=$(find plugins/pstack/skills -maxdepth 1 -mindepth 1 -type d | wc -l)
-          echo "installed=$installed expected=$expected"
-          test "$installed" -eq "$expected"
-          test -f .agents/skills/poteto-mode/references/agents/comment-sicko.md
-          test -f .agents/skills/poteto-mode/references/licenses/LICENSE
+          diff -qr plugins/pstack/skills .agents/skills
+          node tools/validate-skills.mjs .agents/skills
 
   scripts:
     name: Vendored bun tooling

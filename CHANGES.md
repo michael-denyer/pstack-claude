@@ -10,7 +10,7 @@ Two dependencies previously escaped that boundary. The `poteto-agent` and `comme
 
 `codex-tools.md` pointed at `agents/comment-sicko.md`, a path that does not exist in a skills-only install. It now names the vendored copy.
 
-A skill can also name an unreachable path in prose rather than in a Markdown link, which is how `codex-tools.md` came to tell the reader to open `agents/comment-sicko.md`. The link check does not see backticked paths, so `validateProsePaths` scans them separately and fails when the sentence instructs the reader to read or open something under `agents/`, `hooks/`, `commands/`, `.codex-plugin/`, `.claude-plugin/`, or `../../`. Mentioning a directory to explain what a runtime ships stays legal.
+A skill can also name an unreachable path in prose rather than in a Markdown link, which is how `codex-tools.md` came to tell the reader to open `agents/comment-sicko.md`. The link check does not see backticked paths, so `validateProsePaths` normalizes and scans them separately. It rejects direct instructions to consult a plugin-only path or any parent-relative `../` path, including instructions wrapped onto the previous line. Describing a runtime path without directing the reader to open it stays legal.
 
 Two checks keep the boundary honest. `tools/validate-skills.mjs` resolves bare, dotted, and reference-style local Markdown targets and rejects missing files, lexical escapes, and symlink escapes. The placeholder link in `why/references/synthesizer-prompt.md` now uses an explicit example URL so it cannot masquerade as a local file. A `Skills-only install` CI job installs the tree with the `skills` CLI on every pull request, compares every copied file with the source tree, and runs the same validator against the installed artifact.
 
@@ -148,7 +148,7 @@ The multi-model panels (`arena` runners, `architect` runners, `interrogate` revi
 
 ## Codex port
 
-pstack also ships as a Codex plugin. The skill bodies are not forked or regenerated. The same `skills/` tree serves both runtimes. One mapping file does the Claude-to-Codex translation. That single-mapping-file spine is the same one the official `superpowers` plugin ships for Codex.
+pstack also ships as a Codex plugin. The same generated `skills/` tree serves both runtimes, and both read the same skill prose. One mapping file handles the Claude-to-Codex translation, matching the structure the official `superpowers` plugin uses for Codex.
 
 pstack diverges from superpowers in one respect, and it is deliberate. superpowers writes its skill prose in tool-neutral language ("dispatch a subagent"), so no skill names a runtime tool and no per-skill note is needed. pstack instead keeps the upstream Claude-native prose intact, to stay in lockstep with upstream sync, and adds a one-line Platform note to each skill that names a Claude primitive. The note points at the mapping. Rewriting 44 upstream skills into neutral language would fork them from upstream and was rejected for that reason.
 

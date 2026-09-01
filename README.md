@@ -40,7 +40,7 @@ The [`skills` CLI](https://github.com/vercel-labs/skills) installs the same tree
 npx skills add https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills --skill "*" --agent "*" --yes
 ```
 
-`plugins/pstack/skills` is a supported installation boundary. Everything a skill reads at runtime lives inside it, including the `poteto-agent` and `comment-sicko` definitions under `poteto-mode/references/agents/` and the MIT terms under `poteto-mode/references/licenses/`. Both directories sit inside a skill because the CLI installs skill directories and drops loose files at the tree root. The generator stamps exactly five portable assets from the sources declared in `PORTABLE_ASSETS`, removes stale output from those two generated directories, and validates every local Markdown target. The `Skills-only install` CI job copies the tree with the CLI, compares every installed file with the source, and validates the installed tree again.
+`plugins/pstack/skills` is a supported installation boundary. Everything a skill reads at runtime lives inside it, including the `poteto-agent` and `comment-sicko` definitions under `poteto-mode/references/agents/` and the MIT terms under `poteto-mode/references/licenses/`. Both directories sit inside a skill because the CLI installs skill directories and drops loose files at the tree root. The generator stamps exactly five portable assets from the sources declared in `PORTABLE_ASSETS` and removes stale output from those two generated directories. It rejects missing or escaping local Markdown links and direct instructions to open paths outside the skills tree. The `Skills-only install` CI job copies the tree with the CLI, compares every installed file with the source, and runs the same validation against the installed tree.
 
 Three plugin features do not survive a skills-only install, because they belong to a specific runtime rather than to the skills. Claude Code's `SessionStart` auto-fire lives in `hooks/`, the Codex slash-command stubs live in `.codex-plugin/prompts/`, and Claude Code's native subagent registration reads `agents/`. On a skills-only install, dispatch `comment-sicko` by pointing the runtime's agent primitive at `poteto-mode/references/agents/comment-sicko.md`.
 
@@ -92,7 +92,7 @@ Discovery is not a promise that Claude-specific execution details translate auto
 
 ```text
 .
-├── .github/workflows/               # CI: invariants, bun tooling, shellcheck, OSV scan
+├── .github/workflows/               # CI, security checks, and Dependabot lockfile repair
 ├── .claude-plugin/marketplace.json   # Claude Code marketplace manifest (repo root)
 ├── .agents/plugins/marketplace.json  # Codex marketplace manifest (repo root)
 ├── plugins/pstack/                   # the plugin itself
@@ -107,9 +107,9 @@ Discovery is not a promise that Claude-specific execution details translate auto
 │   ├── hooks/                        # SessionStart auto-fire: injects the poteto-mode mandate (Claude Code only)
 │   └── agents/                       # Claude subagents: poteto-agent, comment-sicko (Codex routes via codex-tools.md)
 ├── tests/skill-collision-repro.sh    # layout and flag invariants (needs claude CLI)
-├── tests/agent-skills.test.mjs       # shared metadata, portable assets, link checks, and Codex prompt boundary
+├── tests/agent-skills.test.mjs       # shared metadata, portable assets, path checks, and Codex prompt boundary
 ├── tools/generate.mjs                # stamps versioned, model, prompt, README, and portable-asset copies
-├── tools/validate-skills.mjs         # rejects escaping Markdown links and prose that opens unreachable paths
+├── tools/validate-skills.mjs         # rejects missing/escaping links and instructions to open unreachable paths
 ├── tools/sync.mjs                    # syncs a component to a new upstream SHA, applying substitutions.json
 ├── tools/upstream.json               # upstream remote + per-component pinned SHAs
 ├── tools/substitutions.json          # mechanical Cursor→Claude rewrites + the denylist of manual-only Cursor-isms
@@ -127,7 +127,7 @@ Plugin-internal path references in the docs below (`skills/<name>/`, `.codex-plu
 
 ## Running on Codex
 
-The Codex build shares one `skills/` tree with the Claude Code build. Nothing is forked; the only generated files are the prompt stubs, which `tools/generate.mjs` stamps from each skill's `menu-description` frontmatter. One mapping file does the translation. That single-mapping-file spine is the one `superpowers` ships for Codex. pstack diverges in one respect. superpowers writes its skills in tool-neutral language, so no skill names a runtime tool. pstack keeps the upstream Claude-native prose and adds a one-line Platform note to each skill that names a Claude primitive, so the port stays in lockstep with upstream sync.
+The Codex and Claude Code builds use the same `skills/` tree. Codex-specific generation adds prompt stubs from each skill's `menu-description` frontmatter. The shared generator also stamps manifest versions, model-policy sections, the README command table, and five portable assets. One mapping file handles the Claude-to-Codex translation, the same structure `superpowers` uses for Codex. pstack diverges in one respect. superpowers writes its skills in tool-neutral language, so no skill names a runtime tool. pstack keeps the upstream Claude-native prose and adds a one-line Platform note to each skill that names a Claude primitive, so the port stays in lockstep with upstream sync.
 
 - **Skill invocation.** Codex loads `SKILL.md` natively. There is no `Skill` tool. You invoke a skill by name (ask for it, or pick `pstack:poteto-mode` from the list).
 - **Commands.** The 31 `.codex-plugin/prompts/*.md` files are Codex-only, generated by `tools/generate.mjs` from each public skill's `menu-description` frontmatter (edit the skill, rerun the generator; hand edits to a stub are overwritten). Codex reads their `description` frontmatter and the filename, ignores the keys it doesn't know, and each body invokes its skill. Link them into `~/.codex/prompts/` for `/name` shortcuts (see [Install on Codex](#codex)). Claude Code ships no `commands/` directory: it renders both commands and user-invocable skills in the slash menu, so a trampoline paired with its skill duplicated every `/pstack:<name>` row (see CHANGES 0.9.13). The skill alone serves the slash command there.
@@ -140,9 +140,9 @@ Verified on a live Codex session installed via the symlinks: the user-facing ski
 
 ## CI
 
-Two workflows run on every pull request and push to `main`.
+`ci.yml` and `security.yml` run on every pull request and push to `main`. `dependabot-lockfile.yml` also triggers on every pull request, but its only job runs when Dependabot authored the PR.
 
-`ci.yml` runs five jobs. The static plugin invariants run `tests/skill-collision-repro.sh` under `SKIP_BEHAVIORAL=1`, since the behavioral leg needs the `claude` CLI and API access. The generated-files job runs `bun tools/generate.mjs`, rejects a resulting diff, and runs the Bun tests. The skills-only job installs through the `skills` CLI, compares the copied tree with the source, and checks its local Markdown links. The other jobs test the vendored Bun tooling and run `shellcheck` over scripts selected by extension or shebang, so the extensionless hook scripts are covered.
+`ci.yml` runs five jobs. The static plugin invariants run `tests/skill-collision-repro.sh` under `SKIP_BEHAVIORAL=1`, since the behavioral leg needs the `claude` CLI and API access. The generated-files job runs `bun tools/generate.mjs`, rejects a resulting diff, and runs the Bun tests. The skills-only job installs through the `skills` CLI, compares the copied tree with the source, and checks for missing or escaping Markdown links and direct instructions to open unreachable paths. The other jobs test the vendored Bun tooling and run `shellcheck` over scripts selected by extension or shebang, so the extensionless hook scripts are covered.
 
 `security.yml` runs `osv-scanner` against the lockfiles and fails the build if no lockfile was found, because an empty scan reads exactly like a clean one. It also rejects any action reference not pinned to a full 40-character commit SHA. It runs weekly on top of the per-PR trigger, so a CVE published after a merge still surfaces. `zizmor` audits the workflows themselves for template injection, over-broad permissions, and credential persistence.
 

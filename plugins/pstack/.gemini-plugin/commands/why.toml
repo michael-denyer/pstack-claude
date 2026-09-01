@@ -1,2 +1,0 @@
-description = "investigate why something was built this way (parallel multi-MCP evidence)"
-prompt = "Read plugins/pstack/skills/why/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

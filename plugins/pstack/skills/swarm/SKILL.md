@@ -8,7 +8,7 @@ menu-description: fan out N parallel workers across slices or races, then return
 
 Fan out N parallel workers. They may cover separate slices, race the same brief, or mix both. The parent waits, aggregates, and returns one report.
 
-**Platform note.** On Codex or another non-Claude runtime, the Claude tool names and `claude-*` slugs named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
+**Platform note.** On Codex, the Claude tool names and `claude-*` slugs named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
 
 ## Start
 

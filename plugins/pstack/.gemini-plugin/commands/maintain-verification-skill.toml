@@ -1,2 +1,0 @@
-description = "re-sync a drifted verification skill and its feature map"
-prompt = "Read plugins/pstack/skills/maintain-verification-skill/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

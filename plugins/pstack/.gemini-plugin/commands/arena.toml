@@ -1,2 +1,0 @@
-description = "run N parallel attempts at the same task and pick the best parts"
-prompt = "Read plugins/pstack/skills/arena/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

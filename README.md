@@ -1,6 +1,6 @@
 # pstack for Claude Code, Codex, Prime Agent, opencode, and Gemini CLI
 
-Claude Code port of [poteto](https://x.com/poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack) plugin (skill tree synced against upstream `4612556`, pstack v0.14.2 — see [What's deliberately not ported](#whats-deliberately-not-ported)). The same `skills/` tree also ships as a Codex plugin (see [Running on Codex](#running-on-codex)), is discovered as-is by [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) (see [Prime Agent](#prime-agent)) and [opencode](#opencode), and is reachable from [Gemini CLI](#gemini-cli) through generated TOML commands. Original by Lauren Tan; ships MIT. Imports seven skills from [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (also MIT): `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`.
+Claude Code port of [poteto](https://x.com/poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack) plugin. The skill tree is synced against upstream `4612556`, pstack v0.14.2. See [What's deliberately not ported](#whats-deliberately-not-ported). The same `skills/` tree ships as a Codex plugin and is discovered natively by [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent), [opencode](#opencode), and [Gemini CLI](#gemini-cli). Original by Lauren Tan; ships MIT. Imports seven skills from [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (also MIT): `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`.
 
 > if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence.
 
@@ -19,15 +19,24 @@ This repo ships as a Claude Code marketplace containing one plugin (`pstack`).
 
 From 0.9.5 the plugin auto-fires, the same way superpowers does: a `SessionStart` hook (on `startup`, `/clear`, and post-`compact`) injects a ~0.3k-token mandate that routes any non-trivial engineering task into `poteto-mode` before the first response. The full skill still loads only on invoke. Dispatched subagents are told to ignore the mandate, and explicit user instructions take precedence. To opt out, delete `hooks/hooks.json` from the installed copy (`~/.claude/plugins/cache/pstack-claude/pstack/<version>/hooks/hooks.json`); a plugin update restores it.
 
-### Codex
+### Shared Agent Skills install
 
-The same plugin carries a `.codex-plugin/plugin.json` manifest and a root `.agents/plugins/marketplace.json`. The verified install is to link the plugin's skills into your cross-runtime skills directory:
+Codex, Prime Agent, opencode, and Gemini CLI all discover user skills from `~/.agents/skills/`. Clone the repository and link its shared skill tree once:
 
 ```shell
 git clone https://github.com/michael-denyer/pstack-claude
 cd pstack-claude
+mkdir -p ~/.agents/skills
 for s in plugins/pstack/skills/*/; do ln -s "$PWD/$s" ~/.agents/skills/"$(basename "$s")"; done
 ```
+
+The loop links all 52 skill directories. Thirty-one are public workflows and 21 `principle-*` directories are internal references used by `poteto-mode`. Each runtime decides whether it understands pstack-specific frontmatter such as `user-invocable: false`, so menu visibility differs. Keep the principle directories installed even when a runtime lists them.
+
+Removing a link from `~/.agents/skills/` removes that skill from every runtime using the shared directory. Teardown is `rm ~/.agents/skills/<name>`.
+
+### Codex
+
+The same plugin carries a `.codex-plugin/plugin.json` manifest and a root `.agents/plugins/marketplace.json`. Use the [shared Agent Skills install](#shared-agent-skills-install). This path is verified on a live Codex session.
 
 Codex discovers the linked skills and namespaces them under the plugin, so they list as `pstack:poteto-mode`, `pstack:tdd`, and so on. The namespace comes from `plugins/pstack/.codex-plugin/plugin.json` and resolves through the flat symlinks, even though each linked skill sits one directory below that manifest (verified on a live session via this symlink install). To enable the multi-model and parallel-subagent skills (`interrogate`, `arena`, `how`, `why`, `reflect`, `architect`), turn on subagents in `~/.codex/config.toml`:
 
@@ -43,47 +52,31 @@ mkdir -p ~/.codex/prompts
 for c in plugins/pstack/.codex-plugin/prompts/*.md; do ln -s "$PWD/$c" ~/.codex/prompts/"$(basename "$c")"; done
 ```
 
-Each command invokes its skill, so `/tdd` runs the `tdd` skill. Installing the full plugin through the Codex marketplace (the root `.agents/plugins/marketplace.json`) carries skills and commands together; the two symlink steps above are the verified local path. Teardown is `rm ~/.agents/skills/<name>` and `rm ~/.codex/prompts/<name>.md`.
+Each command invokes its skill, so `/tdd` runs the `tdd` skill. Installing the full plugin through the Codex marketplace (the root `.agents/plugins/marketplace.json`) carries skills and commands together. The skill links plus prompt links are the verified local path. Teardown for a prompt is `rm ~/.codex/prompts/<name>.md`.
 
 ### Prime Agent
 
-[Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) discovers skills from `~/.agents/skills/` and from `.agents/skills/` in the working tree up to the git root ([docs](https://github.com/PrimeIntellect-ai/prime-agent/blob/main/packages/coding-agent/docs/skills.md)). That is the same `~/.agents/skills/` directory the Codex install symlinks into, so the [Codex skill-link step](#codex) doubles as the Prime install — if you have already run it, Prime picks the skills up with no extra work:
-
-```shell
-git clone https://github.com/michael-denyer/pstack-claude
-cd pstack-claude
-for s in plugins/pstack/skills/*/; do ln -s "$PWD/$s" ~/.agents/skills/"$(basename "$s")"; done
-```
+[Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) discovers skills from `~/.agents/skills/` and from `.agents/skills/` in the working tree up to the git root ([docs](https://github.com/PrimeIntellect-ai/prime-agent/blob/main/packages/coding-agent/docs/skills.md)). The [shared Agent Skills install](#shared-agent-skills-install) is the complete Prime install.
 
 pstack's `SKILL.md` frontmatter is a subset of what Prime reads: it requires `name` (lowercase, matching the parent directory — every pstack skill already conforms) and `description`, honours `disable-model-invocation`, and ignores unknown keys such as pstack's `user-invocable`. `curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh` installs Prime itself; `--no-skills` disables discovery, and explicit `--skill <path>` still loads. Prime is model-agnostic, so running these skills against **ChatGPT / OpenAI models is a Prime backend setting, not a plugin change** — keep the multi-model panels in `arena`, `interrogate`, `architect`, and `how` genuinely diverse across whatever models you configure (see the OpenAI panel note under [Running on Codex](#running-on-codex)).
 
-Unverified relative to Codex: the Codex path above is confirmed on a live session; the Prime path is derived from Prime's documented discovery paths and frontmatter schema, not yet run on a live Prime session. Prime has no plugin-hook runtime, so the Claude Code auto-fire hook does not apply — enter `pstack:poteto-mode` by name or add a standing routing instruction to your Prime config. Teardown is `rm ~/.agents/skills/<name>`.
+Unverified relative to Codex: the Prime path is derived from Prime's documented discovery paths and frontmatter schema, not yet run on a live Prime session. Prime has no plugin-hook runtime, so the Claude Code auto-fire hook does not apply. Enter `pstack:poteto-mode` by name or add a standing routing instruction to your Prime config.
 
 ### opencode
 
-[opencode](https://opencode.ai) implements the Anthropic Agent Skills spec and loads skills from `$OPENCODE_CONFIG_DIR/skills/` (defaulting to `~/.config/opencode/skills/`), or from `.opencode/skills/` in the working tree. pstack's `skills/` tree is already in that format, so there is nothing to generate. Link it:
+[opencode](https://opencode.ai/docs/skills) loads Agent Skills from `~/.agents/skills/` as well as its own `~/.config/opencode/skills/` directory. Use the [shared Agent Skills install](#shared-agent-skills-install). There is nothing to generate.
 
-```shell
-mkdir -p ~/.config/opencode/skills
-for s in plugins/pstack/skills/*/; do ln -s "$PWD/$s" ~/.config/opencode/skills/"$(basename "$s")"; done
-```
+opencode ignores the pstack-specific `user-invocable: false` key, so its picker lists the 21 `principle-*` leaves alongside the 31 public workflows. Codex and Claude Code hide the leaves. Keep them linked because `poteto-mode` cites them by name and expects to read each one.
 
-All 52 skill directories are linked, not just the 31 public ones. The `principle-*` leaves carry `user-invocable: false`, which is a pstack key rather than an Agent Skills one, so opencode ignores it and lists all 52 in the picker — Codex and Claude Code show only the 31. Linking the leaves anyway is deliberate: `poteto-mode` cites them by name and expects to read each leaf, so filtering them out of the loop above would break it. Drop a leaf only if you also accept that `poteto-mode` can no longer resolve it.
-
-Project-local skills take precedence over global ones of the same name, and opencode logs a warning on a duplicate. Agents, commands, and permissions are configured in `opencode.json`. Teardown is `rm ~/.config/opencode/skills/<name>`.
+The opencode path is verified on a live opencode 1.18.25 session. It discovers all 31 public skills through the links and reads a linked `SKILL.md` on request. Agents, commands, and permissions are configured in `opencode.json`.
 
 ### Gemini CLI
 
-Gemini CLI has no skills concept and reads TOML slash commands from `~/.gemini/commands/`, so the generator emits one `.toml` per public skill into `plugins/pstack/.gemini-plugin/commands/`. Each command tells Gemini to read the corresponding `SKILL.md` and follow it:
+[Gemini CLI](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/using-agent-skills.md) has native Agent Skills. It discovers user skills from `~/.gemini/skills/` or the `~/.agents/skills/` compatibility alias. Use the [shared Agent Skills install](#shared-agent-skills-install), then run `/skills list` to inspect discovery or `/skills reload` after changing a linked file. Ask Gemini to use `poteto-mode`; its `activate_skill` tool loads the skill and its resources.
 
-```shell
-mkdir -p ~/.gemini/commands/pstack
-for c in plugins/pstack/.gemini-plugin/commands/*.toml; do ln -s "$PWD/$c" ~/.gemini/commands/pstack/"$(basename "$c")"; done
-```
+The Gemini path follows published Gemini CLI documentation and has not been run on a live session. Neither Gemini CLI nor opencode gets generated command files. Native discovery keeps each `SKILL.md`, its references, and its scripts attached to one installed directory, so the skills work from the repository where the user actually needs them.
 
-Gemini derives a command's name from its path, converting separators to colons, so linking into a `pstack/` subdirectory gives `/pstack:tdd` and `/pstack:poteto-mode`. A command in `~/.gemini/commands/` takes precedence over an extension-provided one of the same name. Because the stubs reference skill files by repository-relative path, run Gemini from the clone (or edit the paths to absolute) or the `SKILL.md` read will miss. Teardown is `rm -r ~/.gemini/commands/pstack`.
-
-The opencode path is verified on a live session: opencode 1.18.25 discovers all 31 public skills through the symlinks and reads a linked `SKILL.md` on request. The Gemini CLI path is derived from published documentation and has not been run against a live session. The skills name Claude Code tools and `claude-*` model slugs throughout; they resolve on these runtimes the same way they do on Codex, via [`codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md). Neither runtime has a plugin-hook equivalent of the Claude Code auto-fire hook, so enter `poteto-mode` by name.
+Discovery is not a promise that Claude-specific execution details translate automatically. The skill bodies retain Claude Code tool names, `claude-*` model slugs, and Claude built-in skills. [`codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md) maps those names on Codex only. Gemini CLI, opencode, and Prime Agent must use their own tool, model, and configuration equivalents. Delegation-heavy and multi-model workflows remain unverified on those runtimes. None has a plugin-hook equivalent of the Claude Code auto-fire hook, so ask the runtime to use `poteto-mode` explicitly.
 
 ## Layout
 
@@ -95,13 +88,14 @@ The opencode path is verified on a live session: opencode 1.18.25 discovers all 
 ├── plugins/pstack/                   # the plugin itself
 │   ├── .claude-plugin/plugin.json    # Claude Code manifest
 │   ├── .codex-plugin/plugin.json     # Codex manifest (skills: ./skills/)
-│   ├── skills/                       # 52 skills (shared by all three runtimes)
+│   ├── skills/                       # 52 Agent Skills (shared by all five runtimes)
 │   │   ├── poteto-mode/references/codex-tools.md  # Claude→Codex tool/model/skill map
 │   │   └── poteto-mode/scripts/      # vendored bun/bash tooling: watch-pr, orch, worktree-audit.sh
 │   ├── .codex-plugin/prompts/        # 31 slash command stubs, generated (Codex only; link into ~/.codex/prompts)
 │   ├── hooks/                        # SessionStart auto-fire: injects the poteto-mode mandate (Claude Code only)
 │   └── agents/                       # Claude subagents: poteto-agent, comment-sicko (Codex routes via codex-tools.md)
 ├── tests/skill-collision-repro.sh    # layout and flag invariants (needs claude CLI)
+├── tests/agent-skills.test.mjs       # shared Agent Skills metadata + Codex prompt boundary
 ├── tools/generate.mjs                # stamps VERSION, model defaults, Codex prompts, and the command table
 ├── tools/sync.mjs                    # syncs a component to a new upstream SHA, applying substitutions.json
 ├── tools/upstream.json               # upstream remote + per-component pinned SHAs

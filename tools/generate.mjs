@@ -7,9 +7,10 @@
 // Sources of truth:
 //   VERSION  -> the "version" field in the three plugin manifests
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
-//   each public skill's frontmatter (name + menu-description)
-//     -> a command stub per runtime in STUB_TARGETS (Codex prompts, Gemini
-//        CLI TOML commands). opencode reads skills/ natively and needs none.
+//   each skill's frontmatter (name + description) defines the shared Agent
+//   Skills boundary consumed natively by Codex, Prime, opencode, and Gemini CLI
+//   each public skill's menu-description
+//     -> its Codex prompt stub in plugins/pstack/.codex-plugin/prompts/
 //     -> its row in README.md's "Slash commands" table
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
 //   available slugs, Codex equivalents)
@@ -24,7 +25,6 @@
 
 import {
   existsSync,
-  mkdirSync,
   readFileSync,
   readdirSync,
   statSync,
@@ -92,49 +92,53 @@ export function frontmatterValue(text, key) {
   return line?.slice(key.length + 2);
 }
 
-// A public skill is any skills/<name>/SKILL.md not marked user-invocable: false
-// (the principle-* leaves). Each must carry menu-description, the one-liner the
-// Codex slash menu and the README command table both render.
-export function publicSkills(skillsDir) {
+// Validate the shared subset of the Agent Skills contract before deriving any
+// runtime-specific views. Runtime-only frontmatter keys may be ignored by other
+// consumers, but every skill needs a portable name and description.
+export function agentSkills(skillsDir) {
   const skills = [];
   for (const entry of readdirSync(skillsDir).sort()) {
     const path = join(skillsDir, entry, "SKILL.md");
     if (!statSync(join(skillsDir, entry)).isDirectory() || !existsSync(path)) continue;
     const text = readFileSync(path, "utf8");
     const front = text.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
-    if (front.split("\n").includes("user-invocable: false")) continue;
     const name = frontmatterValue(text, "name");
     if (name !== entry) throw new Error(`${path}: frontmatter name "${name}" != directory "${entry}"`);
-    const menu = frontmatterValue(text, "menu-description");
-    if (!menu) throw new Error(`${path}: public skill has no menu-description frontmatter`);
-    skills.push({ name, menu });
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || name.length > 64) {
+      throw new Error(`${path}: frontmatter name "${name}" is not a portable Agent Skills name`);
+    }
+    const description = frontmatterValue(text, "description");
+    if (!description) throw new Error(`${path}: skill has no description frontmatter`);
+    if (description.length > 1024) {
+      throw new Error(`${path}: description exceeds the portable Agent Skills limit of 1024 characters`);
+    }
+    skills.push({
+      name,
+      description,
+      menu: frontmatterValue(text, "menu-description"),
+      userInvocable: !front.split("\n").includes("user-invocable: false"),
+    });
   }
   return skills;
+}
+
+// A public skill is any Agent Skill not marked user-invocable: false (the
+// principle-* leaves). Each needs the one-liner rendered into the Codex slash
+// menu and README command table.
+export function publicSkills(skillsDir) {
+  return agentSkills(skillsDir)
+    .filter((skill) => skill.userInvocable)
+    .map(({ name, menu }) => {
+      if (!menu) {
+        throw new Error(`${join(skillsDir, name, "SKILL.md")}: public skill has no menu-description`);
+      }
+      return { name, menu };
+    });
 }
 
 export function promptStub({ name, menu }) {
   return `---\nname: ${name}\ndescription: ${menu}\ndisable-model-invocation: true\n---\n\nInvoke the \`${name}\` skill and follow it.\n`;
 }
-
-// Gemini CLI has no skills concept, so the stub points at the SKILL.md path
-// rather than naming a skill the runtime could resolve.
-export function geminiStub({ name, menu }) {
-  const body = [
-    `Read plugins/pstack/skills/${name}/SKILL.md in full, then follow it.`,
-    "",
-    "Tool and model names in that file are Claude Code's. Resolve them via",
-    "plugins/pstack/skills/poteto-mode/references/codex-tools.md.",
-  ].join("\n");
-  return `description = ${JSON.stringify(menu)}\nprompt = ${JSON.stringify(body)}\n`;
-}
-
-// One row per runtime that needs generated command stubs. opencode is absent
-// on purpose: it reads plugins/pstack/skills/ natively via the Agent Skills
-// spec, so generating stubs for it would duplicate files it already loads.
-export const STUB_TARGETS = [
-  { dir: "plugins/pstack/.codex-plugin/prompts", ext: ".md", render: promptStub },
-  { dir: "plugins/pstack/.gemini-plugin/commands", ext: ".toml", render: geminiStub },
-];
 
 const code = (s) => `\`${s}\``;
 const codeList = (models) => models.map(code).join(", ");
@@ -409,26 +413,23 @@ function main() {
 
   const skills = publicSkills(skillsDir);
 
-  for (const { dir, ext, render } of STUB_TARGETS) {
-    const stubsDir = join(repo, dir);
-    mkdirSync(stubsDir, { recursive: true });
-    let changed = 0;
-    for (const skill of skills) {
-      const path = join(stubsDir, `${skill.name}${ext}`);
-      const next = render(skill);
-      if (existsSync(path) && readFileSync(path, "utf8") === next) continue;
-      writeFileSync(path, next);
-      changed++;
-      console.log(`stamped: ${dir}/${skill.name}${ext}`);
-    }
-    const expected = new Set(skills.map((s) => `${s.name}${ext}`));
-    for (const file of readdirSync(stubsDir)) {
-      if (!file.endsWith(ext) || expected.has(file)) continue;
-      unlinkSync(join(stubsDir, file));
-      console.log(`removed orphan: ${dir}/${file}`);
-    }
-    if (changed === 0) console.log(`ok: ${skills.length} stubs current in ${dir}`);
+  const promptsDir = join(repo, "plugins/pstack/.codex-plugin/prompts");
+  let promptsChanged = 0;
+  for (const skill of skills) {
+    const path = join(promptsDir, `${skill.name}.md`);
+    const next = promptStub(skill);
+    if (existsSync(path) && readFileSync(path, "utf8") === next) continue;
+    writeFileSync(path, next);
+    promptsChanged++;
+    console.log(`stamped: .codex-plugin/prompts/${skill.name}.md`);
   }
+  const expected = new Set(skills.map((s) => `${s.name}.md`));
+  for (const file of readdirSync(promptsDir)) {
+    if (!file.endsWith(".md") || expected.has(file)) continue;
+    unlinkSync(join(promptsDir, file));
+    console.log(`removed orphan: .codex-plugin/prompts/${file}`);
+  }
+  if (promptsChanged === 0) console.log(`ok: ${skills.length} Codex prompts current`);
 
   const readmePath = join(repo, "README.md");
   const readme = readFileSync(readmePath, "utf8");
@@ -456,8 +457,8 @@ function main() {
   console.log("ok: hooks.json commands point at existing, executable scripts");
 }
 
-// Guarded so importing this module for its exports (the stub renderers, the
-// section builders) does not regenerate the repo as a side effect.
+// Guarded so importing the generator's validation and rendering functions does
+// not regenerate the repo as a side effect.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     main();

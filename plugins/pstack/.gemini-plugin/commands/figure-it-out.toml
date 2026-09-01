@@ -1,2 +1,0 @@
-description = "design a rigorous, auditable playbook for a task no bundled playbook fits"
-prompt = "Read plugins/pstack/skills/figure-it-out/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

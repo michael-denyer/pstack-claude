@@ -1,2 +1,0 @@
-description = "catch up on recent working context from chat history, live state, and the shared record"
-prompt = "Read plugins/pstack/skills/recall/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

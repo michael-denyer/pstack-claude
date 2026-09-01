@@ -1,2 +1,0 @@
-description = "strip comments before review, fix the accepted findings, encode claimed constraints"
-prompt = "Read plugins/pstack/skills/no-comments/SKILL.md in full, then follow it.\n\nTool and model names in that file are Claude Code's. Resolve them via\nplugins/pstack/skills/poteto-mode/references/codex-tools.md."

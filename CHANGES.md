@@ -2,17 +2,15 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
-## 0.9.16 — install paths for opencode and Gemini CLI
+## 0.9.16 — native Agent Skills paths for opencode and Gemini CLI
 
-The generator now writes command stubs per runtime from one table, `STUB_TARGETS` in `tools/generate.mjs`, instead of a hardcoded Codex loop. Gemini CLI gets 31 TOML commands in `plugins/pstack/.gemini-plugin/commands/`, one per public skill. Each tells Gemini to read the matching `SKILL.md` and follow it, because Gemini has no skills concept and cannot resolve a skill by name.
+opencode and Gemini CLI both discover the shared `plugins/pstack/skills/` tree natively. They support the same `~/.agents/skills/` user directory already used by the Codex and Prime installs, so one symlink loop now installs all four Agent Skills runtimes. Neither new runtime gets generated command files. The generator keeps its single Codex-only prompt adapter.
 
-opencode gets no generated files at all. It implements the Anthropic Agent Skills spec and reads `plugins/pstack/skills/` directly, so its install is a symlink into `~/.config/opencode/skills/`. That path is verified on a live opencode 1.18.25 session, which discovers all 31 public skills and reads a linked `SKILL.md` on request. The Gemini CLI path is documented as derived from published documentation rather than run live.
+The shared install links all 52 directories. Thirty-one are public workflows and 21 `principle-*` leaves are internal references used by `poteto-mode`. opencode ignores the pstack-specific `user-invocable: false` key and lists the leaves; the README records that tradeoff. The opencode path is verified on a live 1.18.25 session. The Gemini CLI path follows its published Agent Skills discovery contract and has not been run live.
 
-The symlink loop links all 52 skill directories, so opencode's picker lists the 21 `principle-*` leaves alongside the 31 public skills; Codex and Claude Code honour `user-invocable: false` and hide them, but that key is pstack's rather than the Agent Skills spec's and opencode ignores it. The leaves stay linked on purpose, because `poteto-mode` cites them by name and reads each one. The README records the tradeoff.
+The generator now validates the portable `name` and `description` frontmatter on every shared skill before deriving public Codex prompts and the README command table. `tests/agent-skills.test.mjs` exercises that boundary instead of testing a runtime-specific serializer. Importing `tools/generate.mjs` no longer regenerates the repository as a side effect.
 
-Importing `tools/generate.mjs` no longer regenerates the repo as a side effect. `main()` now runs only when the file is the process entrypoint, which lets `tests/stubs.test.mjs` import the stub renderers and assert their output shape, including that the Gemini prompt body survives TOML escaping.
-
-Model policy is unchanged. Neither runtime can be a dispatch target for `interrogate`, `arena`, or `swarm` from a Claude Code session, because the `Agent` tool takes Claude models only; `models.json` keeps its Claude slugs and its Codex documentation block.
+`codex-tools.md` remains a Codex-only adapter. Platform notes no longer send arbitrary non-Claude runtimes through Codex tool names, model slugs, or configuration paths. Gemini CLI, opencode, and Prime Agent get native discovery, but their Claude-specific execution equivalents and delegation-heavy workflows remain runtime-owned and unverified. Model policy is unchanged.
 
 ## 0.9.15 — retire Opus 4.8 from the model defaults
 

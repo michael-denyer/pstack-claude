@@ -68,6 +68,8 @@ mkdir -p ~/.config/opencode/skills
 for s in plugins/pstack/skills/*/; do ln -s "$PWD/$s" ~/.config/opencode/skills/"$(basename "$s")"; done
 ```
 
+All 52 skill directories are linked, not just the 31 public ones. The `principle-*` leaves carry `user-invocable: false`, which is a pstack key rather than an Agent Skills one, so opencode ignores it and lists all 52 in the picker — Codex and Claude Code show only the 31. Linking the leaves anyway is deliberate: `poteto-mode` cites them by name and expects to read each leaf, so filtering them out of the loop above would break it. Drop a leaf only if you also accept that `poteto-mode` can no longer resolve it.
+
 Project-local skills take precedence over global ones of the same name, and opencode logs a warning on a duplicate. Agents, commands, and permissions are configured in `opencode.json`. Teardown is `rm ~/.config/opencode/skills/<name>`.
 
 ### Gemini CLI
@@ -81,7 +83,7 @@ for c in plugins/pstack/.gemini-plugin/commands/*.toml; do ln -s "$PWD/$c" ~/.ge
 
 Gemini derives a command's name from its path, converting separators to colons, so linking into a `pstack/` subdirectory gives `/pstack:tdd` and `/pstack:poteto-mode`. A command in `~/.gemini/commands/` takes precedence over an extension-provided one of the same name. Because the stubs reference skill files by repository-relative path, run Gemini from the clone (or edit the paths to absolute) or the `SKILL.md` read will miss. Teardown is `rm -r ~/.gemini/commands/pstack`.
 
-Both paths above are derived from published documentation, not yet run on a live opencode or Gemini CLI session. The skills name Claude Code tools and `claude-*` model slugs throughout; they resolve on these runtimes the same way they do on Codex, via [`codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md). Neither runtime has a plugin-hook equivalent of the Claude Code auto-fire hook, so enter `poteto-mode` by name.
+The opencode path is verified on a live session: opencode 1.18.25 discovers all 31 public skills through the symlinks and reads a linked `SKILL.md` on request. The Gemini CLI path is derived from published documentation and has not been run against a live session. The skills name Claude Code tools and `claude-*` model slugs throughout; they resolve on these runtimes the same way they do on Codex, via [`codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md). Neither runtime has a plugin-hook equivalent of the Claude Code auto-fire hook, so enter `poteto-mode` by name.
 
 ## Layout
 

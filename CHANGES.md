@@ -6,7 +6,9 @@ This port applies the Cursor → Claude Code substitutions in skill bodies. Earl
 
 The generator now writes command stubs per runtime from one table, `STUB_TARGETS` in `tools/generate.mjs`, instead of a hardcoded Codex loop. Gemini CLI gets 31 TOML commands in `plugins/pstack/.gemini-plugin/commands/`, one per public skill. Each tells Gemini to read the matching `SKILL.md` and follow it, because Gemini has no skills concept and cannot resolve a skill by name.
 
-opencode gets no generated files at all. It implements the Anthropic Agent Skills spec and reads `plugins/pstack/skills/` directly, so its install is a symlink into `~/.config/opencode/skills/`. The README documents both install paths and marks them as derived from published documentation rather than run on a live session.
+opencode gets no generated files at all. It implements the Anthropic Agent Skills spec and reads `plugins/pstack/skills/` directly, so its install is a symlink into `~/.config/opencode/skills/`. That path is verified on a live opencode 1.18.25 session, which discovers all 31 public skills and reads a linked `SKILL.md` on request. The Gemini CLI path is documented as derived from published documentation rather than run live.
+
+The symlink loop links all 52 skill directories, so opencode's picker lists the 21 `principle-*` leaves alongside the 31 public skills; Codex and Claude Code honour `user-invocable: false` and hide them, but that key is pstack's rather than the Agent Skills spec's and opencode ignores it. The leaves stay linked on purpose, because `poteto-mode` cites them by name and reads each one. The README records the tradeoff.
 
 Importing `tools/generate.mjs` no longer regenerates the repo as a side effect. `main()` now runs only when the file is the process entrypoint, which lets `tests/stubs.test.mjs` import the stub renderers and assert their output shape, including that the Gemini prompt body survives TOML escaping.
 

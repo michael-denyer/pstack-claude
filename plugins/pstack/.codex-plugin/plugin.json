@@ -1,9 +1,11 @@
 {
   "name": "pstack",
-  "version": "0.9.17",
-  "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Codex port of the Claude Code plugin; skills are shared, tool names resolve via skills/poteto-mode/references/codex-tools.md.",
+  "version": "0.9.18",
+  "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Codex port of the Claude Code plugin; skills are shared, tool names resolve via skills/poteto-mode/references/codex-tools.md. Original pstack by Lauren Tan (poteto).",
   "author": {
-    "name": "Lauren Tan"
+    "name": "Michael Denyer",
+    "email": "mdenyer@gmail.com",
+    "url": "https://github.com/michael-denyer"
   },
   "homepage": "https://github.com/michael-denyer/pstack-claude",
   "repository": "https://github.com/michael-denyer/pstack-claude",
@@ -22,7 +24,7 @@
     "displayName": "pstack",
     "shortDescription": "Rigorous, parallelizable agent workflows: go deep first, write less, verify everything",
     "longDescription": "pstack guides agent work through poteto-mode's principles, parallel design exploration (architect/arena), adversarial multi-model review (interrogate), root-cause debugging, prose deslopping, and verified delivery. Skills are shared with the Claude Code build; on Codex, tool names resolve via the codex-tools mapping.",
-    "developerName": "Lauren Tan (original), Michael Denyer (Codex port)",
+    "developerName": "Michael Denyer (port of Lauren Tan's pstack)",
     "category": "Developer Tools",
     "capabilities": [
       "Interactive",

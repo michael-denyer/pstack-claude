@@ -1,10 +1,12 @@
 {
   "name": "pstack",
   "displayName": "pstack (Claude Code port)",
-  "version": "0.9.17",
-  "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Ported from cursor/plugins/pstack to Claude Code.",
+  "version": "0.9.18",
+  "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Ported from cursor/plugins/pstack to Claude Code. Original pstack by Lauren Tan (poteto).",
   "author": {
-    "name": "Lauren Tan"
+    "name": "Michael Denyer",
+    "email": "mdenyer@gmail.com",
+    "url": "https://github.com/michael-denyer"
   },
   "homepage": "https://github.com/michael-denyer/pstack-claude",
   "repository": "https://github.com/michael-denyer/pstack-claude",

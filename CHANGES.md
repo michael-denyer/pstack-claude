@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.18 — plugin author names the port maintainer
+
+`plugin.json` and the marketplace entry listed Lauren Tan as `author`, so the Claude Code plugin UI credited the upstream author for the port. The `author` and `owner` fields now name Michael Denyer with an email and GitHub URL. Lauren Tan's authorship of the original pstack stays in every description, the README, and the vendored license texts.
+
 ## 0.9.17 — a self-contained skills-only install
 
 `plugins/pstack/skills/` is a supported installation boundary. The [`skills` CLI](https://github.com/vercel-labs/skills) resolves it as a subtree URL, so a skills-only install needs no clone and no second maintained copy of the tree.

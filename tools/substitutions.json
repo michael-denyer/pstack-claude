@@ -19,6 +19,16 @@
       "pattern": ".cursor/rules/",
       "replacement": "CLAUDE.md imports",
       "rationale": "Claude Code has no auto-applied rules directory; inclusion is explicit via CLAUDE.md"
+    },
+    {
+      "pattern": "subagent_type: \"poteto-agent\"",
+      "replacement": "subagent_type: \"pstack:poteto-agent\"",
+      "rationale": "Claude Code registers plugin subagents under <plugin>:<agent>; the bare name does not resolve"
+    },
+    {
+      "pattern": "subagent_type: \"comment-sicko\"",
+      "replacement": "subagent_type: \"pstack:comment-sicko\"",
+      "rationale": "Claude Code registers plugin subagents under <plugin>:<agent>; the bare name does not resolve"
     }
   ],
   "denylist": [
@@ -49,6 +59,14 @@
     {
       "token": "/goal",
       "hint": "Cursor's /goal has no Claude Code equivalent; the autopilot playbooks keep the objective in standing orders"
+    },
+    {
+      "token": "subagent_type: \"poteto-agent\"",
+      "hint": "Claude Code needs the pstack: prefix on plugin subagents; substitution rule failed to apply"
+    },
+    {
+      "token": "subagent_type: \"comment-sicko\"",
+      "hint": "Claude Code needs the pstack: prefix on plugin subagents; substitution rule failed to apply"
     }
   ]
 }

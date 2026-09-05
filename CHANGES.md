@@ -2,6 +2,16 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.20 - plan and shipping fixes
+
+Follow-up fixes for the PR 55 review. These change upstream-derived behavior and are deliberate local corrections pending a future upstream sync. The upstream pin stays at `7314f72`.
+
+`multi-phase-plan.md` delegates base preparation and topology ownership to the selected execution playbook. Its shared skeleton no longer tells every stacked child to rebase onto trunk.
+
+`shipping.md` preserves the GitHub watcher's blocker classification, including review gates and unresolved threads. Shipping waits through `WAITING`, handles blockers through Babysit, and confirms the merge after `COMPLETE` before advancing the stack. It no longer maintains a second failure classifier in prose.
+
+`check-plan.mjs` requires checkboxes in every program subsection and in Close the program. It tracks fenced code by delimiter and length so tilde fences and nested Markdown examples stay exempt from prose punctuation checks. CLI regression tests exercise the shipped skeleton, missing checklists, fenced examples, and prose after closing fences.
+
 ## 0.9.19 — sync to upstream v0.14.8
 
 Catches the port up with upstream `cursor/plugins/pstack` from `4612556` (v0.14.2) to `7314f72` (v0.14.8). Seven upstream commits; three carry content the port ships. Skill count stays at 52.

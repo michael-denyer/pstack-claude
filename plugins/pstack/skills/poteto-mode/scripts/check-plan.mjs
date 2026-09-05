@@ -44,13 +44,22 @@ if (raw[0] === "---") {
 }
 
 const lines = [];
-let fence = false;
+let fence = null;
 for (let i = start; i < raw.length; i++) {
 	const text = raw[i];
 	const n = i + 1;
-	if (/^```/.test(text)) fence = !fence;
-	lines.push({ n, text, code: fence });
-	if (fence) continue;
+	const delimiter = text.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+	let code = fence !== null;
+	if (fence !== null) {
+		if (delimiter && delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length && /^[ \t]*$/.test(delimiter[2])) {
+			fence = null;
+		}
+	} else if (delimiter && (delimiter[1][0] !== "`" || !delimiter[2].includes("`"))) {
+		fence = delimiter[1];
+		code = true;
+	}
+	lines.push({ n, text, code });
+	if (code) continue;
 	const prose = text
 		.replace(/`[^`]*`/g, "`")
 		.replace(/!\[[^\]]*\]\([^)]*\)/g, "")
@@ -60,13 +69,16 @@ for (let i = start; i < raw.length; i++) {
 	if (/: \S/.test(prose)) fail(n, "mid-sentence colon");
 }
 
-const h2 = (l) => (!l.code && l.text.startsWith("## ") ? l.text.slice(3).trim() : null);
-const sections = [];
-for (const l of lines) {
-	const title = h2(l);
-	if (title !== null) sections.push({ title, n: l.n, body: [] });
-	else if (sections.length) sections.at(-1).body.push(l);
+function sectionsAtLevel(lines, prefix) {
+	const sections = [];
+	for (const l of lines) {
+		if (!l.code && l.text.startsWith(prefix)) {
+			sections.push({ title: l.text.slice(prefix.length).trim(), n: l.n, body: [] });
+		} else if (sections.length) sections.at(-1).body.push(l);
+	}
+	return sections;
 }
+const sections = sectionsAtLevel(lines, "## ");
 const find = (title) => sections.find((s) => s.title === title);
 const bodyText = (s) => s.body.map((l) => l.text).join("\n");
 const boxes = (ls) => ls.filter((l) => !l.code && BOX.test(l.text)).map((l) => ({ n: l.n, text: l.text.match(BOX)[1] }));
@@ -86,12 +98,16 @@ if (h1 !== -1 && howToRead) {
 const program = find("Program checklist");
 if (!program) fail(1, 'no "## Program checklist" section');
 else {
-	const h3s = program.body.filter((l) => !l.code && l.text.startsWith("### ")).map((l) => l.text.slice(4).trim());
+	const tasks = sectionsAtLevel(program.body, "### ");
 	let cursor = 0;
 	for (const name of PROGRAM_H3) {
-		const at = h3s.findIndex((t, i) => i >= cursor && t.startsWith(name));
+		const at = tasks.findIndex((t, i) => i >= cursor && t.title.startsWith(name));
 		if (at === -1) fail(program.n, `Program checklist lacks "### ${name}" in order`);
-		else cursor = at + 1;
+		else {
+			const task = tasks[at];
+			if (boxes(task.body).length === 0) fail(task.n, `${task.title} has no box`);
+			cursor = at + 1;
+		}
 	}
 	for (const marker of PROGRAM_MARKERS) {
 		const ok = marker instanceof RegExp ? marker.test(bodyText(program)) : bodyText(program).includes(marker);
@@ -101,6 +117,7 @@ else {
 
 const close = find("Close the program");
 if (!close) fail(1, 'no "## Close the program" section');
+else if (boxes(close.body).length === 0) fail(close.n, "Close the program has no box");
 const programIndex = sections.indexOf(program);
 const closeIndex = sections.indexOf(close);
 const prSections = programIndex === -1 || closeIndex === -1 ? [] : sections.slice(programIndex + 1, closeIndex);

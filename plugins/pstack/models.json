@@ -31,7 +31,7 @@
     { "role": "interrogate reviewers", "models": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5"], "skill": "interrogate" }
   ],
   "codex": {
-    "singleRoleExample": "gpt-5.6-sol",
-    "panelQuad": ["gpt-5.6-sol", "gpt-5.5", "gpt-5.4", "gpt-5.6-luna"]
+    "singleRoleExample": "gpt-6-astra",
+    "panelQuad": ["gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]
   }
 }

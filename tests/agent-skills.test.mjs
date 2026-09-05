@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   agentSkills,
+  codexModelNamesSection,
   PORTABLE_ASSETS,
   promptStub,
   publicSkills,
@@ -294,5 +295,20 @@ describe("shared Agent Skills tree", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("Codex model names", () => {
+  test("names a strongest Codex model for the roles that default to it on Claude", () => {
+    const models = JSON.parse(
+      readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8"),
+    );
+    const section = codexModelNamesSection(models);
+
+    expect(section).toContain("gpt-6-astra");
+    for (const role of ["bug-fix", "perf-issue", "hillclimb", "strongest judgment"]) {
+      expect(section).toContain(role);
+    }
+    expect(section).not.toContain("claude-opus-5");
   });
 });

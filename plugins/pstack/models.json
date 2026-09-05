@@ -32,6 +32,7 @@
   ],
   "codex": {
     "singleRoleExample": "gpt-5.6-sol",
-    "panelQuad": ["gpt-5.6-sol", "gpt-5.5", "gpt-5.4", "gpt-5.6-luna"]
+    "strongestRoleExample": "gpt-6-astra",
+    "panelQuad": ["gpt-6-astra", "gpt-5.6-sol", "gpt-5.5", "gpt-5.6-luna"]
   }
 }

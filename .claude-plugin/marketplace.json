@@ -11,7 +11,7 @@
       "name": "pstack",
       "source": "./plugins/pstack",
       "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Original pstack by Lauren Tan (poteto).",
-      "version": "0.9.18",
+      "version": "0.9.19",
       "author": {
         "name": "Michael Denyer",
         "email": "mdenyer@gmail.com",

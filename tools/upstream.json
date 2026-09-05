@@ -4,7 +4,7 @@
     "pstack": {
       "upstreamPath": "pstack",
       "localPath": "plugins/pstack",
-      "sha": "4612556"
+      "sha": "7314f72"
     },
     "cursor-team-kit": {
       "upstreamPath": "cursor-team-kit/skills",

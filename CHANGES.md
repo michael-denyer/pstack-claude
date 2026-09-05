@@ -2,6 +2,12 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.19 — name a Codex counterpart for the strongest-model roles
+
+The `codex` block in `plugins/pstack/models.json` named one example model and a panel quad, so a Codex user reading `codex-tools.md` had nothing to substitute for the roles that run `claude-fable-5` on Claude (`bug-fix`, `perf-issue`, `hillclimb`, and `strongest judgment`). The block now names `gpt-6-astra` as the Codex counterpart for those roles, and `gpt-6-astra` leads the default panel quad in place of `gpt-5.4`, which drops so the quad stays four models.
+
+The generator restamped the `## Model names` section of `poteto-mode/references/codex-tools.md` with a bullet for those roles. It derives the role list from the role table rather than repeating it, so a role moving on or off the strongest model restamps the Codex guidance with it. Claude defaults are unchanged.
+
 ## 0.9.18 — plugin author names the port maintainer
 
 `plugin.json` and the marketplace entry listed Lauren Tan as `author`, so the Claude Code plugin UI credited the upstream author for the port. The `author` and `owner` fields now name Michael Denyer with an email and GitHub URL. Lauren Tan's authorship of the original pstack stays in every description, the README, and the vendored license texts.

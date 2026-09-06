@@ -32,7 +32,7 @@ ls -t ~/.claude/projects/<encoded-cwd>/*.jsonl 2>/dev/null | head -10
 
 Three transcript layouts: legacy flat (`<id>.jsonl`), current nested (`<id>/<id>.jsonl`), and subagent (`<parent>/subagents/<child>.jsonl`).
 
-For each candidate, read the first JSONL line and check that `message.content[0].text` contains the conversation's opening user prompt. Take the matching path. If no path resolves, write a tight digest of the session and pass that instead.
+For each candidate, scan for the first record whose `type` is `"user"` and check that its `message.content` carries the conversation's opening user prompt. Do not check only the first line: the first record is session metadata, so `message.content[0].text` on it is `None`. Transcripts run to several megabytes, so walk the file as JSONL line by line and never read one whole. Take the matching path. If no path resolves, write a tight digest of the session and pass that instead.
 
 ### 2. Spawn three reviewers in parallel
 

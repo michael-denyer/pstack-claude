@@ -19,10 +19,12 @@
 // material for the CHANGES.md entry.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -50,22 +52,11 @@ export function denylistHits(path, text, denylist) {
   return hits;
 }
 
-function listFiles(dir) {
-  const out = [];
-  for (const entry of readdirSync(dir)) {
-    if (entry === ".git" || entry === "node_modules") continue;
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) out.push(...listFiles(full));
-    else out.push(full);
-  }
-  return out;
-}
-
 // Compare old-upstream vs new-upstream vs local for one component tree.
 // Returns { written, manual, unchanged, counts } and writes clean updates.
 export function syncComponent({ oldDir, newDir, localDir, rules, write }) {
   const report = { written: [], manual: [], unchanged: 0, counts: new Map() };
-  for (const newFile of listFiles(newDir)) {
+  for (const newFile of walk(newDir)) {
     const rel = relative(newDir, newFile);
     const localFile = join(localDir, rel);
     const oldFile = join(oldDir, rel);

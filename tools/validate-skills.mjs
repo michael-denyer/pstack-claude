@@ -4,12 +4,23 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
-function markdownFiles(dir) {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+// The one directory walker for every tool in tools/. `node_modules` under
+// poteto-mode/scripts is gitignored but present on any machine that ran the
+// vendored tooling's install, and its READMEs are not ours to validate.
+export const SKIPPED_DIRS = new Set([".git", "node_modules"]);
+
+// Sorted, so reports and scans read the same on every filesystem.
+export function walk(dir) {
+  const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+  return entries.flatMap((entry) => {
+    if (SKIPPED_DIRS.has(entry.name)) return [];
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) return markdownFiles(path);
-    return entry.name.endsWith(".md") ? [path] : [];
+    return entry.isDirectory() ? walk(path) : [path];
   });
+}
+
+export function markdownFiles(dir) {
+  return walk(dir).filter((path) => path.endsWith(".md"));
 }
 
 function markdownTargets(text) {

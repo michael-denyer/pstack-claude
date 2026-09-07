@@ -20,7 +20,7 @@ import {
   publicSkills,
   syncPortableAssets,
 } from "../tools/generate.mjs";
-import { validateProsePaths, validateSkillsTree } from "../tools/validate-skills.mjs";
+import { validateProsePaths, validateSkillsTree, walk } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const skillsDir = join(repoRoot, "plugins/pstack/skills");
@@ -96,6 +96,38 @@ describe("shared Agent Skills tree", () => {
           "Read this section before noting that `agents/comment-sicko.md` ships only with the plugin.",
         ].join("\n"),
       );
+      expect(() => validateProsePaths(root)).not.toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("walk returns a sorted listing regardless of directory order", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-walk-"));
+    try {
+      for (const name of ["zeta", "alpha", "mid"]) {
+        mkdirSync(join(root, name));
+        writeFileSync(join(root, name, "SKILL.md"), "# x\n");
+      }
+      expect(walk(root).map((p) => p.slice(root.length + 1))).toEqual([
+        "alpha/SKILL.md",
+        "mid/SKILL.md",
+        "zeta/SKILL.md",
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("an installed node_modules under a skill is not validated", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-skills-links-"));
+    const vendored = join(root, "example/scripts/node_modules/dep");
+    mkdirSync(vendored, { recursive: true });
+    writeFileSync(join(root, "example/SKILL.md"), "# Example\n");
+    writeFileSync(join(vendored, "Readme.md"), "[docs](./docs/missing.md)\nRead `../../../../etc/passwd`.\n");
+
+    try {
+      expect(() => validateSkillsTree(root)).not.toThrow();
       expect(() => validateProsePaths(root)).not.toThrow();
     } finally {
       rmSync(root, { recursive: true, force: true });

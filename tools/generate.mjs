@@ -41,7 +41,7 @@ import {
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { pathIsInside, validateProsePaths, validateSkillsTree } from "./validate-skills.mjs";
+import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -487,18 +487,9 @@ function main() {
   }
   if (modelStamps === 0) console.log("ok: model-policy sections current");
 
-  const strays = [];
-  const walk = (dir) => {
-    for (const entry of readdirSync(dir)) {
-      if (entry === "node_modules" || entry === "scripts") continue;
-      const full = join(dir, entry);
-      if (statSync(full).isDirectory()) walk(full);
-      else if (entry.endsWith(".md")) {
-        strays.push(...strayModelSlugs(full.slice(repo.length + 1), readFileSync(full, "utf8")));
-      }
-    }
-  };
-  walk(skillsDir);
+  const strays = markdownFiles(skillsDir).flatMap((full) =>
+    strayModelSlugs(full.slice(repo.length + 1), readFileSync(full, "utf8")),
+  );
   if (strays.length) {
     throw new Error(
       `claude-* model slugs outside generator-owned regions (move the fact into models.json or reference the role):\n` +

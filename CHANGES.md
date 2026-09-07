@@ -2,6 +2,16 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.24 - close the full-code review findings
+
+The PR watcher reads every review-thread page, rejects non-advancing cursors, and checks that the PR head stayed unchanged while collecting evidence. Ready verdicts include that head SHA; a missing commit no longer looks like an explicitly absent rollup. Stack discovery keeps fork branches separate from repository-local branches and rejects cycles. One monotonic deadline covers discovery, subprocesses, polling, and retry delays; an expired command is killed and reaped before the watcher exits.
+
+Upstream sync validates the planned installed text before writing or deleting anything. Unchanged files and manual local contents are scanned too, so retrying a rejected sync cannot bypass validation. Worktree audit parses complete NUL-delimited Git records, preserves spaces in paths, and requires ancestry or an exact merged PR head before suggesting removal. Closed PRs, commits added after a merge, and failed probes do not establish safety.
+
+The orchestration store serializes complete mutations per handle. Concurrent additions and updates no longer overwrite each other; a failed mutation does not poison the queue. Closing rejects new operations, drains accepted writes, and releases the process lock once. Frontier discovery, status rendering, and shared types leave the oversized store module, with existing public imports and file formats preserved.
+
+These are deliberate port-side corrections to vendored runtime behavior. The upstream pin remains at `7314f72`.
+
 ## 0.9.23 - sync boundary in code, generator region model, dead layers removed
 
 Fixes from a whole-repo code quality review. The upstream pin stays at `7314f72`. Prose in upstream-owned skills changes only where a port addition is removed.

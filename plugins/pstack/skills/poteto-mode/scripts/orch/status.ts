@@ -22,7 +22,7 @@ export function countValues(values: readonly string[]): Counts {
     result[value] = (result[value] ?? 0) + 1;
   }
   return Object.fromEntries(
-    Object.entries(result).sort(([left], [right]) => left.localeCompare(right))
+    Object.entries(result).sort(([left], [right]) => left.localeCompare(right)),
   );
 }
 
@@ -30,7 +30,7 @@ export function summarize(
   unitRows: readonly Unit[],
   ledgerRows: readonly LedgerEntry[],
   currentFrontier: Frontier,
-  gateRows: readonly Gate[]
+  gateRows: readonly Gate[],
 ): StatusSummary {
   return {
     unitStates: countValues(unitRows.map((unit) => unit.state)),
@@ -82,7 +82,7 @@ export function previousSummary(raw: string): StatusSummary | null {
   const unitStates = countRecord(value.unitStates);
   const ledgerVerdicts = countRecord(value.ledgerVerdicts);
   const openGateIds = value.openGateIds.filter(
-    (item): item is string => typeof item === "string"
+    (item): item is string => typeof item === "string",
   );
   if (
     unitStates === null ||
@@ -101,7 +101,7 @@ export function previousSummary(raw: string): StatusSummary | null {
 
 export function changed(
   before: StatusSummary | null,
-  after: StatusSummary
+  after: StatusSummary,
 ): string {
   if (before === null) {
     return "first render";
@@ -137,12 +137,12 @@ export function changed(
   }
   if (before.frontierGeneration !== after.frontierGeneration) {
     result.push(
-      `frontier generation ${before.frontierGeneration}->${after.frontierGeneration}`
+      `frontier generation ${before.frontierGeneration}->${after.frontierGeneration}`,
     );
   }
   if (before.openGateIds.join("\0") !== after.openGateIds.join("\0")) {
     result.push(
-      `open gates ${before.openGateIds.length}->${after.openGateIds.length}`
+      `open gates ${before.openGateIds.length}->${after.openGateIds.length}`,
     );
   }
   return result.length === 0 ? "no derived changes" : result.join("; ");
@@ -157,7 +157,7 @@ function markdown(value: string): string {
 
 function table(
   headers: readonly string[],
-  rows: readonly (readonly string[])[]
+  rows: readonly (readonly string[])[],
 ): string {
   if (rows.length === 0) {
     return "(none)";
@@ -181,7 +181,7 @@ export function statusMarkdown(
   ledgerRows: readonly LedgerEntry[],
   currentFrontier: Frontier,
   gateRows: readonly Gate[],
-  currentSummary: StatusSummary
+  currentSummary: StatusSummary,
 ): string {
   return `# Orchestrate status
 
@@ -201,7 +201,7 @@ ${table(
     unit.pr,
     unit.sha,
     unit.brief,
-  ])
+  ]),
 )}
 
 ## Verification ledger
@@ -217,7 +217,7 @@ ${table(
     row.evidence,
     row.verifier,
     row.ts,
-  ])
+  ]),
 )}
 
 ## Frontier
@@ -232,7 +232,7 @@ ${table(
     String(row.pr),
     row.sha,
     row.state,
-  ])
+  ]),
 )}
 
 ## Gates
@@ -246,7 +246,7 @@ ${table(
     gate.options,
     gate.defaultAnswer,
     gate.kind === "resolved" ? gate.answer : "",
-  ])
+  ]),
 )}
 
 <!-- orch-summary ${JSON.stringify(currentSummary)} -->

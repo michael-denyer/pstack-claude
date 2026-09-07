@@ -209,7 +209,7 @@ export class UsageError extends UserError {}
 export class NotFoundError extends UserError {
   public constructor(
     message: string,
-    public readonly output?: NotFoundOutput
+    public readonly output?: NotFoundOutput,
   ) {
     super(message);
   }

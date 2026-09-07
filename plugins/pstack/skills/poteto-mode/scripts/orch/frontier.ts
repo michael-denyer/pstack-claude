@@ -127,13 +127,11 @@ function parseGtPullRequest({
   detail: string;
 }): GtPullRequest {
   const match =
-    /^(?:\[origin\] )?PR #([1-9]\d*)(?: \(([^)\r\n]+)\))?( .+)?$/.exec(
-      detail
-    );
+    /^(?:\[origin\] )?PR #([1-9]\d*)(?: \(([^)\r\n]+)\))?( .+)?$/.exec(detail);
   const pr = Number(match?.[1] ?? 0);
   if (match === null || !Number.isSafeInteger(pr)) {
     throw new UserError(
-      `gt info output has an invalid PR row for branch ${branch}: ${detail}`
+      `gt info output has an invalid PR row for branch ${branch}: ${detail}`,
     );
   }
   const status = match[2];
@@ -142,7 +140,7 @@ function parseGtPullRequest({
   // no-status would silently report the PR as OPEN.
   if (status === undefined && (match[3] ?? "").startsWith(" (")) {
     throw new UserError(
-      `gt info output has an invalid PR row for branch ${branch}: ${detail}`
+      `gt info output has an invalid PR row for branch ${branch}: ${detail}`,
     );
   }
   if (status === "Merged") {
@@ -155,7 +153,7 @@ function parseGtPullRequest({
     return { pr, state: "OPEN" };
   }
   throw new UserError(
-    `gt info output has an unknown PR state for branch ${branch}: ${status}`
+    `gt info output has an unknown PR state for branch ${branch}: ${status}`,
   );
 }
 
@@ -172,13 +170,13 @@ function parseGtBranches(raw: string): readonly string[] {
       /^(?:│ )*[◯◉] +((?!-)[^\s]+)((?: \([^()\r\n]*\))*)$/.exec(line);
     if (branchMatch === null) {
       throw new UserError(
-        `gt log short output has an unparseable line ${index + 1}: ${JSON.stringify(line)}`
+        `gt log short output has an unparseable line ${index + 1}: ${JSON.stringify(line)}`,
       );
     }
     const branch = branchMatch[1] ?? "";
     if (branches.includes(branch)) {
       throw new UserError(
-        `gt log short output contains duplicate branch ${branch}`
+        `gt log short output contains duplicate branch ${branch}`,
       );
     }
     branches.push(branch);
@@ -212,16 +210,16 @@ function graphitePullRequest({
     .replace(/\r/g, "")
     .split("\n")
     .filter(
-      (line) => line.startsWith("PR #") || line.startsWith("[origin] PR #")
+      (line) => line.startsWith("PR #") || line.startsWith("[origin] PR #"),
     );
   if (rows.length === 0) {
     throw new UserError(
-      `gt info output branch ${branch} has no pull request; this clone's gt metadata may predate the submit, so resolve the frontier from the stacker's clone or after gt sync`
+      `gt info output branch ${branch} has no pull request; this clone's gt metadata may predate the submit, so resolve the frontier from the stacker's clone or after gt sync`,
     );
   }
   if (rows.length > 1) {
     throw new UserError(
-      `gt info output contains multiple PRs for branch ${branch}`
+      `gt info output contains multiple PRs for branch ${branch}`,
     );
   }
   return parseGtPullRequest({ branch, detail: rows[0] ?? "" });
@@ -238,11 +236,11 @@ function graphiteFrontier(repo: string): readonly GtFrontierEntry[] {
         encoding: "utf8",
         env: { ...process.env, NO_COLOR: "1" },
         stdio: ["ignore", "pipe", "pipe"],
-      }
+      },
     );
   } catch (error) {
     throw new UserError(
-      `gt log short --stack --reverse failed: ${errorMessage(error)}`
+      `gt log short --stack --reverse failed: ${errorMessage(error)}`,
     );
   }
   const result = parseGtBranches(raw).map((branch) => ({
@@ -255,13 +253,7 @@ function graphiteFrontier(repo: string): readonly GtFrontierEntry[] {
   return result;
 }
 
-function branchSha({
-  branch,
-  repo,
-}: {
-  branch: string;
-  repo: string;
-}): string {
+function branchSha({ branch, repo }: { branch: string; repo: string }): string {
   let raw: string;
   try {
     raw = execFileSync("git", ["rev-parse", branch], {
@@ -272,7 +264,7 @@ function branchSha({
     });
   } catch (error) {
     throw new UserError(
-      `git rev-parse ${branch} failed: ${errorMessage(error)}`
+      `git rev-parse ${branch} failed: ${errorMessage(error)}`,
     );
   }
   const sha = raw.trim();
@@ -315,7 +307,7 @@ export function validateFrontierPin({
   }
   if (missing.length === 0 && extra.length === 0) {
     drift.push(
-      `order differs: expected ${expected.join(",")}; gt ${actual.join(",")}`
+      `order differs: expected ${expected.join(",")}; gt ${actual.join(",")}`,
     );
   }
   throw new UserError(`frontier pin mismatch: ${drift.join("; ")}`);

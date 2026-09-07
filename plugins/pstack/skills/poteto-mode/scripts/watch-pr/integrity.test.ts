@@ -83,6 +83,52 @@ describe("commit identity", () => {
   });
 });
 
+describe("stack branch ambiguity", () => {
+  const pr = (number: number, headRefName: string, baseRefName: string) => ({
+    number: parsePrNumber(number),
+    headRepository: context,
+    headRefName,
+    baseRefName,
+  });
+
+  it("ignores duplicate heads outside the requested stack", () => {
+    const result = orderStack(context, [
+      pr(1, "feature", "main"),
+      pr(2, "hotfix", "main"),
+      pr(3, "hotfix", "release"),
+      pr(4, "child", "feature"),
+    ]);
+    expect(result.map((row) => row.number)).toEqual([
+      parsePrNumber(1),
+      parsePrNumber(4),
+    ]);
+  });
+
+  it("keeps a missing seed independent of unrelated duplicate heads", () => {
+    expect(orderStack(context, [
+      pr(2, "hotfix", "main"),
+      pr(3, "hotfix", "release"),
+    ])).toEqual([context]);
+  });
+
+  it("rejects an ambiguous downstack parent", () => {
+    expect(() => orderStack(context, [
+      pr(1, "feature", "hotfix"),
+      pr(2, "hotfix", "main"),
+      pr(3, "hotfix", "release"),
+    ])).toThrow("multiple PRs have the same repository branch: hotfix");
+  });
+
+  it("rejects an ambiguous parent when traversing descendants", () => {
+    expect(() => orderStack(context, [
+      pr(1, "feature", "main"),
+      pr(2, "hotfix", "feature"),
+      pr(3, "hotfix", "release"),
+      pr(4, "child", "hotfix"),
+    ])).toThrow("multiple PRs have the same repository branch: hotfix");
+  });
+});
+
 it("rejects a repository-local cycle without walking forever", () => {
   expect(() =>
     orderStack(context, [

@@ -62,7 +62,7 @@ Some triggers name skills that ship with Claude Code, not pstack. They do not ex
 
 ## Per-skill notes
 
-The Codex slash stub for every public skill points here. Most skills need only the tables above. These need one more mapping:
+Affected skill entry points and the optional Codex slash stubs point here. Most skills need only the tables above. These need one more mapping:
 
 | Skill | On Codex |
 |-------|----------|

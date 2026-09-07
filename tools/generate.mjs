@@ -292,8 +292,8 @@ export function readmeCommands(readme, skillNames) {
   return rows;
 }
 
-// The one Codex entry point per public skill. The second sentence replaces the
-// per-skill Platform note the port used to hand-write into upstream files.
+// Optional Codex slash shortcut. Skills also link to the platform mapping so
+// native invocation and skills-only installs do not depend on these stubs.
 export function promptStub({ name, menu }) {
   return (
     `---\nname: ${name}\ndescription: ${menu}\ndisable-model-invocation: true\n---\n\n` +

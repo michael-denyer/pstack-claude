@@ -2,6 +2,12 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.25 - fix Codex entry points, sync validation, and stack discovery
+
+Duplicate-head rejection is limited to branches traversed in the requested PR stack. The two autopilot playbooks keep the standing-objective instruction without naming the unsupported command, so their installed text passes the expanded sync denylist. Fourteen skill entry points again link to the Codex mapping, preserving direct invocation on skills-only installs.
+
+These are deliberate port-side corrections. The upstream pin remains at `7314f72`.
+
 ## 0.9.24 - close the full-code review findings
 
 The PR watcher reads every review-thread page, rejects non-advancing cursors, and checks that the PR head stayed unchanged while collecting evidence. Ready verdicts include that head SHA; a missing commit no longer looks like an explicitly absent rollup. Stack discovery keeps fork branches separate from repository-local branches and rejects cycles. One monotonic deadline covers discovery, subprocesses, polling, and retry delays; an expired command is killed and reaped before the watcher exits.

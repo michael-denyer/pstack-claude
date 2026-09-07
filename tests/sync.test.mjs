@@ -83,6 +83,13 @@ describe("denylistHits", () => {
 });
 
 describe("syncComponent", () => {
+  test("installed plugin text passes sync validation without changes", () => {
+    const plugin = join(import.meta.dir, "../plugins/pstack");
+    const report = sync({ oldDir: plugin, newDir: plugin, localDir: plugin, dryRun: true });
+    expect(report.written).toEqual([]);
+    expect(report.hits).toEqual([]);
+  });
+
   test("clean update, new file, and port-edited file each route correctly", () => {
     const oldUp = tree({
       "skills/a/SKILL.md": "Step 1: AskQuestion about scope.\n",

@@ -766,7 +766,7 @@ export function orderStack(
     pr.headRepository !== null &&
     pr.headRepository.owner.toLowerCase() === context.owner.toLowerCase() &&
     pr.headRepository.repo.toLowerCase() === context.repo.toLowerCase();
-  const byHead = new Map<string, T.OpenPullRequest>();
+  const byHead = new Map<string, T.OpenPullRequest[]>();
   const invalid = (detail: string): never => {
     throw new WatcherQueryError({
       kind: "invalid-stack",
@@ -775,12 +775,16 @@ export function orderStack(
     });
   };
   for (const pr of open.filter(localHead)) {
-    if (byHead.has(pr.headRefName))
-      invalid(
-        `multiple PRs have the same repository branch: ${pr.headRefName}`,
-      );
-    byHead.set(pr.headRefName, pr);
+    byHead.set(pr.headRefName, [...(byHead.get(pr.headRefName) ?? []), pr]);
   }
+  const parentFor = (branch: string): T.OpenPullRequest | undefined => {
+    const candidates = byHead.get(branch) ?? [];
+    if (candidates.length > 1)
+      invalid(
+        `multiple PRs have the same repository branch: ${branch}`,
+      );
+    return candidates[0];
+  };
   const children = new Map<string, T.OpenPullRequest[]>();
   for (const pr of open)
     children.set(pr.baseRefName, [...(children.get(pr.baseRefName) ?? []), pr]);
@@ -792,7 +796,7 @@ export function orderStack(
   const ancestors = new Set<T.PrNumber>([start.number]);
   let current = start;
   while (byHead.has(current.baseRefName)) {
-    const parent = byHead.get(current.baseRefName);
+    const parent = parentFor(current.baseRefName);
     if (parent === undefined) break;
     if (ancestors.has(parent.number))
       invalid(`cycle in PR stack at #${parent.number}`);
@@ -807,7 +811,9 @@ export function orderStack(
   const up: T.OpenPullRequest[] = [];
   const visit = (parent: T.OpenPullRequest): void => {
     if (!localHead(parent)) return;
-    for (const child of children.get(parent.headRefName) ?? []) {
+    const descendants = children.get(parent.headRefName) ?? [];
+    if (descendants.length > 0) parentFor(parent.headRefName);
+    for (const child of descendants) {
       if (seen.has(child.number)) continue;
       seen.add(child.number);
       up.push(child);

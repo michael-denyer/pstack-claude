@@ -56,12 +56,13 @@ export function denylistHits(path, text, denylist) {
 
 const BINARY = /\.(png|jpe?g|gif|webp|ico|woff2?|lock)$/;
 
-// Paths the port deliberately does not carry (upstream.json `exclude`): a
-// directory prefix or an exact file, relative to the component root.
+// Paths the port deliberately does not carry (upstream.json `exclude`). An
+// entry matches a path relative to the component root exactly or as its
+// directory prefix; a trailing slash is optional and changes nothing.
 export function isExcluded(rel, exclude) {
   return exclude.some((entry) => {
-    const asDirectory = entry.endsWith("/") ? entry : `${entry}/`;
-    return rel === entry || rel.startsWith(asDirectory);
+    const prefix = entry.replace(/\/$/, "");
+    return rel === prefix || rel.startsWith(`${prefix}/`);
   });
 }
 
@@ -99,13 +100,13 @@ export function syncComponent({
     scan(rel, next);
   };
 
-  for (const newFile of walk(newDir)) {
-    const rel = relative(newDir, newFile);
-    if (isExcluded(rel, exclude)) {
-      report.excluded++;
-      continue;
-    }
+  const carried = (dir) => walk(dir).map((file) => relative(dir, file)).filter((rel) => !isExcluded(rel, exclude));
+  const carriedNew = carried(newDir);
+  report.excluded = walk(newDir).length - carriedNew.length;
+
+  for (const rel of carriedNew) {
     const localFile = join(localDir, rel);
+    const newFile = join(newDir, rel);
     const next = portForm(rel, readFileSync(newFile));
     if (!existsSync(localFile)) {
       planWrite(rel, "added", next.buffer);
@@ -125,10 +126,9 @@ export function syncComponent({
     }
   }
 
-  for (const oldFile of walk(oldDir)) {
-    const rel = relative(oldDir, oldFile);
+  for (const rel of carried(oldDir)) {
     const localFile = join(localDir, rel);
-    if (isExcluded(rel, exclude) || existsSync(join(newDir, rel)) || !existsSync(localFile)) continue;
+    if (existsSync(join(newDir, rel)) || !existsSync(localFile)) continue;
     const local = readFileSync(localFile);
     if (localMatchesOld(rel, local)) {
       operations.push({ kind: "delete", rel });

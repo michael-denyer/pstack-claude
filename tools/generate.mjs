@@ -425,7 +425,7 @@ export function loadModels() {
 // 0.9.8, 0.9.9). Then the generator's own stamps: a Models section is
 // appended as the last H2 when upstream has none, which is where every
 // hand-added one already sits. A region whose anchor upstream lacks is left
-// unstamped, so the file surfaces on the manual-merge list instead of
+// unstamped, so the file surfaces as forked or conflicted instead of
 // aborting the sync.
 export function deriveSkill(file, text, models = loadModels()) {
   let out = text;

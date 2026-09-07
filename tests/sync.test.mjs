@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applySubstitutions, denylistHits, syncComponent } from "../tools/sync.mjs";
+import { applySubstitutions, denylistHits, mergeFile, syncComponent } from "../tools/sync.mjs";
 
 const RULES = JSON.parse(readFileSync(join(import.meta.dir, "../tools/substitutions.json"), "utf8"));
 
@@ -82,6 +82,29 @@ describe("denylistHits", () => {
   });
 });
 
+describe("mergeFile", () => {
+  const base = ["l1", "l2", "l3", "l4", "l5"].join("\n") + "\n";
+
+  test("returns the merged bytes when the two sides do not overlap", () => {
+    const merged = mergeFile(
+      Buffer.from(base.replace("l1", "ours")),
+      Buffer.from(base),
+      Buffer.from(base.replace("l5", "theirs")),
+    );
+    expect(merged.clean).toBe(true);
+    expect(merged.buffer.toString("utf8")).toBe(base.replace("l1", "ours").replace("l5", "theirs"));
+  });
+
+  test("reports the hunk count instead of throwing when the sides overlap", () => {
+    const merged = mergeFile(
+      Buffer.from(base.replace("l3", "ours")),
+      Buffer.from(base),
+      Buffer.from(base.replace("l3", "theirs")),
+    );
+    expect(merged).toEqual({ clean: false, hunks: 1 });
+  });
+});
+
 describe("syncComponent", () => {
   test("installed plugin text passes sync validation without changes", () => {
     const plugin = join(import.meta.dir, "../plugins/pstack");
@@ -111,7 +134,7 @@ describe("syncComponent", () => {
       { kind: "updated", rel: "skills/a/SKILL.md" },
       { kind: "added", rel: "skills/c/SKILL.md" },
     ]);
-    expect(report.manual).toEqual(["skills/b/SKILL.md"]);
+    expect(report.conflicts).toEqual([{ rel: "skills/b/SKILL.md", reason: "conflict", hunks: 1 }]);
     expect(report.counts.get("AskQuestion")).toBe(2);
     expect(report.hits).toEqual([]);
     expect(readFileSync(join(local, "skills/a/SKILL.md"), "utf8")).toBe(
@@ -141,7 +164,8 @@ describe("syncComponent", () => {
 
     expect(report.written).toEqual([]);
     expect(report.deleted).toEqual([]);
-    expect(report.manual).toEqual([]);
+    expect(report.conflicts).toEqual([]);
+    expect(report.forked).toEqual([]);
     expect(report.hits).toEqual([]);
     expect(report.excluded).toBe(3);
     expect(report.unchanged).toBe(1);
@@ -157,7 +181,7 @@ describe("syncComponent", () => {
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
     expect(report.deleted).toEqual(["gone.md"]);
-    expect(report.manual).toEqual(["forked.md"]);
+    expect(report.conflicts).toEqual([{ rel: "forked.md", reason: "removed-upstream" }]);
     expect(existsSync(join(local, "gone.md"))).toBe(false);
     expect(existsSync(join(local, "forked.md"))).toBe(true);
   });
@@ -232,25 +256,25 @@ describe("syncComponent", () => {
     expect(existsSync(join(local, "new.md"))).toBe(false);
   });
 
-  test("a manual local correction is scanned instead of invalid upstream bytes", () => {
+  test("a conflicted local correction is scanned instead of invalid upstream bytes", () => {
     const oldUp = tree({ "s.md": "old\n" });
     const newUp = tree({ "s.md": "run control-cli\n" });
     const local = tree({ "s.md": "manual correction\n" });
 
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
-    expect(report.manual).toEqual(["s.md"]);
+    expect(report.conflicts).toEqual([{ rel: "s.md", reason: "conflict", hunks: 1 }]);
     expect(report.hits).toEqual([]);
     expect(readFileSync(join(local, "s.md"), "utf8")).toBe("manual correction\n");
   });
 
-  test("a retained manual file removed upstream blocks sibling writes on every retry", () => {
+  test("a retained forked file removed upstream blocks sibling writes on every retry", () => {
     const oldDir = tree({ "gone.md": "old\n", "sibling.md": "old\n" });
     const newDir = tree({ "sibling.md": "new\n" });
     const localDir = tree({ "gone.md": "run control-cli\n", "sibling.md": "old\n" });
     for (const dryRun of [true, false, false]) {
       const report = sync({ oldDir, newDir, localDir, dryRun });
-      expect(report.manual).toEqual(["gone.md"]);
+      expect(report.conflicts).toEqual([{ rel: "gone.md", reason: "removed-upstream" }]);
       expect(report.hits).toHaveLength(1);
       expect(readFileSync(join(localDir, "sibling.md"), "utf8")).toBe("old\n");
     }
@@ -285,23 +309,52 @@ describe("syncComponent", () => {
   });
 
   test("dry-run and actual mode report the same plan and dry-run preserves bytes", () => {
+    const base = ["l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8", "l9"].join("\n") + "\n";
     const makeFixture = () => {
-      const oldDir = tree({ "bad.md": "old\n", "gone.md": "gone\n", "updated.md": "old update\n" });
-      const newDir = tree({ "bad.md": "run control-cli\n", "new.md": "new\n", "updated.md": "new update\n" });
-      const localDir = tree({ "bad.md": "old\n", "gone.md": "gone\n", "updated.md": "old update\n" });
+      const oldDir = tree({
+        "bad.md": "old\n",
+        "gone.md": "gone\n",
+        "updated.md": "old update\n",
+        "merged.md": base,
+        "clash.md": base,
+        "untouched.md": base,
+      });
+      const newDir = tree({
+        "bad.md": "run control-cli\n",
+        "new.md": "new\n",
+        "updated.md": "new update\n",
+        "merged.md": base.replace("l9", "l9 upstream"),
+        "clash.md": base.replace("l5", "l5 upstream"),
+        "untouched.md": base,
+      });
+      const localDir = tree({
+        "bad.md": "old\n",
+        "gone.md": "gone\n",
+        "updated.md": "old update\n",
+        "merged.md": base.replace("l1", "l1 port"),
+        "clash.md": base.replace("l5", "l5 port"),
+        "untouched.md": base.replace("l1", "l1 port"),
+      });
       return { oldDir, newDir, localDir };
     };
     const actualFixture = makeFixture();
     const dryRunFixture = makeFixture();
     const beforeDryRun = readFileSync(join(dryRunFixture.localDir, "updated.md"));
+    const beforeMerged = readFileSync(join(dryRunFixture.localDir, "merged.md"));
 
     const actual = sync({ ...actualFixture });
     const dryRun = sync({ ...dryRunFixture, dryRun: true });
 
     expect(dryRun.written).toEqual(actual.written);
     expect(dryRun.deleted).toEqual(actual.deleted);
+    expect(dryRun.conflicts).toEqual(actual.conflicts);
+    expect(dryRun.forked).toEqual(actual.forked);
     expect(dryRun.hits).toEqual(actual.hits);
+    expect(actual.written).toContainEqual({ kind: "merged", rel: "merged.md" });
+    expect(actual.conflicts).toContainEqual({ rel: "clash.md", reason: "conflict", hunks: 1 });
+    expect(actual.forked).toEqual(["untouched.md"]);
     expect(readFileSync(join(dryRunFixture.localDir, "updated.md")).equals(beforeDryRun)).toBe(true);
+    expect(readFileSync(join(dryRunFixture.localDir, "merged.md")).equals(beforeMerged)).toBe(true);
     expect(existsSync(join(dryRunFixture.localDir, "new.md"))).toBe(false);
     expect(existsSync(join(dryRunFixture.localDir, "gone.md"))).toBe(true);
   });
@@ -339,5 +392,89 @@ describe("syncComponent", () => {
     const local = tree({});
     sync({ oldDir: oldUp, newDir: newUp, localDir: local });
     expect(readFileSync(join(local, "logo.png")).equals(bytes)).toBe(true);
+  });
+
+  test("a file upstream never touched is forked, not conflicted", () => {
+    const body = "shared line\n";
+    const oldUp = tree({ "s.md": body });
+    const newUp = tree({ "s.md": body });
+    const local = tree({ "s.md": "shared line, plus the port's own paragraph\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.forked).toEqual(["s.md"]);
+    expect(report.conflicts).toEqual([]);
+    expect(report.written).toEqual([]);
+    expect(readFileSync(join(local, "s.md"), "utf8")).toBe("shared line, plus the port's own paragraph\n");
+  });
+
+  test("a forked file is denylist-scanned on its local bytes", () => {
+    const body = "one\n";
+    const oldUp = tree({ "s.md": body });
+    const newUp = tree({ "s.md": body });
+    const local = tree({ "s.md": "one\nrun control-cli\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.forked).toEqual(["s.md"]);
+    expect(report.hits).toHaveLength(1);
+    expect(report.hits[0]).toStartWith("s.md:2:");
+  });
+
+  test("non-overlapping port and upstream edits merge into one written file", () => {
+    const base = ["l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8", "l9"].join("\n") + "\n";
+    const oldUp = tree({ "s.md": base });
+    const newUp = tree({ "s.md": base.replace("l9", "l9 upstream rewrote the tail") });
+    const local = tree({ "s.md": base.replace("l1", "l1 the port rewrote the head") });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.written).toEqual([{ kind: "merged", rel: "s.md" }]);
+    expect(report.conflicts).toEqual([]);
+    expect(report.forked).toEqual([]);
+    expect(readFileSync(join(local, "s.md"), "utf8")).toBe(
+      base.replace("l1", "l1 the port rewrote the head").replace("l9", "l9 upstream rewrote the tail"),
+    );
+  });
+
+  test("overlapping edits are reported with a hunk count and leave local bytes alone", () => {
+    const base = ["l1", "l2", "l3", "l4", "l5"].join("\n") + "\n";
+    const oldUp = tree({ "s.md": base });
+    const newUp = tree({ "s.md": base.replace("l3", "l3 upstream") });
+    const localText = base.replace("l3", "l3 the port");
+    const local = tree({ "s.md": localText });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.conflicts).toEqual([{ rel: "s.md", reason: "conflict", hunks: 1 }]);
+    expect(report.written).toEqual([]);
+    expect(readFileSync(join(local, "s.md"), "utf8")).toBe(localText);
+  });
+
+  test("a file new upstream that already exists locally conflicts against an empty base", () => {
+    const oldUp = tree({});
+    const newUp = tree({ "s.md": "upstream's brand new body\n" });
+    const local = tree({ "s.md": "the port wrote this file first\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.conflicts).toEqual([{ rel: "s.md", reason: "conflict", hunks: 1 }]);
+    expect(report.written).toEqual([]);
+    expect(readFileSync(join(local, "s.md"), "utf8")).toBe("the port wrote this file first\n");
+  });
+
+  test("a binary file differing three ways is reported as unmergeable", () => {
+    const oldUp = tree({});
+    const newUp = tree({});
+    const local = tree({});
+    writeFileSync(join(oldUp, "logo.png"), Buffer.from([0x89, 0x50, 0x00, 0x01]));
+    writeFileSync(join(newUp, "logo.png"), Buffer.from([0x89, 0x50, 0x00, 0x02]));
+    writeFileSync(join(local, "logo.png"), Buffer.from([0x89, 0x50, 0x00, 0x03]));
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.conflicts).toEqual([{ rel: "logo.png", reason: "binary" }]);
+    expect(report.written).toEqual([]);
+    expect(readFileSync(join(local, "logo.png")).equals(Buffer.from([0x89, 0x50, 0x00, 0x03]))).toBe(true);
   });
 });

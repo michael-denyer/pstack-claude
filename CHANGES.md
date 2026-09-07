@@ -2,6 +2,12 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.26 - sync to upstream e8d856f, the September density pass
+
+The upstream pin moves from `7314f72` to `e8d856f`, upstream's deletion-only density and mannered-prose pass across the skill tree, still versioned v0.14.8 upstream. Two new principle leaves arrive, `principle-attack-the-premise` and `principle-test-behavior-not-implementation`, indexed in `poteto-mode`. The `how` skill loses its Critique Mode along with `references/critic-prompt.md` and `references/critique-rubric.md`; the `how critics` role leaves `models.json`, the override-sheet example, and the README panel row. `opening-a-pr` and `technical-writing` carry upstream's PR-body briefing rules. Port-side policy is unchanged where it diverges from upstream: the autopilot playbooks still stop at merge-ready for the operator's click, `shipping` keeps the watcher-owned blocker classification, and `feature` keeps the per-delegate worktree rule.
+
+`tools/upstream.json` gains an `exclude` list per component for the paths the port deliberately does not carry (`.cursor-plugin/`, `assets/`, `automations/`, `docs/`, `skills/make-bot-ui/`, upstream's `README.md`, `LICENSE`, and `.gitignore`). `tools/sync.mjs` skips them on both walks, so a real run at the pinned SHA now exits 0 instead of failing on Benny's `.cursor/` paths. One new substitution rewrites `generalPurpose` to `general-purpose`. Measured with `bun tools/sync.mjs pstack e8d856f`: 34 files written clean, 2 deleted, 35 excluded; 33 forked files that upstream also touched were merged three-way against the port's derivation of both upstream trees, 9 clean and 24 by hand.
+
 ## 0.9.25 - fix Codex entry points, sync validation, and stack discovery
 
 Duplicate-head rejection is limited to branches traversed in the requested PR stack. The two autopilot playbooks keep the standing-objective instruction without naming the unsupported command, so their installed text passes the expanded sync denylist. Fourteen skill entry points again link to the Codex mapping, preserving direct invocation on skills-only installs.

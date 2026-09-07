@@ -1,6 +1,11 @@
 {
   "substitutions": [
     {
+      "pattern": "~/.cursor/rules/pstack-models.mdc",
+      "replacement": "~/.claude/pstack-models.md",
+      "rationale": "the per-role override sheet; must precede the generic .cursor/rules/ rule or that rule mangles the path"
+    },
+    {
       "pattern": "AskQuestion",
       "replacement": "AskUserQuestion",
       "rationale": "Claude Code's fixed-choice question tool; upstream Cursor names it AskQuestion"
@@ -9,6 +14,36 @@
       "pattern": "the `Task` tool",
       "replacement": "the `Agent` tool",
       "rationale": "Claude Code dispatches subagents with the Agent tool; Cursor calls it Task"
+    },
+    {
+      "pattern": "the Task tool",
+      "replacement": "the Agent tool",
+      "rationale": "same tool, unbackticked"
+    },
+    {
+      "pattern": "`Task` call",
+      "replacement": "`Agent` call",
+      "rationale": "same tool, as a noun for one dispatch (also matches `Task` calls)"
+    },
+    {
+      "pattern": "via the matching control skill",
+      "replacement": "via the driver skill (`run` for CLIs/TUIs, `verify` for UIs)",
+      "rationale": "cursor-team-kit's control-cli/control-ui are Claude Code's run/verify built-ins; must precede the shorter rule"
+    },
+    {
+      "pattern": "via the control skill",
+      "replacement": "via the driver skill (`run` for CLIs/TUIs, `verify` for UIs)",
+      "rationale": "same mapping"
+    },
+    {
+      "pattern": "restart Cursor",
+      "replacement": "restart Claude Code",
+      "rationale": "the host application"
+    },
+    {
+      "pattern": "(default `claude-fable-5-1-thinking-max`)",
+      "replacement": "(default in poteto-mode's Models section)",
+      "rationale": "model defaults live in models.json and are stamped into Models sections, never hard-coded in prose"
     },
     {
       "pattern": ".cursor/skills/",

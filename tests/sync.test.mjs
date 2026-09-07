@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applySubstitutions, denylistHits, syncComponent } from "../tools/sync.mjs";
@@ -15,6 +15,10 @@ function tree(files) {
   return dir;
 }
 
+function sync(overrides) {
+  return syncComponent({ rules: RULES.substitutions, denylist: RULES.denylist, ...overrides });
+}
+
 describe("applySubstitutions", () => {
   test("rewrites Cursor primitives and counts per rule", () => {
     const { text, counts } = applySubstitutions(
@@ -28,6 +32,44 @@ describe("applySubstitutions", () => {
   test("leaves AskUserQuestion alone", () => {
     const { text } = applySubstitutions("Prefer AskUserQuestion here.", RULES.substitutions);
     expect(text).toBe("Prefer AskUserQuestion here.");
+  });
+
+  test("the override sheet path survives the generic .cursor/rules/ rule", () => {
+    const { text } = applySubstitutions(
+      "Use `arena runners` from `~/.cursor/rules/pstack-models.mdc` when present. Rules in .cursor/rules/ apply.",
+      RULES.substitutions,
+    );
+    expect(text).toBe(
+      "Use `arena runners` from `~/.claude/pstack-models.md` when present. Rules in CLAUDE.md imports apply.",
+    );
+  });
+
+  test("the driver-skill and model-default phrases rewrite as the port writes them", () => {
+    const { text } = applySubstitutions(
+      [
+        "Capture a trace via the matching control skill.",
+        "Reproduce via the control skill.",
+        "Multiple `Task` calls in the Task tool.",
+        "your configured bug-fix model (default `claude-fable-5-1-thinking-max`)",
+        "on \"restart Cursor\"",
+      ].join("\n"),
+      RULES.substitutions,
+    );
+    expect(text).toBe(
+      [
+        "Capture a trace via the driver skill (`run` for CLIs/TUIs, `verify` for UIs).",
+        "Reproduce via the driver skill (`run` for CLIs/TUIs, `verify` for UIs).",
+        "Multiple `Agent` calls in the Agent tool.",
+        "your configured bug-fix model (default in poteto-mode's Models section)",
+        "on \"restart Claude Code\"",
+      ].join("\n"),
+    );
+  });
+
+  test("every rule's replacement is free of the denylist", () => {
+    for (const rule of RULES.substitutions) {
+      expect(denylistHits("rule", rule.replacement, RULES.denylist)).toEqual([]);
+    }
   });
 });
 
@@ -52,17 +94,19 @@ describe("syncComponent", () => {
       "skills/c/SKILL.md": "Brand new skill. AskQuestion early.\n",
     });
     const local = tree({
-      // a matches substituted old upstream -> clean update expected
       "skills/a/SKILL.md": "Step 1: AskUserQuestion about scope.\n",
-      // b carries a port-specific edit -> manual merge expected
       "skills/b/SKILL.md": "Old b body, plus a Platform note the port added.\n",
     });
 
-    const report = syncComponent({ oldDir: oldUp, newDir: newUp, localDir: local, rules: RULES.substitutions, write: true });
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
-    expect(report.written).toContain("updated: skills/a/SKILL.md");
-    expect(report.written).toContain("added: skills/c/SKILL.md");
+    expect(report.written).toEqual([
+      { kind: "updated", rel: "skills/a/SKILL.md" },
+      { kind: "added", rel: "skills/c/SKILL.md" },
+    ]);
     expect(report.manual).toEqual(["skills/b/SKILL.md"]);
+    expect(report.counts.get("AskQuestion")).toBe(2);
+    expect(report.hits).toEqual([]);
     expect(readFileSync(join(local, "skills/a/SKILL.md"), "utf8")).toBe(
       "Step 1: AskUserQuestion about scope. Step 2: verify.\n",
     );
@@ -72,12 +116,60 @@ describe("syncComponent", () => {
     );
   });
 
-  test("write: false reports without touching the tree", () => {
+  test("an upstream deletion removes the local copy when the port never edited it", () => {
+    const oldUp = tree({ "a.md": "keep\n", "gone.md": "AskQuestion here\n", "forked.md": "old\n" });
+    const newUp = tree({ "a.md": "keep\n" });
+    const local = tree({ "a.md": "keep\n", "gone.md": "AskUserQuestion here\n", "forked.md": "old, port edit\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.deleted).toEqual(["gone.md"]);
+    expect(report.manual).toEqual(["forked.md"]);
+    expect(existsSync(join(local, "gone.md"))).toBe(false);
+    expect(existsSync(join(local, "forked.md"))).toBe(true);
+  });
+
+  test("a written file that still carries a Cursor-ism is reported as a hit", () => {
     const oldUp = tree({ "s.md": "one\n" });
-    const newUp = tree({ "s.md": "two\n" });
+    const newUp = tree({ "s.md": "one\nrun control-cli\n" });
     const local = tree({ "s.md": "one\n" });
-    const report = syncComponent({ oldDir: oldUp, newDir: newUp, localDir: local, rules: RULES.substitutions, write: false });
-    expect(report.written).toEqual(["updated: s.md"]);
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+    expect(report.hits).toHaveLength(1);
+    expect(report.hits[0]).toStartWith("s.md:2:");
+  });
+
+  test("derive turns substituted upstream text into the port's form before comparing", () => {
+    const oldUp = tree({ "s.md": "flag: on\nbody\n" });
+    const newUp = tree({ "s.md": "flag: on\nbody two\n" });
+    const local = tree({ "s.md": "flag: off\nbody\n" });
+    const derive = (rel, text) => text.replace("flag: on", "flag: off");
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, derive });
+    expect(report.written).toEqual([{ kind: "updated", rel: "s.md" }]);
+    expect(readFileSync(join(local, "s.md"), "utf8")).toBe("flag: off\nbody two\n");
+  });
+
+  test("dryRun reports without touching the tree", () => {
+    const oldUp = tree({ "s.md": "one\n", "gone.md": "x\n" });
+    const newUp = tree({ "s.md": "two\n", "new.md": "y\n" });
+    const local = tree({ "s.md": "one\n", "gone.md": "x\n" });
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, dryRun: true });
+    expect(report.written).toEqual([
+      { kind: "added", rel: "new.md" },
+      { kind: "updated", rel: "s.md" },
+    ]);
+    expect(report.deleted).toEqual(["gone.md"]);
     expect(readFileSync(join(local, "s.md"), "utf8")).toBe("one\n");
+    expect(existsSync(join(local, "gone.md"))).toBe(true);
+    expect(existsSync(join(local, "new.md"))).toBe(false);
+  });
+
+  test("binary files are copied byte for byte", () => {
+    const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff]);
+    const oldUp = tree({});
+    const newUp = tree({});
+    writeFileSync(join(newUp, "logo.png"), bytes);
+    const local = tree({});
+    sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+    expect(readFileSync(join(local, "logo.png")).equals(bytes)).toBe(true);
   });
 });

@@ -216,6 +216,85 @@ describe("Store", () => {
     expect(await readdir(directory)).not.toContain(".orch.lock");
   });
 
+  it("persists concurrent unit additions made through one handle", async () => {
+    const { directory, store } = await initializedStore();
+    const ids = Array.from({ length: 12 }, (_, index) => `u${index + 1}`);
+
+    const additions = await Promise.allSettled(
+      ids.map((id) => store.units.add({ id, track: "build" }))
+    );
+    expect(additions.map((result) => result.status)).toEqual(
+      ids.map(() => "fulfilled")
+    );
+
+    await store.close();
+    const reopened = useStore(directory);
+    expect((await reopened.units.list()).map((unit) => unit.id).sort()).toEqual(
+      ids.sort()
+    );
+  });
+
+  it("persists concurrent updates to different units", async () => {
+    const { directory, store } = await initializedStore();
+    await store.units.add({ id: "u1", track: "build" });
+    await store.units.add({ id: "u2", track: "verify" });
+
+    await Promise.all([
+      store.units.set({ id: "u1", state: "done", branch: "stack/u1" }),
+      store.units.set({ id: "u2", state: "failed", sha: "abc123" }),
+    ]);
+
+    await store.close();
+    const reopened = useStore(directory);
+    expect(await reopened.units.get("u1")).toMatchObject({
+      state: "done",
+      branch: "stack/u1",
+    });
+    expect(await reopened.units.get("u2")).toMatchObject({
+      state: "failed",
+      sha: "abc123",
+    });
+  });
+
+  it("continues queued mutations after one rejects", async () => {
+    const { directory, store } = await initializedStore();
+    await store.units.add({ id: "existing", track: "build" });
+
+    const invalid = store.units.add({ id: "existing", track: "build" });
+    const valid = store.units.add({ id: "next", track: "build" });
+    await expect(invalid).rejects.toThrow("unit existing already exists");
+    await expect(valid).resolves.toMatchObject({ id: "next" });
+
+    await store.close();
+    const reopened = useStore(directory);
+    expect(await reopened.units.get("next")).toMatchObject({ id: "next" });
+  });
+
+  it("closes only after an already accepted mutation persists", async () => {
+    const { directory, store } = await initializedStore();
+
+    const write = store.units.add({ id: "u1", track: "build" });
+    const close = store.close();
+    await Promise.all([write, close]);
+
+    expect(await readdir(directory)).not.toContain(".orch.lock");
+    const reopened = useStore(directory);
+    expect(await reopened.units.get("u1")).toMatchObject({ id: "u1" });
+  });
+
+  it("shares close completion and rejects operations once closing starts", async () => {
+    const { store } = await initializedStore();
+
+    const firstClose = store.close();
+    const secondClose = store.close();
+    expect(secondClose).toBe(firstClose);
+    await expect(
+      store.units.add({ id: "too-late", track: "build" })
+    ).rejects.toThrow("store is closed");
+    await expect(store.units.list()).rejects.toThrow("store is closed");
+    await Promise.all([firstClose, secondClose]);
+  });
+
   it("composes unit add, set, get, list, and counts", async () => {
     const { store } = await initializedStore();
 

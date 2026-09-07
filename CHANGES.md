@@ -2,9 +2,13 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.22 - Codex counterpart for the Fable roles
+
+Lands #53 (contributed by @tlmader) on top of #54. `models.json` gains `codex.strongestRoleExample`, and `codexModelNamesSection` in `tools/generate.mjs` renders a bullet for every role whose single Claude model is not the single-role default (today `bug-fix`, `perf-issue`, `hillclimb`, and `strongest judgment`), pointing them at `gpt-6-astra`. The list is derived from the role table, so a role moving on or off Fable restamps the Codex guidance with it. The single-role example returns to `gpt-5.6-sol` as the Opus counterpart; the Astra, Sol, Terra, Luna quad from #54 is unchanged. `tests/agent-skills.test.mjs` renders the section from the real `models.json` and asserts the bullet names all four roles.
+
 ## 0.9.21 - agent mechanics and production-session gaps
 
-Fixes from #58 and the seven judgment gaps in #59, both reported from a poteto-mode session that ran a real backend change through review, merge, deploy, and `reflect`. The upstream pin stays at `7314f72`.
+Fixes from #58 and the seven judgment gaps in #59 (both by @synergenix19), reported from a poteto-mode session that ran a real backend change through review, merge, deploy, and `reflect`. The upstream pin stays at `7314f72`.
 
 Every dispatch of a plugin agent names it `pstack:poteto-agent` or `pstack:comment-sicko`. A plugin's agents register under the plugin namespace and the bare name errors on install. #58 covered the poteto-mode site; this release covers the other three, and `tests/skill-collision-repro.sh` now fails on any bare `subagent_type` that matches a file in `plugins/pstack/agents/`.
 

@@ -45,6 +45,13 @@ describe("models.json shape", () => {
     for (const role of resolved) expect(role.models).toEqual(raw.panel);
   });
 
+  test("the file stays one row per entry so a role change is a one-line diff", () => {
+    const text = readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8");
+    const rows = raw.available.length + raw.roles.length;
+    expect(text.split("\n").length).toBeLessThan(rows * 2);
+    expect(text.match(/^\s*\{ "/gm)).toHaveLength(rows);
+  });
+
   test("the codex examples name distinct models", () => {
     expect(typeof models.codex.singleRoleExample).toBe("string");
     expect(typeof models.codex.strongestRoleExample).toBe("string");

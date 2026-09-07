@@ -1,105 +1,89 @@
-// Proves each static invariant in skill-collision-repro.sh still fails when it
-// should. A check that quietly matches nothing looks identical to a pass, and
-// that already happened once (the 0.9.10 quad check hunted a retired slug for
-// a whole release), so every check gets a fixture that must trip it.
+// Proves each static layout invariant still fails when it should. A check
+// that quietly matches nothing looks identical to a pass, and that already
+// happened once (the 0.9.10 quad check hunted a retired slug for a whole
+// release), so every check gets a fixture that must trip it.
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const script = join(import.meta.dir, "skill-collision-repro.sh");
+import { agentSkills, validatePluginLayout } from "../tools/generate.mjs";
 
-function skill(dir, name, front, body = "body\n") {
-  mkdirSync(join(dir, "plugins/pstack/skills", name), { recursive: true });
+function skill(root, name, front, body = "body\n") {
+  mkdirSync(join(root, "skills", name), { recursive: true });
   writeFileSync(
-    join(dir, "plugins/pstack/skills", name, "SKILL.md"),
+    join(root, "skills", name, "SKILL.md"),
     `---\nname: ${name}\ndescription: fixture\n${front}---\n\n${body}`,
   );
 }
 
-function agent(dir, name) {
-  mkdirSync(join(dir, "plugins/pstack/agents"), { recursive: true });
-  writeFileSync(join(dir, "plugins/pstack/agents", `${name}.md`), `---\nname: ${name}\ndescription: fixture\n---\n`);
+function agent(root, name) {
+  mkdirSync(join(root, "agents"), { recursive: true });
+  writeFileSync(join(root, "agents", `${name}.md`), `---\nname: ${name}\ndescription: fixture\n---\n`);
 }
 
-function fixture(mutate = () => {}) {
-  const dir = mkdtempSync(join(tmpdir(), "invariants-"));
-  skill(dir, "good", "");
-  skill(dir, "principle-good", "user-invocable: false\n");
-  mutate(dir);
-  return dir;
+function plugin(mutate = () => {}) {
+  const root = mkdtempSync(join(tmpdir(), "invariants-"));
+  skill(root, "good", "");
+  skill(root, "principle-good", "user-invocable: false\n");
+  mutate(root);
+  return root;
 }
 
-function run(dir) {
-  const r = spawnSync("bash", [script], {
-    encoding: "utf8",
-    env: { ...process.env, PSTACK_REPO: dir, SKIP_BEHAVIORAL: "1" },
-  });
-  return { code: r.status, out: r.stdout + r.stderr };
-}
+const check = (root) => {
+  agentSkills(join(root, "skills"));
+  validatePluginLayout(root);
+};
 
-describe("skill-collision-repro.sh static invariants", () => {
+describe("static plugin invariants", () => {
   test("a clean tree passes", () => {
-    const { code, out } = run(fixture());
-    expect(code).toBe(0);
-    expect(out).not.toContain("FAIL:");
+    expect(() => check(plugin())).not.toThrow();
   });
 
   test("a commands/ directory fails", () => {
-    const { code, out } = run(fixture((d) => mkdirSync(join(d, "plugins/pstack/commands"), { recursive: true })));
-    expect(code).toBe(1);
-    expect(out).toContain("FAIL: no plugins/pstack/commands/ directory");
+    const root = plugin((r) => mkdirSync(join(r, "commands"), { recursive: true }));
+    expect(() => check(root)).toThrow("plugins/pstack/commands/ exists");
   });
 
   test("disable-model-invocation on a skill fails and names the file", () => {
-    const { code, out } = run(fixture((d) => skill(d, "flagged", "disable-model-invocation: true\n")));
-    expect(code).toBe(1);
-    expect(out).toContain("FAIL: no skill carries disable-model-invocation: true");
-    expect(out).toContain("skills/flagged/SKILL.md");
+    const root = plugin((r) => skill(r, "flagged", "disable-model-invocation: true\n"));
+    expect(() => check(root)).toThrow(/skills\/flagged\/SKILL\.md: disable-model-invocation: true breaks/);
   });
 
   test("a principle leaf missing user-invocable: false fails", () => {
-    const { code, out } = run(fixture((d) => skill(d, "principle-visible", "")));
-    expect(code).toBe(1);
-    expect(out).toContain("FAIL: principle-* leaves");
-    expect(out).toContain("principle-visible/SKILL.md (missing user-invocable: false)");
+    const root = plugin((r) => skill(r, "principle-visible", ""));
+    expect(() => check(root)).toThrow(/principle-visible\/SKILL\.md: principle leaves carry user-invocable: false/);
   });
 
   test("a principle leaf carrying disable-model-invocation fails", () => {
-    const { code, out } = run(
-      fixture((d) => skill(d, "principle-dead", "user-invocable: false\ndisable-model-invocation: true\n")),
-    );
-    expect(code).toBe(1);
-    expect(out).toContain("principle-dead/SKILL.md (still carries disable-model-invocation)");
+    const root = plugin((r) => skill(r, "principle-dead", "user-invocable: false\ndisable-model-invocation: true\n"));
+    expect(() => check(root)).toThrow(/principle-dead\/SKILL\.md: disable-model-invocation/);
   });
 
   test("a skill dispatching a plugin agent by its bare name fails and names the site", () => {
-    const { code, out } = run(
-      fixture((d) => {
-        agent(d, "poteto-agent");
-        skill(d, "caller", "", 'Spawn with `subagent_type: "poteto-agent"`.\n');
-      }),
+    const root = plugin((r) => {
+      agent(r, "poteto-agent");
+      skill(r, "caller", "", 'Spawn with `subagent_type: "poteto-agent"`.\n');
+    });
+    expect(() => check(root)).toThrow(
+      'skills/caller/SKILL.md:6: subagent_type: "poteto-agent" (use "pstack:poteto-agent")',
     );
-    expect(code).toBe(1);
-    expect(out).toContain("FAIL: plugin agents are dispatched by their namespaced name");
-    expect(out).toContain('skills/caller/SKILL.md:6: subagent_type: "poteto-agent" (use "pstack:poteto-agent")');
   });
 
   test("a skill dispatching a plugin agent by its namespaced name passes", () => {
-    const dir = fixture((d) => {
-      agent(d, "poteto-agent");
-      skill(d, "caller", "", 'Spawn with `subagent_type: "pstack:poteto-agent"`.\n');
+    const root = plugin((r) => {
+      agent(r, "poteto-agent");
+      skill(r, "caller", "", 'Spawn with `subagent_type: "pstack:poteto-agent"`.\n');
     });
-    expect(run(dir).code).toBe(0);
+    expect(() => check(root)).not.toThrow();
   });
 
   test("the body of a skill may mention the flag in prose", () => {
-    const dir = fixture();
+    const root = plugin();
     writeFileSync(
-      join(dir, "plugins/pstack/skills/good/SKILL.md"),
+      join(root, "skills/good/SKILL.md"),
       "---\nname: good\ndescription: fixture\n---\n\nNever set disable-model-invocation: true on a skill.\n",
     );
-    expect(run(dir).code).toBe(0);
+    expect(() => check(root)).not.toThrow();
   });
 });

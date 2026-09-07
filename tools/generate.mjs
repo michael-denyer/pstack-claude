@@ -203,14 +203,52 @@ export function agentSkills(skillsDir) {
     if (description.length > 1024) {
       throw new Error(`${path}: description exceeds the portable Agent Skills limit of 1024 characters`);
     }
-    skills.push({
-      name,
-      description,
-      menu: frontmatterValue(text, "menu-description"),
-      userInvocable: !front.split("\n").includes("user-invocable: false"),
-    });
+    const flags = front.split("\n");
+    // CHANGES 0.9.8: on a skill the flag makes the Skill tool refuse the
+    // invocation outright, which breaks the SessionStart mandate. Upstream
+    // ships it on every skill; the sync derivation strips it.
+    if (flags.includes("disable-model-invocation: true")) {
+      throw new Error(`${path}: disable-model-invocation: true breaks model-initiated entry (CHANGES 0.9.8)`);
+    }
+    const userInvocable = !flags.includes("user-invocable: false");
+    // CHANGES 0.9.9: principle leaves are read by path from poteto-mode and
+    // stay out of the slash menu.
+    if (name.startsWith("principle-") && userInvocable) {
+      throw new Error(`${path}: principle leaves carry user-invocable: false (CHANGES 0.9.9)`);
+    }
+    skills.push({ name, description, menu: frontmatterValue(text, "menu-description"), userInvocable });
   }
   return skills;
+}
+
+// Layout invariants that live outside any one skill.
+export function validatePluginLayout(pluginRoot) {
+  // CHANGES 0.9.13 (#22): Claude Code lists a plugin's commands and its
+  // user-invocable skills in the slash menu, so a command trampoline beside a
+  // same-named skill shows twice. The Codex trampolines live in
+  // .codex-plugin/prompts/, which only Codex reads.
+  if (existsSync(join(pluginRoot, "commands"))) {
+    throw new Error("plugins/pstack/commands/ exists; trampolines belong in .codex-plugin/prompts/ (CHANGES 0.9.13)");
+  }
+  // #58: a plugin's agents register under the plugin namespace, so a dispatch
+  // of the bare name errors at runtime with "Agent type 'x' not found".
+  const agentsDir = join(pluginRoot, "agents");
+  const agents = existsSync(agentsDir)
+    ? readdirSync(agentsDir).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3))
+    : [];
+  const problems = [];
+  for (const file of markdownFiles(join(pluginRoot, "skills"))) {
+    readFileSync(file, "utf8").split("\n").forEach((line, i) => {
+      for (const name of agents) {
+        if (line.includes(`subagent_type: "${name}"`)) {
+          problems.push(`${relative(pluginRoot, file)}:${i + 1}: subagent_type: "${name}" (use "pstack:${name}")`);
+        }
+      }
+    });
+  }
+  if (problems.length) {
+    throw new Error(`plugin agents are dispatched by their namespaced name:\n${problems.join("\n")}`);
+  }
 }
 
 // A public skill is any Agent Skill not marked user-invocable: false (the
@@ -548,6 +586,8 @@ function main() {
   console.log("ok: .agents/plugins/marketplace.json names the plugin and points at a real path");
 
   const pluginRoot = join(repo, "plugins/pstack");
+  validatePluginLayout(pluginRoot);
+  console.log("ok: no commands/ directory; plugin agents dispatched by namespaced name");
   validateHooks(readFileSync(join(pluginRoot, "hooks/hooks.json"), "utf8"), {
     statOf: (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null),
   });

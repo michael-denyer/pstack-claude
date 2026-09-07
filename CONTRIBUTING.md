@@ -25,18 +25,18 @@ bun tools/sync.mjs pstack <new-upstream-sha>
 
 ## Before you open a PR
 
-Run the generator, then the invariant script:
+Run the generator and the tests:
 
 ```shell
 bun tools/generate.mjs
-bash tests/skill-collision-repro.sh
+bun test tests/
 ```
 
 The generator stamps the root `VERSION` into the three plugin manifests, validates every shared Agent Skill's `name` and `description`, emits one Codex prompt stub per public skill from its `menu-description` frontmatter, rewrites the README slash-command table, and stamps model defaults from `plugins/pstack/models.json`. It also copies the five files declared in `PORTABLE_ASSETS` into the skills-only boundary and removes stale files from their generated directories. `NOTICE-skills.md` is the source for the scoped notice that travels with those skills.
 
-The same run rejects missing or escaping local Markdown links and direct instructions to open unreachable paths. It also checks for stray model slugs, requires a matching `CHANGES.md` heading, and validates the Codex marketplace and Claude hook paths. CI reruns it and fails on any resulting diff, so commit whatever it changes. Adding a skill means giving it `name` and `description` frontmatter. A public skill also needs a `menu-description` and a name in `README_COMMAND_ORDER` in `tools/generate.mjs`; the generator fails by name if either is missing. Changing a model default means editing `models.json`, never a skill body. A `claude-*` slug in skill prose outside a stamped region fails the generator with the file and line.
+The same run rejects missing or escaping local Markdown links and direct instructions to open unreachable paths. It also checks for stray model slugs, requires a matching `CHANGES.md` heading, validates the Codex marketplace and Claude hook paths, and enforces the plugin layout invariants: no `commands/` directory, no `disable-model-invocation` on any skill, `user-invocable: false` on every `principle-*` leaf, and plugin agents dispatched by their namespaced `pstack:<name>`. CI reruns it and fails on any resulting diff, so commit whatever it changes. Adding a skill means giving it `name` and `description` frontmatter. A public skill also needs a `menu-description` and a name in `README_COMMAND_ORDER` in `tools/generate.mjs`; the generator fails by name if either is missing. Changing a model default means editing `models.json`, never a skill body. A `claude-*` slug in skill prose outside a stamped region fails the generator with the file and line.
 
-The invariant script checks plugin layout and frontmatter flags. Each static check is a named function; `bun test tests/` runs `tests/invariants.test.mjs`, which points the script at fixture trees (via `PSTACK_REPO`) and asserts every check still fails when it should, alongside the Agent Skills boundary and sync-tool tests. The last check is behavioral: it needs the `claude` CLI and API access and makes one haiku call. CI runs everything except that leg via `SKIP_BEHAVIORAL=1`, so run it unflagged at least once before a release.
+`bun test tests/` covers the generator, the sync tool, the link validator, and `tests/invariants.test.mjs`, which builds fixture trees that must trip each layout invariant. One check is behavioral and lives in `tests/skill-collision-repro.sh`: it needs the `claude` CLI and API access and makes one haiku call to prove a user-typed `/plugin:name` reaches a skill with no `commands/` present. CI cannot run it, so run it locally at least once before a release.
 
 If you touched `skills/poteto-mode/scripts/`:
 

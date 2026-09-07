@@ -60,6 +60,21 @@ Some triggers name skills that ship with Claude Code, not pstack. They do not ex
 | `plugin-dev:skill-development` (Claude's SKILL.md authoring guidance) | Follow your platform's skill-authoring guidance; the `writing-skills` skill if present. Keep `name` + `description` frontmatter and progressive disclosure. |
 | `loop` (recurring/self-paced re-invocation, used by `babysit`) | Codex has no `loop` skill. Re-run the step yourself on a cadence, or use a Codex scheduled task if available. |
 
+## Per-skill notes
+
+The Codex slash stub for every public skill points here. Most skills need only the tables above. These need one more mapping:
+
+| Skill | On Codex |
+|-------|----------|
+| `interrogate` | The `subagent_type`/`model`/`readonly` dispatch fields map to `spawn_agent`; substitute your configured Codex models and keep the reviewer panel model-diverse. |
+| `setup-pstack` | The override sheet is `~/.codex/pstack-models.md`, the slugs are your Codex models (see Model names above), and you load it by adding the sheet's contents to `~/.codex/AGENTS.md`; Codex has no `@`-include into a rules file. The role rows in step 5 are identical. |
+| `no-comments` | There is no `comment-sicko` subagent type; see Subagent policy above. |
+| `teach` | Running `how` and `why` in parallel maps to `spawn_agent` fan-out; image generation uses the configured Codex equivalent. |
+| `create-verification-skill` | The generated skill lands under `.claude/skills/verify-<app>/` on Claude Code; write it to Codex's project-skill location instead. The app-driving harness is platform-neutral. |
+| `maintain-verification-skill` | The parallel per-feature source readers map to `spawn_agent` fan-out; the project-local skill lives under Codex's skills location, not `.claude/skills/`. |
+| `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
+| `automate-me` | `plugin-dev:skill-development` resolves through the built-in skills table above. |
+
 ## Vendored scripts
 
 `skills/poteto-mode/scripts/` ships the `watch-pr` PR watcher, the `orch` store CLI, and `worktree-audit.sh`. They are plain bun and bash, so they run the same on Codex; invoke them through `shell`. They need `bun`, `gh`, (for stack work) `gt`, and (for `worktree-audit.sh`) `jq` and `rg`. `worktree-audit.sh` reads Claude Code transcripts under `~/.claude/projects/`; point it at your runtime's transcript directory instead when you run it elsewhere.

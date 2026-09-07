@@ -291,8 +291,14 @@ export function readmeCommands(readme, skillNames) {
   return rows;
 }
 
+// The one Codex entry point per public skill. The second sentence replaces the
+// per-skill Platform note the port used to hand-write into upstream files.
 export function promptStub({ name, menu }) {
-  return `---\nname: ${name}\ndescription: ${menu}\ndisable-model-invocation: true\n---\n\nInvoke the \`${name}\` skill and follow it.\n`;
+  return (
+    `---\nname: ${name}\ndescription: ${menu}\ndisable-model-invocation: true\n---\n\n` +
+    `Invoke the \`${name}\` skill and follow it. Resolve Claude tool names, \`claude-*\` model slugs, and ` +
+    "Claude built-in skills through `poteto-mode/references/codex-tools.md`, including its Per-skill notes.\n"
+  );
 }
 
 const code = (s) => `\`${s}\``;

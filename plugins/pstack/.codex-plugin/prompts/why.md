@@ -4,4 +4,4 @@ description: investigate why something was built this way (parallel multi-MCP ev
 disable-model-invocation: true
 ---
 
-Invoke the `why` skill and follow it.
+Invoke the `why` skill and follow it. Resolve Claude tool names, `claude-*` model slugs, and Claude built-in skills through `poteto-mode/references/codex-tools.md`, including its Per-skill notes.

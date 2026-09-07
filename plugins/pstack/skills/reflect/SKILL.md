@@ -7,8 +7,6 @@ description: Spawn three parallel review subagents over the active transcript, s
 
 Mine the current conversation for durable learnings, then route them into skill edits.
 
-**Platform note.** On Codex, the Claude tool names, `claude-*` slugs, and Claude built-in skills named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
-
 ## When to invoke
 
 - The user said "reflect" or "/reflect".

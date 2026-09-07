@@ -7,8 +7,6 @@ description: "Fan out N parallel workers, drain them, and return one report. Use
 
 Fan out N parallel workers. They may cover separate slices, race the same brief, or mix both. The parent waits, aggregates, and returns one report.
 
-**Platform note.** On Codex, the Claude tool names and `claude-*` slugs named below are Claude defaults. Resolve them via [`codex-tools.md`](../poteto-mode/references/codex-tools.md).
-
 ## Start
 
 Open a todolist with one entry per phase before launching anything.

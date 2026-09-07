@@ -4,4 +4,4 @@ description: find what a change could break beyond the diff and prove safety by 
 disable-model-invocation: true
 ---
 
-Invoke the `blast-radius` skill and follow it.
+Invoke the `blast-radius` skill and follow it. Resolve Claude tool names, `claude-*` model slugs, and Claude built-in skills through `poteto-mode/references/codex-tools.md`, including its Per-skill notes.

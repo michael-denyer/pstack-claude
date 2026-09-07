@@ -64,41 +64,50 @@ describe("shared Agent Skills tree", () => {
     expect(() => validateProsePaths(skillsDir)).not.toThrow();
   });
 
-  test("a backticked plugin path in prose fails the boundary check", () => {
-    const root = mkdtempSync(join(tmpdir(), "pstack-prose-paths-"));
+  test("prose naming a real plugin file outside the skills tree fails the boundary check", () => {
+    const plugin = mkdtempSync(join(tmpdir(), "pstack-prose-paths-"));
+    const root = join(plugin, "skills");
     try {
+      mkdirSync(join(plugin, "agents"), { recursive: true });
+      writeFileSync(join(plugin, "agents/comment-sicko.md"), "# agent\n");
       const skill = join(root, "example");
       mkdirSync(skill, { recursive: true });
       for (const prose of [
         "Read `agents/comment-sicko.md` in full first.",
         "Read `./agents/comment-sicko.md` in full first.",
-        "Read the following file:\n`agents/comment-sicko.md`",
+        "The `agents/comment-sicko.md` file ships only with the plugin.",
+        "Open `../../agents/comment-sicko.md`.",
       ]) {
         writeFileSync(join(skill, "SKILL.md"), `# Example\n\n${prose}\n`);
-        expect(() => validateProsePaths(root)).toThrow("example/SKILL.md -> agents/comment-sicko.md");
+        expect(() => validateProsePaths(root)).toThrow("agents/comment-sicko.md is not installed with the skills tree");
       }
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      rmSync(plugin, { recursive: true, force: true });
     }
   });
 
-  test("prose may name a runtime directory it does not tell the reader to open", () => {
-    const root = mkdtempSync(join(tmpdir(), "pstack-prose-allowed-"));
+  test("prose paths that resolve inside the tree or to nothing are left alone", () => {
+    const plugin = mkdtempSync(join(tmpdir(), "pstack-prose-allowed-"));
+    const root = join(plugin, "skills");
     try {
-      const skill = join(root, "example");
-      mkdirSync(skill, { recursive: true });
+      mkdirSync(join(plugin, "hooks"), { recursive: true });
+      mkdirSync(join(root, "mode/playbooks"), { recursive: true });
+      mkdirSync(join(root, "mode/references"), { recursive: true });
+      writeFileSync(join(root, "mode/playbooks/babysit.md"), "# playbook\n");
       writeFileSync(
-        join(skill, "SKILL.md"),
+        join(root, "mode/references/triage.md"),
         [
-          "# Example",
+          "# Reference",
           "",
-          "The `hooks/` directory is Claude Code only and ships with the plugin.",
-          "Read this section before noting that `agents/comment-sicko.md` ships only with the plugin.",
+          "Read `../playbooks/babysit.md` first.",
+          "Write the log to `/tmp/<slug>-resume.md` and run `/setup-pstack`.",
+          "Edit `plugins/pstack/models.json`, then rerun `tools/generate.mjs`.",
+          "Cursor keeps rules in `.cursor/rules/`; Claude Code has no `hooks/nope.md`.",
         ].join("\n"),
       );
       expect(() => validateProsePaths(root)).not.toThrow();
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      rmSync(plugin, { recursive: true, force: true });
     }
   });
 

@@ -305,11 +305,16 @@ export function stampReviewerTable(text, models, file) {
 }
 
 export function codexModelNamesSection(models) {
+  const strongest = models.roles.filter(
+    (r) => r.models.length === 1 && r.models[0] !== models.singleRoleDefault,
+  );
   return (
     "Skills name Claude defaults (a single-role default for code/prose/judgment plus a diverse-model panel for " +
     "diverse-model panels; each model-consuming skill lists its own in a Models section). These slugs do not " +
     "resolve on Codex. Substitute your configured Codex models:\n\n" +
     `- Single-model roles: your primary Codex model (for example ${code(models.codex.singleRoleExample)}).\n` +
+    `- Roles that default to the strongest Claude model (${strongest.map((r) => code(r.role)).join(", ")}): ` +
+    `your strongest Codex model (for example ${code(models.codex.strongestRoleExample)}).\n` +
     "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
     "signal comes from model diversity, so use the distinct Codex models available to you. A good default quad " +
     `on ChatGPT is ${codeList(models.codex.panelQuad)}. If only one model family is reachable, vary reasoning ` +

@@ -121,10 +121,12 @@ describe("stampVersion", () => {
 });
 
 describe("assertChangesHeading", () => {
-  test("accepts a bare or suffixed heading and rejects a missing one", () => {
-    expect(() => assertChangesHeading("## 0.9.1\n", "0.9.1")).not.toThrow();
-    expect(() => assertChangesHeading("## 0.9.1 - title\n", "0.9.1")).not.toThrow();
-    expect(() => assertChangesHeading("## 0.9.10 - title\n", "0.9.1")).toThrow('no "## 0.9.1" heading');
+  test("requires the current version's heading and one shape for every release heading", () => {
+    expect(() => assertChangesHeading("## 0.9.1 - title\n## 0.9.0 - older\n", "0.9.1")).not.toThrow();
+    expect(() => assertChangesHeading("## 0.9.10 - title\n", "0.9.1")).toThrow('no "## 0.9.1 - <title>" heading');
+    expect(() => assertChangesHeading("## 0.9.1 - title\n## 0.9.0 — em dash\n## 0.8.9\n", "0.9.1")).toThrow(
+      'read "## <version> - <title>":\n## 0.9.0 — em dash\n## 0.8.9',
+    );
   });
 });
 

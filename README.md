@@ -30,7 +30,7 @@ mkdir -p ~/.agents/skills
 for s in plugins/pstack/skills/*/; do ln -s "$PWD/$s" ~/.agents/skills/"$(basename "$s")"; done
 ```
 
-The loop links all 52 skill directories. Thirty-one are public workflows and 21 `principle-*` directories are internal references used by `poteto-mode`. Each runtime decides whether it understands pstack-specific frontmatter such as `user-invocable: false`, so menu visibility differs. Keep the principle directories installed even when a runtime lists them.
+The loop links all 52 skill directories. 31 are public workflows and 21 `principle-*` directories are internal references used by `poteto-mode`. Each runtime decides whether it understands pstack-specific frontmatter such as `user-invocable: false`, so menu visibility differs. Keep the principle directories installed even when a runtime lists them.
 
 Removing a link from `~/.agents/skills/` removes that skill from every runtime using the shared directory. Teardown is `rm ~/.agents/skills/<name>`.
 
@@ -139,17 +139,11 @@ Verified on a live Codex session installed via the symlinks: the user-facing ski
 
 ## CI
 
-`ci.yml` and `security.yml` run on every pull request and push to `main`.
-
-`ci.yml` runs seven jobs. The generated-files job runs `bun tools/generate.mjs`, which also enforces the plugin layout invariants, rejects a resulting diff, and runs the Bun tests. The skills-only job installs through the `skills` CLI, compares the copied tree with the source, and checks for missing or escaping Markdown links and direct instructions to open unreachable paths. The other jobs test the vendored Bun tooling and run `shellcheck` over every `.sh` file. The workflow-lint job runs `actionlint` over `.github/workflows` and rejects invalid syntax, a bad expression, or an unknown runner label before a broken workflow reaches `main`. The Markdown-lint job runs `markdownlint-cli2` over every Markdown file under a correctness-only rule set held in `.markdownlint-cli2.jsonc`, chosen so style rules never fight the upstream sync. The link job runs `lychee` offline over the same files and resolves relative file and fragment targets, which covers the README, `CHANGES.md`, `CONTRIBUTING.md` and the other top-level docs that `tools/validate-skills.mjs` does not reach. Those three jobs invoke their tool through `docker` or `npx` rather than a third-party action, because the repository only allows GitHub-owned actions, verified creators, `oven-sh/setup-bun` and `zizmorcore/zizmor-action`.
-
-`security.yml` runs `osv-scanner` against the lockfiles and fails the build if no lockfile was found, because an empty scan reads exactly like a clean one. It also rejects any action reference not pinned to a full 40-character commit SHA. It runs weekly on top of the per-PR trigger, so a CVE published after a merge still surfaces. `zizmor` audits the workflows themselves for template injection, over-broad permissions, and credential persistence.
+`ci.yml` and `security.yml` run on every pull request and push to `main`. `ci.yml` regenerates and diffs the generator's outputs, runs the Bun tests, installs the skills tree through the `skills` CLI and compares the copy with the source, typechecks and tests the vendored Bun tooling, and lints shell scripts, workflows, Markdown, and relative links. `security.yml` runs `osv-scanner` over the lockfiles and `zizmor` over the workflows, weekly as well as per PR. [CONTRIBUTING.md](CONTRIBUTING.md#things-that-will-fail-ci) lists what each gate rejects and how to run it locally.
 
 Dependabot keeps the pinned action SHAs current, on a 7-day cooldown so a compromised release has time to be reported before a PR opens. The vendored scripts' `commander` pin follows upstream through `tools/sync.mjs`.
 
 Before a release, run `tests/skill-collision-repro.sh` locally to exercise the behavioral check CI cannot.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the sync boundary, the local checks to run, and the release rules.
 
 ## Dependencies
 

@@ -148,15 +148,16 @@ export function stampVersion(text, version, file) {
   return text.replace(/("version"\s*:\s*)"[^"]*"/, `$1"${version}"`);
 }
 
+// Every release heading reads "## <version> - <title>"; the current version
+// must have one. A bump without an entry (or an entry without a bump) ships a
+// release nobody can read about.
 export function assertChangesHeading(changes, version) {
-  const found = changes
-    .split("\n")
-    .some((line) => line === `## ${version}` || line.startsWith(`## ${version} `));
-  if (!found) {
-    throw new Error(
-      `CHANGES.md has no "## ${version}" heading. Every version needs a CHANGES entry; ` +
-        `a bump without one (or an entry without a bump) ships a release nobody can read about.`,
-    );
+  const lines = changes.split("\n");
+  const current = lines.find((line) => line.startsWith(`## ${version} `));
+  if (!current) throw new Error(`CHANGES.md has no "## ${version} - <title>" heading`);
+  const malformed = lines.filter((line) => /^## \d+\.\d+\.\d+/.test(line) && !/^## \d+\.\d+\.\d+ - \S/.test(line));
+  if (malformed.length) {
+    throw new Error(`CHANGES.md release headings read "## <version> - <title>":\n${malformed.join("\n")}`);
   }
 }
 

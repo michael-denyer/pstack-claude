@@ -26,7 +26,7 @@ Follow-up fixes for the PR 55 review. These change upstream-derived behavior and
 
 `check-plan.mjs` requires checkboxes in every program subsection and in Close the program. It tracks fenced code by delimiter and length so tilde fences and nested Markdown examples stay exempt from prose punctuation checks. CLI regression tests exercise the shipped skeleton, missing checklists, fenced examples, and prose after closing fences.
 
-## 0.9.19 — sync to upstream v0.14.8
+## 0.9.19 - sync to upstream v0.14.8
 
 Catches the port up with upstream `cursor/plugins/pstack` from `4612556` (v0.14.2) to `7314f72` (v0.14.8). Seven upstream commits; three carry content the port ships. Skill count stays at 52.
 
@@ -40,11 +40,11 @@ Catches the port up with upstream `cursor/plugins/pstack` from `4612556` (v0.14.
 
 **Sync tooling note.** `tools/sync.mjs` writes the whole upstream tree before the denylist scan, so a run against a pin that adds excluded paths (`automations/`, `docs/`, `.cursor-plugin/`, `assets/`, the upstream `README.md` and `LICENSE`) exits 1 on hits inside those paths and leaves the pin unadvanced. This sync removed them by hand and set the pin directly. An exclusion list in `upstream.json` would let the tool finish on its own; not done here.
 
-## 0.9.18 — plugin author names the port maintainer
+## 0.9.18 - plugin author names the port maintainer
 
 `plugin.json` and the marketplace entry listed Lauren Tan as `author`, so the Claude Code plugin UI credited the upstream author for the port. The `author` and `owner` fields now name Michael Denyer with an email and GitHub URL. Lauren Tan's authorship of the original pstack stays in every description, the README, and the vendored license texts.
 
-## 0.9.17 — a self-contained skills-only install
+## 0.9.17 - a self-contained skills-only install
 
 `plugins/pstack/skills/` is a supported installation boundary. The [`skills` CLI](https://github.com/vercel-labs/skills) resolves it as a subtree URL, so a skills-only install needs no clone and no second maintained copy of the tree.
 
@@ -58,7 +58,7 @@ Two checks keep the boundary honest. `tools/validate-skills.mjs` resolves bare, 
 
 The `SessionStart` auto-fire hook, the Codex prompt stubs, and Claude Code's native subagent registration remain runtime-specific and outside the boundary by design. The README records what a skills-only install does not carry.
 
-## 0.9.16 — native Agent Skills paths for opencode and Gemini CLI
+## 0.9.16 - native Agent Skills paths for opencode and Gemini CLI
 
 opencode and Gemini CLI both discover the shared `plugins/pstack/skills/` tree natively. They support the same `~/.agents/skills/` user directory already used by the Codex and Prime installs, so one symlink loop now installs all four Agent Skills runtimes. Neither new runtime gets generated command files. The generator keeps its single Codex-only prompt adapter.
 
@@ -68,11 +68,11 @@ The generator now validates the portable `name` and `description` frontmatter on
 
 `codex-tools.md` remains a Codex-only adapter. Platform notes no longer send arbitrary non-Claude runtimes through Codex tool names, model slugs, or configuration paths. Gemini CLI, opencode, and Prime Agent get native discovery, but their Claude-specific execution equivalents and delegation-heavy workflows remain runtime-owned and unverified. Model policy is unchanged.
 
-## 0.9.15 — retire Opus 4.8 from the model defaults
+## 0.9.15 - retire Opus 4.8 from the model defaults
 
 `plugins/pstack/models.json` no longer names `claude-opus-4-8` as a default. Every single-model role that used it (`feature, refactoring`, `judgment and prose`, `how explorer`, `how explainer`, `why investigators`, `why synthesizer`, `reflect tooling`, `reflect judgment, divergent, synthesizer`, `swarm workers`, and the single-role default) now runs `claude-opus-5`. The three roles that carry the hardest code changes (`bug-fix`, `perf-issue`, `hillclimb`) move to `claude-fable-5`, matching the existing `strongest judgment` row. `claude-haiku-4-5` leaves the four panels (`how critics`, `arena runners`, `architect runners`, `interrogate reviewers`), so each runs the three-model panel `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`; the `models.json` key is now `panel`, not `panelQuad`. The generator restamped the `## Models` sections, the interrogate reviewer table, and the interrogate menu row; the README substitution table rows for the Cursor `claude-opus-4-X-thinking-xhigh` variant and the panel quad now state the current defaults. Opus 4.8 stays in the available-model list for `/setup-pstack` overrides.
 
-## 0.9.14 — single-source the duplicated facts behind a generator
+## 0.9.14 - single-source the duplicated facts behind a generator
 
 Four PRs (#36, #37, #40, #39) moved every convention-held duplication behind `tools/generate.mjs`, which stamps each fact from one source and fails CI on any diff after regeneration.
 
@@ -83,7 +83,7 @@ Four PRs (#36, #37, #40, #39) moved every convention-held duplication behind `to
 
 No skill workflow changes; the skill-body edits replace inline model slugs with role references resolved one section down in the same file. This bump exists to ship those prose changes to installed copies.
 
-## 0.9.13 — drop the Claude Code command trampolines
+## 0.9.13 - drop the Claude Code command trampolines
 
 Claude Code renders a plugin's commands and its user-invocable skills in the same slash menu, so every one of the 31 trampolines showed `/pstack:<name>` twice (#22, reported by @razvangirgiz). The trampolines existed for Codex, which has no skill picker of its own; on Claude Code they only shadowed the skill, which is what 0.9.7 and 0.9.8 spent two releases working around.
 
@@ -91,11 +91,11 @@ Claude Code renders a plugin's commands and its user-invocable skills in the sam
 
 The 0.9.7 collision machinery retires with the collision. `tests/skill-collision-repro.sh` drops the three trampoline-precedence legs and the command-flag invariant, and gains two static checks: `plugins/pstack/commands/` must not exist (an upstream sync reintroducing it fails here rather than silently restoring the duplicates), and every Codex prompt must have a matching skill. The 0.9.8 flag invariant widens from command-paired skills to every skill, since none may carry `disable-model-invocation`. The remaining behavioral leg proves the assumption this all rests on: a command-less plugin still serves `/plugin:name`.
 
-## 0.9.12 — pin the thermo-nuclear report format
+## 0.9.12 - pin the thermo-nuclear report format
 
 The 0.9.11 swarm routing flattened thermo-nuclear reviews into one consolidated report, dropping the summary-plus-per-subsystem-file layout earlier reviews produced. `thermo-nuclear-code-quality-review` now carries a Report Format section that pins the layered deliverable (a ~200-line narrative summary plus one detail file per subsystem reviewer) and overrides swarm's aggregation rules for this review (#28).
 
-## 0.9.11 — sync to upstream v0.14.2
+## 0.9.11 - sync to upstream v0.14.2
 
 Catches the port up with upstream `cursor/plugins/pstack` from `3fe2823` (v0.11.3) to `4612556` (v0.14.2). Skills 48 → 52, commands 27 → 31, subagents 1 → 2, plus a vendored `scripts/` tree under `poteto-mode/`.
 
@@ -126,7 +126,7 @@ Substitutions in the six: Cursor cloud agents become local background subagents 
 
 **Verified.** 52 skills / 31 commands / 2 subagents; three manifests parse at 0.9.11. Static invariants pass, including the repaired quad check. The vendored scripts pass `bun install --frozen-lockfile`, `bun test orch watch-pr` (52 tests), and `bun run typecheck` from their ported location. Not yet live-verified in a Claude Code or Codex session.
 
-## 0.9.10 — sync to upstream v0.11.3
+## 0.9.10 - sync to upstream v0.11.3
 
 Catches the port up with upstream `cursor/plugins/pstack` from `0452e08` (v0.10.0) to `3fe2823` (v0.11.3). Skill count 44 → 48, commands 24 → 27.
 
@@ -142,13 +142,13 @@ Catches the port up with upstream `cursor/plugins/pstack` from `0452e08` (v0.10.
 
 **Deliberately not ported.** Sticky mode (#144) is Cursor-only frontmatter (`mode`/`icon`/`color`/`reminder`) with no Claude Code equivalent; the port's 0.9.5 SessionStart hook already auto-fires `poteto-mode` with the same non-trivial/trivial/opt-out logic. Benny (#137) remains out, per the earlier review.
 
-## 0.9.9 — principle leaves hide from the slash menu
+## 0.9.9 - principle leaves hide from the slash menu
 
 0.9.8 kept `disable-model-invocation: true` on the 20 `principle-*` leaves, on the reasoning that they have no command and are read by path from `poteto-mode`. But that flag only blocks *model* invocation. It does not hide a skill from the user `/` menu, so all 20 surfaced as bare `/principle-*` slash commands in every session (confirmed across projects on the desktop app). They are internal references; users should never invoke them.
 
 Fix: swap the flag for `user-invocable: false` on all 20 leaves. Per the [Claude Code skills docs](https://code.claude.com/docs/en/skills.md), `user-invocable: false` hides a skill from the `/` menu and controls menu visibility only, not Skill-tool or file access — so `poteto-mode` reading each leaf by path (`../principle-<name>/SKILL.md`, the mechanism the leaves have always used) is untouched. The two flags are mutually exclusive: setting both leaves a skill neither user- nor model-invocable, so this is a swap, not an addition. The visible consequence is that the leaves become model-auto-invocable on description match — the same standing the 12 command-paired skills took in 0.9.8, and immaterial to the by-path reference the leaves actually rely on. The invariant is now: every command carries `disable-model-invocation: true`, no command-paired skill carries it, and every `principle-*` leaf carries `user-invocable: false`.
 
-## 0.9.8 — command-paired skills drop `disable-model-invocation`
+## 0.9.8 - command-paired skills drop `disable-model-invocation`
 
 The 0.9.7 fix put `disable-model-invocation: true` on all 24 command trampolines so the Skill tool resolves a colliding name to the skill. But 12 of those skills carried the same flag in their own frontmatter (present since the initial port), and the flag on a **skill** makes the Skill tool refuse the invocation outright. Net effect: the 0.9.5 SessionStart mandate ("invoke `pstack:poteto-mode` with the Skill tool") was refused every session, five of the six direct-entry skills it lists (`poteto-mode`, `tdd`, `architect`, `arena`, `interrogate`; only `how` and `why` were unflagged) were model-unreachable, and every user-typed `/pstack:<name>` for a flagged skill expanded to a trampoline body the model then couldn't follow. 0.9.7 didn't cause the skill-side flags, but it surfaced them: before it, the same calls died in the trampoline loop instead.
 
@@ -156,7 +156,7 @@ Fix: remove the flag from the 12 command-paired skills that carried it (`archite
 
 `tests/skill-collision-repro.sh` gains the mirrored static invariant (no skill with a same-named command may carry the flag) and a fourth behavioral leg preserving the repro: with the flag on the skill, the Skill tool refuses the invocation even though the command no longer shadows it.
 
-## 0.9.7 — command trampolines no longer shadow their skills
+## 0.9.7 - command trampolines no longer shadow their skills
 
 Every user-facing skill ships with a same-named `commands/<name>.md` trampoline whose body is "Invoke the `<name>` skill and follow it." On Claude Code, the Skill tool resolves a colliding name to the **command**, not the skill — so a model-initiated invoke of `pstack:<name>` got the trampoline back, which told it to invoke the skill, which resolved to the trampoline again. Mutual recursion; the real `SKILL.md` never loaded. This hit every model-side entry path, including the 0.9.5 SessionStart mandate (whose whole job is telling the model to invoke `pstack:poteto-mode`), and it made each name appear twice in the model's skill list. Observed in desktop-app sessions (inline `--plugin-dir` loading, same path as the 0.9.3 entry); reproduced on CLI 2.1.195 with a minimal two-artifact plugin.
 
@@ -164,7 +164,7 @@ Fix: all 24 command files now carry `disable-model-invocation: true` — the fla
 
 The repro is preserved as `tests/skill-collision-repro.sh` (manual; needs the `claude` CLI, makes three haiku calls). It checks the static invariant (every command carries the flag) and the three behavioral legs: command wins the collision without the flag, skill wins with it, user-typed `/command` still runs. The first leg is a precedence detector — if it ever fails, upstream changed the undocumented resolution order and the flag should be re-evaluated, not the fix declared broken.
 
-## 0.9.6 — hook hardening and duplication trims (thermo-nuclear review)
+## 0.9.6 - hook hardening and duplication trims (thermo-nuclear review)
 
 A strict maintainability review of the 0.9.3–0.9.5 range drove these:
 
@@ -176,15 +176,15 @@ A strict maintainability review of the 0.9.3–0.9.5 range drove these:
 
 One upstream pstack commit landed after the `e46364b` sync: `0452e08` adds the dormant `automations/benny/` pack (Slack issue triage plus reproduce-and-fix, built on Cursor's event-triggered automations) and bumps upstream to 0.10.0. Deliberately not ported — rationale and revisit criteria in README → What's deliberately not ported. `cursor-team-kit` has no commits since the sync point (its latest, `679fdaf`, 2026-05-28, predates `e46364b`). The port's skill tree was current with upstream HEAD as of this note; the later 0.9.10 sync carries it forward to v0.11.3 (see above).
 
-## 0.9.5 — poteto-mode auto-fires via SessionStart hook
+## 0.9.5 - poteto-mode auto-fires via SessionStart hook
 
 `plugins/pstack/hooks/` is new. `hooks.json` registers a `SessionStart` hook (matcher `startup|clear|compact`) that injects `hooks/session-start-context.md` (~0.3k tokens) as additional context — the same mechanism superpowers uses to auto-load its skill-use mandate. The injected block routes any non-trivial engineering task into `pstack:poteto-mode` before the first response, lists the direct-entry skills, tells dispatched subagents to ignore it, and defers to explicit user instructions. The full poteto-mode skill still loads only on invoke. `run-hook.cmd` (cross-platform polyglot) and the JSON-emission pattern in `session-start` are adapted from superpowers (MIT; see NOTICE.md and LICENSE-superpowers). Codex is unaffected — it has no plugin hook runtime; invoke poteto-mode by name there.
 
-## 0.9.4 — Sonnet 5 joins the default panels
+## 0.9.4 - Sonnet 5 joins the default panels
 
 The multi-model panels (`arena` runners, `architect` runners, `interrogate` reviewers, `how` critics) grow from a triple to a quad: `claude-opus-4-8`, `claude-sonnet-5`, `claude-opus-4-6`, `claude-sonnet-4-6` — both generations in each of two tiers. This also restores upstream's four-way `interrogate` split; the port had been running three reviewers under a "four different models" description. `setup-pstack` adds Sonnet 5 (`claude-sonnet-5`) to the available-family enumeration and to the four panel rows of its default sheet. Single-model delegation defaults stay `claude-opus-4-8`. Touched: `arena`, `architect`, `interrogate`, `how`, `setup-pstack`, `poteto-mode` (`SKILL.md`, `references/plan.md`, `references/codex-tools.md`), and the README substitution-table panel row. The historical Cursor→Claude mapping rows (`composer-2.5-fast`, `gpt-5.x`) are unchanged — they record what the 0.9.2 sync substituted, not current defaults.
 
-## 0.9.3 — dependency declaration removed
+## 0.9.3 - dependency declaration removed
 
 `plugin.json` no longer declares `dependencies: [{ "name": "plugin-dev", "marketplace": "claude-plugins-official" }]`, and `marketplace.json` drops the matching `allowCrossMarketplaceDependenciesOn`. The Claude Code desktop app passes every enabled plugin to the CLI as a session-only `--plugin-dir`, which strips marketplace identity (`pstack@inline`); a cross-marketplace dependency can never resolve in that mode, and the loader disables the entire plugin with `dependency-unsatisfied`. Result: pstack loaded in the CLI and the VS Code extension but silently vanished from desktop-app sessions. `optional: true` on a dependency entry passes `claude plugin validate` but is not honored by the loader (tested on 2.1.197). `plugin-dev` is now a documented manual install (README → Dependencies); skill bodies still route skill-authoring to `plugin-dev:skill-development` when it is present.
 
@@ -216,7 +216,7 @@ pstack diverges from superpowers in one respect, and it is deliberate. superpowe
 
 **Maintenance.** The plugin version string now lives in three manifests: `plugins/pstack/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, and `plugins/pstack/.codex-plugin/plugin.json`. A version bump must update all three; `tests/skill-collision-repro.sh` checks they match. `.agents/plugins/marketplace.json` carries no version field. The default panel quad is enumerated only in the four panel skills (`arena`, `architect`, `how`, `interrogate`) and the `setup-pstack` sheet — keep those lines grep-identical when models change (`tests/skill-collision-repro.sh` checks they match, deriving the canonical quad from `setup-pstack`'s `arena runners` row and reading `interrogate`'s from its reviewer table); `poteto-mode` and its references deliberately do not enumerate it. After a sync that touches `skills/poteto-mode/scripts/`, run `bun install --frozen-lockfile`, `bun test orch watch-pr`, and `bun run typecheck` from that directory. `hooks/session-start-context.md` restates skill one-liners — re-verify it whenever skill names or descriptions change. `plugins/pstack/commands/` must not exist (see 0.9.13); upstream ships trampolines there and a sync that restores them duplicates every slash-menu row, so move any new ones to `.codex-plugin/prompts/`. No skill may carry `disable-model-invocation` in its frontmatter (see 0.9.8) — on a skill it makes the Skill tool refuse the invocation, breaking the SessionStart mandate. The 21 command-less `principle-*` leaves instead carry `user-invocable: false` (see 0.9.9) to stay out of the `/` menu while `poteto-mode` reads them by path: `grep -L 'user-invocable: false' plugins/pstack/skills/principle-*/SKILL.md` must print nothing, and no leaf may also carry `disable-model-invocation` (the pair cancels to a dead skill). Re-run `tests/skill-collision-repro.sh` after Claude Code upgrades; its behavioral leg depends on undocumented slash resolution. The script checks the static invariants: the absent `commands/` directory, Codex prompts having matching skills, the skill and leaf flags, version parity across the three manifests, and the default model quad's identity across the four panel skills and `setup-pstack`.
 
-## 0.9.2 sync (against upstream `e46364b`)
+## 0.9.2 - sync against upstream `e46364b`
 
 Upstream pstack jumped from `0.1.0` → `0.9.2` between syncs. 30+ commits, including 11 new files.
 

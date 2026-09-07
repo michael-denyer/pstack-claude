@@ -6,8 +6,10 @@
 *.swp
 *.swo
 
-# VS Code per-user (the .code-workspace file IS tracked)
+# Editor and per-user Claude Code state
 .vscode/
+*.code-workspace
+.claude/settings.local.json
 
 # bun deps for the vendored poteto-mode scripts (bootstrap.ts installs them on first run)
 plugins/pstack/skills/poteto-mode/scripts/node_modules/

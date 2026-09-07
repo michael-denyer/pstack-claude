@@ -42,15 +42,15 @@ jobs:
         with:
           persist-credentials: false
       # Installs this checkout rather than the GitHub URL, so the canary proves
-      # the tree in the PR instead of whatever is on main.
+      # the tree in the PR instead of whatever is on main. One agent target is
+      # enough: the CLI copies the same bytes for every agent, and the
+      # generated job already validated the source tree's links and prose.
       - name: Install the skills tree with the skills CLI
         run: |
           npx --yes skills@1.5.23 add "$PWD/plugins/pstack/skills" \
-            --skill '*' --agent '*' --yes --copy
-      - name: Compare and validate the installed skills tree
-        run: |
-          diff -qr plugins/pstack/skills .agents/skills
-          node tools/validate-skills.mjs .agents/skills
+            --skill '*' --agent codex --yes --copy
+      - name: Compare the installed skills tree with the source
+        run: diff -qr plugins/pstack/skills .agents/skills
 
   scripts:
     name: Vendored bun tooling

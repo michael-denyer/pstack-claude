@@ -63,24 +63,3 @@ jobs:
           annotations: true
           persona: pedantic
           min-severity: low
-
-  actions-pinned:
-    name: Actions pinned to SHAs
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # zizmor's unpinned-uses audit covers this too, but only for files it
-      # parses as workflows. This is a cheap belt-and-braces grep that also
-      # catches a malformed workflow zizmor skips.
-      - name: Reject unpinned action references
-        run: |
-          unpinned="$(grep -rnE '^\s*(- )?uses:' .github/workflows \
-            | grep -vE 'uses:\s*\S+@[0-9a-f]{40}' || true)"
-          if [ -n "$unpinned" ]; then
-            echo "FAIL: actions must be pinned to a full commit SHA:"
-            echo "$unpinned"
-            exit 1
-          fi
-          echo "ok: every action reference is pinned to a 40-character SHA"

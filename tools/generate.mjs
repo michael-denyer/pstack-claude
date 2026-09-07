@@ -404,8 +404,17 @@ export function applyRegions(file, text, models, { strict = true } = {}) {
   return lines.join("\n");
 }
 
+// A role's "models" is a list of slugs or the string "panel", which resolves to
+// the shared diverse-model panel so the panel is written once.
+export function resolveModels(models) {
+  return {
+    ...models,
+    roles: models.roles.map((r) => (r.models === "panel" ? { ...r, models: models.panel } : r)),
+  };
+}
+
 export function loadModels() {
-  return JSON.parse(readFileSync(join(repo, "plugins/pstack/models.json"), "utf8"));
+  return resolveModels(JSON.parse(readFileSync(join(repo, "plugins/pstack/models.json"), "utf8")));
 }
 
 // The port's derivation of an upstream file, as tools/sync.mjs applies it

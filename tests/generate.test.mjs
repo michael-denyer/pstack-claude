@@ -11,6 +11,7 @@ import {
   assertChangesHeading,
   deriveSkill,
   fenceUnder,
+  loadModels,
   promptStub,
   publicSkills,
   readmeCommands,
@@ -24,7 +25,7 @@ import {
 } from "../tools/generate.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const models = JSON.parse(readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8"));
+const models = loadModels();
 
 const lines = (text) => text.split("\n");
 

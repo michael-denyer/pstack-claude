@@ -1,4 +1,5 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { DeadlineExceeded, WatchDeadline } from "./deadline.ts";
 import {
   Command,
   CommanderError,
@@ -13,6 +14,7 @@ import {
 } from "./github.ts";
 import {
   runQueued,
+  deadlineVerdict,
   runSimple,
   statusQueryVerdict,
   verdictFactory,
@@ -81,11 +83,11 @@ interface RawOptions {
 }
 export function parseArgs(
   argv: readonly string[],
-  io: Pick<CliRuntime, "stdout" | "stderr">
+  io: Pick<CliRuntime, "stdout" | "stderr">,
 ): CliOptions {
   const program = new Command("watch-pr")
     .description(
-      "Watch one pull request, a connected stack, or an immutable queued stack.\nJSON (NDJSON while polling) is the default; --pretty renders human text."
+      "Watch one pull request, a connected stack, or an immutable queued stack.\nJSON (NDJSON while polling) is the default; --pretty renders human text.",
     )
     .configureOutput({ writeOut: io.stdout, writeErr: io.stderr })
     .exitOverride()
@@ -95,36 +97,36 @@ export function parseArgs(
     .addOption(
       new Option("--stack", "watch the connected open stack")
         .default(false)
-        .conflicts("queuedStack")
+        .conflicts("queuedStack"),
     )
     .option(
       "--queued-stack",
       "watch the captured stack until all PRs merge",
-      false
+      false,
     )
     .option(
       "--stack-prs <n,...>",
       "frozen bottom-to-top queue (queued mode only)",
-      stackPrList
+      stackPrList,
     )
     .option("--interval <seconds>", "poll interval", positiveNumber, 60)
     .option(
       "--sweep-interval <seconds>",
       "whole-stack sweep interval",
       positiveNumber,
-      300
+      300,
     )
     .option(
       "--timeout <seconds>",
       "deadline; 0 disables it",
       nonNegativeNumber,
-      0
+      0,
     )
     .option(
       "--max-query-errors <count>",
       "consecutive query-error budget",
       positiveInteger,
-      5
+      5,
     )
     .option("--status-only", "print one status table and exit 0", false)
     .option("--allow-draft", "do not treat a draft as a merge gate", false)
@@ -151,14 +153,17 @@ export function parseArgs(
   };
 }
 export interface CliRuntime {
+  readonly deadline?: WatchDeadline;
   readonly reader: T.GitHubReader;
   readonly clock: WatchClock;
   readonly stdout: (value: string) => void;
   readonly stderr: (value: string) => void;
 }
-function realRuntime(): CliRuntime {
+function realRuntime(timeout: number): CliRuntime {
+  const deadline = new WatchDeadline(timeout, () => performance.now() / 1_000);
   return {
-    reader: new GhGitHubReader(),
+    deadline,
+    reader: new GhGitHubReader(deadline),
     clock: {
       now: () => performance.now() / 1_000,
       observedAt: () => new Date().toISOString(),
@@ -172,15 +177,25 @@ function realRuntime(): CliRuntime {
 }
 export async function main(
   argv: readonly string[],
-  runtime: CliRuntime = realRuntime()
+  supplied?: CliRuntime,
 ): Promise<number> {
   let options: CliOptions;
   try {
-    options = parseArgs(argv, runtime);
+    options = parseArgs(
+      argv,
+      supplied ?? {
+        stdout: (value) => process.stdout.write(value),
+        stderr: (value) => process.stderr.write(value),
+      },
+    );
   } catch (error) {
     if (!(error instanceof CommanderError)) throw error;
     return error.exitCode === 0 ? 0 : 64;
   }
+  const runtime = supplied ?? realRuntime(options.polling.timeout);
+  const deadline =
+    runtime.deadline ??
+    new WatchDeadline(options.polling.timeout, () => runtime.clock.now());
   const render = options.pretty ? renderPretty : renderJson;
   const emit = (verdict: T.ProgressVerdict): void =>
     runtime.stdout(render(verdict));
@@ -198,16 +213,28 @@ export async function main(
         ? [seed]
         : await discoverStack(runtime.reader, seed));
   } catch (error) {
-    if (!(error instanceof WatcherQueryError)) throw error;
-    const verdict = statusQueryVerdict(
-      verdictFactory(runtime.clock, options.mode),
-      1,
-      error.failure
-    );
+    if (
+      !(error instanceof WatcherQueryError) &&
+      !(error instanceof DeadlineExceeded)
+    )
+      throw error;
+    const verdict =
+      error instanceof DeadlineExceeded
+        ? deadlineVerdict(verdictFactory(runtime.clock, options.mode))
+        : statusQueryVerdict(
+            verdictFactory(runtime.clock, options.mode),
+            1,
+            error.failure,
+          );
     runtime.stdout(render(verdict));
     return verdict.exitCode;
   }
-  const dependencies = { reader: runtime.reader, clock: runtime.clock, emit };
+  const dependencies = {
+    reader: runtime.reader,
+    clock: runtime.clock,
+    emit,
+    deadline,
+  };
   const verdict =
     options.mode === "queued-stack" && !options.statusOnly
       ? await runQueued({ dependencies, contexts, options: options.polling })

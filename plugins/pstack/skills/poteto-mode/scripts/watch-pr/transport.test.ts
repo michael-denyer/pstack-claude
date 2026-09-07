@@ -1,11 +1,21 @@
 import { afterEach, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const directories: string[] = [];
-afterEach(() => { for (const dir of directories.splice(0)) rmSync(dir, { recursive: true, force: true }); });
+afterEach(() => {
+  for (const dir of directories.splice(0))
+    rmSync(dir, { recursive: true, force: true });
+});
 
 function run(scenario: string, extra: string[] = []) {
   const dir = mkdtempSync(join(tmpdir(), "watch-transport-"));
@@ -13,7 +23,9 @@ function run(scenario: string, extra: string[] = []) {
   const bin = join(dir, "bin");
   mkdirSync(bin);
   const gh = join(bin, "gh");
-  writeFileSync(gh, `#!${process.execPath}
+  writeFileSync(
+    gh,
+    `#!${process.execPath}
 import { appendFileSync, writeFileSync } from 'node:fs';
 const args = process.argv.slice(2);
 const scenario = process.env.WATCH_FIXTURE;
@@ -41,38 +53,74 @@ if (args[0] === 'pr' && args[1] === 'view') {
   value = { data: { repository: { pullRequest: { commits: { nodes: [{ commit: { oid: 'head', statusCheckRollup: { state: 'SUCCESS' } } }] } } } } };
 } else { throw new Error('unexpected fixture command: ' + JSON.stringify(args)); }
 console.log(JSON.stringify(value));
-`);
+`,
+  );
   chmodSync(gh, 0o755);
   const entry = join(dir, "entry.ts");
-  writeFileSync(entry, `import { main } from ${JSON.stringify(join(import.meta.dir, "cli.ts"))}; process.exitCode = await main(process.argv.slice(2));\n`);
+  writeFileSync(
+    entry,
+    `import { main } from ${JSON.stringify(join(import.meta.dir, "cli.ts"))}; process.exitCode = await main(process.argv.slice(2));\n`,
+  );
   const callsFile = join(dir, "calls.jsonl");
   writeFileSync(callsFile, "");
   const pidFile = join(dir, "pid");
   const started = performance.now();
-  const result = spawnSync(process.execPath, [entry, "--owner", "owner", "--repo", "repo", "--pr", "1", ...extra], {
-    encoding: "utf8", timeout: 3000,
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, WATCH_FIXTURE: scenario, WATCH_CALLS: callsFile, WATCH_PID: pidFile },
-  });
-  return { ...result, elapsed: performance.now() - started, calls: readFileSync(callsFile, "utf8").trim().split("\n").filter(Boolean).map(line => JSON.parse(line) as string[]), pidFile };
+  const result = spawnSync(
+    process.execPath,
+    [entry, "--owner", "owner", "--repo", "repo", "--pr", "1", ...extra],
+    {
+      encoding: "utf8",
+      timeout: 3000,
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        WATCH_FIXTURE: scenario,
+        WATCH_CALLS: callsFile,
+        WATCH_PID: pidFile,
+      },
+    },
+  );
+  return {
+    ...result,
+    elapsed: performance.now() - started,
+    calls: readFileSync(callsFile, "utf8")
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as string[]),
+    pidFile,
+  };
 }
 
 it("reads page two before reporting unresolved review threads", () => {
   const result = run("threads");
   expect(result.status).toBe(3);
-  expect(JSON.parse(result.stdout.trim())).toMatchObject({ kind: "BLOCKER", blocker: { kind: "review-threads", threads: [{ id: "t100" }] } });
-  expect(result.calls.filter(args => args.includes("after=next"))).toHaveLength(1);
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({
+    kind: "BLOCKER",
+    blocker: { kind: "review-threads", threads: [{ id: "t100" }] },
+  });
+  expect(
+    result.calls.filter((args) => args.includes("after=next")),
+  ).toHaveLength(1);
 });
 
 it("rejects a repeating page cursor instead of looping or silently truncating", () => {
   const result = run("stuck-cursor", ["--max-query-errors", "1"]);
   expect(result.status).toBe(7);
-  expect(result.calls.filter(args => args.some(arg => arg.includes("ReviewThreads")))).toHaveLength(2);
+  expect(
+    result.calls.filter((args) =>
+      args.some((arg) => arg.includes("ReviewThreads")),
+    ),
+  ).toHaveLength(2);
 });
 
 it("keeps a fork main branch distinct from destination main during stack discovery", () => {
   const result = run("fork", ["--stack", "--status-only"]);
   expect(result.status).toBe(0);
-  expect(JSON.parse(result.stdout.trim())).toMatchObject({ kind: "STATUS", rows: [{ context: { number: 1 } }] });
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({
+    kind: "STATUS",
+    rows: [{ context: { number: 1 } }],
+  });
 });
 
 it("cancels an in-flight command at the CLI deadline", () => {

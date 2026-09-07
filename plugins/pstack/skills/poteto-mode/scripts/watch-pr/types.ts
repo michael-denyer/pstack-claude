@@ -52,6 +52,7 @@ export interface PullRequestFacts {
 }
 export interface OpenPullRequest {
   readonly number: PrNumber;
+  readonly headRepository: Repository | null;
   readonly headRefName: string;
   readonly baseRefName: string;
 }
@@ -151,7 +152,7 @@ export type PrSnapshot =
   | {
       readonly kind: "open";
       readonly context: PrContext;
-      readonly facts: PullRequestFacts;
+      readonly facts: PullRequestFacts & { readonly headRefOid: string };
       readonly threads: readonly ReviewThread[];
       readonly ci: CiState;
       readonly reviewAutomationRunning: boolean;
@@ -160,6 +161,7 @@ export interface ReadyPr {
   readonly kind: "ready-pr";
   readonly context: PrContext;
   readonly proof: {
+    readonly headRefOid: string;
     readonly mergeability: "clear";
     readonly threads: readonly [];
     readonly ci: CiClean;
@@ -201,6 +203,16 @@ export type MergeBlocker =
       readonly reason: MergeGateReason;
     };
 export type QueryFailure =
+  | {
+      readonly kind: "deadline";
+      readonly retryable: false;
+      readonly detail: string;
+    }
+  | {
+      readonly kind: "snapshot-changed" | "invalid-stack";
+      readonly retryable: true;
+      readonly detail: string;
+    }
   | {
       readonly kind: "json-parse";
       readonly retryable: true;
@@ -383,11 +395,12 @@ export interface GitHubReader {
   originRepo(): Promise<Repository | null>;
   currentPr(pr: PrNumber | null): Promise<PrContext>;
   pullRequest(context: PrContext): Promise<PullRequestFacts>;
+  headCommit(context: PrContext): Promise<string | null>;
   openPullRequests(repository: Repository): Promise<readonly OpenPullRequest[]>;
   checksFastPath(context: PrContext): Promise<ChecksFastPath>;
   checkRollupPage(
     context: PrContext,
-    after: string | null
+    after: string | null,
   ): Promise<RollupPage>;
   reviewThreads(context: PrContext): Promise<readonly ReviewThread[]>;
   commitRollups(context: PrContext): Promise<readonly CommitRollup[]>;

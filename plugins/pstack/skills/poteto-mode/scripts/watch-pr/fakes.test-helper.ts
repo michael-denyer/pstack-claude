@@ -57,7 +57,7 @@ export function failedCheck(name = "ci"): Check {
 }
 
 export function fakeReader(
-  options: FakeReaderOptions = {}
+  options: FakeReaderOptions = {},
 ): GitHubReader & { readonly calls: readonly string[] } {
   const calls: string[] = [];
   const context = options.current ?? {
@@ -93,6 +93,10 @@ export function fakeReader(
     async pullRequest(requested) {
       calls.push("pullRequest");
       return { ...defaults, ...options.facts, context: requested };
+    },
+    async headCommit() {
+      calls.push("headCommit");
+      return options.facts?.headRefOid ?? defaults.headRefOid;
     },
     async openPullRequests() {
       calls.push("openPullRequests");

@@ -41,6 +41,7 @@ const readyPr = {
   kind: "ready-pr",
   context,
   proof: {
+    headRefOid: "head",
     mergeability: "clear",
     threads: [],
     ci: cleanCi,

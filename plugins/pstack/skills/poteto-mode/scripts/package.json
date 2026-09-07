@@ -1,13 +1,13 @@
 {
-  "name": "@pstack-claude/poteto-mode-tools",
+  "name": "@cursor-skill/poteto-mode-tools",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "bun test orch watch-pr",
-    "typecheck": "tsc --project watch-pr/tsconfig.json --noEmit --strict"
+    "typecheck": "tsc --project tsconfig.json"
   },
   "dependencies": {
-    "commander": "15.0.0"
+    "commander": "14.0.0"
   },
   "devDependencies": {
     "bun-types": "latest",

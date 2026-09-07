@@ -106,3 +106,54 @@ jobs:
             find . -path ./.git -prune -o -path '*/node_modules' -prune -o -name '*.sh' -print
             grep -rlE --exclude-dir=.git --exclude-dir=node_modules '^#!/(usr/bin/env )?(ba)?sh' .
           } | sed 's#^\./##' | sort -u | tee /dev/stderr | xargs shellcheck --severity=warning
+
+  actionlint:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # This job and the two below reach for their tool through docker or npx
+      # because allowed_actions permits only GitHub-owned actions, verified
+      # creators, oven-sh/setup-bun and zizmorcore/zizmor-action.
+      #
+      # The 1.7.12 tag is mutable, so the digest is what actually pins this.
+      # Resolved with: docker buildx imagetools inspect rhysd/actionlint:1.7.12
+      - name: Run actionlint
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo \
+            rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
+            -no-color
+
+  markdownlint:
+    name: Markdown lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Rule selection and the reasoning behind it live in
+      # .markdownlint-cli2.jsonc, which the tool picks up from the repo root.
+      - name: Run markdownlint
+        run: npx --yes markdownlint-cli2@0.18.1 '**/*.md'
+
+  links:
+    name: Markdown links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # --offline resolves relative file and fragment targets and skips every
+      # remote URL, so a contributor's PR never fails on someone else's link
+      # rot. tools/validate-skills.mjs already covers the skills tree; this
+      # reaches the README, CHANGES, CONTRIBUTING and the other top-level docs.
+      #
+      # Resolved with: docker buildx imagetools inspect lycheeverse/lychee:0.24.2
+      - name: Check relative links and fragments
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo \
+            lycheeverse/lychee:0.24.2@sha256:e2d19e57cf6ab037026f20b8e449a1f30d9d7f81eef4194763aab2eab20bd28d \
+            --offline --no-progress --include-fragments \
+            --exclude-path node_modules --exclude-path .git '**/*.md'

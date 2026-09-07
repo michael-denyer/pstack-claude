@@ -1,0 +1,21 @@
+// Correctness rules only: most skill files are synced from upstream, so style rules would conflict on every sync.
+{
+  "config": {
+    "default": false,
+    "MD011": true,
+    "MD037": true,
+    "MD038": true,
+    "MD039": true,
+    "MD042": true,
+    "MD045": true,
+    "MD051": true,
+    "MD052": true,
+    "MD053": true,
+    "MD056": true
+  },
+  "ignores": [
+    "**/node_modules/**",
+    ".git/**",
+    ".agents/**"
+  ]
+}

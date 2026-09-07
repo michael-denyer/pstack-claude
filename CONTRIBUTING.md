@@ -64,6 +64,9 @@ uvx zizmor@1.29.0 --persona pedantic --min-severity low --collect all -- .
 - **Prose telling the reader to open a path the install does not carry.** The same tool normalizes backticked paths and checks plugin-only prefixes such as `agents/`, `hooks/`, `commands/`, `.codex-plugin/`, and `.claude-plugin/`, plus any parent-relative `../` path. It fails when the preceding text directly instructs the reader to consult one of those paths, including an instruction wrapped onto the previous line. Describing a runtime path without directing the reader to open it is legal. A Markdown link is caught by the link check; this covers the backticked form that is not a link.
 - **A shell script that fails shellcheck.** Scripts are selected by `.sh` extension or by shebang, so the extensionless hook scripts (`hooks/session-start`) are linted too.
 - **An action pinned to a tag.** Use the full 40-character commit SHA with a version comment. A mutable tag can be force-pushed into our runners.
+- **A workflow file that fails `actionlint`.** Invalid YAML, a malformed expression, an unknown runner label, or a `needs:` pointing at a job that does not exist. Run `actionlint` from the repository root.
+- **A Markdown correctness error.** Reversed link syntax, an empty link target, a missing image alt, a fragment link to a heading that is not there, or an undefined or unused reference definition. The rule set is deliberately correctness-only and lives in `.markdownlint-cli2.jsonc`. Run `npx --yes markdownlint-cli2@0.18.1 '**/*.md'`.
+- **A broken relative link in any Markdown file.** The link job resolves file and fragment targets offline and never touches a remote URL, so external link rot cannot fail your PR. Run `lychee --offline --include-fragments --exclude-path node_modules --exclude-path .git '**/*.md'`.
 
 ## Dependency updates
 

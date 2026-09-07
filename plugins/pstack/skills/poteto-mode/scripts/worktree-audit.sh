@@ -78,21 +78,30 @@ classify_bucket() {
     echo review
 }
 
-# origin/main drives the merge check. Best-effort; stale is fine for a first pass.
+# Keep displaying partial facts when discovery fails, but never label them safe.
+discovery_known=yes
 if ! fetch_err=$(git fetch origin main 2>&1 >/dev/null); then
+    discovery_known=no
     echo "warn: could not fetch origin/main; merged column may be stale: $fetch_err" >&2
 fi
 
 # PR state by branch, fetched once. Empty if gh is unavailable.
 if ! prs=$(gh pr list --author "@me" --state all --limit 1000 --json number,state,headRefName,headRefOid 2>&1); then
+    discovery_known=no
     echo "warn: gh pr list failed; PR column will be empty: $prs" >&2
     prs="[]"
 fi
 
 # jq reads that JSON and rg finds the transcripts. Without either, the PR and
 # LAST_CHAT columns blank out and no row can reach verify-recent-chat.
-command -v jq >/dev/null || echo "warn: jq not found; PR column will be empty" >&2
-command -v rg >/dev/null || echo "warn: rg not found; LAST_CHAT column will be empty and no row can bucket verify-recent-chat" >&2
+if ! command -v jq >/dev/null; then
+    discovery_known=no
+    echo "warn: jq not found; PR column will be empty" >&2
+fi
+if ! command -v rg >/dev/null; then
+    discovery_known=no
+    echo "warn: rg not found; LAST_CHAT column will be empty" >&2
+fi
 
 # Transcripts: ~/.claude/projects/<encoded-cwd>/<uuid>.jsonl, where <encoded-cwd> is a
 # session's cwd with every "/" turned into "-". A session run inside a worktree lives
@@ -119,7 +128,7 @@ parse_worktrees | while IFS= read -r -d '' wt && IFS= read -r -d '' state; do
         size="?"
     fi
 
-    facts_known=yes
+    facts_known="$discovery_known"
     if head=$(git -C "$wt" rev-parse HEAD 2>/dev/null); then
         if head_ts=$(git -C "$wt" log -1 --format='%ct' HEAD 2>/dev/null); then
             age="$(( (now - head_ts) / 86400 ))d"
@@ -200,11 +209,14 @@ parse_worktrees | while IFS= read -r -d '' wt && IFS= read -r -d '' state; do
     pr_state="-"
     pr_head_oid="-"
     if [ -n "$branch" ] && command -v jq >/dev/null 2>&1; then
-        pr_fields=$(jq -r --arg b "$branch" \
-            '.[] | select(.headRefName==$b) | [.number,.state,.headRefOid // ""] | @tsv' <<<"$prs" | head -1)
-        if [ -n "$pr_fields" ]; then
-            IFS=$'\t' read -r pr_number pr_state pr_head_oid <<<"$pr_fields"
-            pr="#$pr_number/$pr_state"
+        if pr_fields=$(jq -r --arg b "$branch" \
+            '.[] | select(.headRefName==$b) | [.number,.state,.headRefOid // ""] | @tsv' <<<"$prs"); then
+            if [ -n "$pr_fields" ]; then
+                IFS=$'\t' read -r pr_number pr_state pr_head_oid <<<"$pr_fields"
+                pr="#$pr_number/$pr_state"
+            fi
+        else
+            facts_known=no
         fi
     fi
 

@@ -1,13 +1,18 @@
-import { test } from 'bun:test';
+import { afterEach, test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const auditScript = join(
   process.cwd(),
   'plugins/pstack/skills/poteto-mode/scripts/worktree-audit.sh',
 );
+const fixtures = [];
+afterEach(() => {
+  for (const root of fixtures.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 
 const git = (...args) => execFileSync('/usr/bin/git', args, {
   encoding: 'utf8',
@@ -21,11 +26,12 @@ if [ "$1" = -C ] && [ "$3" = status ] && [ -n "$AUDIT_FAIL_STATUS_PATH" ] && [ "
   exit 1
 fi
 if [ "$1" = fetch ]; then
-  exit 0
+  exit "\${AUDIT_FAIL_FETCH:-0}"
 fi
 exec /usr/bin/git "$@"
 `;
   const gh = `#!/bin/sh
+if [ "$AUDIT_FAIL_GH" = 1 ]; then exit 1; fi
 printf '%s\\n' "$AUDIT_GH_RESPONSE"
 `;
   const jq = `#!/usr/bin/env node
@@ -55,7 +61,8 @@ exit 1
 }
 
 function createRepo() {
-  const root = mkdtempSync('/private/tmp/worktree-audit-test-');
+  const root = mkdtempSync(join(tmpdir(), 'worktree-audit-test-'));
+  fixtures.push(root);
   const repo = join(root, 'repo');
   git('init', '--initial-branch=main', repo);
   git('-C', repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
@@ -86,6 +93,8 @@ function runAudit(fixture, prs = [], extraEnv = {}) {
       AUDIT_GH_RESPONSE: JSON.stringify(prs),
       AUDIT_RG_MATCH: '',
       AUDIT_FAIL_STATUS_PATH: '',
+      AUDIT_FAIL_FETCH: '0',
+      AUDIT_FAIL_GH: '0',
       ...extraEnv,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -191,3 +200,13 @@ test('reviews a worktree when its status probe fails', () => {
   assert.equal(row[3], 'unknown');
   assert.equal(row[7], 'review');
 });
+
+for (const probe of ['AUDIT_FAIL_FETCH', 'AUDIT_FAIL_GH']) {
+  test(`reviews an ancestor when discovery fails: ${probe}`, () => {
+    const fixture = createRepo();
+    const candidate = addWorktree(fixture, 'candidate', 'candidate');
+    const row = rowFor(runAudit(fixture, [], { [probe]: '1' }), candidate);
+    assert.equal(row[2], 'YES');
+    assert.equal(row[7], 'review');
+  });
+}

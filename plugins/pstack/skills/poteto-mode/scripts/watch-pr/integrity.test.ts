@@ -102,6 +102,27 @@ it("rejects a repository-local cycle without walking forever", () => {
   ).toThrow("cycle in PR stack");
 });
 
+it("includes a fork PR whose base genuinely depends on a local parent", () => {
+  const result = orderStack(context, [
+    {
+      number: context.number,
+      headRepository: context,
+      headRefName: "base",
+      baseRefName: "main",
+    },
+    {
+      number: parsePrNumber(2),
+      headRepository: { owner: "fork", repo: "repo" },
+      headRefName: "foreign",
+      baseRefName: "base",
+    },
+  ]);
+  expect(result.map((pr) => pr.number)).toEqual([
+    context.number,
+    parsePrNumber(2),
+  ]);
+});
+
 it("does not attach children to a same-named branch in a fork", () => {
   const result = orderStack(context, [
     {

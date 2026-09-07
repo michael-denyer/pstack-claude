@@ -106,11 +106,13 @@ export function syncComponent({ oldDir, newDir, localDir, rules, denylist = [], 
     const rel = relative(oldDir, oldFile);
     const localFile = join(localDir, rel);
     if (existsSync(join(newDir, rel)) || !existsSync(localFile)) continue;
-    if (localMatchesOld(rel, readFileSync(localFile))) {
+    const local = readFileSync(localFile);
+    if (localMatchesOld(rel, local)) {
       operations.push({ kind: "delete", rel });
       report.deleted.push(rel);
     } else {
       report.manual.push(rel);
+      scan(rel, local);
     }
   }
 

@@ -211,6 +211,18 @@ describe("syncComponent", () => {
     expect(readFileSync(join(local, "s.md"), "utf8")).toBe("manual correction\n");
   });
 
+  test("a retained manual file removed upstream blocks sibling writes on every retry", () => {
+    const oldDir = tree({ "gone.md": "old\n", "sibling.md": "old\n" });
+    const newDir = tree({ "sibling.md": "new\n" });
+    const localDir = tree({ "gone.md": "run control-cli\n", "sibling.md": "old\n" });
+    for (const dryRun of [true, false, false]) {
+      const report = sync({ oldDir, newDir, localDir, dryRun });
+      expect(report.manual).toEqual(["gone.md"]);
+      expect(report.hits).toHaveLength(1);
+      expect(readFileSync(join(localDir, "sibling.md"), "utf8")).toBe("old\n");
+    }
+  });
+
   test("a substitution added after a failed attempt allows a valid retry", () => {
     const oldUp = tree({ "s.md": "old\n" });
     const newUp = tree({ "s.md": "run control-cli\n" });

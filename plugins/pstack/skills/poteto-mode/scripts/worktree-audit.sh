@@ -4,7 +4,7 @@
 # operated in it. Emits a table sorted by size with a suggested bucket. Never
 # deletes anything; deletion stays a human-gated step in the playbook.
 #
-# Usage: worktree-audit.sh [repo-path]   (defaults to the current repo)
+# Usage: worktree-audit.sh [repo-path] [transcripts-path]
 set -u
 
 repo="${1:-$(git rev-parse --show-toplevel 2>/dev/null)}"
@@ -106,7 +106,7 @@ fi
 # Transcripts: ~/.claude/projects/<encoded-cwd>/<uuid>.jsonl, where <encoded-cwd> is a
 # session's cwd with every "/" turned into "-". A session run inside a worktree lives
 # under that worktree's own directory, so scan the whole projects tree, not one repo's.
-transcripts="$HOME/.claude/projects"
+transcripts="${2:-$HOME/.claude/projects}"
 now=$(date +%s)
 
 printf "SIZE\tAGE\tMERGED\tDIRTY\tREMOTE\tPR\tLAST_CHAT\tBUCKET\tWORKTREE\n"
@@ -224,12 +224,25 @@ parse_worktrees | while IFS= read -r -d '' wt && IFS= read -r -d '' state; do
     last="-"
     last_ts=0
     if [ -d "$transcripts" ] && command -v rg >/dev/null 2>&1; then
-        newest=$(rg -F -l -e "${wt}/" -e "${wt}\"" -- "$transcripts" | while IFS= read -r f; do
-            printf '%s %s\n' "$(mtime "$f")" "$f"
-        done | sort -rn | head -1)
-        if [ -n "$newest" ]; then
-            last_ts=${newest%% *}
-            last=$(ymd "$last_ts")
+        if matches=$(rg -F -l -e "${wt}/" -e "${wt}\"" -- "$transcripts"); then
+            while IFS= read -r f; do
+                [ -z "$f" ] && continue
+                if timestamp=$(mtime "$f"); then
+                    case "$timestamp" in
+                        ''|*[!0-9]*) facts_known=no ;;
+                        *) if [ "$timestamp" -gt "$last_ts" ]; then last_ts=$timestamp; fi ;;
+                    esac
+                else
+                    facts_known=no
+                fi
+            done <<<"$matches"
+        else
+            search_status=$?
+            # rg uses 1 for a successful search with no matches.
+            if [ "$search_status" -ne 1 ]; then facts_known=no; fi
+        fi
+        if [ "$last_ts" -gt 0 ]; then
+            if ! last=$(ymd "$last_ts"); then facts_known=no; fi
         fi
     fi
     if [ "$last_ts" -gt 0 ] && [ $(( (now - last_ts) / 86400 )) -le 4 ]; then

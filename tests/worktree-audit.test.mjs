@@ -1,6 +1,6 @@
 import { afterEach, test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -43,6 +43,7 @@ const match = records.find((record) => record.headRefName === branch);
 if (match) console.log([match.number, match.state, match.headRefOid ?? ''].join('\\t'));
 `;
   const rg = `#!/bin/sh
+if [ "$AUDIT_FAIL_RG" = 2 ]; then exit 2; fi
 if [ -n "$AUDIT_RG_MATCH" ]; then
   printf '%s\\n' "$AUDIT_RG_MATCH"
 fi
@@ -64,11 +65,13 @@ function createRepo() {
   const root = mkdtempSync(join(tmpdir(), 'worktree-audit-test-'));
   fixtures.push(root);
   const repo = join(root, 'repo');
+  const transcripts = join(root, 'transcripts');
+  mkdirSync(transcripts);
   git('init', '--initial-branch=main', repo);
   git('-C', repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
     'commit', '--allow-empty', '-m', 'base');
   git('-C', repo, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
-  return { root, repo, bin: createStubs(root) };
+  return { root, repo, transcripts, bin: createStubs(root) };
 }
 
 function addWorktree(fixture, name, branch) {
@@ -85,7 +88,7 @@ function commit(worktree, message, filename = `${message.replaceAll(' ', '-')}.t
 }
 
 function runAudit(fixture, prs = [], extraEnv = {}) {
-  const result = execFileSync('/bin/bash', [auditScript, fixture.repo], {
+  const result = execFileSync('/bin/bash', [auditScript, fixture.repo, fixture.transcripts], {
     encoding: 'utf8',
     env: {
       ...process.env,
@@ -95,6 +98,7 @@ function runAudit(fixture, prs = [], extraEnv = {}) {
       AUDIT_FAIL_STATUS_PATH: '',
       AUDIT_FAIL_FETCH: '0',
       AUDIT_FAIL_GH: '0',
+      AUDIT_FAIL_RG: '0',
       ...extraEnv,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -210,3 +214,19 @@ for (const probe of ['AUDIT_FAIL_FETCH', 'AUDIT_FAIL_GH']) {
     assert.equal(row[7], 'review');
   });
 }
+
+test('reviews an ancestor when transcript search fails', () => {
+  const fixture = createRepo();
+  const candidate = addWorktree(fixture, 'candidate', 'candidate');
+  const row = rowFor(runAudit(fixture, [], { AUDIT_FAIL_RG: '2' }), candidate);
+  assert.equal(row[7], 'review');
+});
+
+test('keeps the recent-chat hold with an isolated transcript fixture', () => {
+  const fixture = createRepo();
+  const candidate = addWorktree(fixture, 'candidate', 'candidate');
+  const transcript = join(fixture.transcripts, 'fixture.jsonl');
+  writeFileSync(transcript, '{}\n');
+  const row = rowFor(runAudit(fixture, [], { AUDIT_RG_MATCH: transcript }), candidate);
+  assert.equal(row[7], 'verify-recent-chat');
+});

@@ -13,7 +13,6 @@ This plugin is a port of upstream MIT-licensed work. All upstream copyright noti
 | `plugins/pstack/skills/fix-ci/` | [cursor/plugins/cursor-team-kit/skills/fix-ci @ e46364b](https://github.com/cursor/plugins/tree/e46364b8be46000b7df0f260550cd712afbb8d36/cursor-team-kit/skills/fix-ci) | (c) 2026 Cursor | MIT | [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) |
 | `plugins/pstack/skills/fix-merge-conflicts/` | [cursor/plugins/cursor-team-kit/skills/fix-merge-conflicts @ e46364b](https://github.com/cursor/plugins/tree/e46364b8be46000b7df0f260550cd712afbb8d36/cursor-team-kit/skills/fix-merge-conflicts) | (c) 2026 Cursor | MIT | [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) |
 | `plugins/pstack/skills/get-pr-comments/` | [cursor/plugins/cursor-team-kit/skills/get-pr-comments @ e46364b](https://github.com/cursor/plugins/tree/e46364b8be46000b7df0f260550cd712afbb8d36/cursor-team-kit/skills/get-pr-comments) | (c) 2026 Cursor | MIT | [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) |
-| `plugins/pstack/hooks/run-hook.cmd` (near-verbatim) | [anthropics/claude-plugins-official → superpowers @ 6.1.0](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/superpowers) (originally obra/superpowers) | (c) 2025 Jesse Vincent | MIT | [LICENSE-superpowers](LICENSE-superpowers) |
 | `plugins/pstack/skills/what-did-i-get-done/` | [cursor/plugins/cursor-team-kit/skills/what-did-i-get-done @ e46364b](https://github.com/cursor/plugins/tree/e46364b8be46000b7df0f260550cd712afbb8d36/cursor-team-kit/skills/what-did-i-get-done) | (c) 2026 Cursor | MIT | [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) |
 | `plugins/pstack/skills/teach/`, `plugins/pstack/skills/principle-model-the-domain/`, `plugins/pstack/skills/create-verification-skill/`, `plugins/pstack/skills/maintain-verification-skill/` (v0.11.3 additions) | [cursor/plugins/pstack @ 3fe2823](https://github.com/cursor/plugins/tree/3fe2823ce17c1656c222d4b7c59d3f82fbf20143/pstack) | (c) 2026 Lauren Tan | MIT | [LICENSE](LICENSE) |
 | `plugins/pstack/skills/{swarm,no-comments,technical-writing,bro}/`, `plugins/pstack/agents/comment-sicko.md`, `plugins/pstack/skills/poteto-mode/playbooks/{babysit,shipping,orchestrate,autopilot-full,autopilot-stack,worktree-cleanup}.md`, `plugins/pstack/skills/poteto-mode/references/bugbot-triage.md`, `plugins/pstack/skills/poteto-mode/scripts/`, `plugins/pstack/skills/architect/references/design-red-flags.md`, `plugins/pstack/skills/create-verification-skill/references/feature-map-example/` (v0.14.2 additions) | [cursor/plugins/pstack @ 4612556](https://github.com/cursor/plugins/tree/4612556/pstack) | (c) 2026 Lauren Tan | MIT | [LICENSE](LICENSE) |
@@ -47,7 +46,7 @@ Port-authored files covered by this notice include:
 - `plugins/pstack/skills/poteto-mode/references/codex-tools.md`
 - `plugins/pstack/.codex-plugin/prompts/*.md`
 - `plugins/pstack/skills/babysit/SKILL.md` (independently authored; workflow informed by Cursor's public `/babysit` behavior)
-- `plugins/pstack/hooks/hooks.json`, `plugins/pstack/hooks/session-start`, and `plugins/pstack/hooks/session-start-context.md` (the auto-fire hook and its mandate)
+- `plugins/pstack/hooks/hooks.json` and `plugins/pstack/hooks/session-start-context.md` (the auto-fire hook and its mandate)
 - `NOTICE.md` (this file)
 - `NOTICE-skills.md`
 - `README.md`

@@ -513,26 +513,25 @@ export function strayModelSlugs(file, text, models) {
   return strays;
 }
 
-// hooks.json names commands as "${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd <script>";
-// both the runner and the named script must exist in the plugin and be
-// executable, or the SessionStart hook fails silently for every user.
+// Every ${CLAUDE_PLUGIN_ROOT}/<path> a hook command names must exist in the
+// plugin, and one the command executes directly must be executable, or the
+// SessionStart hook fails silently for every user.
 export function validateHooks(hooksJson, { statOf }) {
   const problems = [];
   for (const [event, groups] of Object.entries(JSON.parse(hooksJson).hooks ?? {})) {
     for (const group of groups) {
       for (const hook of group.hooks ?? []) {
-        const m = hook.command?.match(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)"?(?:\s+(\S+))?/);
-        if (!m) {
+        const refs = [...hook.command.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)/g)].map((m) => m[1]);
+        if (!refs.length) {
           problems.push(`${event}: command does not reference \${CLAUDE_PLUGIN_ROOT}: ${hook.command}`);
           continue;
         }
-        const targets = [m[1]];
-        if (m[1].endsWith("run-hook.cmd") && m[2]) targets.push(`hooks/${m[2]}`);
-        for (const t of targets) {
-          const st = statOf(t);
-          if (!st) problems.push(`${event}: ${t} does not exist`);
-          else if (!(st.mode & 0o111)) problems.push(`${event}: ${t} is not executable`);
-        }
+        const executed = hook.command.replace(/^"/, "").startsWith("${CLAUDE_PLUGIN_ROOT}/");
+        refs.forEach((rel, i) => {
+          const st = statOf(rel);
+          if (!st) problems.push(`${event}: ${rel} does not exist`);
+          else if (i === 0 && executed && !(st.mode & 0o111)) problems.push(`${event}: ${rel} is not executable`);
+        });
       }
     }
   }
@@ -627,7 +626,7 @@ function main() {
   validateHooks(readFileSync(join(pluginRoot, "hooks/hooks.json"), "utf8"), {
     statOf: (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null),
   });
-  console.log("ok: hooks.json commands point at existing, executable scripts");
+  console.log("ok: hooks.json commands point at files that exist in the plugin");
 }
 
 // Guarded so importing the generator's validation and rendering functions does

@@ -116,7 +116,6 @@ Discovery is not a promise that Claude-specific execution details translate auto
 ├── VERSION                           # canonical plugin version (single source; manifests are stamped)
 ├── LICENSE                           # pstack upstream MIT
 ├── LICENSE-cursor-team-kit           # cursor-team-kit upstream MIT
-├── LICENSE-superpowers               # superpowers upstream MIT (hook runner)
 ├── CONTRIBUTING.md                   # sync boundary, local checks, release rules
 ├── NOTICE.md                         # attribution table
 ├── CHANGES.md                        # per-skill substitution audit
@@ -142,7 +141,7 @@ Verified on a live Codex session installed via the symlinks: the user-facing ski
 
 `ci.yml` and `security.yml` run on every pull request and push to `main`. `dependabot-lockfile.yml` also triggers on every pull request, but its only job runs when Dependabot authored the PR.
 
-`ci.yml` runs seven jobs. The generated-files job runs `bun tools/generate.mjs`, which also enforces the plugin layout invariants, rejects a resulting diff, and runs the Bun tests. The skills-only job installs through the `skills` CLI, compares the copied tree with the source, and checks for missing or escaping Markdown links and direct instructions to open unreachable paths. The other jobs test the vendored Bun tooling and run `shellcheck` over scripts selected by extension or shebang, so the extensionless hook scripts are covered. The workflow-lint job runs `actionlint` over `.github/workflows` and rejects invalid syntax, a bad expression, or an unknown runner label before a broken workflow reaches `main`. The Markdown-lint job runs `markdownlint-cli2` over every Markdown file under a correctness-only rule set held in `.markdownlint-cli2.jsonc`, chosen so style rules never fight the upstream sync. The link job runs `lychee` offline over the same files and resolves relative file and fragment targets, which covers the README, `CHANGES.md`, `CONTRIBUTING.md` and the other top-level docs that `tools/validate-skills.mjs` does not reach. Those three jobs invoke their tool through `docker` or `npx` rather than a third-party action, because the repository only allows GitHub-owned actions, verified creators, `oven-sh/setup-bun` and `zizmorcore/zizmor-action`.
+`ci.yml` runs seven jobs. The generated-files job runs `bun tools/generate.mjs`, which also enforces the plugin layout invariants, rejects a resulting diff, and runs the Bun tests. The skills-only job installs through the `skills` CLI, compares the copied tree with the source, and checks for missing or escaping Markdown links and direct instructions to open unreachable paths. The other jobs test the vendored Bun tooling and run `shellcheck` over every `.sh` file. The workflow-lint job runs `actionlint` over `.github/workflows` and rejects invalid syntax, a bad expression, or an unknown runner label before a broken workflow reaches `main`. The Markdown-lint job runs `markdownlint-cli2` over every Markdown file under a correctness-only rule set held in `.markdownlint-cli2.jsonc`, chosen so style rules never fight the upstream sync. The link job runs `lychee` offline over the same files and resolves relative file and fragment targets, which covers the README, `CHANGES.md`, `CONTRIBUTING.md` and the other top-level docs that `tools/validate-skills.mjs` does not reach. Those three jobs invoke their tool through `docker` or `npx` rather than a third-party action, because the repository only allows GitHub-owned actions, verified creators, `oven-sh/setup-bun` and `zizmorcore/zizmor-action`.
 
 `security.yml` runs `osv-scanner` against the lockfiles and fails the build if no lockfile was found, because an empty scan reads exactly like a clean one. It also rejects any action reference not pinned to a full 40-character commit SHA. It runs weekly on top of the per-PR trigger, so a CVE published after a merge still surfaces. `zizmor` audits the workflows themselves for template injection, over-broad permissions, and credential persistence.
 
@@ -288,6 +287,5 @@ MIT. Three upstream LICENSE files are preserved:
 
 - [LICENSE](LICENSE) — pstack (Lauren Tan)
 - [LICENSE-cursor-team-kit](LICENSE-cursor-team-kit) — Cursor (covers the `deslop` and `thermo-nuclear-code-quality-review` skills)
-- [LICENSE-superpowers](LICENSE-superpowers) — superpowers, Jesse Vincent (covers the vendored `hooks/run-hook.cmd`)
 
 [NOTICE-skills.md](NOTICE-skills.md) is the scoped notice copied into skills-only installations. The root [NOTICE.md](NOTICE.md) covers the full plugin, including runtime-specific files.

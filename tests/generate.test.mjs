@@ -167,6 +167,14 @@ describe("validateHooks", () => {
     );
   });
 
+  test("a file the command reads only has to exist", () => {
+    const cmd = hooks('cat "${CLAUDE_PLUGIN_ROOT}/hooks/session-start-context.md"');
+    expect(() => validateHooks(cmd, { statOf: () => plain })).not.toThrow();
+    expect(() => validateHooks(cmd, { statOf: () => null })).toThrow(
+      "SessionStart: hooks/session-start-context.md does not exist",
+    );
+  });
+
   test("rejects a command that does not go through the plugin root", () => {
     expect(() => validateHooks(hooks("cat /etc/motd"), { statOf: () => exec })).toThrow(
       "does not reference ${CLAUDE_PLUGIN_ROOT}",

@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
 import {
@@ -13,227 +12,51 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
+import {
+  parseFrontier,
+  resolveFrontier,
+  validateFrontierPin,
+} from "./frontier.ts";
+import {
+  changed,
+  countValues,
+  previousSummary,
+  statusMarkdown,
+  summarize,
+} from "./status.ts";
+import { NotFoundError, UserError } from "./types.ts";
+import type {
+  Frontier,
+  Gate,
+  InboxPointer,
+  LedgerEntry,
+  OpenGate,
+  OpenStoreOptions,
+  ResolvedGate,
+  StandingLine,
+  Store,
+  Unit,
+  Verdict,
+} from "./types.ts";
+
+export { NotFoundError, UserError, UsageError } from "./types.ts";
+export type {
+  Counts,
+  Frontier,
+  Gate,
+  InboxPointer,
+  OpenGate,
+  OpenStoreOptions,
+  StandingLine,
+  StatusReport,
+  Store,
+  Unit,
+  Verdict,
+} from "./types.ts";
 
 const UNIT_HEADER = "id\ttrack\tstate\tbranch\tpr\tsha\tbrief";
 const LEDGER_HEADER = "pr\tsha\tverdict\tevidence\tverifier\tts";
 const LOCK_FILE = ".orch.lock";
-
-export type Verdict =
-  | "live-ui-verified"
-  | "unit-test-verified"
-  | "type-check-only"
-  | "verifier-blocked"
-  | "verifier-failed";
-
-export interface Unit {
-  readonly id: string;
-  readonly track: string;
-  readonly state: string;
-  readonly branch: string;
-  readonly pr: string;
-  readonly sha: string;
-  readonly brief: string;
-}
-
-interface LedgerEntry {
-  readonly pr: string;
-  readonly sha: string;
-  readonly verdict: Verdict;
-  readonly evidence: string;
-  readonly verifier: string;
-  readonly ts: string;
-}
-
-export interface InboxPointer {
-  readonly ts: string;
-  readonly agent: string;
-  readonly unit: string;
-  readonly status: string;
-  readonly report: string;
-}
-
-interface InboxPushResult {
-  readonly pointer: InboxPointer;
-  readonly filename: string;
-}
-
-export interface OpenGate {
-  readonly kind: "open";
-  readonly id: string;
-  readonly question: string;
-  readonly options: string;
-  readonly defaultAnswer: string;
-}
-
-interface ResolvedGate {
-  readonly kind: "resolved";
-  readonly id: string;
-  readonly question: string;
-  readonly options: string;
-  readonly defaultAnswer: string;
-  readonly answer: string;
-}
-
-export type Gate = OpenGate | ResolvedGate;
-
-type FrontierPrState = "OPEN" | "MERGED" | "CLOSED";
-
-interface FrontierPr {
-  readonly pr: number;
-  readonly branches: string;
-  readonly sha: string;
-  readonly state: FrontierPrState;
-}
-
-export interface Frontier {
-  readonly generation: number;
-  readonly prs: readonly FrontierPr[];
-  readonly lowestUnmerged: number | null;
-}
-
-export interface StandingLine {
-  readonly number: number;
-  readonly line: string;
-}
-
-export type Counts = Readonly<Record<string, number>>;
-
-interface StatusSummary {
-  readonly unitStates: Counts;
-  readonly ledgerVerdicts: Counts;
-  readonly frontierGeneration: number;
-  readonly openGateIds: readonly string[];
-}
-
-export interface StatusReport {
-  readonly units: readonly Unit[];
-  readonly ledger: readonly LedgerEntry[];
-  readonly frontier: Frontier;
-  readonly gates: readonly Gate[];
-  readonly summary: StatusSummary;
-  readonly changed: string;
-}
-
-interface AddUnitParams {
-  readonly id: string;
-  readonly track: string;
-  readonly brief?: string;
-}
-
-interface SetUnitParams {
-  readonly id: string;
-  readonly state: string;
-  readonly branch?: string;
-  readonly pr?: number;
-  readonly sha?: string;
-}
-
-interface ListUnitsParams {
-  readonly state?: string;
-  readonly track?: string;
-}
-
-interface RecordLedgerParams {
-  readonly pr: number;
-  readonly sha: string;
-  readonly verdict: Verdict;
-  readonly evidence: string;
-  readonly verifier?: string;
-}
-
-interface CheckLedgerParams {
-  readonly pr: number;
-  readonly sha: string;
-}
-
-interface PushInboxParams {
-  readonly agent: string;
-  readonly unit: string;
-  readonly status: string;
-  readonly report?: string;
-}
-
-interface ParkGateParams {
-  readonly id: string;
-  readonly question: string;
-  readonly options: string;
-  readonly defaultAnswer: string;
-}
-
-interface ResolveGateParams {
-  readonly id: string;
-  readonly answer: string;
-}
-
-interface SetFrontierParams {
-  readonly repo: string;
-  readonly prs?: readonly number[];
-}
-
-interface AddStandingParams {
-  readonly line: string;
-}
-
-export interface OpenStoreOptions {
-  readonly force?: boolean;
-  readonly onLockStolen?: (holder: string) => void;
-  readonly onStaleLock?: (holder: string) => void;
-}
-
-export interface Store {
-  readonly units: {
-    readonly add: (params: AddUnitParams) => Promise<Unit>;
-    readonly set: (params: SetUnitParams) => Promise<Unit>;
-    readonly get: (id: string) => Promise<Unit>;
-    readonly list: (params?: ListUnitsParams) => Promise<readonly Unit[]>;
-    readonly counts: () => Promise<Counts>;
-  };
-  readonly ledger: {
-    readonly record: (params: RecordLedgerParams) => Promise<LedgerEntry>;
-    readonly check: (params: CheckLedgerParams) => Promise<LedgerEntry>;
-    readonly summary: () => Promise<Counts>;
-  };
-  readonly inbox: {
-    readonly push: (params: PushInboxParams) => Promise<InboxPushResult>;
-    readonly drain: () => Promise<readonly InboxPointer[]>;
-    readonly peek: () => Promise<readonly InboxPointer[]>;
-    readonly count: () => Promise<number>;
-  };
-  readonly gates: {
-    readonly park: (params: ParkGateParams) => Promise<OpenGate>;
-    readonly list: () => Promise<readonly OpenGate[]>;
-    readonly resolve: (params: ResolveGateParams) => Promise<ResolvedGate>;
-  };
-  readonly frontier: {
-    readonly set: (params: SetFrontierParams) => Promise<Frontier>;
-    readonly show: () => Promise<Frontier>;
-  };
-  readonly standing: {
-    readonly show: () => Promise<readonly StandingLine[]>;
-    readonly add: (params: AddStandingParams) => Promise<StandingLine>;
-  };
-  readonly status: {
-    readonly render: () => Promise<StatusReport>;
-  };
-  readonly init: () => Promise<{ readonly store: string }>;
-  readonly close: () => Promise<void>;
-}
-
-interface NotFoundOutput {
-  readonly compact: string;
-  readonly json: unknown;
-}
-
-export class UserError extends Error {}
-export class UsageError extends UserError {}
-export class NotFoundError extends UserError {
-  public constructor(
-    message: string,
-    public readonly output?: NotFoundOutput
-  ) {
-    super(message);
-  }
-}
 
 function errorCode(error: unknown): string | null {
   if (
@@ -247,18 +70,6 @@ function errorCode(error: unknown): string | null {
   return null;
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function isUnknownArray(value: unknown): value is readonly unknown[] {
-  return Array.isArray(value);
-}
-
 function verdictOrNull(value: string): Verdict | null {
   switch (value) {
     case "live-ui-verified":
@@ -266,17 +77,6 @@ function verdictOrNull(value: string): Verdict | null {
     case "type-check-only":
     case "verifier-blocked":
     case "verifier-failed":
-      return value;
-    default:
-      return null;
-  }
-}
-
-function frontierPrStateOrNull(value: unknown): FrontierPrState | null {
-  switch (value) {
-    case "OPEN":
-    case "MERGED":
-    case "CLOSED":
       return value;
     default:
       return null;
@@ -667,63 +467,6 @@ async function readGates(store: string): Promise<readonly Gate[]> {
   return result;
 }
 
-function parseFrontier(raw: string): Frontier {
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch {
-    throw new UserError("frontier.json is not valid JSON");
-  }
-  if (!isRecord(value)) {
-    throw new UserError("frontier.json must contain an object");
-  }
-  if (Object.keys(value).length === 0) {
-    return { generation: 0, prs: [], lowestUnmerged: null };
-  }
-  if (
-    typeof value.generation !== "number" ||
-    !Number.isSafeInteger(value.generation) ||
-    value.generation < 0 ||
-    !isUnknownArray(value.prs) ||
-    !(
-      value.lowestUnmerged === null ||
-      (typeof value.lowestUnmerged === "number" &&
-        Number.isSafeInteger(value.lowestUnmerged))
-    )
-  ) {
-    throw new UserError("frontier.json has an invalid shape");
-  }
-  const prs: FrontierPr[] = [];
-  for (const row of value.prs) {
-    const state = isRecord(row)
-      ? frontierPrStateOrNull(row.state)
-      : null;
-    if (
-      !isRecord(row) ||
-      typeof row.pr !== "number" ||
-      !Number.isSafeInteger(row.pr) ||
-      row.pr < 1 ||
-      typeof row.branches !== "string" ||
-      row.branches.length === 0 ||
-      typeof row.sha !== "string" ||
-      state === null
-    ) {
-      throw new UserError("frontier.json has an invalid PR row");
-    }
-    prs.push({
-      pr: row.pr,
-      branches: row.branches,
-      sha: row.sha,
-      state,
-    });
-  }
-  return {
-    generation: value.generation,
-    prs,
-    lowestUnmerged: value.lowestUnmerged,
-  };
-}
-
 async function readFrontier(store: string): Promise<Frontier> {
   return parseFrontier(await requiredFile(join(store, "frontier.json")));
 }
@@ -750,484 +493,36 @@ async function readStanding(
   return result;
 }
 
-function countValues(values: readonly string[]): Counts {
-  const result: Record<string, number> = {};
-  for (const value of values) {
-    result[value] = (result[value] ?? 0) + 1;
-  }
-  return Object.fromEntries(
-    Object.entries(result).sort(([left], [right]) =>
-      left.localeCompare(right)
-    )
-  );
-}
-
-function summarize(
-  unitRows: readonly Unit[],
-  ledgerRows: readonly LedgerEntry[],
-  currentFrontier: Frontier,
-  gateRows: readonly Gate[]
-): StatusSummary {
-  return {
-    unitStates: countValues(unitRows.map((unit) => unit.state)),
-    ledgerVerdicts: countValues(ledgerRows.map((row) => row.verdict)),
-    frontierGeneration: currentFrontier.generation,
-    openGateIds: gateRows
-      .filter((gate): gate is OpenGate => gate.kind === "open")
-      .map((gate) => gate.id)
-      .sort(),
-  };
-}
-
-function countRecord(value: unknown): Record<string, number> | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-  const result: Record<string, number> = {};
-  for (const [name, count] of Object.entries(value)) {
-    if (
-      typeof count !== "number" ||
-      !Number.isSafeInteger(count) ||
-      count < 0
-    ) {
-      return null;
-    }
-    result[name] = count;
-  }
-  return result;
-}
-
-function previousSummary(raw: string): StatusSummary | null {
-  const match = /<!-- orch-summary (.+) -->/.exec(raw);
-  if (match === null) {
-    return null;
-  }
-  let value: unknown;
-  try {
-    value = JSON.parse(match[1] ?? "");
-  } catch {
-    return null;
-  }
-  if (
-    !isRecord(value) ||
-    typeof value.frontierGeneration !== "number" ||
-    !isUnknownArray(value.openGateIds)
-  ) {
-    return null;
-  }
-  const unitStates = countRecord(value.unitStates);
-  const ledgerVerdicts = countRecord(value.ledgerVerdicts);
-  const openGateIds = value.openGateIds.filter(
-    (item): item is string => typeof item === "string"
-  );
-  if (
-    unitStates === null ||
-    ledgerVerdicts === null ||
-    openGateIds.length !== value.openGateIds.length
-  ) {
-    return null;
-  }
-  return {
-    unitStates,
-    ledgerVerdicts,
-    frontierGeneration: value.frontierGeneration,
-    openGateIds,
-  };
-}
-
-function changed(before: StatusSummary | null, after: StatusSummary): string {
-  if (before === null) {
-    return "first render";
-  }
-  const result: string[] = [];
-  const groups: readonly {
-    readonly label: string;
-    readonly oldCounts: Counts;
-    readonly newCounts: Counts;
-  }[] = [
-    {
-      label: "units",
-      oldCounts: before.unitStates,
-      newCounts: after.unitStates,
-    },
-    {
-      label: "ledger",
-      oldCounts: before.ledgerVerdicts,
-      newCounts: after.ledgerVerdicts,
-    },
-  ];
-  for (const { label, oldCounts, newCounts } of groups) {
-    const names = [
-      ...new Set([...Object.keys(oldCounts), ...Object.keys(newCounts)]),
-    ].sort();
-    for (const name of names) {
-      const oldCount = oldCounts[name] ?? 0;
-      const newCount = newCounts[name] ?? 0;
-      if (oldCount !== newCount) {
-        result.push(`${label} ${name} ${oldCount}->${newCount}`);
-      }
-    }
-  }
-  if (before.frontierGeneration !== after.frontierGeneration) {
-    result.push(
-      `frontier generation ${before.frontierGeneration}->${after.frontierGeneration}`
-    );
-  }
-  if (before.openGateIds.join("\0") !== after.openGateIds.join("\0")) {
-    result.push(
-      `open gates ${before.openGateIds.length}->${after.openGateIds.length}`
-    );
-  }
-  return result.length === 0 ? "no derived changes" : result.join("; ");
-}
-
-function markdown(value: string): string {
-  return value
-    .replace(/[\t\n\r]/g, " ")
-    .replace(/\\/g, "\\\\")
-    .replace(/\|/g, "\\|");
-}
-
-function table(
-  headers: readonly string[],
-  rows: readonly (readonly string[])[]
-): string {
-  if (rows.length === 0) {
-    return "(none)";
-  }
-  return [
-    `| ${headers.join(" | ")} |`,
-    `| ${headers.map(() => "---").join(" | ")} |`,
-    ...rows.map((row) => `| ${row.map(markdown).join(" | ")} |`),
-  ].join("\n");
-}
-
-function statusMarkdown(
-  unitRows: readonly Unit[],
-  ledgerRows: readonly LedgerEntry[],
-  currentFrontier: Frontier,
-  gateRows: readonly Gate[],
-  currentSummary: StatusSummary
-): string {
-  return `# Orchestrate status
-
-Generated: ${new Date().toISOString()}
-
-## Units
-
-States: ${countLine(currentSummary.unitStates)}
-
-${table(
-  ["ID", "Track", "State", "Branch", "PR", "SHA", "Brief"],
-  unitRows.map(unitCells)
-)}
-
-## Verification ledger
-
-Verdicts: ${countLine(currentSummary.ledgerVerdicts)}
-
-${table(
-  ["PR", "SHA", "Verdict", "Evidence", "Verifier", "Timestamp"],
-  ledgerRows.map(ledgerCells)
-)}
-
-## Frontier
-
-Generation: ${currentFrontier.generation}
-Lowest unmerged: ${currentFrontier.lowestUnmerged ?? "none"}
-
-${table(
-  ["Branch", "PR", "SHA", "State"],
-  currentFrontier.prs.map((row) => [
-    row.branches,
-    String(row.pr),
-    row.sha,
-    row.state,
-  ])
-)}
-
-## Gates
-
-${table(
-  ["ID", "Status", "Question", "Options", "Default", "Answer"],
-  gateRows.map((gate) => [
-    gate.id,
-    gate.kind,
-    gate.question,
-    gate.options,
-    gate.defaultAnswer,
-    gate.kind === "resolved" ? gate.answer : "",
-  ])
-)}
-
-<!-- orch-summary ${JSON.stringify(currentSummary)} -->
-`;
-}
-
-function countLine(value: Counts): string {
-  const entries = Object.entries(value);
-  return entries.length === 0
-    ? "none"
-    : entries.map(([name, count]) => `${name}=${count}`).join(", ");
-}
-
-const OPEN_GT_PR_STATUSES = new Set([
-  "Trunk branch locked",
-  "Changes requested",
-  "Waiting on PRs in this stack to merge",
-  "Waiting on downstack merge state",
-  "Draft",
-  "Required checks failed",
-  "Undergoing failure detection",
-  "Merge queue failed on current head commit",
-  "Handed off to merge queue...",
-  "Waiting on downstack",
-  "Merge conflicts",
-  "Needs reviewers",
-  "Needs approvals",
-  "Needs restack",
-  "Queued to merge...",
-  "Ready to merge",
-  "Ready to merge as stack",
-  "Rebasing...",
-  "Waiting on CI...",
-  "Stale, needs rebase onto trunk",
-  "Unresolved comments",
-  "Waiting on required CI",
-  "Waiting to merge...",
-]);
-
-interface GtPullRequest {
-  readonly pr: number;
-  readonly state: FrontierPrState;
-}
-
-interface GtFrontierEntry extends GtPullRequest {
-  readonly branches: string;
-}
-
-function parseGtPullRequest({
-  branch,
-  detail,
-}: {
-  branch: string;
-  detail: string;
-}): GtPullRequest {
-  const match =
-    /^(?:\[origin\] )?PR #([1-9]\d*)(?: \(([^)\r\n]+)\))?( .+)?$/.exec(
-      detail
-    );
-  const pr = Number(match?.[1] ?? 0);
-  if (match === null || !Number.isSafeInteger(pr)) {
-    throw new UserError(
-      `gt info output has an invalid PR row for branch ${branch}: ${detail}`
-    );
-  }
-  const status = match[2];
-  // A "(" right after the PR number that the status group did not capture
-  // means a nested-paren status like "Needs approvals (2)"; treating it as
-  // no-status would silently report the PR as OPEN.
-  if (status === undefined && (match[3] ?? "").startsWith(" (")) {
-    throw new UserError(
-      `gt info output has an invalid PR row for branch ${branch}: ${detail}`
-    );
-  }
-  if (status === "Merged") {
-    return { pr, state: "MERGED" };
-  }
-  if (status === "Closed") {
-    return { pr, state: "CLOSED" };
-  }
-  if (status === undefined || OPEN_GT_PR_STATUSES.has(status)) {
-    return { pr, state: "OPEN" };
-  }
-  throw new UserError(
-    `gt info output has an unknown PR state for branch ${branch}: ${status}`
-  );
-}
-
-function parseGtBranches(raw: string): readonly string[] {
-  const branches: string[] = [];
-  const lines = raw.replace(/\r/g, "").split("\n");
-  for (const [index, line] of lines.entries()) {
-    if (line.length === 0) {
-      continue;
-    }
-    // (?!-) rejects leading-dash names, which git and gt would parse as
-    // options when the branch is later passed to them as an argument.
-    const branchMatch =
-      /^(?:│ )*[◯◉] +((?!-)[^\s]+)((?: \([^()\r\n]*\))*)$/.exec(line);
-    if (branchMatch === null) {
-      throw new UserError(
-        `gt log short output has an unparseable line ${index + 1}: ${JSON.stringify(line)}`
-      );
-    }
-    const branch = branchMatch[1] ?? "";
-    if (branches.includes(branch)) {
-      throw new UserError(
-        `gt log short output contains duplicate branch ${branch}`
-      );
-    }
-    branches.push(branch);
-  }
-  const trunk = branches[0];
-  if (trunk === undefined) {
-    throw new UserError("gt log short output did not contain a stack");
-  }
-  return branches.slice(1);
-}
-
-function graphitePullRequest({
-  branch,
-  repo,
-}: {
-  branch: string;
-  repo: string;
-}): GtPullRequest {
-  let raw: string;
-  try {
-    raw = execFileSync("gt", ["--no-interactive", "info", branch], {
-      cwd: repo,
-      encoding: "utf8",
-      env: { ...process.env, NO_COLOR: "1" },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  } catch (error) {
-    throw new UserError(
-      `gt info ${branch} failed: ${errorMessage(error)}`
-    );
-  }
-  const rows = raw
-    .replace(/\r/g, "")
-    .split("\n")
-    .filter(
-      (line) =>
-        line.startsWith("PR #") || line.startsWith("[origin] PR #")
-    );
-  if (rows.length === 0) {
-    throw new UserError(
-      `gt info output branch ${branch} has no pull request; this clone's gt metadata may predate the submit, so resolve the frontier from the stacker's clone or after gt sync`
-    );
-  }
-  if (rows.length > 1) {
-    throw new UserError(
-      `gt info output contains multiple PRs for branch ${branch}`
-    );
-  }
-  return parseGtPullRequest({ branch, detail: rows[0] ?? "" });
-}
-
-function graphiteFrontier(repo: string): readonly GtFrontierEntry[] {
-  let raw: string;
-  try {
-    raw = execFileSync(
-      "gt",
-      ["--no-interactive", "log", "short", "--stack", "--reverse"],
-      {
-        cwd: repo,
-        encoding: "utf8",
-        env: { ...process.env, NO_COLOR: "1" },
-        stdio: ["ignore", "pipe", "pipe"],
-      }
-    );
-  } catch (error) {
-    throw new UserError(
-      `gt log short --stack --reverse failed: ${errorMessage(error)}`
-    );
-  }
-  const result = parseGtBranches(raw).map((branch) => ({
-    branches: branch,
-    ...graphitePullRequest({ branch, repo }),
-  }));
-  if (new Set(result.map((row) => row.pr)).size !== result.length) {
-    throw new UserError("gt info output contains duplicate pull requests");
-  }
-  return result;
-}
-
-function branchSha({
-  branch,
-  repo,
-}: {
-  branch: string;
-  repo: string;
-}): string {
-  let raw: string;
-  try {
-    raw = execFileSync("git", ["rev-parse", branch], {
-      cwd: repo,
-      encoding: "utf8",
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  } catch (error) {
-    throw new UserError(
-      `git rev-parse ${branch} failed: ${errorMessage(error)}`
-    );
-  }
-  const sha = raw.trim();
-  if (!/^[0-9a-f]{40,64}$/i.test(sha)) {
-    throw new UserError(`git rev-parse ${branch} returned an invalid SHA`);
-  }
-  return sha;
-}
-
-function resolveFrontier(repo: string): readonly FrontierPr[] {
-  return graphiteFrontier(repo).map((row) => ({
-    ...row,
-    sha: branchSha({ branch: row.branches, repo }),
-  }));
-}
-
-function validateFrontierPin({
-  actual,
-  expected,
-}: {
-  actual: readonly number[];
-  expected: readonly number[];
-}): void {
-  if (
-    actual.length === expected.length &&
-    actual.every((pr, index) => pr === expected[index])
-  ) {
-    return;
-  }
-  const actualSet = new Set(actual);
-  const expectedSet = new Set(expected);
-  const missing = expected.filter((pr) => !actualSet.has(pr));
-  const extra = actual.filter((pr) => !expectedSet.has(pr));
-  const drift: string[] = [];
-  if (missing.length > 0) {
-    drift.push(`missing from gt: ${missing.join(",")}`);
-  }
-  if (extra.length > 0) {
-    drift.push(`extra in gt: ${extra.join(",")}`);
-  }
-  if (missing.length === 0 && extra.length === 0) {
-    drift.push(
-      `order differs: expected ${expected.join(",")}; gt ${actual.join(",")}`
-    );
-  }
-  throw new UserError(`frontier pin mismatch: ${drift.join("; ")}`);
-}
-
 export function openStore(
   directory: string,
   options: OpenStoreOptions = {}
 ): Store {
   const store = resolve(directory);
-  let closed = false;
+  let accepting = true;
+  let mutationTail: Promise<void> = Promise.resolve();
+  let closePromise: Promise<void> | null = null;
   let releaseLock: (() => Promise<void>) | null = null;
   let lockRequest: Promise<void> | null = null;
 
   const ensureOpen = (): void => {
-    if (closed) {
+    if (!accepting) {
       throw new UserError("store is closed");
     }
   };
 
+  const scheduleMutation = <T>(operation: () => Promise<T>): Promise<T> => {
+    if (!accepting) {
+      return Promise.reject(new UserError("store is closed"));
+    }
+    const result = mutationTail.then(operation);
+    mutationTail = result.then(
+      () => {},
+      () => {}
+    );
+    return result;
+  };
+
   const ensureLock = async (): Promise<void> => {
-    ensureOpen();
     if (releaseLock !== null) {
       return;
     }
@@ -1245,7 +540,6 @@ export function openStore(
   };
 
   const beginWrite = async (): Promise<void> => {
-    ensureOpen();
     if (!(await exists(store))) {
       throw new UserError(
         `store is not initialized at ${store}; run orch init`
@@ -1256,7 +550,7 @@ export function openStore(
 
   return {
     units: {
-      add: async (params) => {
+      add: (params) => scheduleMutation(async () => {
         await beginWrite();
         const row: Unit = {
           id: requiredCell(params.id, "unit id"),
@@ -1277,8 +571,8 @@ export function openStore(
         rows.push(row);
         await saveUnits(store, rows);
         return row;
-      },
-      set: async (params) => {
+      }),
+      set: (params) => scheduleMutation(async () => {
         await beginWrite();
         const id = requiredCell(params.id, "unit id");
         const state = requiredCell(params.state, "state");
@@ -1307,7 +601,7 @@ export function openStore(
         rows[index] = row;
         await saveUnits(store, rows);
         return row;
-      },
+      }),
       get: async (id) => {
         ensureOpen();
         const cleanId = requiredCell(id, "unit id");
@@ -1343,7 +637,7 @@ export function openStore(
       },
     },
     ledger: {
-      record: async (params) => {
+      record: (params) => scheduleMutation(async () => {
         await beginWrite();
         const verdict = parseVerdict(params.verdict);
         const row: LedgerEntry = {
@@ -1368,7 +662,7 @@ export function openStore(
         }
         await saveLedger(store, rows);
         return row;
-      },
+      }),
       check: async (params) => {
         ensureOpen();
         const pr = String(positiveInteger(params.pr, "PR"));
@@ -1392,7 +686,7 @@ export function openStore(
       },
     },
     inbox: {
-      push: async (params) => {
+      push: (params) => scheduleMutation(async () => {
         await beginWrite();
         const pointer: InboxPointer = {
           ts: new Date().toISOString(),
@@ -1415,8 +709,8 @@ export function openStore(
         const contents = `${pointerCells(pointer).map(cleanCell).join("\t")}\n`;
         await atomicWrite(join(inbox, filename), contents);
         return { pointer, filename };
-      },
-      drain: async () => {
+      }),
+      drain: () => scheduleMutation(async () => {
         await beginWrite();
         const inbox = join(store, "inbox");
         const rows = await readPointers(inbox);
@@ -1433,7 +727,7 @@ export function openStore(
         }
         await rm(drained, { recursive: true, force: true });
         return rows;
-      },
+      }),
       peek: async () => {
         ensureOpen();
         return readPointers(join(store, "inbox"));
@@ -1444,7 +738,7 @@ export function openStore(
       },
     },
     gates: {
-      park: async (params) => {
+      park: (params) => scheduleMutation(async () => {
         await beginWrite();
         const gate: OpenGate = {
           kind: "open",
@@ -1465,14 +759,14 @@ export function openStore(
         }
         await atomicWrite(join(store, "gates.md"), renderGates(rows));
         return gate;
-      },
+      }),
       list: async () => {
         ensureOpen();
         return (await readGates(store)).filter(
           (gate): gate is OpenGate => gate.kind === "open"
         );
       },
-      resolve: async (params) => {
+      resolve: (params) => scheduleMutation(async () => {
         await beginWrite();
         const id = requiredLine(params.id, "gate id");
         const rows = [...(await readGates(store))];
@@ -1492,10 +786,10 @@ export function openStore(
         rows[index] = gate;
         await atomicWrite(join(store, "gates.md"), renderGates(rows));
         return gate;
-      },
+      }),
     },
     frontier: {
-      set: async (params) => {
+      set: (params) => scheduleMutation(async () => {
         await beginWrite();
         const repo = resolve(requiredLine(params.repo, "repo directory"));
         const pin =
@@ -1523,7 +817,7 @@ export function openStore(
           `${JSON.stringify(value, null, 2)}\n`
         );
         return value;
-      },
+      }),
       show: async () => {
         ensureOpen();
         return readFrontier(store);
@@ -1534,7 +828,7 @@ export function openStore(
         ensureOpen();
         return readStanding(store);
       },
-      add: async (params) => {
+      add: (params) => scheduleMutation(async () => {
         await beginWrite();
         const rows = [...(await readStanding(store))];
         const item: StandingLine = {
@@ -1547,10 +841,10 @@ export function openStore(
           `${rows.map((row) => `${row.number}. ${row.line}`).join("\n")}\n`
         );
         return item;
-      },
+      }),
     },
     status: {
-      render: async () => {
+      render: () => scheduleMutation(async () => {
         await beginWrite();
         const unitRows = await readUnits(store);
         const ledgerRows = await readLedger(store);
@@ -1585,10 +879,9 @@ export function openStore(
           summary: currentSummary,
           changed: change,
         };
-      },
+      }),
     },
-    init: async () => {
-      ensureOpen();
+    init: () => scheduleMutation(async () => {
       await mkdir(store, { recursive: true });
       await ensureLock();
       await writeIfMissing(join(store, "units.tsv"), `${UNIT_HEADER}\n`);
@@ -1598,24 +891,27 @@ export function openStore(
       await writeIfMissing(join(store, "preferences.md"), "");
       await writeIfMissing(join(store, "frontier.json"), "{}\n");
       return { store };
-    },
-    close: async () => {
-      if (closed) {
-        return;
+    }),
+    close: () => {
+      if (closePromise !== null) {
+        return closePromise;
       }
-      if (lockRequest !== null) {
-        try {
-          await lockRequest;
-        } catch {
-          // A failed acquisition has no lock to release.
+      accepting = false;
+      closePromise = mutationTail.then(async () => {
+        if (lockRequest !== null) {
+          try {
+            await lockRequest;
+          } catch {
+            // A failed acquisition has no lock to release.
+          }
         }
-      }
-      const release = releaseLock;
-      releaseLock = null;
-      closed = true;
-      if (release !== null) {
-        await release();
-      }
+        const release = releaseLock;
+        releaseLock = null;
+        if (release !== null) {
+          await release();
+        }
+      });
+      return closePromise;
     },
   };
 }

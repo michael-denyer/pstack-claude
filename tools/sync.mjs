@@ -14,11 +14,11 @@
 //   - upstream deleted it and local matches the derived OLD text -> deleted
 //   - local copy differs (port-specific edits) -> left alone, reported for manual merge
 //
-// Every written file is denylist-scanned; a hit fails the run with file, line,
-// and the hint for that token, leaving the tree for inspection. The pin in
-// upstream.json is advanced only when the run succeeds. With --dry-run nothing
-// is written and the pin stays; passing the pinned SHA as <new-sha> under
-// --dry-run prints the ownership map (which files the port has forked).
+// Every effective text file is denylist-scanned; a hit fails the run with file,
+// line, and the hint for that token, leaving the tree for inspection. The pin
+// in upstream.json is advanced only when the run succeeds. With --dry-run
+// nothing is written and the pin stays; passing the pinned SHA as <new-sha>
+// under --dry-run prints the ownership map (which files the port has forked).
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
@@ -60,6 +60,7 @@ const BINARY = /\.(png|jpe?g|gif|webp|ico|woff2?|lock)$/;
 // the default is identity. Returns the report and, unless dryRun, applies it.
 export function syncComponent({ oldDir, newDir, localDir, rules, denylist = [], derive = (_, t) => t, dryRun = false }) {
   const report = { written: [], deleted: [], manual: [], unchanged: 0, counts: new Map(), hits: [] };
+  const operations = [];
   const addCounts = (counts) => counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
   const portForm = (rel, raw) => {
     if (BINARY.test(rel)) return { buffer: raw, counts: new Map() };
@@ -70,14 +71,13 @@ export function syncComponent({ oldDir, newDir, localDir, rules, denylist = [], 
     const oldFile = join(oldDir, rel);
     return existsSync(oldFile) && local.equals(portForm(rel, readFileSync(oldFile)).buffer);
   };
-  const write = (rel, kind, next) => {
-    const localFile = join(localDir, rel);
-    if (!dryRun) {
-      mkdirSync(dirname(localFile), { recursive: true });
-      writeFileSync(localFile, next);
-    }
+  const scan = (rel, buffer) => {
+    if (!BINARY.test(rel)) report.hits.push(...denylistHits(rel, buffer.toString("utf8"), denylist));
+  };
+  const planWrite = (rel, kind, next) => {
+    operations.push({ kind: "write", rel, buffer: next });
     report.written.push({ kind, rel });
-    if (!BINARY.test(rel)) report.hits.push(...denylistHits(rel, next.toString("utf8"), denylist));
+    scan(rel, next);
   };
 
   for (const newFile of walk(newDir)) {
@@ -85,18 +85,20 @@ export function syncComponent({ oldDir, newDir, localDir, rules, denylist = [], 
     const localFile = join(localDir, rel);
     const next = portForm(rel, readFileSync(newFile));
     if (!existsSync(localFile)) {
-      write(rel, "added", next.buffer);
+      planWrite(rel, "added", next.buffer);
       addCounts(next.counts);
       continue;
     }
     const local = readFileSync(localFile);
     if (local.equals(next.buffer)) {
       report.unchanged++;
+      scan(rel, next.buffer);
     } else if (localMatchesOld(rel, local)) {
-      write(rel, "updated", next.buffer);
+      planWrite(rel, "updated", next.buffer);
       addCounts(next.counts);
     } else {
       report.manual.push(rel);
+      scan(rel, local);
     }
   }
 
@@ -105,10 +107,21 @@ export function syncComponent({ oldDir, newDir, localDir, rules, denylist = [], 
     const localFile = join(localDir, rel);
     if (existsSync(join(newDir, rel)) || !existsSync(localFile)) continue;
     if (localMatchesOld(rel, readFileSync(localFile))) {
-      if (!dryRun) unlinkSync(localFile);
+      operations.push({ kind: "delete", rel });
       report.deleted.push(rel);
     } else {
       report.manual.push(rel);
+    }
+  }
+
+  if (report.hits.length || dryRun) return report;
+  for (const operation of operations) {
+    const localFile = join(localDir, operation.rel);
+    if (operation.kind === "write") {
+      mkdirSync(dirname(localFile), { recursive: true });
+      writeFileSync(localFile, operation.buffer);
+    } else {
+      unlinkSync(localFile);
     }
   }
   return report;

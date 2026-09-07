@@ -138,6 +138,129 @@ describe("syncComponent", () => {
     expect(report.hits[0]).toStartWith("s.md:2:");
   });
 
+  test("a denylist hit leaves an update unapplied on every identical retry", () => {
+    const oldUp = tree({ "s.md": "old\n" });
+    const newUp = tree({ "s.md": "run control-cli\n" });
+    const local = tree({ "s.md": "old\n" });
+
+    const first = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+    const second = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(first.written).toEqual([{ kind: "updated", rel: "s.md" }]);
+    expect(second.written).toEqual([{ kind: "updated", rel: "s.md" }]);
+    expect(first.hits).toHaveLength(1);
+    expect(second.hits).toHaveLength(1);
+    expect(readFileSync(join(local, "s.md"), "utf8")).toBe("old\n");
+  });
+
+  test("an unchanged forbidden file is scanned in actual and dry-run modes", () => {
+    for (const dryRun of [false, true]) {
+      const oldUp = tree({ "s.md": "run control-cli\n" });
+      const newUp = tree({ "s.md": "run control-cli\n" });
+      const local = tree({ "s.md": "run control-cli\n" });
+
+      const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, dryRun });
+
+      expect(report.unchanged).toBe(1);
+      expect(report.hits).toHaveLength(1);
+      expect(readFileSync(join(local, "s.md"), "utf8")).toBe("run control-cli\n");
+    }
+  });
+
+  test("a hit prevents valid sibling additions, updates, and deletions", () => {
+    const oldUp = tree({
+      "bad.md": "old bad\n",
+      "gone.md": "old gone\n",
+      "updated.md": "old update\n",
+    });
+    const newUp = tree({
+      "bad.md": "run control-cli\n",
+      "new.md": "new sibling\n",
+      "updated.md": "new update\n",
+    });
+    const local = tree({
+      "bad.md": "old bad\n",
+      "gone.md": "old gone\n",
+      "updated.md": "old update\n",
+    });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.written).toEqual([
+      { kind: "updated", rel: "bad.md" },
+      { kind: "added", rel: "new.md" },
+      { kind: "updated", rel: "updated.md" },
+    ]);
+    expect(report.deleted).toEqual(["gone.md"]);
+    expect(report.hits).toHaveLength(1);
+    expect(readFileSync(join(local, "bad.md"), "utf8")).toBe("old bad\n");
+    expect(readFileSync(join(local, "updated.md"), "utf8")).toBe("old update\n");
+    expect(readFileSync(join(local, "gone.md"), "utf8")).toBe("old gone\n");
+    expect(existsSync(join(local, "new.md"))).toBe(false);
+  });
+
+  test("a manual local correction is scanned instead of invalid upstream bytes", () => {
+    const oldUp = tree({ "s.md": "old\n" });
+    const newUp = tree({ "s.md": "run control-cli\n" });
+    const local = tree({ "s.md": "manual correction\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.manual).toEqual(["s.md"]);
+    expect(report.hits).toEqual([]);
+    expect(readFileSync(join(local, "s.md"), "utf8")).toBe("manual correction\n");
+  });
+
+  test("a substitution added after a failed attempt allows a valid retry", () => {
+    const oldUp = tree({ "s.md": "old\n" });
+    const newUp = tree({ "s.md": "run control-cli\n" });
+    const local = tree({ "s.md": "old\n" });
+
+    const failed = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+    const recovered = sync({
+      oldDir: oldUp,
+      newDir: newUp,
+      localDir: local,
+      rules: [{ pattern: "run control-cli", replacement: "run cli" }],
+    });
+    const unchanged = sync({
+      oldDir: oldUp,
+      newDir: newUp,
+      localDir: local,
+      rules: [{ pattern: "run control-cli", replacement: "run cli" }],
+    });
+
+    expect(failed.hits).toHaveLength(1);
+    expect(readFileSync(join(local, "s.md"), "utf8")).toBe("run cli\n");
+    expect(recovered.written).toEqual([{ kind: "updated", rel: "s.md" }]);
+    expect(recovered.hits).toEqual([]);
+    expect(unchanged.written).toEqual([]);
+    expect(unchanged.unchanged).toBe(1);
+    expect(unchanged.hits).toEqual([]);
+  });
+
+  test("dry-run and actual mode report the same plan and dry-run preserves bytes", () => {
+    const makeFixture = () => {
+      const oldDir = tree({ "bad.md": "old\n", "gone.md": "gone\n", "updated.md": "old update\n" });
+      const newDir = tree({ "bad.md": "run control-cli\n", "new.md": "new\n", "updated.md": "new update\n" });
+      const localDir = tree({ "bad.md": "old\n", "gone.md": "gone\n", "updated.md": "old update\n" });
+      return { oldDir, newDir, localDir };
+    };
+    const actualFixture = makeFixture();
+    const dryRunFixture = makeFixture();
+    const beforeDryRun = readFileSync(join(dryRunFixture.localDir, "updated.md"));
+
+    const actual = sync({ ...actualFixture });
+    const dryRun = sync({ ...dryRunFixture, dryRun: true });
+
+    expect(dryRun.written).toEqual(actual.written);
+    expect(dryRun.deleted).toEqual(actual.deleted);
+    expect(dryRun.hits).toEqual(actual.hits);
+    expect(readFileSync(join(dryRunFixture.localDir, "updated.md")).equals(beforeDryRun)).toBe(true);
+    expect(existsSync(join(dryRunFixture.localDir, "new.md"))).toBe(false);
+    expect(existsSync(join(dryRunFixture.localDir, "gone.md"))).toBe(true);
+  });
+
   test("derive turns substituted upstream text into the port's form before comparing", () => {
     const oldUp = tree({ "s.md": "flag: on\nbody\n" });
     const newUp = tree({ "s.md": "flag: on\nbody two\n" });

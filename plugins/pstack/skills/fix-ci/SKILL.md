@@ -1,7 +1,6 @@
 ---
 name: fix-ci
 description: Find failing PR checks, inspect logs or external check links, and apply focused fixes
-menu-description: find failing PR checks, inspect logs, apply focused fixes
 ---
 
 # Fix CI

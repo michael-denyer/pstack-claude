@@ -9,9 +9,12 @@
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
 //   each skill's frontmatter (name + description) defines the shared Agent
 //   Skills boundary consumed natively by Codex, Prime, opencode, and Gemini CLI
-//   each public skill's menu-description
+//   README.md's "Slash commands" table (one row per public skill, in editorial
+//   order; the row text is the Codex slash-menu one-liner)
 //     -> its Codex prompt stub in plugins/pstack/.codex-plugin/prompts/
-//     -> its row in README.md's "Slash commands" table
+//   The row set must equal the public skills (every Agent Skill not marked
+//   user-invocable: false); a skill without a row or a row without a skill
+//   fails by name.
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
 //   available slugs, Codex equivalents)
 //     -> each model-consuming skill's "## Models" section
@@ -216,7 +219,7 @@ export function agentSkills(skillsDir) {
     if (name.startsWith("principle-") && userInvocable) {
       throw new Error(`${path}: principle leaves carry user-invocable: false (CHANGES 0.9.9)`);
     }
-    skills.push({ name, description, menu: frontmatterValue(text, "menu-description"), userInvocable });
+    skills.push({ name, description, userInvocable });
   }
   return skills;
 }
@@ -252,17 +255,40 @@ export function validatePluginLayout(pluginRoot) {
 }
 
 // A public skill is any Agent Skill not marked user-invocable: false (the
-// principle-* leaves). Each needs the one-liner rendered into the Codex slash
-// menu and README command table.
+// principle-* leaves). Each has a row in the README slash-command table.
 export function publicSkills(skillsDir) {
   return agentSkills(skillsDir)
     .filter((skill) => skill.userInvocable)
-    .map(({ name, menu }) => {
-      if (!menu) {
-        throw new Error(`${join(skillsDir, name, "SKILL.md")}: public skill has no menu-description`);
-      }
-      return { name, menu };
-    });
+    .map(({ name }) => name);
+}
+
+const README_TABLE_HEADER = "| command | use it when |";
+
+// The README table is the source of the Codex slash-menu one-liners and their
+// order. Returns [{ name, menu }] in row order; throws when the row set and the
+// public skills disagree, naming each side's leftovers.
+export function readmeCommands(readme, skillNames) {
+  const lines = readme.split("\n");
+  const range = tableRows(README_TABLE_HEADER, "|")(lines);
+  if (!range) throw new Error(`README.md: "${README_TABLE_HEADER}" table header not found`);
+  const rows = lines.slice(range[0], range[1]).map((line, i) => {
+    const m = line.match(/^\| `\/([^`]+)` \| (.+) \|$/);
+    if (!m) throw new Error(`README.md: slash-command row ${i + 1} is not "| \`/name\` | text |": ${line}`);
+    return { name: m[1], menu: m[2] };
+  });
+  const rowNames = new Set(rows.map((r) => r.name));
+  const skills = new Set(skillNames);
+  const extraRows = [...rowNames].filter((n) => !skills.has(n));
+  const missingRows = [...skills].filter((n) => !rowNames.has(n));
+  if (extraRows.length || missingRows.length) {
+    throw new Error(
+      "README.md slash-command table is out of sync with the public skills" +
+        (extraRows.length ? `; row without a skill: ${extraRows.join(", ")}` : "") +
+        (missingRows.length ? `; skill without a row: ${missingRows.join(", ")}` : ""),
+    );
+  }
+  if (rows.length !== rowNames.size) throw new Error("README.md slash-command table repeats a command");
+  return rows;
 }
 
 export function promptStub({ name, menu }) {
@@ -439,40 +465,6 @@ export function strayModelSlugs(file, text, models) {
   return strays;
 }
 
-// Editorial ordering of the README "Slash commands" table. Set-checked against
-// the public skills on every run: adding or retiring a skill without updating
-// this list fails here by name.
-const README_COMMAND_ORDER = [
-  "poteto-mode", "how", "why", "architect", "arena", "interrogate",
-  "automate-me", "reflect", "tdd", "typescript-best-practices", "teach",
-  "swarm", "technical-writing", "bro", "figure-it-out", "show-me-your-work",
-  "blast-radius", "recall", "setup-pstack", "unslop", "no-comments",
-  "create-verification-skill", "maintain-verification-skill", "deslop",
-  "babysit", "thermo-nuclear-code-quality-review", "make-pr-easy-to-review",
-  "fix-ci", "fix-merge-conflicts", "get-pr-comments", "what-did-i-get-done",
-];
-
-export function renderReadmeTable(readme, skills) {
-  const byName = new Map(skills.map((s) => [s.name, s]));
-  const missing = README_COMMAND_ORDER.filter((n) => !byName.has(n));
-  const extra = skills.filter((s) => !README_COMMAND_ORDER.includes(s.name)).map((s) => s.name);
-  if (missing.length || extra.length) {
-    throw new Error(
-      `README_COMMAND_ORDER in tools/generate.mjs is out of sync with the public skills` +
-        (missing.length ? `; listed but not a skill: ${missing.join(", ")}` : "") +
-        (extra.length ? `; skill without a row: ${extra.join(", ")}` : ""),
-    );
-  }
-  const lines = readme.split("\n");
-  const header = lines.indexOf("| command | use it when |");
-  if (header === -1) throw new Error('README.md: "| command | use it when |" table header not found');
-  let end = header + 1;
-  while (end < lines.length && lines[end].startsWith("|")) end++;
-  const rows = README_COMMAND_ORDER.map((n) => `| \`/${n}\` | ${byName.get(n).menu} |`);
-  lines.splice(header, end - header, "| command | use it when |", "| --- | --- |", ...rows);
-  return lines.join("\n");
-}
-
 // hooks.json names commands as "${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd <script>";
 // both the runner and the named script must exist in the plugin and be
 // executable, or the SessionStart hook fails silently for every user.
@@ -544,7 +536,9 @@ function main() {
   }
   console.log("ok: no stray model slugs in skill prose");
 
-  const skills = publicSkills(skillsDir);
+  const readmePath = join(repo, "README.md");
+  const skills = readmeCommands(readFileSync(readmePath, "utf8"), publicSkills(skillsDir));
+  console.log(`ok: README slash-command table names the ${skills.length} public skills`);
 
   const promptsDir = join(repo, "plugins/pstack/.codex-plugin/prompts");
   let promptsChanged = 0;
@@ -560,12 +554,6 @@ function main() {
     console.log(`removed orphan: .codex-plugin/prompts/${file}`);
   }
   if (promptsChanged === 0) console.log(`ok: ${skills.length} Codex prompts current`);
-
-  const readmePath = join(repo, "README.md");
-  const readme = readFileSync(readmePath, "utf8");
-  if (!stampFile(readmePath, renderReadmeTable(readme, skills), "README.md slash-command table")) {
-    console.log("ok: README slash-command table current");
-  }
 
   const portable = syncPortableAssets(repo, skillsDir);
   if (portable.stamped === 0 && portable.removed === 0) {

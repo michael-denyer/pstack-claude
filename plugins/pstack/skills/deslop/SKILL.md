@@ -1,7 +1,6 @@
 ---
 name: deslop
 description: Remove AI-generated code slop and clean up code style
-menu-description: deslop a diff before commit
 ---
 
 # Remove AI code slop

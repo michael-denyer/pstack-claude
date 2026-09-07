@@ -1,7 +1,6 @@
 ---
 name: unslop
 description: Cut AI tells from any writing. Must always apply.
-menu-description: clean up writing by removing AI tells
 ---
 
 # Unslop

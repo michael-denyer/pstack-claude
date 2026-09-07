@@ -16,7 +16,6 @@ import {
   agentSkills,
   codexModelNamesSection,
   PORTABLE_ASSETS,
-  promptStub,
   publicSkills,
   syncPortableAssets,
 } from "../tools/generate.mjs";
@@ -45,15 +44,11 @@ describe("shared Agent Skills tree", () => {
     }
   });
 
-  test("derives the public Codex prompts from the validated shared skills", () => {
-    const skills = publicSkills(skillsDir);
-    expect(skills.length).toBeGreaterThan(0);
-    for (const skill of skills) {
-      const out = promptStub(skill);
-      expect(out).toContain(`name: ${skill.name}`);
-      expect(out).toContain("disable-model-invocation: true");
-      expect(out).toContain(`Invoke the \`${skill.name}\` skill and follow it.`);
-    }
+  test("public skills are the user-invocable ones and exclude every principle leaf", () => {
+    const names = publicSkills(skillsDir);
+    expect(names).toContain("poteto-mode");
+    expect(names.some((n) => n.startsWith("principle-"))).toBe(false);
+    expect(names).toHaveLength(agentSkills(skillsDir).filter((s) => s.userInvocable).length);
   });
 
   test("no markdown link escapes the skills tree", () => {

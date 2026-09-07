@@ -10,6 +10,9 @@ import {
   applyRegions,
   assertChangesHeading,
   fenceUnder,
+  promptStub,
+  publicSkills,
+  readmeCommands,
   regions,
   section,
   stampVersion,
@@ -166,5 +169,35 @@ describe("validateHooks", () => {
     expect(() => validateHooks(hooks("cat /etc/motd"), { statOf: () => exec })).toThrow(
       "does not reference ${CLAUDE_PLUGIN_ROOT}",
     );
+  });
+});
+
+describe("readmeCommands", () => {
+  const readme = (rows) => `# R\n\n| command | use it when |\n| --- | --- |\n${rows.join("\n")}\n\nafter\n`;
+
+  test("reads name and menu text in row order", () => {
+    const text = readme(["| `/b` | second thing |", "| `/a` | first thing |"]);
+    expect(readmeCommands(text, ["a", "b"])).toEqual([
+      { name: "b", menu: "second thing" },
+      { name: "a", menu: "first thing" },
+    ]);
+  });
+
+  test("names a skill without a row and a row without a skill", () => {
+    expect(() => readmeCommands(readme(["| `/a` | x |", "| `/gone` | y |"]), ["a", "new"])).toThrow(
+      "row without a skill: gone; skill without a row: new",
+    );
+  });
+
+  test("rejects a malformed row and a missing table", () => {
+    expect(() => readmeCommands(readme(["| /a | x |"]), ["a"])).toThrow("row 1 is not");
+    expect(() => readmeCommands("# R\n\nno table\n", ["a"])).toThrow("table header not found");
+  });
+
+  test("the live README names exactly the public skills", () => {
+    const text = readFileSync(join(repoRoot, "README.md"), "utf8");
+    const rows = readmeCommands(text, publicSkills(join(repoRoot, "plugins/pstack/skills")));
+    expect(rows[0].name).toBe("poteto-mode");
+    for (const row of rows) expect(promptStub(row)).toContain(`description: ${row.menu}\n`);
   });
 });

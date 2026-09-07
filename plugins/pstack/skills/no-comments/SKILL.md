@@ -1,7 +1,6 @@
 ---
 name: no-comments
 description: "Spawn the comment-sicko subagent, fix accepted findings, and offer encodings for claimed constraints."
-menu-description: strip comments before review, fix the accepted findings, encode claimed constraints
 ---
 
 # No comments

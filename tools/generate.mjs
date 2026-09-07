@@ -352,6 +352,7 @@ export function regions(models) {
         file: skillFile(skill),
         name: "Models section",
         locate: section("Models"),
+        appendHeading: "## Models",
         render: () => blankPadded(modelsSection(roles)),
       })),
     {
@@ -383,15 +384,47 @@ export function regions(models) {
 
 // Stamp every region the generator owns in `file` (repo-relative). A missing
 // anchor throws: a stamped region is a structural contract with the file, not
-// an optional nicety.
-export function applyRegions(file, text, models) {
+// an optional nicety. With strict: false a missing anchor is left alone.
+export function applyRegions(file, text, models, { strict = true } = {}) {
   const lines = text.split("\n");
   for (const region of regions(models).filter((r) => r.file === file)) {
     const range = region.locate(lines);
-    if (!range) throw new Error(`${file}: no anchor for the ${region.name} to stamp`);
+    if (!range) {
+      if (strict) throw new Error(`${file}: no anchor for the ${region.name} to stamp`);
+      continue;
+    }
     lines.splice(range[0], range[1] - range[0], ...region.render());
   }
   return lines.join("\n");
+}
+
+export function loadModels() {
+  return JSON.parse(readFileSync(join(repo, "plugins/pstack/models.json"), "utf8"));
+}
+
+// The port's derivation of an upstream file, as tools/sync.mjs applies it
+// before comparing with the local copy. Upstream ships
+// disable-model-invocation: true on every skill; the port drops it on public
+// skills and swaps it for user-invocable: false on principle leaves (CHANGES
+// 0.9.8, 0.9.9). Then the generator's own stamps: a Models section is
+// appended as the last H2 when upstream has none, which is where every
+// hand-added one already sits. A region whose anchor upstream lacks is left
+// unstamped, so the file surfaces on the manual-merge list instead of
+// aborting the sync.
+export function deriveSkill(file, text, models = loadModels()) {
+  let out = text;
+  const skill = file.match(/^plugins\/pstack\/skills\/([^/]+)\/SKILL\.md$/)?.[1];
+  if (skill) {
+    const swap = skill.startsWith("principle-") ? "\nuser-invocable: false\n" : "\n";
+    out = out.replace("\ndisable-model-invocation: true\n", swap);
+  }
+  const lines = out.split("\n");
+  for (const region of regions(models).filter((r) => r.file === file && r.appendHeading)) {
+    if (region.locate(lines)) continue;
+    if (lines.at(-1) !== "") lines.push("");
+    lines.push(region.appendHeading, "");
+  }
+  return applyRegions(file, lines.join("\n"), models, { strict: false });
 }
 
 export function modelsSection(roles) {
@@ -515,7 +548,7 @@ function main() {
     }
   }
 
-  const models = JSON.parse(readFileSync(join(repo, "plugins/pstack/models.json"), "utf8"));
+  const models = loadModels();
   const skillsDir = join(repo, "plugins/pstack/skills");
 
   let modelStamps = 0;

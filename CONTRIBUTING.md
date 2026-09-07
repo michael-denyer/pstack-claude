@@ -21,7 +21,9 @@ Every substitution is recorded per-skill in [CHANGES.md](CHANGES.md). If you add
 bun tools/sync.mjs pstack <new-upstream-sha>
 ```
 
-`tools/upstream.json` pins the current upstream SHA per component; `tools/substitutions.json` holds the mechanical Cursor-to-Claude rewrites and a denylist of Cursor-isms that need a rewritten sentence rather than a token swap. The tool fetches both upstream revisions, applies the substitutions, writes files whose only local differences came from upstream (new files included), and reports files carrying port-specific edits for manual merge. Any denylist token in a written file fails the run with the file, line, and hint — add a substitution rule or rewrite the sentence, then rerun. The pin advances only on success. Write the CHANGES.md entry from the printed report, then run the generator and the invariant script as usual.
+`tools/upstream.json` pins the current upstream SHA per component; `tools/substitutions.json` holds the mechanical Cursor-to-Claude rewrites and a denylist of Cursor-isms that need a rewritten sentence rather than a token swap. The tool fetches both upstream revisions and derives each upstream file into its port form: the substitutions, then `deriveSkill` in `tools/generate.mjs`, which drops `disable-model-invocation` (or swaps it for `user-invocable: false` on a `principle-*` leaf) and applies the generator's stamps, appending a `## Models` section where upstream has none. It writes files whose only local differences came from upstream (new files included), deletes files upstream removed that the port never edited, and reports files carrying port-specific edits for manual merge. Any denylist token in a written file fails the run with the file, line, and hint — add a substitution rule or rewrite the sentence, then rerun. The pin advances only on success. Write the CHANGES.md entry from the printed report, then run the generator and the tests as usual.
+
+`--dry-run` reports without writing. Passing the pinned SHA itself under `--dry-run` prints the ownership map: every file on the manual-merge list is one the port has forked, and everything else syncs clean.
 
 ## Before you open a PR
 

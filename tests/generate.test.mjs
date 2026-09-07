@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import {
   applyRegions,
   assertChangesHeading,
+  deriveSkill,
   fenceUnder,
   promptStub,
   publicSkills,
@@ -199,5 +200,42 @@ describe("readmeCommands", () => {
     const rows = readmeCommands(text, publicSkills(join(repoRoot, "plugins/pstack/skills")));
     expect(rows[0].name).toBe("poteto-mode");
     for (const row of rows) expect(promptStub(row)).toContain(`description: ${row.menu}\n`);
+  });
+});
+
+describe("deriveSkill", () => {
+  const front = (flags) => `---\nname: x\ndescription: d\n${flags}---\n\nbody\n`;
+
+  test("drops disable-model-invocation on a public skill and swaps it on a principle leaf", () => {
+    expect(deriveSkill("plugins/pstack/skills/tdd/SKILL.md", front("disable-model-invocation: true\n"), models)).toBe(
+      front(""),
+    );
+    expect(
+      deriveSkill("plugins/pstack/skills/principle-x/SKILL.md", front("disable-model-invocation: true\n"), models),
+    ).toBe(front("user-invocable: false\n"));
+  });
+
+  test("leaves a prose mention of the flag alone", () => {
+    const text = front("") + "Never write `disable-model-invocation: true` on a skill.\n";
+    expect(deriveSkill("plugins/pstack/skills/automate-me/SKILL.md", text, models)).toBe(text);
+  });
+
+  test("appends and stamps a Models section when upstream has none", () => {
+    const out = deriveSkill("plugins/pstack/skills/how/SKILL.md", front("disable-model-invocation: true\n"), models);
+    expect(out.endsWith("body\n\n## Models\n\nRole defaults, stamped from")).toBe(false);
+    expect(out).toContain("body\n\n## Models\n\nRole defaults, stamped from");
+    expect(out).toContain("- how explorer:");
+    expect(out.endsWith("\n")).toBe(true);
+    expect(deriveSkill("plugins/pstack/skills/how/SKILL.md", out, models)).toBe(out);
+  });
+
+  test("leaves a region whose anchor upstream lacks unstamped instead of throwing", () => {
+    const text = front("disable-model-invocation: true\n") + "no reviewer table here\n";
+    expect(deriveSkill("plugins/pstack/skills/interrogate/SKILL.md", text, models)).toBe(front("") + "no reviewer table here\n");
+  });
+
+  test("a file the generator does not own passes through", () => {
+    const text = "# plain\n\nreference text\n";
+    expect(deriveSkill("plugins/pstack/skills/how/references/x.md", text, models)).toBe(text);
   });
 });

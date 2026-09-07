@@ -6,7 +6,8 @@
 // Reads tools/upstream.json (remote + per-component pin) and
 // tools/substitutions.json (mechanical Cursor->Claude rewrites plus a denylist
 // of Cursor-isms that need a human sentence, not a token swap). Each upstream
-// file is substituted into its port form and compared three ways:
+// file is derived into its port form (substitutions, then the port's own
+// frontmatter and generator stamps via deriveSkill) and compared three ways:
 //
 //   - local copy matches the derived OLD upstream text -> clean update, written
 //   - local copy is missing -> new file, written
@@ -25,6 +26,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { deriveSkill } from "./generate.mjs";
 import { walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -146,6 +148,7 @@ function main() {
       localDir: join(repo, spec.localPath),
       rules: substitutions,
       denylist,
+      derive: (rel, text) => deriveSkill(join(spec.localPath, rel), text),
       dryRun,
     });
 

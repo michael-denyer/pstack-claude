@@ -4,7 +4,17 @@
     "pstack": {
       "upstreamPath": "pstack",
       "localPath": "plugins/pstack",
-      "sha": "7314f72"
+      "sha": "7314f72",
+      "exclude": [
+        ".cursor-plugin/",
+        ".gitignore",
+        "LICENSE",
+        "README.md",
+        "assets/",
+        "automations/",
+        "docs/",
+        "skills/make-bot-ui/"
+      ]
     },
     "cursor-team-kit": {
       "upstreamPath": "cursor-team-kit/skills",

@@ -3,7 +3,8 @@
 //
 //   bun tools/sync.mjs <component> <new-sha> [--dry-run]
 //
-// Reads tools/upstream.json (remote + per-component pin) and
+// Reads tools/upstream.json (remote, per-component pin, and the `exclude`
+// list of upstream paths the port deliberately does not carry) and
 // tools/substitutions.json (mechanical Cursor->Claude rewrites plus a denylist
 // of Cursor-isms that need a human sentence, not a token swap). Each upstream
 // file is derived into its port form (substitutions, then the port's own
@@ -55,11 +56,29 @@ export function denylistHits(path, text, denylist) {
 
 const BINARY = /\.(png|jpe?g|gif|webp|ico|woff2?|lock)$/;
 
+// Paths the port deliberately does not carry (upstream.json `exclude`): a
+// directory prefix or an exact file, relative to the component root.
+export function isExcluded(rel, exclude) {
+  return exclude.some((entry) => {
+    const asDirectory = entry.endsWith("/") ? entry : `${entry}/`;
+    return rel === entry || rel.startsWith(asDirectory);
+  });
+}
+
 // Compare old-upstream vs new-upstream vs local for one component tree.
 // `derive(rel, text)` turns substituted upstream text into the port's form;
 // the default is identity. Returns the report and, unless dryRun, applies it.
-export function syncComponent({ oldDir, newDir, localDir, rules, denylist = [], derive = (_, t) => t, dryRun = false }) {
-  const report = { written: [], deleted: [], manual: [], unchanged: 0, counts: new Map(), hits: [] };
+export function syncComponent({
+  oldDir,
+  newDir,
+  localDir,
+  rules,
+  denylist = [],
+  exclude = [],
+  derive = (_, t) => t,
+  dryRun = false,
+}) {
+  const report = { written: [], deleted: [], manual: [], unchanged: 0, excluded: 0, counts: new Map(), hits: [] };
   const operations = [];
   const addCounts = (counts) => counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
   const portForm = (rel, raw) => {
@@ -82,6 +101,10 @@ export function syncComponent({ oldDir, newDir, localDir, rules, denylist = [], 
 
   for (const newFile of walk(newDir)) {
     const rel = relative(newDir, newFile);
+    if (isExcluded(rel, exclude)) {
+      report.excluded++;
+      continue;
+    }
     const localFile = join(localDir, rel);
     const next = portForm(rel, readFileSync(newFile));
     if (!existsSync(localFile)) {
@@ -105,7 +128,7 @@ export function syncComponent({ oldDir, newDir, localDir, rules, denylist = [], 
   for (const oldFile of walk(oldDir)) {
     const rel = relative(oldDir, oldFile);
     const localFile = join(localDir, rel);
-    if (existsSync(join(newDir, rel)) || !existsSync(localFile)) continue;
+    if (isExcluded(rel, exclude) || existsSync(join(newDir, rel)) || !existsSync(localFile)) continue;
     const local = readFileSync(localFile);
     if (localMatchesOld(rel, local)) {
       operations.push({ kind: "delete", rel });
@@ -163,11 +186,12 @@ function main() {
       localDir: join(repo, spec.localPath),
       rules: substitutions,
       denylist,
+      exclude: spec.exclude ?? [],
       derive: (rel, text) => deriveSkill(join(spec.localPath, rel), text),
       dryRun,
     });
 
-    console.log(`\n${dryRun ? "dry run; " : ""}unchanged: ${report.unchanged} files`);
+    console.log(`\n${dryRun ? "dry run; " : ""}unchanged: ${report.unchanged} files, excluded: ${report.excluded}`);
     for (const { kind, rel } of report.written) console.log(`${kind}: ${rel}`);
     for (const rel of report.deleted) console.log(`deleted: ${rel}`);
     for (const [pattern, n] of report.counts) console.log(`substituted: "${pattern}" x${n}`);

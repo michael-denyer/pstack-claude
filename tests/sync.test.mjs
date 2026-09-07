@@ -123,6 +123,32 @@ describe("syncComponent", () => {
     );
   });
 
+  test("excluded upstream paths are neither added, updated, deleted, nor scanned", () => {
+    const oldUp = tree({
+      "skills/a/SKILL.md": "keep\n",
+      "docs/guide/01.md": "old guide\n",
+      "README.md": "old readme\n",
+    });
+    const newUp = tree({
+      "skills/a/SKILL.md": "keep\n",
+      "docs/guide/01.md": "run control-cli\n",
+      "README.md": "run control-ui\n",
+      "automations/benny/README.md": "lives in .cursor/\n",
+    });
+    const local = tree({ "skills/a/SKILL.md": "keep\n", "README.md": "the port's own readme\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, exclude: ["docs/", "automations", "README.md"] });
+
+    expect(report.written).toEqual([]);
+    expect(report.deleted).toEqual([]);
+    expect(report.manual).toEqual([]);
+    expect(report.hits).toEqual([]);
+    expect(report.excluded).toBe(3);
+    expect(report.unchanged).toBe(1);
+    expect(existsSync(join(local, "docs/guide/01.md"))).toBe(false);
+    expect(readFileSync(join(local, "README.md"), "utf8")).toBe("the port's own readme\n");
+  });
+
   test("an upstream deletion removes the local copy when the port never edited it", () => {
     const oldUp = tree({ "a.md": "keep\n", "gone.md": "AskQuestion here\n", "forked.md": "old\n" });
     const newUp = tree({ "a.md": "keep\n" });

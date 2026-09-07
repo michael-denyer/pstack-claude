@@ -111,7 +111,7 @@ Discovery is not a promise that Claude-specific execution details translate auto
 ├── tools/generate.mjs                # stamps versioned, model, prompt, README, and portable-asset copies
 ├── tools/validate-skills.mjs         # rejects missing/escaping links and instructions to open unreachable paths
 ├── tools/sync.mjs                    # syncs a component to a new upstream SHA, applying substitutions.json
-├── tools/upstream.json               # upstream remote + per-component pinned SHAs
+├── tools/upstream.json               # upstream remote, per-component pinned SHAs, and excluded upstream paths
 ├── tools/substitutions.json          # mechanical Cursor→Claude rewrites + the denylist of manual-only Cursor-isms
 ├── VERSION                           # canonical plugin version (single source; manifests are stamped)
 ├── LICENSE                           # pstack upstream MIT

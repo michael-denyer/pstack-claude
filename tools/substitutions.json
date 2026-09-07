@@ -54,6 +54,10 @@
       "pattern": ".cursor/rules/",
       "replacement": "CLAUDE.md imports",
       "rationale": "Claude Code has no auto-applied rules directory; inclusion is explicit via CLAUDE.md"
+    },
+    {
+      "pattern": "`generalPurpose`",
+      "replacement": "`general-purpose`"
     }
   ],
   "denylist": [

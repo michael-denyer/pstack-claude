@@ -2,6 +2,16 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.21 - agent mechanics and production-session gaps
+
+Fixes from #58 and the seven judgment gaps in #59, both reported from a poteto-mode session that ran a real backend change through review, merge, deploy, and `reflect`. The upstream pin stays at `7314f72`.
+
+Every dispatch of a plugin agent names it `pstack:poteto-agent` or `pstack:comment-sicko`. A plugin's agents register under the plugin namespace and the bare name errors on install. #58 covered the poteto-mode site; this release covers the other three, and `tests/skill-collision-repro.sh` now fails on any bare `subagent_type` that matches a file in `plugins/pstack/agents/`.
+
+`reflect` step 1 runs `skills/reflect/scripts/find-transcript.mjs` instead of a scan re-derived each session. The finder covers the flat, nested, and subagent layouts newest first, streams each candidate, and stops at its first `user` record; the first line of a transcript is session metadata, which is why the old first-line check never matched. `tests/find-transcript.test.mjs` covers the layouts, string and block content, a truncated trailing line, and the CLI exit codes.
+
+poteto-mode's Subagents section says to stop an abandoned agent and confirm the stop before re-delegating, because `completed` in the agent listing means notified rather than exited. `feature.md` gives every file-writing delegate its own worktree. `opening-a-pr.md` drains the live agent roster, grandchildren included, before any commit, merge, or deploy from a worktree. `principle-prove-it-works` verifies the process behind an outcome and requires the failure content of a red check, not the assertion line; `tdd` step 4 says the same. `recall` sweeps every location the project's rules name before reporting anything as unrecorded. `blast-radius` triggers on a brief that asserts something about existing code, before design. poteto-mode's triggers add loading a managed platform's skill before its CLI, and choosing a finding's artifact by severity rather than by where it turned up. `tests/skill-rules.test.mjs` pins each of these sentences so a manual upstream merge cannot drop one unnoticed.
+
 ## 0.9.20 - plan and shipping fixes
 
 Follow-up fixes for the PR 55 review. These change upstream-derived behavior and are deliberate local corrections pending a future upstream sync. The upstream pin stays at `7314f72`.

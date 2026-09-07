@@ -1,0 +1,53 @@
+import { describe, expect, it } from "bun:test";
+import { fakeReader, pendingCheck } from "./fakes.test-helper.ts";
+import { WatcherQueryError } from "./github.ts";
+import { classifyPr, readSnapshot, runSimple, runQueued } from "./policy.ts";
+import { parsePrNumber } from "./types.ts";
+
+const context = { owner: "owner", repo: "repo", number: parsePrNumber(1) };
+const options = { interval: 60, sweepInterval: 300, timeout: 1, maxQueryErrors: 5, allowDraft: false };
+const snapshotArgs = { context, pendingHistory: "include" as const, allowDraft: false };
+
+describe("commit identity", () => {
+  it("rejects a missing expected commit instead of treating it as a null rollup", async () => {
+    const reader = fakeReader({ facts: { headRefOid: "old", mergeStateStatus: "BLOCKED" }, commitRollups: [{ oid: "new", state: "FAILURE" }] });
+    await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(WatcherQueryError);
+  });
+
+  it("keeps an explicitly absent rollup distinct from a missing commit", async () => {
+    const reader = fakeReader({ commitRollups: [{ oid: "head", state: null }] });
+    expect(classifyPr(await readSnapshot({ ...snapshotArgs, reader })).kind).toBe("ready");
+  });
+
+  it("includes the checked commit in a ready proof", async () => {
+    expect(classifyPr(await readSnapshot({ ...snapshotArgs, reader: fakeReader() }))).toMatchObject({ kind: "ready", pr: { proof: { headRefOid: "head" } } });
+  });
+});
+
+describe("deadline", () => {
+  for (const mode of ["single", "queued"] as const) {
+    it(`${mode} stops at the deadline before another observation`, async () => {
+      let now = 0;
+      const sleeps: number[] = [];
+      const reader = fakeReader({ fastPath: { kind: "checks", checks: [pendingCheck()] } });
+      const dependencies = { reader, emit() {}, clock: { now: () => now, observedAt: () => "fixture", async sleep(seconds: number) { sleeps.push(seconds); now += seconds; } } };
+      const result = mode === "single"
+        ? await runSimple({ dependencies, contexts: [context], mode: "single", statusOnly: false, options })
+        : await runQueued({ dependencies, contexts: [context], options });
+      expect(result.kind).toBe("TIMEOUT");
+      expect(sleeps).toEqual([1]);
+      expect(now).toBe(1);
+      expect(reader.calls.filter(call => call === "pullRequest")).toHaveLength(1);
+    });
+  }
+
+  it("bounds a retry by remaining time", async () => {
+    let now = 0;
+    let reads = 0;
+    const reader = { ...fakeReader(), async pullRequest(): Promise<never> { reads++; throw new WatcherQueryError({ kind: "command-exit", retryable: true, code: 1, detail: "fixture" }); } };
+    const result = await runSimple({ dependencies: { reader, emit() {}, clock: { now: () => now, observedAt: () => "fixture", async sleep(seconds) { now += seconds; } } }, contexts: [context], mode: "single", statusOnly: false, options });
+    expect(result.kind).toBe("TIMEOUT");
+    expect(now).toBe(1);
+    expect(reads).toBe(1);
+  });
+});

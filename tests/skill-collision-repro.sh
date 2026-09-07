@@ -76,7 +76,24 @@ principle_leaves_hidden() {
   return 0
 }
 
+# (#58): a plugin's agents register under the plugin namespace, so a skill
+# that dispatches `subagent_type: "poteto-agent"` errors on install with
+# "Agent type 'poteto-agent' not found. Available agents: ... pstack:poteto-agent".
+# Every dispatch of a plugin-local agent names it `pstack:<name>`.
+agent_dispatch_namespaced() {
+  local agent name
+  for agent in "$repo"/plugins/pstack/agents/*.md; do
+    [ -f "$agent" ] || continue
+    name="$(basename "$agent" .md)"
+    grep -rn --include='*.md' "subagent_type: \"$name\"" "$repo/plugins/pstack/skills" |
+      sed "s|^$repo/plugins/pstack/||" |
+      awk -F: -v n="$name" '{ printf "%s:%s: subagent_type: \"%s\" (use \"pstack:%s\")\n", $1, $2, n, n }'
+  done
+  return 0
+}
+
 check "no plugins/pstack/commands/ directory" no_commands_dir
+check "plugin agents are dispatched by their namespaced name" agent_dispatch_namespaced
 check "no skill carries disable-model-invocation: true" no_disable_model_invocation
 check "principle-* leaves carry user-invocable: false and not disable-model-invocation" principle_leaves_hidden
 

@@ -10,12 +10,17 @@ import { join } from "node:path";
 
 const script = join(import.meta.dir, "skill-collision-repro.sh");
 
-function skill(dir, name, front) {
+function skill(dir, name, front, body = "body\n") {
   mkdirSync(join(dir, "plugins/pstack/skills", name), { recursive: true });
   writeFileSync(
     join(dir, "plugins/pstack/skills", name, "SKILL.md"),
-    `---\nname: ${name}\ndescription: fixture\n${front}---\n\nbody\n`,
+    `---\nname: ${name}\ndescription: fixture\n${front}---\n\n${body}`,
   );
+}
+
+function agent(dir, name) {
+  mkdirSync(join(dir, "plugins/pstack/agents"), { recursive: true });
+  writeFileSync(join(dir, "plugins/pstack/agents", `${name}.md`), `---\nname: ${name}\ndescription: fixture\n---\n`);
 }
 
 function fixture(mutate = () => {}) {
@@ -67,6 +72,26 @@ describe("skill-collision-repro.sh static invariants", () => {
     );
     expect(code).toBe(1);
     expect(out).toContain("principle-dead/SKILL.md (still carries disable-model-invocation)");
+  });
+
+  test("a skill dispatching a plugin agent by its bare name fails and names the site", () => {
+    const { code, out } = run(
+      fixture((d) => {
+        agent(d, "poteto-agent");
+        skill(d, "caller", "", 'Spawn with `subagent_type: "poteto-agent"`.\n');
+      }),
+    );
+    expect(code).toBe(1);
+    expect(out).toContain("FAIL: plugin agents are dispatched by their namespaced name");
+    expect(out).toContain('skills/caller/SKILL.md:6: subagent_type: "poteto-agent" (use "pstack:poteto-agent")');
+  });
+
+  test("a skill dispatching a plugin agent by its namespaced name passes", () => {
+    const dir = fixture((d) => {
+      agent(d, "poteto-agent");
+      skill(d, "caller", "", 'Spawn with `subagent_type: "pstack:poteto-agent"`.\n');
+    });
+    expect(run(dir).code).toBe(0);
   });
 
   test("the body of a skill may mention the flag in prose", () => {

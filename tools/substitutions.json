@@ -57,7 +57,8 @@
     },
     {
       "pattern": "`generalPurpose`",
-      "replacement": "`general-purpose`"
+      "replacement": "`general-purpose`",
+      "rationale": "Claude Code's built-in agent type is general-purpose"
     }
   ],
   "denylist": [

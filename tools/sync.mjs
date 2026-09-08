@@ -150,11 +150,13 @@ export function syncComponent({
       continue;
     }
     const local = readFileSync(localFile);
-    const old = derivedOld(rel);
     if (local.equals(next.buffer)) {
       report.unchanged++;
       scan(rel, next.buffer);
-    } else if (old && local.equals(old)) {
+      continue;
+    }
+    const old = derivedOld(rel);
+    if (old && local.equals(old)) {
       planWrite(rel, "updated", next.buffer);
       addCounts(next.counts);
     } else if (old && old.equals(next.buffer)) {

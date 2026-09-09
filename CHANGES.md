@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.28 - discovery keywords on both plugin manifests
+
+The two plugin manifests carried seven keywords, all of which name the project or its own vocabulary: `pstack`, `poteto-mode`, `workflow`, `principles`, `agent-style`, `subagents`, `unslop`. A reader who searches any of them already knows the plugin exists. Nine terms describing what the skills do and where they run join them: `claude-code`, `skills`, `tdd`, `code-review`, `parallel-agents`, `codex`, `opencode`, `gemini-cli`, `prime-agent`. The four non-Claude runtimes are each named where the previous list named none. Metadata only: no skill text, tool behavior, or upstream pin changes. The pin remains at `e8d856f`.
+
 ## 0.9.27 - the sync tool runs the three-way merge itself
 
 `tools/sync.mjs` classified every file it could not write cleanly as `manual`, one word covering three unrelated facts: upstream never touched the file and the port forked it, upstream changed it and the fork does not overlap, or upstream changed it and the fork does. The operator recovered the fact by diffing the two upstream trees by hand, once per file, on every sync. At the `e8d856f` sync the tool listed 57 manual files. 24 of them were untouched upstream, 9 were mergeable by machine, and 24 were real conflicts.

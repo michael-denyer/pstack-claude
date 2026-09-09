@@ -1,7 +1,7 @@
 {
   "name": "pstack",
   "displayName": "pstack (Claude Code port)",
-  "version": "0.9.27",
+  "version": "0.9.28",
   "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Ported from cursor/plugins/pstack to Claude Code. Original pstack by Lauren Tan (poteto).",
   "author": {
     "name": "Michael Denyer",
@@ -18,6 +18,15 @@
     "principles",
     "agent-style",
     "subagents",
-    "unslop"
+    "unslop",
+    "claude-code",
+    "skills",
+    "tdd",
+    "code-review",
+    "parallel-agents",
+    "codex",
+    "opencode",
+    "gemini-cli",
+    "prime-agent"
   ]
 }

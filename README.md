@@ -19,6 +19,8 @@ This repo ships as a Claude Code marketplace containing one plugin (`pstack`).
 
 From 0.9.5 the plugin auto-fires, the same way superpowers does: a `SessionStart` hook (on `startup`, `/clear`, and post-`compact`) injects a ~0.3k-token mandate that routes any non-trivial engineering task into `poteto-mode` before the first response. The full skill still loads only on invoke. Dispatched subagents are told to ignore the mandate, and explicit user instructions take precedence. To opt out, delete `hooks/hooks.json` from the installed copy (`~/.claude/plugins/cache/pstack-claude/pstack/<version>/hooks/hooks.json`); a plugin update restores it.
 
+The playbooks keep a todolist. Claude Code ships its task tools off, so set `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` to turn on `TaskCreate` and `TaskUpdate`. Scope it to one project through the `env` block of that project's `.claude/settings.local.json` when Claude also drives a personal task system, since the two compete for requests like "add a task". The variable is undocumented as of Claude Code 2.1.267. Without it, poteto-mode keeps the list as an uncommitted `todo.md` in the work dir.
+
 ### Shared Agent Skills install
 
 Codex, Prime Agent, opencode, and Gemini CLI all discover user skills from `~/.agents/skills/`. Clone the repository and link its shared skill tree once:
@@ -160,7 +162,7 @@ Nothing is declared in `plugin.json`. Install the one companion plugin yourself:
 
 Not declared as deps, but referenced in skill bodies:
 
-- **`run`, `verify`, `loop`** — Claude Code CLI built-ins (ship with the binary, always available).
+- **`run`, `loop`** — Claude Code bundled skills the model can invoke (ship with the binary, always available). **`verify`** also ships with the binary, but only the user can invoke it, so the playbooks drive UIs through the project `verify` skill that `/create-verification-skill` writes to `.claude/skills/verify/` (from Claude Code 2.1.200 it replaces the bundled one) and fall back to `run`.
 - **`gh` CLI** — system-level requirement of the `babysit` skill and the Babysit / Shipping playbooks. Install via [`brew install gh`](https://cli.github.com) and authenticate with `gh auth login`.
 - **`bun`** — runs the vendored `skills/poteto-mode/scripts/` tooling (`watch-pr`, `orch`). Install via [`brew install oven-sh/bun/bun`](https://bun.sh). Only the playbooks that call those scripts need it; `bootstrap.ts` installs the script dependencies on first run.
 - **`gt` (Graphite CLI)** — only for the Orchestrate playbook and the `orch` script's stack frontier. Since the v0.14.8 sync, Shipping and the autopilots stack with plain `gh` (or Origin's CLI when present) and never require `gt`.
@@ -235,7 +237,7 @@ The port is editorial, not mechanical. Anywhere upstream pstack assumed Cursor-s
 | Cursor's built-in `/babysit` | `babysit` skill bundled in this plugin. From v0.14.0 upstream routes PR-status requests inside poteto-mode to `playbooks/babysit.md` instead; the port does the same, and `/babysit` stays the standalone entry point |
 | Cursor's built-in `/create-skill` | `plugin-dev:skill-development` skill |
 | `cursor-team-kit` `control-cli` (CLI/TUI driver) | Claude Code's `run` skill |
-| `cursor-team-kit` `control-ui` (browser/Electron driver) | Claude Code's `verify` skill |
+| `cursor-team-kit` `control-ui` (browser/Electron driver) | The project `verify` skill from `/create-verification-skill`, else `run`; Claude Code's bundled `/verify` is user-invocable only |
 | Transcripts at `~/.cursor/projects/*/` or `agent-transcripts/` | `~/.claude/projects/<encoded-cwd>/*.jsonl` (where `<encoded-cwd>` is the workspace cwd with `/` → `-`) |
 | Skill paths `.cursor/skills/`, `~/.cursor/plugins/` | `.claude/skills/`, `~/.claude/plugins/` |
 | MCP discovery via Cursor's `mcps/` directory | Tool list at top of system prompt (`mcp__<server>__<name>` entries), or `.mcp.json`, or `claude mcp list` |

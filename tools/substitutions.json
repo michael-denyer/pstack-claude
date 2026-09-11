@@ -27,12 +27,12 @@
     },
     {
       "pattern": "via the matching control skill",
-      "replacement": "via the driver skill (`run` for CLIs/TUIs, `verify` for UIs)",
+      "replacement": "via the driver skill (`run`, or the project `verify` skill for UIs)",
       "rationale": "cursor-team-kit's control-cli/control-ui are Claude Code's run/verify built-ins; must precede the shorter rule"
     },
     {
       "pattern": "via the control skill",
-      "replacement": "via the driver skill (`run` for CLIs/TUIs, `verify` for UIs)",
+      "replacement": "via the driver skill (`run`, or the project `verify` skill for UIs)",
       "rationale": "same mapping"
     },
     {

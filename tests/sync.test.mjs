@@ -57,8 +57,8 @@ describe("applySubstitutions", () => {
     );
     expect(text).toBe(
       [
-        "Capture a trace via the driver skill (`run` for CLIs/TUIs, `verify` for UIs).",
-        "Reproduce via the driver skill (`run` for CLIs/TUIs, `verify` for UIs).",
+        "Capture a trace via the driver skill (`run`, or the project `verify` skill for UIs).",
+        "Reproduce via the driver skill (`run`, or the project `verify` skill for UIs).",
         "Multiple `Agent` calls in the Agent tool.",
         "your configured bug-fix model (default in poteto-mode's Models section)",
         "on \"restart Claude Code\"",

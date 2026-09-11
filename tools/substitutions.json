@@ -26,14 +26,9 @@
       "rationale": "same tool, as a noun for one dispatch (also matches `Task` calls)"
     },
     {
-      "pattern": "via the matching control skill",
-      "replacement": "via the driver skill (`run` for CLIs/TUIs, `verify` for UIs)",
-      "rationale": "cursor-team-kit's control-cli/control-ui are Claude Code's run/verify built-ins; must precede the shorter rule"
-    },
-    {
-      "pattern": "via the control skill",
-      "replacement": "via the driver skill (`run` for CLIs/TUIs, `verify` for UIs)",
-      "rationale": "same mapping"
+      "pattern": "control skill",
+      "replacement": "driver skill",
+      "rationale": "driver selection lives in poteto-mode/SKILL.md Non-negotiables; preserve the older generator trigger in its local description"
     },
     {
       "pattern": "restart Cursor",
@@ -63,12 +58,20 @@
   ],
   "denylist": [
     {
+      "token": "`verify` skill (UIs)",
+      "hint": "use the driver policy in poteto-mode/SKILL.md Non-negotiables"
+    },
+    {
+      "token": "`verify` for UIs",
+      "hint": "use the driver policy in poteto-mode/SKILL.md Non-negotiables"
+    },
+    {
       "token": "control-cli",
-      "hint": "Claude Code's `run` built-in drives CLIs/TUIs; rewrite the sentence, don't token-swap"
+      "hint": "use the driver policy in poteto-mode/SKILL.md Non-negotiables; rewrite the sentence, don't token-swap"
     },
     {
       "token": "control-ui",
-      "hint": "Claude Code's `verify` built-in drives UIs; rewrite the sentence, don't token-swap"
+      "hint": "use the driver policy in poteto-mode/SKILL.md Non-negotiables; rewrite the sentence, don't token-swap"
     },
     {
       "token": "AskQuestion",

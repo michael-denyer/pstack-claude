@@ -2,6 +2,14 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.29 - the verify driver and the todolist resolve on Claude Code
+
+Two reports from @Graham3324 (#71, #72), with the isolating experiments that fixed the wording.
+
+The playbooks previously directed UI verification to bundled `/verify`, which only the user can invoke. Driver selection now lives in `poteto-mode` Non-negotiables, and playbooks link there. The sync substitution translates `control skill` to `driver skill`; diagnostics point to the same policy. `create-verification-skill` writes `.claude/skills/verify/`, and maintenance accepts that directory and older `verify-*` skills. A root project skill replaces bundled `/verify` on [Claude Code 2.1.200 or later](https://code.claude.com/docs/en/skills#run-and-verify-your-app).
+
+The todolist policy uses the session's task-tracking tools or an uncommitted `todo.md` checklist that retains skipped steps. Claude Code's [documented task-tool opt-in](https://code.claude.com/docs/en/tools-reference#task-tool-availability), `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`, can be scoped through a project's `.claude/settings.local.json`. Defaults depend on the model. Issue-linked rule pins and a scan of current skill prose protect both fixes during later syncs. The pin remains at `e8d856f`.
+
 ## 0.9.28 - discovery keywords on both plugin manifests
 
 The two plugin manifests carried seven keywords, all of which name the project or its own vocabulary: `pstack`, `poteto-mode`, `workflow`, `principles`, `agent-style`, `subagents`, `unslop`. A reader who searches any of them already knows the plugin exists. Nine terms describing what the skills do and where they run join them: `claude-code`, `skills`, `tdd`, `code-review`, `parallel-agents`, `codex`, `opencode`, `gemini-cli`, `prime-agent`. The four non-Claude runtimes are each named where the previous list named none. Metadata only: no skill text, tool behavior, or upstream pin changes. The pin remains at `e8d856f`.
@@ -318,7 +326,7 @@ Upstream pstack jumped from `0.1.0` → `0.9.2` between syncs. 30+ commits, incl
 | Cursor `/create-skill` (built-in) | `plugin-dev:skill-development` skill | Claude Code's authoring guidance for SKILL.md. |
 | `cursor-team-kit` `/deslop` | This plugin's `deslop` skill | Ported in (only team-kit skill imported). |
 | `cursor-team-kit` `control-cli` | `run` skill (Claude Code built-in) | Drives CLIs/TUIs. |
-| `cursor-team-kit` `control-ui` | `verify` skill (Claude Code built-in, VS Code extension) | Drives UIs (browser/Electron). |
+| `cursor-team-kit` `control-ui` | The [driver policy](plugins/pstack/skills/poteto-mode/SKILL.md#non-negotiables) | Selects the app driver (0.9.29). |
 | `~/.cursor/projects/*/` transcripts | `~/.claude/projects/<encoded-cwd>/*.jsonl` | `<encoded-cwd>` is the workspace's working directory with `/` → `-`. |
 | Cursor `agent-transcripts/` dir | `~/.claude/projects/<encoded-cwd>/` | Same as above. |
 | `.cursor/skills/`, `~/.cursor/skills/`, `~/.cursor/plugins/` | `.claude/skills/`, `~/.claude/skills/`, `~/.claude/plugins/` | Path-only translation. |

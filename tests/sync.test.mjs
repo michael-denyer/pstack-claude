@@ -49,6 +49,8 @@ describe("applySubstitutions", () => {
       [
         "Capture a trace via the matching control skill.",
         "Reproduce via the control skill.",
+        "Drive via the relevant control skill and through its control skill.",
+        "<control skill path> and the control skill's commands",
         "Multiple `Task` calls in the Task tool.",
         "your configured bug-fix model (default `claude-fable-5-1-thinking-max`)",
         "on \"restart Cursor\"",
@@ -57,8 +59,10 @@ describe("applySubstitutions", () => {
     );
     expect(text).toBe(
       [
-        "Capture a trace via the driver skill (`run` for CLIs/TUIs, `verify` for UIs).",
-        "Reproduce via the driver skill (`run` for CLIs/TUIs, `verify` for UIs).",
+        "Capture a trace via the matching driver skill.",
+        "Reproduce via the driver skill.",
+        "Drive via the relevant driver skill and through its driver skill.",
+        "<driver skill path> and the driver skill's commands",
         "Multiple `Agent` calls in the Agent tool.",
         "your configured bug-fix model (default in poteto-mode's Models section)",
         "on \"restart Claude Code\"",
@@ -74,6 +78,20 @@ describe("applySubstitutions", () => {
 });
 
 describe("denylistHits", () => {
+  test("UI repair advice points to the canonical driver policy", () => {
+    const hits = denylistHits("playbook.md", "Drive with control-ui.", RULES.denylist);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toContain("poteto-mode/SKILL.md");
+    expect(hits[0]).not.toContain("`verify` built-in");
+  });
+
+  test("rejects the old UI instruction but permits project and legacy skill references", () => {
+    expect(denylistHits("playbook.md", "Use the `verify` skill (UIs).", RULES.denylist)).toHaveLength(1);
+    const supported = "The bundled `/verify` is user-invocable only. " +
+      "Use the project `verify` skill or maintain `.claude/skills/verify-*/`.";
+    expect(denylistHits("policy.md", supported, RULES.denylist)).toEqual([]);
+  });
+
   test("flags residual Cursor-isms with file, line, and hint", () => {
     const hits = denylistHits("skills/x/SKILL.md", "line one\nrun control-cli now\n", RULES.denylist);
     expect(hits).toHaveLength(1);

@@ -11,6 +11,36 @@ const skillsDir = fileURLToPath(new URL("../plugins/pstack/skills", import.meta.
 
 const rules = [
   {
+    source: "#71 callable driver policy",
+    file: "poteto-mode/SKILL.md",
+    phrase: "fall back to `run` when the repo has none",
+  },
+  {
+    source: "#71 generated skill name",
+    file: "create-verification-skill/SKILL.md",
+    phrase: "YAML frontmatter (`name: verify`",
+  },
+  {
+    source: "#71 preserve the original generator trigger",
+    file: "create-verification-skill/SKILL.md",
+    phrase: "make a control skill for this repo",
+  },
+  {
+    source: "#71 maintain older generated skills",
+    file: "maintain-verification-skill/SKILL.md",
+    phrase: "or `.claude/skills/verify-*/` from an older generator",
+  },
+  {
+    source: "#72 task fallback keeps skipped steps",
+    file: "poteto-mode/SKILL.md",
+    phrase: "with the playbook steps verbatim and each `skip: <reason>` line",
+  },
+  {
+    source: "#72 task fallback is a local checklist",
+    file: "poteto-mode/SKILL.md",
+    phrase: "an uncommitted `todo.md` Markdown checklist",
+  },
+  {
     source: "#58 stop before you re-delegate",
     file: "poteto-mode/SKILL.md",
     phrase: "Stop the abandoned agent first, and confirm it stopped.",

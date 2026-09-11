@@ -6,9 +6,9 @@ This port applies the Cursor → Claude Code substitutions in skill bodies. Earl
 
 Two reports from @Graham3324 (#71, #72), with the isolating experiments that fixed the wording.
 
-Every UI driver line named `verify` and called it a Claude Code built-in. Claude Code bundles `/verify`, but only the user can invoke it, so an agent following a playbook improvised its own driver at every UI step. A project skill named `verify` at the repo root replaces the bundled one from Claude Code 2.1.200, and the model can call that. `create-verification-skill` now writes `.claude/skills/verify/` instead of `verify-<app>/`, `maintain-verification-skill` locates either, and the driver phrase in `tools/substitutions.json`, the poteto-mode trigger, and the eleven playbook lines reads `run`, or the project `verify` skill for UIs, with `run` as the fallback since it drives browser and Electron apps too. The README dependency note, the Codex mapping, and the substitution table below say the same.
+The playbooks previously directed UI verification to bundled `/verify`, which only the user can invoke. Driver selection now lives in `poteto-mode` Non-negotiables, and playbooks link there. The sync substitution translates `control skill` to `driver skill`; diagnostics point to the same policy. `create-verification-skill` writes `.claude/skills/verify/`, and maintenance accepts that directory and older `verify-*` skills. A root project skill replaces bundled `/verify` on [Claude Code 2.1.200 or later](https://code.claude.com/docs/en/skills#run-and-verify-your-app).
 
-The todolist rule named no tool. Claude Code 2.1.267 ships its task tools off, so `poteto-mode`'s Platform Adaptation names `TaskCreate` and `TaskUpdate` when the session has them, the `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` switch that turns them on (undocumented, scoped per project through `.claude/settings.local.json`), and an uncommitted `todo.md` in the work dir as the fallback, so a `skip: <reason>` line still leaves a trace. The README install section carries the same switch. The pin remains at `e8d856f`.
+The todolist policy uses the session's task-tracking tools or an uncommitted `todo.md` checklist that retains skipped steps. Claude Code's [documented task-tool opt-in](https://code.claude.com/docs/en/tools-reference#task-tool-availability), `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`, can be scoped through a project's `.claude/settings.local.json`. Defaults depend on the model. Issue-linked rule pins and a scan of current skill prose protect both fixes during later syncs. The pin remains at `e8d856f`.
 
 ## 0.9.28 - discovery keywords on both plugin manifests
 
@@ -326,7 +326,7 @@ Upstream pstack jumped from `0.1.0` → `0.9.2` between syncs. 30+ commits, incl
 | Cursor `/create-skill` (built-in) | `plugin-dev:skill-development` skill | Claude Code's authoring guidance for SKILL.md. |
 | `cursor-team-kit` `/deslop` | This plugin's `deslop` skill | Ported in (only team-kit skill imported). |
 | `cursor-team-kit` `control-cli` | `run` skill (Claude Code built-in) | Drives CLIs/TUIs. |
-| `cursor-team-kit` `control-ui` | The project `verify` skill, else `run` | Drives UIs (browser/Electron). Claude Code's bundled `/verify` is user-invocable only (0.9.29). |
+| `cursor-team-kit` `control-ui` | The [driver policy](plugins/pstack/skills/poteto-mode/SKILL.md#non-negotiables) | Selects the app driver (0.9.29). |
 | `~/.cursor/projects/*/` transcripts | `~/.claude/projects/<encoded-cwd>/*.jsonl` | `<encoded-cwd>` is the workspace's working directory with `/` → `-`. |
 | Cursor `agent-transcripts/` dir | `~/.claude/projects/<encoded-cwd>/` | Same as above. |
 | `.cursor/skills/`, `~/.cursor/skills/`, `~/.cursor/plugins/` | `.claude/skills/`, `~/.claude/skills/`, `~/.claude/plugins/` | Path-only translation. |

@@ -1,6 +1,6 @@
 # Codex tool mapping for pstack
 
-pstack skills are written in Claude Code tool language (the `Skill` tool, the `Agent` tool, `AskUserQuestion`, `claude-*` model slugs). On Codex the skills are the same files; only the tool names resolve differently. Read this when a pstack skill names a Claude tool, a Claude built-in skill, or a `claude-*` model. This file is Codex-specific. Gemini CLI, opencode, Prime Agent, and other runtimes must use their own concrete tools, model names, and configuration paths.
+pstack skills are written in Claude Code tool language (the `Skill` tool, the `Agent` tool, `AskUserQuestion`, `claude-*` model slugs). On Codex the skills are the same files; only the tool names resolve differently. Read this when a pstack skill names a Claude tool, a driver or bundled skill, or a `claude-*` model. This file is Codex-specific. Gemini CLI, opencode, Prime Agent, and other runtimes must use their own concrete tools, model names, and configuration paths.
 
 ## Tool actions
 
@@ -17,7 +17,7 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 | Dispatch N parallel subagents in one turn | N `spawn_agent` calls in one response |
 | Wait for a subagent result | `wait_agent` |
 | Free a finished subagent slot | `close_agent` |
-| Track tasks (the todolist; `TaskCreate` / `TaskUpdate` on Claude Code) | `update_plan` |
+| Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | `update_plan` |
 | Ask the human a fixed-choice question (`AskUserQuestion`) | Ask in plain text and let the user answer. Codex has no structured-choice tool. |
 
 Subagent dispatch needs `multi_agent` enabled. Add to `~/.codex/config.toml`:
@@ -49,14 +49,14 @@ Skills name Claude defaults (a single-role default for code/prose/judgment plus 
 
 `/setup-pstack` writes the configured model list. On Codex, set it to your Codex model slugs.
 
-## Claude built-in skills pstack references
+## Driver and bundled skills pstack references
 
-Some triggers name skills that ship with Claude Code, not pstack. They do not exist on Codex. Substitute the behavior:
+The [driver policy](../SKILL.md#non-negotiables) selects the app driver. For skills and drivers named by these workflows, use these Codex equivalents:
 
-| Claude built-in named in pstack | On Codex |
+| Skill or driver named in pstack | On Codex |
 |---------------------------------|----------|
 | `run` (drive a CLI/TUI to see a change work) | Run the app yourself via `shell` and observe the real output. |
-| `verify` (the project UI driver at `.claude/skills/verify/`; Claude Code's bundled `/verify` is user-invocable only) | Drive the UI with whatever automation you have, or hand the user a concrete manual check. Do not claim done without observing the artifact. |
+| Project UI driver | Drive the UI with whatever automation you have, or hand the user a concrete manual check. Do not claim done without observing the artifact. |
 | `plugin-dev:skill-development` (Claude's SKILL.md authoring guidance) | Follow your platform's skill-authoring guidance; the `writing-skills` skill if present. Keep `name` + `description` frontmatter and progressive disclosure. |
 | `loop` (recurring/self-paced re-invocation, used by `babysit`) | Codex has no `loop` skill. Re-run the step yourself on a cadence, or use a Codex scheduled task if available. |
 
@@ -73,7 +73,7 @@ Affected skill entry points and the optional Codex slash stubs point here. Most 
 | `create-verification-skill` | The generated skill lands under `.claude/skills/verify/` on Claude Code; write it to Codex's project-skill location instead. The app-driving harness is platform-neutral. |
 | `maintain-verification-skill` | The parallel per-feature source readers map to `spawn_agent` fan-out; the project-local skill lives under Codex's skills location, not `.claude/skills/`. |
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
-| `automate-me` | `plugin-dev:skill-development` resolves through the built-in skills table above. |
+| `automate-me` | `plugin-dev:skill-development` resolves through the skills table above. |
 
 ## Vendored scripts
 

@@ -1,22 +1,22 @@
 {
   "singleRoleDefault": "claude-opus-5",
-  "panel": ["claude-opus-5", "claude-fable-5", "claude-sonnet-5"],
+  "panel": ["claude-opus-5", "claude-fable-5-1", "claude-sonnet-5"],
   "available": [
     { "label": "Opus 5", "slug": "claude-opus-5" },
     { "label": "Opus 4.8", "slug": "claude-opus-4-8" },
     { "label": "Opus 4.6", "slug": "claude-opus-4-6" },
-    { "label": "Fable 5", "slug": "claude-fable-5" },
+    { "label": "Fable 5.1", "slug": "claude-fable-5-1" },
     { "label": "Sonnet 5", "slug": "claude-sonnet-5" },
     { "label": "Sonnet 4.6", "slug": "claude-sonnet-4-6" },
     { "label": "Haiku 4.5", "slug": "claude-haiku-4-5" }
   ],
   "roles": [
     { "role": "feature, refactoring", "models": ["claude-opus-5"], "skill": "poteto-mode" },
-    { "role": "bug-fix", "models": ["claude-fable-5"], "skill": "poteto-mode" },
-    { "role": "perf-issue", "models": ["claude-fable-5"], "skill": "poteto-mode" },
-    { "role": "hillclimb", "models": ["claude-fable-5"], "skill": "poteto-mode" },
+    { "role": "bug-fix", "models": ["claude-fable-5-1"], "skill": "poteto-mode" },
+    { "role": "perf-issue", "models": ["claude-fable-5-1"], "skill": "poteto-mode" },
+    { "role": "hillclimb", "models": ["claude-fable-5-1"], "skill": "poteto-mode" },
     { "role": "judgment and prose", "models": ["claude-opus-5"], "skill": "poteto-mode" },
-    { "role": "strongest judgment", "models": ["claude-fable-5"], "skill": "poteto-mode" },
+    { "role": "strongest judgment", "models": ["claude-fable-5-1"], "skill": "poteto-mode" },
     { "role": "how explorer", "models": ["claude-opus-5"], "skill": "how" },
     { "role": "how explainer", "models": ["claude-opus-5"], "skill": "how" },
     { "role": "why investigators", "models": ["claude-opus-5"], "skill": "why" },

@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.33 - worktree-audit resolves the trunk from the remote
+
+`worktree-audit.sh` read the trunk as a literal `main` in both its fetch and its `git merge-base --is-ancestor` check. On a repo that trunks anywhere else the fetch failed, the run warned once, and every worktree came back `MERGED=?`, which never reaches the `safe` bucket, so a merged worktree read as unresolved and the prune audit stopped pruning. The script now reads the trunk from `refs/remotes/origin/HEAD`, falls back to the `HEAD branch:` line of `git remote show origin`, and keeps `main` only when the remote published no HEAD at all. The pin remains at `e8d856f`.
+
 ## 0.9.32 - setup-pstack toggles the session hook and names the sheet per runtime
 
 `setup-pstack` asks whether the SessionStart hook should route tasks, default on, and records the answer as a `session hook: on` or `off` line in `~/.claude/pstack-models.md`; the generator emits that line in the sheet block. `hooks.json` greps for `session hook: off` before injecting the mandate, so the choice survives plugin updates, replacing the README advice to delete `hooks.json`. `tests/session-hook.test.mjs` runs the shipped command under a temp HOME for no sheet, on, and off. The skill gains an Other runtimes table naming the sheet path, load mechanism, and model listing for Codex, opencode, Gemini CLI, and Prime Agent; the opencode and Gemini rows come from published docs with no live session recorded, and the table is the one place that names the sheet path per runtime. The generator locates the sheet block by the step's title rather than its number, so inserting a step no longer moves the anchor. The pin remains at `e8d856f`.

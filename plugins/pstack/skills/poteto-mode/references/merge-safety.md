@@ -4,34 +4,18 @@ Use this reference with [Shipping](../playbooks/shipping.md) and before topology
 
 ## Read both pending mechanisms
 
-GitHub exposes automatic requests and queue membership separately. Query both for each affected PR, using explicit repository identity:
+Use `ship-pr` under the installed plugin's `skills/poteto-mode/scripts/watch-pr/` directory. It owns GitHub transport, parsing, cancellation order, and readback. The watcher and this command share one `LandingRevision` containing the repository, PR number, head OID, base branch, and base OID.
 
 ```sh
-gh api graphql -f query='query($owner:String!,$repo:String!,$pr:Int!) {
-  repository(owner:$owner,name:$repo) {
-    pullRequest(number:$pr) {
-      id state headRefOid baseRefName
-      autoMergeRequest { enabledAt }
-      mergeQueueEntry { id }
-      mergeCommit { oid }
-    }
-  }
-}' -f owner="$owner" -f repo="$repo" -F pr="$pr"
+ship-pr inspect --repo "$owner/$repo" --pr "$pr" > "$record_file"
+ship-pr cancel-pending --record "$record_file"
 ```
 
-Treat errors, missing fields, null repository/PR, or unsupported APIs as unknown state. A successful read with both fields explicitly null establishes no pending request at that observation only. It does not prevent another actor from rearming.
+Run the installed command by its full path when it is not on PATH. Inspect emits `kind: inspected` with a parsed landing record, including both pending mechanisms and the merge commit when present. Save that record with the verification evidence. Cancellation accepts the saved record, rereads current state, disables auto-merge when present, rereads queue membership, dequeues when needed, and verifies both mechanisms are absent on the same open landing revision. It does not merge, push, retarget, or grant landing authority.
 
-Before rewriting or retargeting, capture the dependency chain and remote heads, coordinate its topology writer, and cancel each affected pending mechanism. Disable auto-merge with `gh pr merge "$pr" --repo "$owner/$repo" --disable-auto`. Reread queue membership after disabling auto-merge. If it remains, remove it separately:
+Only exit 0 with `kind: cancelled` permits the planned topology operation. `changed`, `not-open`, and `still-pending` return exit 1 with the observed record. `unavailable` returns exit 1 with the read or mutation failure. Missing fields and unsupported APIs never mean an absent request. Reconcile those outcomes before rewriting; do not replace the saved record merely to bypass a mismatch.
 
-```sh
-gh api graphql -f query='mutation($id:ID!) {
-  dequeuePullRequest(input:{pullRequestId:$id}) {
-    mergeQueueEntry { id }
-  }
-}' -f id="$pr_node_id"
-```
-
-Read both fields again for every affected PR and require an open PR with neither pending mechanism before mutating topology. Do not cancel unrelated PRs. If state changes or is unreadable, stop and reconcile. On Origin, establish and verify the equivalent pending states and cancellation operations with the installed service; GitHub fields cannot describe Origin's state.
+Establish the affected dependency chain and coordinate its topology writer first. Inspect and cancel each affected PR, including descendants whose context will change; leave unrelated PRs alone. Cancellation is an observed condition, not a lock against another actor rearming afterward. If state changes, stop and reconcile. Origin must supply an equivalent validated operation through its installed service; this command is GitHub-specific and must not be presented as Origin support.
 
 ## Preserve concurrent writes and child changes
 

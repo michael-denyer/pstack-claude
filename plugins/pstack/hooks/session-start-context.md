@@ -12,7 +12,5 @@ It routes to the specific pstack skills from there. Below that bar, work directl
 
 When the intent is already specific, enter that skill directly: `pstack:tdd`, `pstack:architect`, `pstack:how`, `pstack:why`, `pstack:arena`, `pstack:interrogate`.
 
-If you were dispatched as a subagent to execute a specific task, ignore this block; poteto-mode governs the orchestrating session and already shaped your dispatch.
-
 User instructions (CLAUDE.md, AGENTS.md, direct requests) take precedence. Other session-start mandates (such as superpowers) compose with it: their skill-check discipline stands, and poteto-mode is the implementation entry point they route to for work above the bar.
 </EXTREMELY_IMPORTANT>

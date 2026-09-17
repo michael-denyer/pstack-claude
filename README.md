@@ -36,7 +36,7 @@ Add the marketplace and install the plugin:
 /plugin install pstack@pstack-claude
 ```
 
-The plugin's `SessionStart` hook loads a short instruction on startup, `/clear`, and after compaction. It routes a task to `poteto-mode` when it spans more than one file, involves a design choice, is a bug with an unknown cause, or is a performance issue; smaller changes work directly. The full skill loads when invoked. Explicit user instructions take precedence, and dispatched subagents ignore the startup instruction.
+The plugin's `SessionStart` hook loads a short instruction on startup, `/clear`, and after compaction. It routes a task to `poteto-mode` when it spans more than one file, involves a design choice, is a bug with an unknown cause, or is a performance issue; smaller changes work directly. The full skill loads when invoked. Explicit user instructions take precedence.
 
 To disable automatic routing, delete `hooks/hooks.json` from the installed plugin at `~/.claude/plugins/cache/pstack-claude/pstack/<version>/`. A plugin update restores that file.
 

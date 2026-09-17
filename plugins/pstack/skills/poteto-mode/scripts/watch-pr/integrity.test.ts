@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { fakeReader, pendingCheck } from "./fakes.test-helper.ts";
+import { fakeReader, pendingCheck, failedCheck } from "./fakes.test-helper.ts";
 import { orderStack, WatcherQueryError } from "./github.ts";
 import { classifyPr, readSnapshot, runSimple, runQueued } from "./policy.ts";
 import { parsePrNumber } from "./types.ts";
@@ -41,27 +41,71 @@ describe("commit identity", () => {
   it("includes the checked commit in a ready proof", async () => {
     expect(
       classifyPr(await readSnapshot({ ...snapshotArgs, reader: fakeReader() })),
-    ).toMatchObject({ kind: "ready", pr: { proof: { headRefOid: "head" } } });
+    ).toMatchObject({
+      kind: "ready",
+      pr: { proof: { headRefOid: "head", baseRefName: "main" } },
+    });
   });
 
   it("rejects a changed head even when earlier checks and rollups passed", async () => {
     const reader = {
       ...fakeReader(),
-      async headCommit() {
-        return "replacement";
+      async revision() {
+        return { headRefOid: "replacement", baseRefName: "main" };
       },
     };
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
-      "PR head changed",
+      "PR head or destination changed",
     );
+  });
+
+  it("rejects a retarget even when the head and checks remain unchanged", async () => {
+    const reader = {
+      ...fakeReader(),
+      async revision() {
+        return { headRefOid: "head", baseRefName: "release" };
+      },
+    };
+    await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
+      "PR head or destination changed",
+    );
+  });
+
+  it("cannot report ready when the destination query is unavailable", async () => {
+    const reader = {
+      ...fakeReader(),
+      async revision() {
+        throw new WatcherQueryError({
+          kind: "command-exit", retryable: true, code: 1,
+          detail: "destination unavailable",
+        });
+      },
+    };
+    const verdict = await runSimple({
+      dependencies: {
+        reader,
+        emit() {},
+        clock: { now: () => 0, observedAt: () => "fixture", async sleep() {} },
+      },
+      contexts: [context],
+      mode: "single",
+      statusOnly: false,
+      options: { ...options, timeout: 0, maxQueryErrors: 1 },
+    });
+    expect(verdict).toMatchObject({
+      kind: "BLOCKER", blocker: { kind: "status-query" },
+    });
   });
 
   it("retries a changed head and only proves the stable observation", async () => {
     let reads = 0;
     const reader = {
       ...fakeReader(),
-      async headCommit() {
-        return ++reads === 1 ? "replacement" : "head";
+      async revision() {
+        return {
+          headRefOid: ++reads === 1 ? "replacement" : "head",
+          baseRefName: "main",
+        };
       },
     };
     const verdict = await runSimple({
@@ -78,7 +122,7 @@ describe("commit identity", () => {
     expect(reads).toBe(2);
     expect(verdict).toMatchObject({
       kind: "READY",
-      scope: { pr: { proof: { headRefOid: "head" } } },
+      scope: { pr: { proof: { headRefOid: "head", baseRefName: "main" } } },
     });
   });
 });
@@ -261,5 +305,39 @@ describe("deadline", () => {
     expect(result.kind).toBe("TIMEOUT");
     expect(now).toBe(1);
     expect(reads).toBe(1);
+  });
+});
+
+
+it("keeps queued pending checks waiting and stops when they fail without advancing", async () => {
+  let failed = false;
+  const reader = {
+    ...fakeReader(),
+    async checksFastPath() {
+      return {
+        kind: "checks" as const,
+        checks: [failed ? failedCheck("required-build") : pendingCheck("required-build")],
+      };
+    },
+  };
+  const events: string[] = [];
+  const verdict = await runQueued({
+    dependencies: {
+      reader,
+      emit(event) { events.push(event.kind); },
+      clock: {
+        now: () => 0,
+        observedAt: () => "fixture",
+        async sleep() { failed = true; },
+      },
+    },
+    contexts: [context],
+    options: { ...options, timeout: 0 },
+  });
+  expect(events).toContain("WAITING");
+  expect(events).not.toContain("ADVANCE");
+  expect(events).not.toContain("COMPLETE");
+  expect(verdict).toMatchObject({
+    kind: "BLOCKER", blocker: { kind: "failing-checks" },
   });
 });

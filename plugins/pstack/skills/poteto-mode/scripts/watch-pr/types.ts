@@ -162,6 +162,7 @@ export interface ReadyPr {
   readonly context: PrContext;
   readonly proof: {
     readonly headRefOid: string;
+    readonly baseRefName: string;
     readonly mergeability: "clear";
     readonly threads: readonly [];
     readonly ci: CiClean;
@@ -395,7 +396,9 @@ export interface GitHubReader {
   originRepo(): Promise<Repository | null>;
   currentPr(pr: PrNumber | null): Promise<PrContext>;
   pullRequest(context: PrContext): Promise<PullRequestFacts>;
-  headCommit(context: PrContext): Promise<string | null>;
+  revision(
+    context: PrContext,
+  ): Promise<Pick<PullRequestFacts, "headRefOid" | "baseRefName">>;
   openPullRequests(repository: Repository): Promise<readonly OpenPullRequest[]>;
   checksFastPath(context: PrContext): Promise<ChecksFastPath>;
   checkRollupPage(

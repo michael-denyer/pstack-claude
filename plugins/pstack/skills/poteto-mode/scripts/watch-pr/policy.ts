@@ -132,11 +132,15 @@ export async function readSnapshot(args: {
         github: merge.github,
       };
   }
-  if ((await args.reader.headCommit(args.context)) !== headRefOid)
+  const revision = await args.reader.revision(args.context);
+  if (
+    revision.headRefOid !== headRefOid ||
+    revision.baseRefName !== facts.baseRefName
+  )
     throw new WatcherQueryError({
       kind: "snapshot-changed",
       retryable: true,
-      detail: `PR head changed while collecting ${headRefOid}`,
+      detail: `PR head or destination changed while collecting ${headRefOid} against ${facts.baseRefName}`,
     });
   return {
     kind: "open",
@@ -220,6 +224,7 @@ function readyContribution(
     context: row.context,
     proof: {
       headRefOid: row.facts.headRefOid,
+      baseRefName: row.facts.baseRefName,
       mergeability: "clear",
       threads: [],
       ci: row.ci,

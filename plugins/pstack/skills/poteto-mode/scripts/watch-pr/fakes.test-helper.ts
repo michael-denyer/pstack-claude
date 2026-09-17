@@ -94,9 +94,12 @@ export function fakeReader(
       calls.push("pullRequest");
       return { ...defaults, ...options.facts, context: requested };
     },
-    async headCommit() {
-      calls.push("headCommit");
-      return options.facts?.headRefOid ?? defaults.headRefOid;
+    async revision() {
+      calls.push("revision");
+      return {
+        headRefOid: options.facts?.headRefOid ?? defaults.headRefOid,
+        baseRefName: options.facts?.baseRefName ?? defaults.baseRefName,
+      };
     },
     async openPullRequests() {
       calls.push("openPullRequests");

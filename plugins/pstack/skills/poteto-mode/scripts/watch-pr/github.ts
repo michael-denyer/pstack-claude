@@ -534,7 +534,9 @@ export class GhGitHubReader implements T.GitHubReader {
       context,
     );
   }
-  async headCommit(context: T.PrContext): Promise<string | null> {
+  async revision(
+    context: T.PrContext,
+  ): Promise<Pick<T.PullRequestFacts, "headRefOid" | "baseRefName">> {
     const value = record(
       await this.runJson([
         "gh",
@@ -544,11 +546,14 @@ export class GhGitHubReader implements T.GitHubReader {
         "--repo",
         `${context.owner}/${context.repo}`,
         "--json",
-        "headRefOid",
+        "headRefOid,baseRefName",
       ]),
       "pull request head",
     );
-    return optionalString(value.headRefOid, "pull request head.headRefOid");
+    return {
+      headRefOid: optionalString(value.headRefOid, "pull request head.headRefOid"),
+      baseRefName: string(value.baseRefName, "pull request base.baseRefName"),
+    };
   }
   async openPullRequests(
     repository: T.Repository,

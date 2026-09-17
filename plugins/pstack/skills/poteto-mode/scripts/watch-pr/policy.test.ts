@@ -108,7 +108,7 @@ describe("snapshot query planning", () => {
       "pullRequest",
       "reviewThreads",
       "checksFastPath",
-      "headCommit",
+      "revision",
     ]);
   });
 

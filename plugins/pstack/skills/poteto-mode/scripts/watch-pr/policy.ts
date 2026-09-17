@@ -1,3 +1,4 @@
+import { sameLandingRevision } from "./landing.ts";
 import { WatcherQueryError, resolveChecks } from "./github.ts";
 import { DeadlineExceeded, WatchDeadline } from "./deadline.ts";
 import type * as T from "./types.ts";
@@ -67,12 +68,12 @@ export async function readSnapshot(args: {
     return { kind: "merged", context: args.context, facts };
   if (facts.state === "CLOSED")
     return { kind: "closed", context: args.context, facts };
-  const headRefOid = facts.headRefOid;
-  if (headRefOid === null || headRefOid === "")
+  const { headRefOid, baseRefOid } = facts;
+  if (!headRefOid || !baseRefOid)
     throw new WatcherQueryError({
       kind: "snapshot-changed",
       retryable: true,
-      detail: "open PR has no head commit",
+      detail: "open PR has no head or base commit",
     });
   const [threads, checks] = await Promise.all([
     args.reader.reviewThreads(args.context),
@@ -133,10 +134,7 @@ export async function readSnapshot(args: {
       };
   }
   const revision = await args.reader.revision(args.context);
-  if (
-    revision.headRefOid !== headRefOid ||
-    revision.baseRefName !== facts.baseRefName
-  )
+  if (!sameLandingRevision({ ...facts, headRefOid, baseRefOid }, revision))
     throw new WatcherQueryError({
       kind: "snapshot-changed",
       retryable: true,
@@ -145,7 +143,7 @@ export async function readSnapshot(args: {
   return {
     kind: "open",
     context: args.context,
-    facts: { ...facts, headRefOid },
+    facts: { ...facts, headRefOid, baseRefOid },
     threads,
     ci,
     reviewAutomationRunning: checks.checks.some(
@@ -223,8 +221,12 @@ function readyContribution(
     kind: "ready-pr",
     context: row.context,
     proof: {
-      headRefOid: row.facts.headRefOid,
-      baseRefName: row.facts.baseRefName,
+      revision: {
+        context: row.context,
+        headRefOid: row.facts.headRefOid,
+        baseRefName: row.facts.baseRefName,
+        baseRefOid: row.facts.baseRefOid,
+      },
       mergeability: "clear",
       threads: [],
       ci: row.ci,

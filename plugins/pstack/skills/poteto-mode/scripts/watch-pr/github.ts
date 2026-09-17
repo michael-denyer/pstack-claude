@@ -1,3 +1,4 @@
+import { parseLandingRevision, type LandingRevision } from "./landing.ts";
 import { spawn } from "node:child_process";
 import { DeadlineExceeded, type WatchDeadline } from "./deadline.ts";
 import type * as T from "./types.ts";
@@ -102,7 +103,7 @@ function parseJson(text: string, label: string): unknown {
     });
   }
 }
-async function runJson(
+export async function runJson(
   argv: readonly [string, ...string[]],
   deadline?: WatchDeadline,
 ): Promise<unknown> {
@@ -445,6 +446,13 @@ export function parseReviewThreads(value: unknown): readonly T.ReviewThread[] {
       bugbotReviewPasses: passes,
     }));
 }
+function readLandingRevision(value: unknown, context: T.PrContext): LandingRevision {
+  try {
+    return parseLandingRevision(value, context);
+  } catch (error) {
+    return missing("landing revision", error instanceof Error ? error.message : String(error));
+  }
+}
 export function parsePullRequest(
   value: unknown,
   context: T.PrContext,
@@ -452,6 +460,7 @@ export function parsePullRequest(
   const object = record(value, "pull request");
   if (typeof object.isDraft !== "boolean")
     missing("pull request.isDraft", object.isDraft);
+  if (object.state === "OPEN") readLandingRevision(object, context);
   return {
     context,
     mergeable: enumValue(
@@ -466,6 +475,7 @@ export function parsePullRequest(
     ),
     reviewDecision: reviewDecision(object.reviewDecision),
     headRefOid: optionalString(object.headRefOid, "pull request.headRefOid"),
+    baseRefOid: optionalString(object.baseRefOid, "pull request.baseRefOid"),
     headRefName: string(object.headRefName, "pull request.headRefName"),
     baseRefName: string(object.baseRefName, "pull request.baseRefName"),
     state: enumValue(
@@ -529,14 +539,14 @@ export class GhGitHubReader implements T.GitHubReader {
         "--repo",
         `${context.owner}/${context.repo}`,
         "--json",
-        "mergeable,mergeStateStatus,reviewDecision,headRefOid,headRefName,baseRefName,state,mergedAt,isDraft",
+        "mergeable,mergeStateStatus,reviewDecision,headRefOid,headRefName,baseRefName,baseRefOid,state,mergedAt,isDraft",
       ]),
       context,
     );
   }
   async revision(
     context: T.PrContext,
-  ): Promise<Pick<T.PullRequestFacts, "headRefOid" | "baseRefName">> {
+  ): Promise<LandingRevision> {
     const value = record(
       await this.runJson([
         "gh",
@@ -546,14 +556,11 @@ export class GhGitHubReader implements T.GitHubReader {
         "--repo",
         `${context.owner}/${context.repo}`,
         "--json",
-        "headRefOid,baseRefName",
+        "headRefOid,baseRefName,baseRefOid",
       ]),
       "pull request head",
     );
-    return {
-      headRefOid: optionalString(value.headRefOid, "pull request head.headRefOid"),
-      baseRefName: string(value.baseRefName, "pull request base.baseRefName"),
-    };
+    return readLandingRevision(value, context);
   }
   async openPullRequests(
     repository: T.Repository,

@@ -36,7 +36,7 @@ if (scenario === 'slow') {
 }
 let value;
 if (args[0] === 'pr' && args[1] === 'view') {
-  value = { headRefOid: 'head', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', reviewDecision: 'APPROVED', headRefName: 'feature', baseRefName: 'main', state: 'OPEN', mergedAt: null, isDraft: false };
+  value = { headRefOid: 'head', baseRefOid: 'base', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', reviewDecision: 'APPROVED', headRefName: 'feature', baseRefName: 'main', state: 'OPEN', mergedAt: null, isDraft: false };
 } else if (args[0] === 'pr' && args[1] === 'checks') {
   value = [{ name: 'ci', state: 'SUCCESS', bucket: 'pass', description: '', link: '', workflow: '' }];
 } else if (args[0] === 'pr' && args[1] === 'list') {

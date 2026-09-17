@@ -43,7 +43,7 @@ describe("commit identity", () => {
       classifyPr(await readSnapshot({ ...snapshotArgs, reader: fakeReader() })),
     ).toMatchObject({
       kind: "ready",
-      pr: { proof: { headRefOid: "head", baseRefName: "main" } },
+      pr: { proof: { revision: { context, headRefOid: "head", baseRefName: "main", baseRefOid: "base" } } },
     });
   });
 
@@ -51,7 +51,7 @@ describe("commit identity", () => {
     const reader = {
       ...fakeReader(),
       async revision() {
-        return { headRefOid: "replacement", baseRefName: "main" };
+        return { context, headRefOid: "replacement", baseRefName: "main", baseRefOid: "base" };
       },
     };
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
@@ -63,7 +63,19 @@ describe("commit identity", () => {
     const reader = {
       ...fakeReader(),
       async revision() {
-        return { headRefOid: "head", baseRefName: "release" };
+        return { context, headRefOid: "head", baseRefName: "release", baseRefOid: "base" };
+      },
+    };
+    await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
+      "PR head or destination changed",
+    );
+  });
+
+  it("rejects base movement with the same head and base branch", async () => {
+    const reader = {
+      ...fakeReader(),
+      async revision() {
+        return { context, headRefOid: "head", baseRefName: "main", baseRefOid: "advanced" };
       },
     };
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
@@ -103,6 +115,7 @@ describe("commit identity", () => {
       ...fakeReader(),
       async revision() {
         return {
+          context, baseRefOid: "base",
           headRefOid: ++reads === 1 ? "replacement" : "head",
           baseRefName: "main",
         };
@@ -122,7 +135,7 @@ describe("commit identity", () => {
     expect(reads).toBe(2);
     expect(verdict).toMatchObject({
       kind: "READY",
-      scope: { pr: { proof: { headRefOid: "head", baseRefName: "main" } } },
+      scope: { pr: { proof: { revision: { context, headRefOid: "head", baseRefName: "main", baseRefOid: "base" } } } },
     });
   });
 });

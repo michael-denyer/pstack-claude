@@ -2,6 +2,17 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.34 - improve agent workflow reliability
+
+These workflow changes are deliberate local forks. Preserve them during upstream sync.
+
+- Testing guidance evaluates the defects a test detects. Required absence, explicit default-value contracts, useful comparisons, and shared setup remain valid. Weak assertions need stronger expectations when correctness requires a particular result.
+- Debugging guidance challenges the assumption shared by failed fixes. Per-actor measurements apply when the hypothesis concerns uneven allocation; an even distribution does not rule out a shared defect.
+- Shipping binds immediate merges to the verified head, records the intended destination, cancels automatic requests and queue entries before dependent work is rewritten, and requires durable verification gates for future merges. Explicit remote leases protect concurrent changes, and child rebases exclude a squashed parent's old commits. The watcher detects destination changes while collecting readiness evidence. Local Git tests and a disposable GitHub verification tool cover the merge mechanics.
+- Decision records distinguish attributable human instructions from agent interpretations. Missing originals leave exact scope uncertain, and copied summaries remain one evidence chain. Component ownership narrows irrelevant investigations without blocking relevant cross-component work.
+- Pause checkpoints preserve explicitly requested resume artifacts in durable storage, link them from the resume note, and verify their contents and order. Continuing work does not trigger a pause.
+- Architecture guidance reconciles accepted deviations with the saved design before the next implementation unit. Local changes can leave the shared contract intact; unaccepted behavior cannot rewrite the agreement.
+
 ## 0.9.33 - worktree-audit resolves the trunk from the remote
 
 `worktree-audit.sh` read the trunk as a literal `main` in both its fetch and its `git merge-base --is-ancestor` check. On a repo that trunks anywhere else the fetch failed, the run warned once, and every worktree came back `MERGED=?`, which never reaches the `safe` bucket, so a merged worktree read as unresolved and the prune audit stopped pruning. The script now asks the remote with `git ls-remote --symref origin HEAD`, which is plumbing and needs no locale pin or placeholder matching, and uses `main` only when the remote publishes no usable HEAD. An explicit fetch refspec updates the trunk's remote-tracking ref even in a single-branch clone. Regression tests use local Git remotes to cover non-main trunks, missing cached HEADs, single-branch clones, and unknown remote HEADs. The pin remains at `e8d856f`.

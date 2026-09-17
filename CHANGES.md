@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.31 - tighten the SessionStart mandate gate
+
+`hooks/session-start-context.md` names three criteria for entering `poteto-mode`: more than one file or a signature other files call, a design or architecture choice, a bug with an unknown cause or a performance issue. Below the bar the agent works directly and verifies on the real artifact. Before, anything beyond a one-line edit routed in, and the skill has no small-task path, so a contained one-file change paid for `how`, `architect`, and a delegate. The direct-entry list now carries skill names only, and the subagent clause is gone: SessionStart does not fire for Agent-tool subagents, which start from their own system prompt, the task, CLAUDE.md, git status, and preloaded skills. The hook is 147 words, down from 176. The README describes the bar. The pin remains at `e8d856f`.
+
 ## 0.9.30 - move the Fable roles to Fable 5.1
 
 `plugins/pstack/models.json` names `claude-fable-5-1` where it named `claude-fable-5`: the panel, the available-model list (label `Fable 5.1`), and the four single-model roles `bug-fix`, `perf-issue`, `hillclimb`, and `strongest judgment`. The generator restamped the `## Models` sections of `poteto-mode`, `arena`, `architect`, and `interrogate`, the interrogate reviewer table, and setup-pstack's override sheet and available-model line. The README panel row states the new default. Fable 5 leaves the available-model list. The pin remains at `e8d856f`.

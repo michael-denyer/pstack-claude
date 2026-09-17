@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.32 - setup-pstack toggles the session hook and names the sheet per runtime
+
+`setup-pstack` asks whether the SessionStart hook should route tasks, default on, and records the answer as a `session hook: on` or `off` line in `~/.claude/pstack-models.md`; the generator emits that line in the sheet block. `hooks.json` greps for `session hook: off` before injecting the mandate, so the choice survives plugin updates, replacing the README advice to delete `hooks.json`. `tests/session-hook.test.mjs` runs the shipped command under a temp HOME for no sheet, on, and off. The skill gains an Other runtimes table naming the sheet path, load mechanism, and model listing for Codex, opencode, Gemini CLI, and Prime Agent; the opencode and Gemini rows come from published docs with no live session recorded. The pin remains at `e8d856f`.
+
 ## 0.9.31 - tighten the SessionStart mandate gate
 
 `hooks/session-start-context.md` names three criteria for entering `poteto-mode`: more than one file or a signature other files call, a design or architecture choice, a bug with an unknown cause or a performance issue. Below the bar the agent works directly and verifies on the real artifact. Before, anything beyond a one-line edit routed in, and the skill has no small-task path, so a contained one-file change paid for `how`, `architect`, and a delegate. The direct-entry list now carries skill names only, and the subagent clause is gone: SessionStart does not fire for Agent-tool subagents, which start from their own system prompt, the task, CLAUDE.md, git status, and preloaded skills. The hook is 147 words, down from 176. The README describes the bar. The pin remains at `e8d856f`.

@@ -80,17 +80,20 @@ classify_bucket() {
 
 # The trunk is whatever the remote says it is; assuming main leaves every
 # worktree unresolved on a repo that trunks elsewhere. main is the last resort,
-# for a remote that published no HEAD at all.
+# when the remote's default branch cannot be determined.
 base_branch=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)
 base_branch="${base_branch#origin/}"
 if [ -z "$base_branch" ]; then
-    base_branch=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
+    base_branch=$(LC_ALL=C git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
 fi
-[ -n "$base_branch" ] || base_branch=main
+case "$base_branch" in
+    ''|'(unknown)') base_branch=main ;;
+esac
 
 # Keep displaying partial facts when discovery fails, but never label them safe.
 discovery_known=yes
-if ! fetch_err=$(git fetch origin "$base_branch" 2>&1 >/dev/null); then
+# Explicitly update the ref even when a single-branch clone does not track it.
+if ! fetch_err=$(git fetch origin "+refs/heads/$base_branch:refs/remotes/origin/$base_branch" 2>&1 >/dev/null); then
     discovery_known=no
     echo "warn: could not fetch origin/$base_branch; merged column may be stale: $fetch_err" >&2
 fi

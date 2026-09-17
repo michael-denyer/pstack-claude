@@ -4,7 +4,7 @@ This port applies the Cursor → Claude Code substitutions in skill bodies. Earl
 
 ## 0.9.33 - worktree-audit resolves the trunk from the remote
 
-`worktree-audit.sh` read the trunk as a literal `main` in both its fetch and its `git merge-base --is-ancestor` check. On a repo that trunks anywhere else the fetch failed, the run warned once, and every worktree came back `MERGED=?`, which never reaches the `safe` bucket, so a merged worktree read as unresolved and the prune audit stopped pruning. The script now reads the trunk from `refs/remotes/origin/HEAD`, falls back to the `HEAD branch:` line of `git remote show origin`, and keeps `main` only when the remote published no HEAD at all. The pin remains at `e8d856f`.
+`worktree-audit.sh` read the trunk as a literal `main` in both its fetch and its `git merge-base --is-ancestor` check. On a repo that trunks anywhere else the fetch failed, the run warned once, and every worktree came back `MERGED=?`, which never reaches the `safe` bucket, so a merged worktree read as unresolved and the prune audit stopped pruning. The script now reads the trunk from `refs/remotes/origin/HEAD`, falls back to the `HEAD branch:` line of `git remote show origin`, and uses `main` when the result is empty or `(unknown)`. An explicit fetch refspec updates the trunk's remote-tracking ref even in a single-branch clone. Regression tests use local Git remotes to cover non-main trunks, missing cached HEADs, single-branch clones, and unknown remote HEADs. The pin remains at `e8d856f`.
 
 ## 0.9.32 - setup-pstack toggles the session hook and names the sheet per runtime
 

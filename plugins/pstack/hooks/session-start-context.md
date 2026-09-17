@@ -6,7 +6,6 @@ Invoke the `pstack:poteto-mode` skill with the Skill tool, and follow it, when a
 - it touches more than one file, or changes a signature other files call
 - it involves a design or architecture choice
 - it is a bug whose cause is not yet known, or a performance issue
-- the user names poteto, /poteto-mode, or a pstack skill
 
 It routes to the specific pstack skills from there. Below that bar, work directly and verify on the real artifact: a contained change to one file with an obvious test, a question, a one-line edit.
 

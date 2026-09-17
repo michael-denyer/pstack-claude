@@ -133,6 +133,13 @@ function pr(number, state, headRefName, headRefOid) {
   return { number, state, headRefName, headRefOid };
 }
 
+function assertAncestorSafe(fixture) {
+  const ancestor = addWorktree(fixture, 'ancestor', 'ancestor');
+  const row = rowFor(runAudit(fixture), ancestor);
+  assert.equal(row[2], 'YES');
+  assert.equal(row[7], 'safe');
+}
+
 test('preserves spaced worktree paths and rejects closed PRs as safe evidence', () => {
   const fixture = createRepo();
   const candidate = addWorktree(fixture, 'candidate', 'candidate');
@@ -162,31 +169,22 @@ for (const cachedHead of [true, false]) {
   test(`audits a non-main trunk with cached HEAD ${cachedHead}`, () => {
     const fixture = createRemoteRepo('release');
     if (!cachedHead) git('-C', fixture.repo, 'symbolic-ref', '--delete', 'refs/remotes/origin/HEAD');
-    const ancestor = addWorktree(fixture, 'ancestor', 'ancestor');
-    const row = rowFor(runAudit(fixture), ancestor);
-    assert.equal(row[2], 'YES');
-    assert.equal(row[7], 'safe');
+    assertAncestorSafe(fixture);
   });
 }
 
-test('audits the default branch outside a single-branch clone fetch refspec', () => {
+test('fetches a trunk the single-branch clone does not track', () => {
   const fixture = createRemoteRepo('release', ['--single-branch', '--branch', 'other']);
   assert.equal(git('-C', fixture.repo, 'for-each-ref', '--format=%(refname)',
     'refs/remotes/origin/release'), '');
-  const ancestor = addWorktree(fixture, 'ancestor', 'ancestor');
-  const row = rowFor(runAudit(fixture), ancestor);
-  assert.equal(row[2], 'YES');
-  assert.equal(row[7], 'safe');
+  assertAncestorSafe(fixture);
 });
 
 test('falls back to main when the remote advertises an unknown HEAD', () => {
   const fixture = createRemoteRepo('main');
   git('--git-dir', fixture.remote, 'symbolic-ref', 'HEAD', 'refs/heads/missing');
   git('-C', fixture.repo, 'symbolic-ref', '--delete', 'refs/remotes/origin/HEAD');
-  const ancestor = addWorktree(fixture, 'ancestor', 'ancestor');
-  const row = rowFor(runAudit(fixture), ancestor);
-  assert.equal(row[2], 'YES');
-  assert.equal(row[7], 'safe');
+  assertAncestorSafe(fixture);
 });
 
 test('holds tracked dirty work', () => {

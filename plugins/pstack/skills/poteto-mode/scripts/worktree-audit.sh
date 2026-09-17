@@ -80,15 +80,10 @@ classify_bucket() {
 
 # The trunk is whatever the remote says it is; assuming main leaves every
 # worktree unresolved on a repo that trunks elsewhere. main is the last resort,
-# when the remote's default branch cannot be determined.
-base_branch=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)
-base_branch="${base_branch#origin/}"
-if [ -z "$base_branch" ]; then
-    base_branch=$(LC_ALL=C git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
-fi
-case "$base_branch" in
-    ''|'(unknown)') base_branch=main ;;
-esac
+# when the remote publishes no usable HEAD.
+base_branch=$(git ls-remote --symref origin HEAD 2>/dev/null \
+    | sed -n 's|^ref: refs/heads/\(.*\)[[:space:]]HEAD$|\1|p')
+base_branch="${base_branch:-main}"
 
 # Keep displaying partial facts when discovery fails, but never label them safe.
 discovery_known=yes

@@ -105,7 +105,7 @@ These verification notes describe prior checks, not a guarantee that every workf
 
 ## Configure models and dependencies
 
-Use `setup-pstack` to choose models for each role and, on Claude Code, whether the session hook routes tasks. Defaults live in [models.json](plugins/pstack/models.json). The Claude Code override sheet is `~/.claude/pstack-models.md`; on Codex it is `~/.codex/pstack-models.md`, whose contents belong in `~/.codex/AGENTS.md`. The skill's Other runtimes table gives the opencode, Gemini CLI, and Prime Agent paths. Use distinct available models for panels that compare independent designs or reviews.
+Use `setup-pstack` to choose models for each role and, on Claude Code, whether the session hook routes tasks. Defaults live in [models.json](plugins/pstack/models.json). The skill's Other runtimes table names the override sheet path and how it loads on each runtime. Use distinct available models for panels that compare independent designs or reviews.
 
 Install dependencies for the workflows you plan to use:
 

@@ -37,12 +37,16 @@ describe("locators", () => {
     expect(section("Absent")(doc)).toBeNull();
   });
 
-  test("fenceUnder spans the inside of the first matching fence after the heading", () => {
+  test("fenceUnder spans the inside of the first matching fence after the titled step, whatever its number", () => {
     const doc = lines("### 5. Write the override sheet\n\ntext\n```markdown\na\nb\n```\nafter");
-    expect(fenceUnder("### 5. Write", "markdown")(doc)).toEqual([4, 6]);
-    expect(fenceUnder("### 5. Write", "yaml")(doc)).toBeNull();
-    expect(fenceUnder("### 9.", "markdown")(doc)).toBeNull();
-    expect(fenceUnder("### 5. Write", "markdown")(lines("### 5. Write\n```markdown\nunclosed"))).toBeNull();
+    const renumbered = lines("### 6. Write the override sheet\n```markdown\na\n```");
+    const unclosed = lines("### 5. Write the override sheet\n```markdown\nunclosed");
+    expect(fenceUnder("Write the override sheet", "markdown")(doc)).toEqual([4, 6]);
+    expect(fenceUnder("Write the override sheet", "markdown")(renumbered)).toEqual([2, 3]);
+    expect(fenceUnder("Write the override sheet", "yaml")(doc)).toBeNull();
+    expect(fenceUnder("Write", "markdown")(doc)).toBeNull();
+    expect(fenceUnder("Absent", "markdown")(doc)).toBeNull();
+    expect(fenceUnder("Write the override sheet", "markdown")(unclosed)).toBeNull();
   });
 
   test("tableRows spans the consecutive rows with the prefix after the separator", () => {

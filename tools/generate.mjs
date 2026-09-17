@@ -319,9 +319,12 @@ export const section = (title) => (lines) => {
   return [start + 1, end];
 };
 
-// The inside of the first ```<lang> fence after a heading line.
-export const fenceUnder = (heading, lang) => (lines) => {
-  const step = lines.findIndex((l) => l.startsWith(heading));
+// The inside of the first ```<lang> fence after the `### N. <title>` step
+// heading. The ordinal is not part of the anchor, so inserting a step above it
+// does not move the region.
+export const fenceUnder = (title, lang) => (lines) => {
+  const heading = "### " + title;
+  const step = lines.findIndex((l) => l.replace(/^### \d+\. /, "### ") === heading);
   if (step === -1) return null;
   const open = lines.indexOf("```" + lang, step);
   if (open === -1) return null;
@@ -377,7 +380,7 @@ export function regions(models) {
     {
       file: skillFile("setup-pstack"),
       name: "override sheet",
-      locate: fenceUnder("### 6. Write the override sheet", "markdown"),
+      locate: fenceUnder("Write the override sheet", "markdown"),
       render: () => [overrideSheetBlock(models)],
     },
     {
@@ -471,7 +474,9 @@ export function overrideSheetBlock(models) {
     "Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; " +
     "the values here override those defaults. Delete a line to fall back to the skill default. " +
     "A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); " +
-    "an alias entry in a panel list still counts toward that panel's fan-out.\n\n" +
+    "an alias entry in a panel list still counts toward that panel's fan-out. " +
+    "`session hook: off` stops the Claude Code SessionStart hook from injecting the poteto-mode mandate; " +
+    "any other value, or no line, leaves it on.\n\n" +
     rows +
     "\n\nsession hook: on"
   );

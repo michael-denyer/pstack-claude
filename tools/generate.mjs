@@ -377,7 +377,7 @@ export function regions(models) {
     {
       file: skillFile("setup-pstack"),
       name: "override sheet",
-      locate: fenceUnder("### 5. Write the override sheet", "markdown"),
+      locate: fenceUnder("### 6. Write the override sheet", "markdown"),
       render: () => [overrideSheetBlock(models)],
     },
     {
@@ -472,7 +472,8 @@ export function overrideSheetBlock(models) {
     "the values here override those defaults. Delete a line to fall back to the skill default. " +
     "A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); " +
     "an alias entry in a panel list still counts toward that panel's fan-out.\n\n" +
-    rows
+    rows +
+    "\n\nsession hook: on"
   );
 }
 

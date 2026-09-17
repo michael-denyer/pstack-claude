@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start-context.md\"",
+            "command": "grep -s '^session hook: off' \"$HOME/.claude/pstack-models.md\" >/dev/null || cat \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start-context.md\"",
             "shell": "bash",
             "async": false
           }

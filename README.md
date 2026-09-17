@@ -38,7 +38,7 @@ Add the marketplace and install the plugin:
 
 The plugin's `SessionStart` hook loads a short instruction on startup, `/clear`, and after compaction. It routes a task to `poteto-mode` when it spans more than one file, involves a design choice, is a bug with an unknown cause, or is a performance issue; smaller changes work directly. The full skill loads when invoked. Explicit user instructions take precedence.
 
-To disable automatic routing, delete `hooks/hooks.json` from the installed plugin at `~/.claude/plugins/cache/pstack-claude/pstack/<version>/`. A plugin update restores that file.
+To turn automatic routing off, run `/setup-pstack` and answer no to the session hook, or write `session hook: off` in `~/.claude/pstack-models.md`. The hook checks that line before it injects anything.
 
 ### Shared skills for Codex, Prime Agent, opencode, and Gemini CLI
 
@@ -105,7 +105,7 @@ These verification notes describe prior checks, not a guarantee that every workf
 
 ## Configure models and dependencies
 
-Use `setup-pstack` to choose models for each role. Defaults live in [models.json](plugins/pstack/models.json). The Claude Code override sheet is `~/.claude/pstack-models.md`; on Codex it is `~/.codex/pstack-models.md`, whose contents belong in `~/.codex/AGENTS.md`. Use distinct available models for panels that compare independent designs or reviews.
+Use `setup-pstack` to choose models for each role and, on Claude Code, whether the session hook routes tasks. Defaults live in [models.json](plugins/pstack/models.json). The Claude Code override sheet is `~/.claude/pstack-models.md`; on Codex it is `~/.codex/pstack-models.md`, whose contents belong in `~/.codex/AGENTS.md`. The skill's Other runtimes table gives the opencode, Gemini CLI, and Prime Agent paths. Use distinct available models for panels that compare independent designs or reviews.
 
 Install dependencies for the workflows you plan to use:
 

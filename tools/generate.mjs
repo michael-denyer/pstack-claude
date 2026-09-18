@@ -523,8 +523,7 @@ export function strayModelSlugs(file, text, models) {
 
 // Every ${CLAUDE_PLUGIN_ROOT}/<path> a hook command names must exist in the
 // plugin, and one the command executes directly must be executable, or the
-// SessionStart hook fails silently for every user. Codex supplies this name as
-// a compatibility alias for PLUGIN_ROOT.
+// SessionStart hook fails silently for every user.
 export function validateHooks(hooksJson, { statOf }) {
   const problems = [];
   for (const [event, groups] of Object.entries(JSON.parse(hooksJson).hooks ?? {})) {

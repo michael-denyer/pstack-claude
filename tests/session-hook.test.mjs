@@ -13,21 +13,28 @@ const command = sessionStart.hooks[0].command;
 const mandate = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
 const codexManifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8"));
 
+// Codex sets PLUGIN_ROOT; CODEX_HOME is only present when the user has
+// relocated their Codex directory.
+const runtimes = {
+  claude: { sheetDir: ".claude", env: () => ({}) },
+  codex: { sheetDir: ".codex", env: () => ({ PLUGIN_ROOT: pluginRoot }) },
+  "codex with CODEX_HOME": {
+    sheetDir: "codex-home",
+    env: (sheetRoot) => ({ PLUGIN_ROOT: pluginRoot, CODEX_HOME: sheetRoot }),
+  },
+};
+
 function runHook(runtime, sheet) {
   const home = mkdtempSync(join(tmpdir(), "pstack-hook-"));
-  const sheetRoot = join(home, runtime === "codex" ? ".codex" : ".claude");
+  const { sheetDir, env } = runtimes[runtime];
+  const sheetRoot = join(home, sheetDir);
   if (sheet !== null) {
     mkdirSync(sheetRoot);
     writeFileSync(join(sheetRoot, "pstack-models.md"), sheet);
   }
   try {
-    const env = { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot };
-    if (runtime === "codex") {
-      env.PLUGIN_ROOT = pluginRoot;
-      env.CODEX_HOME = sheetRoot;
-    }
     const r = spawnSync("sh", ["-c", command], {
-      env,
+      env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot, ...env(sheetRoot) },
       encoding: "utf8",
     });
     return { status: r.status, out: r.stdout, err: r.stderr };
@@ -37,12 +44,14 @@ function runHook(runtime, sheet) {
 }
 
 describe("SessionStart hook", () => {
+  // The manifest names the shared hooks file instead of relying on Codex's
+  // default discovery; `resume` keeps the mandate present after a restart.
   test("declares the hook in the Codex manifest", () => {
     expect(codexManifest.hooks).toBe("./hooks/hooks.json");
     expect(sessionStart.matcher).toBe("startup|resume|clear|compact");
   });
 
-  for (const runtime of ["claude", "codex"]) {
+  for (const runtime of Object.keys(runtimes)) {
     describe(runtime, () => {
       test("injects the mandate when no sheet exists", () => {
         expect(runHook(runtime, null)).toEqual({ status: 0, out: mandate, err: "" });

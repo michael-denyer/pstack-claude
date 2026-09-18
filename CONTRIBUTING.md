@@ -36,9 +36,22 @@ bun tools/generate.mjs
 bun test tests/
 ```
 
-The generator stamps the root `VERSION` into the three plugin manifests, validates every shared Agent Skill's `name` and `description`, emits one Codex prompt stub per public skill from its row in the README slash-command table, and stamps model defaults from `plugins/pstack/models.json`. It also copies the five files declared in `PORTABLE_ASSETS` into the skills-only boundary and removes stale files from their generated directories. `NOTICE-skills.md` is the source for the scoped notice that travels with those skills.
+The generator writes `VERSION` into all three plugin manifests and stamps model defaults from `plugins/pstack/models.json`. It validates each skill's `name` and `description`, then generates a Codex prompt for each public skill using the [slash-command table](docs/reference.md#slash-commands).
 
-The same run rejects missing or escaping local Markdown links and direct instructions to open unreachable paths. It also checks for stray model slugs, requires a matching `CHANGES.md` heading, validates the Codex marketplace and Claude hook paths, and enforces the plugin layout invariants: no `commands/` directory, no `disable-model-invocation` on any skill, `user-invocable: false` on every `principle-*` leaf, and plugin agents dispatched by their namespaced `pstack:<name>`. CI reruns it and fails on any resulting diff, so commit whatever it changes. Adding a skill means giving it `name` and `description` frontmatter and, unless it is a `principle-*` leaf carrying `user-invocable: false`, a row in the README slash-command table. That row is the source of the Codex slash-menu one-liner and of the table's order; the generator fails by name on a skill without a row or a row without a skill. Changing a model default means editing `models.json`, never a skill body; a role whose `models` is `"panel"` takes the shared panel list, so the panel is written once. `tests/models.test.mjs` pins the file's shape and checks that every role label is named by its skill's prose. A `claude-*` slug in skill prose outside a stamped region fails the generator with the file and line.
+It also copies the five files in `PORTABLE_ASSETS` into the skills-only installation and removes stale generated files. `NOTICE-skills.md` supplies the notice included with those skills.
+
+The generator rejects missing Markdown links, links outside the skills tree, and instructions to open unreachable files. It checks for stray model names, requires a matching `CHANGES.md` heading, and validates the Codex marketplace and Claude hook paths. It also enforces these rules:
+
+- No `commands/` directory.
+- No `disable-model-invocation` on a skill.
+- Every `principle-*` leaf sets `user-invocable: false`.
+- Plugin agents use their namespaced `pstack:<name>` names.
+
+CI reruns the generator and fails if files change, so commit its output.
+
+When adding a skill, include `name` and `description` in its frontmatter. Public skills also need a row in the slash-command table. The row supplies the Codex menu description and ordering. The generator reports any skill missing a row or any row without a skill.
+
+Change model defaults in `models.json`, never in a skill body. A role with `models: "panel"` uses the shared panel list. `tests/models.test.mjs` checks the configuration's structure and that skills name every role they use. A `claude-*` model name outside a generated region fails the generator with its file and line.
 
 `bun test tests/` covers the generator, the sync tool, the link validator, and `tests/invariants.test.mjs`, which builds fixture trees that must trip each layout invariant. One check is behavioral and lives in `tests/skill-collision-repro.sh`: it needs the `claude` CLI and API access and makes one haiku call to prove a user-typed `/plugin:name` reaches a skill with no `commands/` present. CI cannot run it, so run it locally at least once before a release.
 

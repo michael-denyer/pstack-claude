@@ -476,7 +476,7 @@ export function overrideSheetBlock(models) {
     "the values here override those defaults. Delete a line to fall back to the skill default. " +
     "A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); " +
     "an alias entry in a panel list still counts toward that panel's fan-out. " +
-    "`session hook: off` stops the Claude Code SessionStart hook from injecting the poteto-mode mandate; " +
+    "`session hook: off` stops the Claude Code or Codex SessionStart hook from injecting the poteto-mode mandate; " +
     "any other value, or no line, leaves it on.\n\n" +
     rows +
     "\n\nsession hook: on"
@@ -523,7 +523,8 @@ export function strayModelSlugs(file, text, models) {
 
 // Every ${CLAUDE_PLUGIN_ROOT}/<path> a hook command names must exist in the
 // plugin, and one the command executes directly must be executable, or the
-// SessionStart hook fails silently for every user.
+// SessionStart hook fails silently for every user. Codex supplies this name as
+// a compatibility alias for PLUGIN_ROOT.
 export function validateHooks(hooksJson, { statOf }) {
   const problems = [];
   for (const [event, groups] of Object.entries(JSON.parse(hooksJson).hooks ?? {})) {

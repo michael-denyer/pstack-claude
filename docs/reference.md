@@ -44,21 +44,21 @@ Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
 ## Runtime support
 
-All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. Claude Code's startup hook and native agent registration require the plugin. Codex command shortcuts are separate.
+All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code and Codex plugins also install automatic routing hooks. Codex command shortcuts are separate.
 
 | Runtime | Setup and recorded verification |
 | --- | --- |
-| Claude Code | Install the marketplace plugin. Skills use Claude tool names and model defaults. |
-| Codex | Install the native plugin through the repository's marketplace. The [Codex mapping](../plugins/pstack/skills/poteto-mode/references/codex-tools.md) translates Claude tools and model names. Shared skill symlinks were also detected in a live session. |
+| Claude Code | Install the marketplace plugin. Skills use Claude tool names and model defaults; the plugin installs automatic routing. |
+| Codex | Install the native plugin through the repository's marketplace and trust its hook through `/hooks`. The [Codex mapping](../plugins/pstack/skills/poteto-mode/references/codex-tools.md) translates Claude tools and model names. Shared skill symlinks were also detected in a live session. |
 | Prime Agent | Its documentation describes shared-directory discovery; it has not been tested in a live session. Choose tools and models through Prime's configuration. |
 | opencode | Discovery and reading a linked skill were verified on version 1.18.25. Configure agents, commands, and permissions in `opencode.json`. Its picker also lists principle skills. |
 | Gemini CLI | Its documentation describes shared-directory discovery; it has not been tested in a live session. Use `/skills list` to check discovery and `/skills reload` after changes. |
 
 These checks cover skill discovery. Delegation and multi-model workflows remain unverified on Prime Agent, opencode, and Gemini CLI. On those runtimes, agents must adapt Claude-specific tools, models, and configuration. The Codex mapping applies only to Codex.
 
-### Claude Code routing
+### Automatic routing
 
-The plugin's [SessionStart hook](../plugins/pstack/hooks/hooks.json) loads a short [routing instruction](../plugins/pstack/hooks/session-start-context.md) on startup, `/clear`, and after compaction. It invokes `poteto-mode` when a task meets any of these conditions:
+The Claude Code and Codex plugins share a [SessionStart hook](../plugins/pstack/hooks/hooks.json) that loads a short [routing instruction](../plugins/pstack/hooks/session-start-context.md) on startup, resume, clear, and compact. Codex requires the user to trust plugin hooks through `/hooks`. The instruction invokes `poteto-mode` when a task meets any of these conditions:
 
 - It touches more than one file or changes a signature other files call.
 - It involves a design or architecture choice.
@@ -66,9 +66,9 @@ The plugin's [SessionStart hook](../plugins/pstack/hooks/hooks.json) loads a sho
 
 Smaller tasks proceed directly. The full skill loads when invoked, and explicit user instructions take precedence.
 
-To disable routing, run `/pstack:setup-pstack` and turn off the session hook, or write `session hook: off` in `~/.claude/pstack-models.md`. The hook reads that setting before injecting its instruction. Without the setting, routing stays on.
+To disable routing, run `setup-pstack` and turn off the session hook. In Claude Code, use `/pstack:setup-pstack`. You can also write `session hook: off` in the runtime's sheet: `~/.claude/pstack-models.md` for Claude Code or `~/.codex/pstack-models.md` for Codex. The hook reads that setting before injecting its instruction. Without the setting, routing stays on.
 
-The startup hook ships only with the Claude Code plugin. On other runtimes, request `poteto-mode` explicitly. On Codex, you can add a standing instruction to use it in `AGENTS.md`.
+Skills-only installs and other runtimes do not include the hook. Request `poteto-mode` explicitly, or add a standing instruction to the runtime's instruction file.
 
 ### Shared skills installation
 
@@ -104,7 +104,7 @@ The [CI installation check](../.github/workflows/ci.yml) uses the skills CLI to 
 
 ### Codex
 
-The [native plugin manifest](../plugins/pstack/.codex-plugin/plugin.json) points to the shared skills directory. The [marketplace catalog](../.agents/plugins/marketplace.json) lists `pstack` in the `pstack-claude` marketplace.
+The [native plugin manifest](../plugins/pstack/.codex-plugin/plugin.json) points to the shared skills directory and [SessionStart hook](../plugins/pstack/hooks/hooks.json). The [marketplace catalog](../.agents/plugins/marketplace.json) lists `pstack` in the `pstack-claude` marketplace. Review and trust the hook through `/hooks`; Codex asks again when its definition changes.
 
 The [README installation](../README.md#codex) registers that catalog with `codex plugin marketplace add`, then installs the plugin with `codex plugin add`. These commands match the help output from `codex-cli 0.154.0-alpha.6.2`. A fresh native installation was not tested for this documentation change.
 

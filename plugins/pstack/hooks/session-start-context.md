@@ -1,7 +1,7 @@
 <EXTREMELY_IMPORTANT>
 You have pstack.
 
-Invoke the `pstack:poteto-mode` skill with the Skill tool, and follow it, when a task meets any of these:
+Invoke the `pstack:poteto-mode` skill and follow its instructions when a task meets any of these:
 
 - it touches more than one file, or changes a signature other files call
 - it involves a design or architecture choice

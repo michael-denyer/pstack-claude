@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.35 - route Codex sessions through pstack
+
+The bundled `SessionStart` hook now runs on both Claude Code and Codex. A runtime-aware executable reads `session hook` from `~/.claude/pstack-models.md` or `~/.codex/pstack-models.md`, while the Codex manifest explicitly declares the shared hook and includes resume events. The setup skill, Codex mapping, README, and reference explain Codex's `/hooks` trust step and the difference between native-plugin and skills-only installs. Tests execute the shipped command under both runtime environments and cover missing, on, and off settings. The upstream pin remains at `e8d856f`.
+
 ## 0.9.34 - improve agent workflow reliability
 
 These workflow changes are deliberate local forks. Preserve them during upstream sync.

@@ -14,8 +14,8 @@ const skillsDir = fileURLToPath(new URL("../plugins/pstack/skills", import.meta.
 const names = new Set(agentSkills(skillsDir).map((s) => s.name));
 const principles = new Set([...names].filter((n) => n.startsWith("principle-")));
 
-// Claude Code built-ins and explanatory mentions of Cursor commands.
-const BUILT_IN_SLASH = new Set(["loop", "run", "verify", "command", "goal", "name", "compact", "clear"]);
+// Runtime built-ins and explanatory mentions of Cursor commands.
+const BUILT_IN_SLASH = new Set(["loop", "run", "verify", "command", "goal", "name", "compact", "clear", "hooks"]);
 
 function references(text) {
   const found = [];

@@ -49,6 +49,12 @@ Skills name Claude defaults (a single-role default for code/prose/judgment plus 
 
 `/setup-pstack` writes the configured model list. On Codex, set it to your Codex model slugs.
 
+## Session routing hook
+
+The native pstack plugin bundles the same `SessionStart` routing hook as the Claude Code plugin. Codex runs it on startup, resume, clear, and compact after the user trusts the hook through `/hooks`. The hook reads `session hook` from `~/.codex/pstack-models.md`; `session hook: off` disables injection.
+
+A skills-only installation does not include plugin hooks. Request `poteto-mode` explicitly or add a standing instruction to `AGENTS.md` in that case.
+
 ## Driver and bundled skills pstack references
 
 The [driver policy](../SKILL.md#non-negotiables) selects the app driver. For skills and drivers named by these workflows, use these Codex equivalents:

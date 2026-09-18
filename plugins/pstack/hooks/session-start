@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+plugin_root="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
+if [ -z "$plugin_root" ]; then
+  echo "pstack SessionStart: plugin root is not set" >&2
+  exit 1
+fi
+
+if [ -n "${PLUGIN_ROOT:-}" ]; then
+  models_file="${CODEX_HOME:-$HOME/.codex}/pstack-models.md"
+else
+  models_file="$HOME/.claude/pstack-models.md"
+fi
+
+if grep -s '^session hook: off$' "$models_file" >/dev/null; then
+  exit 0
+fi
+
+cat "$plugin_root/hooks/session-start-context.md"

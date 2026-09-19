@@ -24,7 +24,7 @@ codex plugin marketplace add michael-denyer/pstack-claude
 codex plugin add pstack@pstack-claude
 ```
 
-Run `setup-pstack` to change model defaults or turn automatic routing off. The plugin installs the routing hook on Claude Code and Codex; Codex asks you to trust it through `/hooks` before it runs. In Claude Code, use `/pstack:setup-pstack`.
+Run `setup-pstack` to change model defaults or turn automatic routing on. The routing hook ships with the Claude Code and Codex plugins but stays silent until you opt in; Codex asks you to trust it through `/hooks` before it runs. In Claude Code, use `/pstack:setup-pstack`.
 
 For Prime Agent, OpenCode, Gemini CLI, or skills-only installs for any harness, see [shared installation](docs/reference.md#shared-skills-installation).
 

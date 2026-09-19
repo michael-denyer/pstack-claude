@@ -1,5 +1,5 @@
 // The shipped SessionStart command, run for real with each runtime's environment:
-// the mandate is injected unless that runtime's model sheet turns it off.
+// the mandate is injected only when that runtime's model sheet turns it on.
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -53,12 +53,12 @@ describe("SessionStart hook", () => {
 
   for (const runtime of Object.keys(runtimes)) {
     describe(runtime, () => {
-      test("injects the mandate when no sheet exists", () => {
-        expect(runHook(runtime, null)).toEqual({ status: 0, out: mandate, err: "" });
+      test("injects nothing when no sheet exists", () => {
+        expect(runHook(runtime, null)).toEqual({ status: 0, out: "", err: "" });
       });
 
-      test("injects the mandate when the sheet has no session hook line", () => {
-        expect(runHook(runtime, "bug-fix: configured-model\n")).toEqual({ status: 0, out: mandate, err: "" });
+      test("injects nothing when the sheet has no session hook line", () => {
+        expect(runHook(runtime, "bug-fix: configured-model\n")).toEqual({ status: 0, out: "", err: "" });
       });
 
       test("injects the mandate when the sheet says on", () => {

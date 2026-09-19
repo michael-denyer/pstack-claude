@@ -35,7 +35,7 @@ Show every role with its current model, marking any real slug not in the detecte
 
 ### 4. Choose whether the session hook routes tasks
 
-On Claude Code and Codex, the plugin's `SessionStart` hook injects the poteto-mode mandate on startup, resume, clear, and compact. Codex asks the user to trust plugin hooks through `/hooks` before running them. Ask whether to keep the hook. The default is on. The answer is the `session hook` line in the current runtime's sheet: `on` or `off`. With no sheet or no line, the hook injects. The line is inert on other runtimes.
+On Claude Code and Codex, the plugin's `SessionStart` hook can inject the poteto-mode mandate on startup, resume, clear, and compact. Codex asks the user to trust plugin hooks through `/hooks` before running them. Ask whether to turn the hook on. The default is off. The answer is the `session hook` line in the current runtime's sheet: `on` or `off`. With no sheet or no line, the hook injects nothing. The line is inert on other runtimes.
 
 ### 5. Validate
 
@@ -48,7 +48,7 @@ Write the current runtime's sheet with the shape below. Overwrite the whole file
 ```markdown
 # pstack model configuration
 
-Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out. `session hook: off` stops the Claude Code or Codex SessionStart hook from injecting the poteto-mode mandate; any other value, or no line, leaves it on.
+Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out. `session hook: on` lets the Claude Code or Codex SessionStart hook inject the poteto-mode mandate; any other value, or no line, leaves it off.
 
 feature, refactoring: claude-opus-5
 bug-fix: claude-fable-5-1
@@ -68,7 +68,7 @@ swarm workers: claude-opus-5
 architect runners: claude-opus-5, claude-fable-5-1, claude-sonnet-5
 interrogate reviewers: claude-opus-5, claude-fable-5-1, claude-sonnet-5
 
-session hook: on
+session hook: off
 ```
 
 ### 7. Wire it in

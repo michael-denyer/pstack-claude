@@ -9,8 +9,7 @@ else
   sheet="$HOME/.claude/pstack-models.md"
 fi
 
-if grep -qs '^session hook: off$' "$sheet"; then
-  exit 0
+# Routing is opt-in: inject only when the sheet turns the hook on.
+if grep -qs '^session hook: on$' "$sheet"; then
+  cat "$(dirname "$0")/session-start-context.md"
 fi
-
-cat "$(dirname "$0")/session-start-context.md"

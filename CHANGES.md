@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.36 - the session hook is opt-in
+
+The `SessionStart` hook now injects the poteto-mode mandate only when the runtime's sheet contains `session hook: on`. No sheet, no line, or `off` leave the session untouched. Before, the hook injected unless the sheet said `off`, so every plugin install shaped every session until the user found the toggle. This changes behavior on upgrade for anyone whose sheet has no `session hook` line: routing stops. To keep it, add `session hook: on` to `~/.claude/pstack-models.md` (Claude Code) or `~/.codex/pstack-models.md` (Codex), or run `setup-pstack`, which now asks whether to turn the hook on and writes `off` by default. Sheets written by `setup-pstack` since 0.9.32 carry an explicit `on` or `off` line and keep their behavior. The hook still ships and still runs, so the choice survives plugin updates as before. `tests/session-hook.test.mjs` asserts the four cases under the new default; the README, reference, Codex mapping, and sheet preamble describe the opt-in. The pin remains at `e8d856f`.
+
 ## 0.9.35 - route Codex sessions through pstack
 
 The bundled `SessionStart` hook now runs on both Claude Code and Codex. A runtime-aware executable reads `session hook` from `~/.claude/pstack-models.md` or `~/.codex/pstack-models.md`, while the Codex manifest explicitly declares the shared hook and includes resume events. The setup skill, Codex mapping, README, and reference explain Codex's `/hooks` trust step and the difference between native-plugin and skills-only installs. Tests execute the shipped command under both runtime environments and cover missing, on, and off settings. The README now leads with installation, a first task, and a workflow diagram; the slash-command table, runtime notes, dependencies, and maintenance documentation move to `docs/reference.md`, which the generator reads for the Codex prompt stubs. The upstream pin remains at `e8d856f`.

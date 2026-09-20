@@ -1,6 +1,6 @@
 import { afterEach, test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -62,7 +62,8 @@ exit 1
 }
 
 function createRepo() {
-  const root = mkdtempSync(join(tmpdir(), 'worktree-audit-test-'));
+  // git reports resolved worktree paths; macOS tmpdir() sits behind the /var symlink.
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'worktree-audit-test-')));
   fixtures.push(root);
   const repo = join(root, 'repo');
   const transcripts = join(root, 'transcripts');

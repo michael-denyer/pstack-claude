@@ -1,14 +1,15 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const cli = fileURLToPath(new URL('../plugins/pstack/skills/poteto-mode/scripts/resume.mjs', import.meta.url));
 function fixture(body) {
-  const project = mkdtempSync(join(tmpdir(), 'resume-project-'));
+  // resume.mjs reports resolved paths; macOS tmpdir() sits behind the /var symlink.
+  const project = realpathSync(mkdtempSync(join(tmpdir(), 'resume-project-')));
   const git = (...args) => execFileSync('git', ['-C', project, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   const run = (...args) => {
     const result = spawnSync('node', [cli, ...args, '--project', project], { encoding: 'utf8' });

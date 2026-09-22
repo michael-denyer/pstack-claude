@@ -75,5 +75,5 @@ Short list, no preamble:
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- reflect tooling: `claude-opus-5`
-- reflect judgment, divergent, synthesizer: `claude-opus-5`
+- reflect tooling: `claude-opus-5-5`
+- reflect judgment, divergent, synthesizer: `claude-opus-5-5`

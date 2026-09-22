@@ -60,5 +60,5 @@ The explanation uses the sections defined in `references/explainer-prompt.md`, d
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- how explorer: `claude-opus-5`
-- how explainer: `claude-opus-5`
+- how explorer: `claude-opus-5-5`
+- how explainer: `claude-opus-5-5`

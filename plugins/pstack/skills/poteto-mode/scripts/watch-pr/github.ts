@@ -194,6 +194,7 @@ const ROLLUP_STATES = [
   "PENDING",
   "SUCCESS",
 ] as const;
+const OPEN_PR_LIMIT = 300;
 const REVIEW_DECISIONS = [
   "APPROVED",
   "CHANGES_REQUESTED",
@@ -586,7 +587,7 @@ export class GhGitHubReader implements T.GitHubReader {
       "--state",
       "open",
       "--limit",
-      "300",
+      String(OPEN_PR_LIMIT),
       "--json",
       "number,headRefName,baseRefName,headRepository,headRepositoryOwner",
     ]);
@@ -872,5 +873,14 @@ export async function discoverStack(
   reader: T.GitHubReader,
   context: T.PrContext,
 ): Promise<T.NonEmpty<T.PrContext>> {
-  return orderStack(context, await reader.openPullRequests(context));
+  const open = await reader.openPullRequests(context);
+  // gh returns the newest PRs with no truncation signal, so a full page may
+  // have dropped an older PR from the bottom of the stack.
+  if (open.length >= OPEN_PR_LIMIT)
+    throw new WatcherQueryError({
+      kind: "invalid-stack",
+      retryable: true,
+      detail: `open PR list reached the ${OPEN_PR_LIMIT}-PR limit, so the stack may be incomplete`,
+    });
+  return orderStack(context, open);
 }

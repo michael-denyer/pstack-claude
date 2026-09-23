@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   ChecksUnavailable,
   WatcherQueryError,
+  discoverStack,
   mapRollupNode,
   orderStack,
   parseFastCheck,
@@ -359,5 +360,24 @@ describe("context and stack discovery", () => {
       },
     ]);
     expect(ordered.map((item) => Number(item.number))).toEqual([41, 42, 43]);
+  });
+
+  it("refuses a full open-PR page, which may have cut the stack", async () => {
+    const openPrs = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        number: parsePrNumber(index + 1),
+        headRepository: { owner: "owner", repo: "repo" },
+        headRefName: `branch-${index + 1}`,
+        baseRefName: "main",
+      }));
+    await expect(
+      discoverStack(fakeReader({ openPullRequests: openPrs(300) }), context),
+    ).rejects.toMatchObject({ failure: { kind: "invalid-stack" } });
+    expect(
+      await discoverStack(
+        fakeReader({ openPullRequests: openPrs(299) }),
+        context,
+      ),
+    ).toEqual([context]);
   });
 });

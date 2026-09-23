@@ -520,7 +520,8 @@ describe("syncComponent", () => {
     const oldUp = tree({ "same.sh": "echo\n", "forked.sh": "echo\n" });
     const newUp = tree({ "same.sh": "echo\n", "forked.sh": "echo\n", "added.sh": "echo\n" });
     const local = tree({ "same.sh": "echo\n", "forked.sh": "echo port\n" });
-    for (const rel of ["same.sh", "forked.sh", "added.sh"]) chmodSync(join(newUp, rel), 0o755);
+    const scripts = ["same.sh", "forked.sh", "added.sh"];
+    for (const rel of scripts) chmodSync(join(newUp, rel), 0o755);
 
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
@@ -529,7 +530,7 @@ describe("syncComponent", () => {
       { kind: "merged", rel: "forked.sh" },
       { kind: "updated", rel: "same.sh" },
     ]);
-    for (const rel of ["same.sh", "forked.sh", "added.sh"]) expect(statSync(join(local, rel)).mode & 0o777).toBe(0o755);
+    for (const rel of scripts) expect(statSync(join(local, rel)).mode & 0o777).toBe(0o755);
     expect(readFileSync(join(local, "forked.sh"), "utf8")).toBe("echo port\n");
   });
 

@@ -109,7 +109,7 @@ export function syncPortableAssets(repoRoot, skillsRoot, { log = console.log } =
     const expected = expectedByDir.get(targetDir);
     if (!expected) throw new Error(`${asset.target} has no declared generated output directory`);
     expected.add(basename(target));
-    if (existsSync(target) && lstatSync(target).isSymbolicLink()) {
+    if (lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink()) {
       throw new Error(`${asset.target} is a symlink; refusing to overwrite it`);
     }
     return { label: asset.target, target, next: readFileSync(source, "utf8") };

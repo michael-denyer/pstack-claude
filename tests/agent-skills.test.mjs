@@ -311,6 +311,31 @@ describe("shared Agent Skills tree", () => {
     }
   });
 
+  test("portable asset sync refuses a dangling symlink at a target", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-portable-assets-"));
+    const fixtureRepo = join(root, "repo");
+    const fixtureSkills = join(fixtureRepo, "plugins/pstack/skills");
+    const [asset] = PORTABLE_ASSETS;
+    const outside = join(root, "outside.md");
+
+    try {
+      for (const { source } of PORTABLE_ASSETS) {
+        const path = join(fixtureRepo, source);
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, `source: ${source}\n`);
+      }
+      mkdirSync(dirname(join(fixtureSkills, asset.target)), { recursive: true });
+      symlinkSync(outside, join(fixtureSkills, asset.target));
+
+      expect(() => syncPortableAssets(fixtureRepo, fixtureSkills, { log() {} })).toThrow(
+        `${asset.target} is a symlink; refusing to overwrite it`,
+      );
+      expect(existsSync(outside)).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("linked skills keep their own resources and sibling principle leaves", () => {
     const root = mkdtempSync(join(tmpdir(), "pstack-agent-skills-"));
     const installed = join(root, "unrelated-home", ".agents", "skills");

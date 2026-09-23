@@ -2,6 +2,18 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.41 - model tiers and shape-based sync rules
+
+`plugins/pstack/models.json` names three tiers, `default`, `strongest`, and `panel`, and each role names the tier it runs on. The Codex mapping reads the same keys from the `codex` block, so it no longer infers the strongest roles from which single-model roles differ from the default. Under that inference, moving a role to `haiku` listed it as a strongest-model role. `available` is a plain list of the family names the `Agent` tool accepts. Stamped output is unchanged.
+
+The generator's stray-model scan builds its pattern from `available`. It still rejects a full `claude-*` ID and now also rejects a backticked family name such as `` `fable` `` outside a stamped region, which the old `claude-*` pattern let through. `poteto-mode`, `setup-pstack`, and `codex-tools.md` point at the Models sections instead of listing the names.
+
+`tools/substitutions.json` rules can match a `regex` and be limited to paths matching `files`. Two rules rewrite any vendor's ``(default `<slug>`)``, pointing playbooks at poteto-mode's Models section and a skill body at its own. The denylist catches any Cursor slug with an effort suffix, such as `gpt-6-sol-max`, in place of the `gpt-5.6-` prefix. A dry run at `12d587d` reports 64 forked and 59 unchanged files, the same as 0.9.40, with no denylist hits.
+
+`check-plan.mjs` accepts one lanes phrasing again, the one the port's plan skeleton writes.
+
+The `setup-pstack` step that rewrites full model IDs in an old override sheet comes out in 0.10.0.
+
 ## 0.9.40 - name models the way the Agent tool accepts them
 
 The Claude Code `Agent` tool takes `opus`, `fable`, `sonnet`, or `haiku` as `model` and rejects full IDs such as `claude-opus-5-5`, checked against the tool schema on Claude Code 2.1.281. Every default in `models.json` was a full ID, so each subagent's first dispatch failed and the skills recovered through their rejection fallback. `models.json` now names the four family names, and the generator restamped the `## Models` sections, the interrogate reviewer table, and setup-pstack's override sheet and available-model line. `tests/models.test.mjs` fails if `available` names anything the tool does not accept.

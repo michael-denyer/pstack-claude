@@ -2,7 +2,7 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
-## Unreleased
+## 0.9.38 - use GPT-6 models for Codex
 
 Codex model examples use GPT-6 Sol for single-model roles and GPT-6 Astra, Sol, and Luna for panels. The Codex panel configuration is named `panel` instead of `panelQuad` because it now has three models. Claude model defaults are unchanged.
 

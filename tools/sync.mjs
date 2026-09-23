@@ -46,7 +46,10 @@ export function applySubstitutions(text, rules, rel = "") {
   for (const rule of rules) {
     if (rule.files && !new RegExp(rule.files).test(rel)) continue;
     let n = 0;
-    out = out.replaceAll(rule.pattern ?? new RegExp(rule.regex, "g"), () => (n++, rule.replacement));
+    out = out.replaceAll(rule.pattern ?? new RegExp(rule.regex, "g"), () => {
+      n++;
+      return rule.replacement;
+    });
     const key = rule.pattern ?? rule.regex;
     if (n) counts.set(key, (counts.get(key) ?? 0) + n);
   }
@@ -55,15 +58,12 @@ export function applySubstitutions(text, rules, rel = "") {
 
 // An entry is a literal `token` or a `regex`; either fails the line it matches.
 export function denylistHits(path, text, denylist) {
-  const entries = denylist.map(({ token, regex, hint }) => ({
-    label: token ?? regex,
-    hit: token ? (line) => line.includes(token) : (line) => new RegExp(regex).test(line),
-    hint,
-  }));
   const hits = [];
   text.split("\n").forEach((line, i) => {
-    for (const { label, hit, hint } of entries) {
-      if (hit(line)) hits.push(`${path}:${i + 1}: "${label}" — ${hint}`);
+    for (const { token, regex, hint } of denylist) {
+      if (token ? line.includes(token) : new RegExp(regex).test(line)) {
+        hits.push(`${path}:${i + 1}: "${token ?? regex}" — ${hint}`);
+      }
     }
   });
   return hits;

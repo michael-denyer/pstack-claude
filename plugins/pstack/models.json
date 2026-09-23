@@ -31,8 +31,8 @@
     { "role": "interrogate reviewers", "models": "panel", "skill": "interrogate" }
   ],
   "codex": {
-    "singleRoleExample": "gpt-5.6-sol",
+    "singleRoleExample": "gpt-6-sol",
     "strongestRoleExample": "gpt-6-astra",
-    "panelQuad": ["gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]
+    "panel": ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"]
   }
 }

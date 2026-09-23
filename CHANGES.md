@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## Unreleased
+
+Codex model examples use GPT-6 Sol for single-model roles and GPT-6 Astra, Sol, and Luna for panels. The Codex panel configuration is named `panel` instead of `panelQuad` because it now has three models. Claude model defaults are unchanged.
+
 ## 0.9.37 - move the Opus roles to Opus 5.5
 
 `plugins/pstack/models.json` names `claude-opus-5-5` where it named `claude-opus-5`: the single-role default, the panel, and every single-model role that ran Opus 5 (`feature, refactoring`, `judgment and prose`, `how explorer`, `how explainer`, `why investigators`, `why synthesizer`, `reflect tooling`, `reflect judgment, divergent, synthesizer`, `swarm workers`). The generator restamped the `## Models` sections, the interrogate reviewer table, and setup-pstack's override sheet and available-model line. Opus 5.5 joins the available-model list as `Opus 5.5`; Opus 5 stays there for `/setup-pstack` overrides. The Fable roles are unchanged. The pin remains at `e8d856f`.

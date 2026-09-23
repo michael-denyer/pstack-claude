@@ -55,7 +55,7 @@ describe("models.json shape", () => {
   test("the codex examples name distinct models", () => {
     expect(typeof models.codex.singleRoleExample).toBe("string");
     expect(typeof models.codex.strongestRoleExample).toBe("string");
-    expect(new Set(models.codex.panelQuad).size).toBe(models.codex.panelQuad.length);
+    expect(new Set(models.codex.panel).size).toBe(models.codex.panel.length);
   });
 });
 

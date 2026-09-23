@@ -495,8 +495,8 @@ export function codexModelNamesSection(models) {
     `- Roles that default to the strongest Claude model (${strongest.map((r) => code(r.role)).join(", ")}): ` +
     `your strongest Codex model (for example ${code(models.codex.strongestRoleExample)}).\n` +
     "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
-    "signal comes from model diversity, so use the distinct Codex models available to you. A good default quad " +
-    `on ChatGPT is ${codeList(models.codex.panelQuad)}. If only one model family is reachable, vary reasoning ` +
+    "signal comes from model diversity, so use the distinct Codex models available to you. A good default panel " +
+    `on ChatGPT is ${codeList(models.codex.panel)}. If only one model family is reachable, vary reasoning ` +
     "effort and note in the verdict that diversity was reduced.\n\n" +
     "`/setup-pstack` writes the configured model list. On Codex, set it to your Codex model slugs."
   );

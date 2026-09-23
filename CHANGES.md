@@ -2,6 +2,14 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.39 - sync to upstream 12d587d (v0.15.5)
+
+The upstream pin moves from `e8d856f` to `12d587d`, upstream v0.15.5. The range carries upstream's punctuation pass (semicolons, long dashes, and connector colons become periods or commas), operator-neutral pronouns, cuts of instructions that current models no longer need, code-ready rounds and multiple audit lanes in the autopilot and multi-phase playbooks, a patch-id noise rule in shipping, and role-line reads for the panel skills with an alias and rejection fallback. `how` and `why` name the override-sheet role line each spawn reads. Measured with `bun tools/sync.mjs pstack 12d587d`: 37 files written clean, 13 merged three-way, 22 unchanged, 35 excluded, 23 forked with upstream untouched, and 28 conflicted files resolved by hand.
+
+Port policy is unchanged where it diverges from upstream. The autopilots stop at merge-ready for the operator's click, `shipping` keeps the watcher-owned blocker classification, and `feature` keeps the per-delegate worktree. Model defaults stay in `models.json`, so upstream's move to Opus 5.5 and Grok 4.7 does not change any role. The reasoning-budget step upstream added to `setup-pstack` is not ported, because Claude Code model slugs carry no effort token.
+
+`tools/substitutions.json` rewrites ``(default `grok-4.7-xhigh-fast`)`` to the Models-section pointer, as it already did for the Fable default. Without it the clean sync wrote the Grok slug into `hillclimb.md` and `perf-issue.md`. The denylist now rejects `grok-`, `gpt-5.6-`, and `pstack-models.mdc`, so a Cursor model slug or rule path that no substitution covers fails the sync.
+
 ## 0.9.38 - use GPT-6 models for Codex
 
 Codex model examples use GPT-6 Sol for single-model roles and GPT-6 Astra, Sol, and Luna for panels. The Codex panel configuration is named `panel` instead of `panelQuad` because it now has three models. Claude model defaults are unchanged.

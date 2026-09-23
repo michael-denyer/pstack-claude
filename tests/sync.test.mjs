@@ -53,6 +53,7 @@ describe("applySubstitutions", () => {
         "<control skill path> and the control skill's commands",
         "Multiple `Task` calls in the Task tool.",
         "your configured bug-fix model (default `claude-fable-5-1-thinking-max`)",
+        "your configured hillclimb model (default `grok-4.7-xhigh-fast`)",
         "on \"restart Cursor\"",
       ].join("\n"),
       RULES.substitutions,
@@ -65,6 +66,7 @@ describe("applySubstitutions", () => {
         "<driver skill path> and the driver skill's commands",
         "Multiple `Agent` calls in the Agent tool.",
         "your configured bug-fix model (default in poteto-mode's Models section)",
+        "your configured hillclimb model (default in poteto-mode's Models section)",
         "on \"restart Claude Code\"",
       ].join("\n"),
     );
@@ -78,6 +80,12 @@ describe("applySubstitutions", () => {
 });
 
 describe("denylistHits", () => {
+  test("a Cursor model slug fails the scan", () => {
+    expect(denylistHits("playbook.md", "default `grok-4.8-fast`", RULES.denylist)).toHaveLength(1);
+    expect(denylistHits("playbook.md", "default `gpt-5.6-sol-max`", RULES.denylist)).toHaveLength(1);
+    expect(denylistHits("how.md", "the role line in the `pstack-models.mdc` rule", RULES.denylist)).toHaveLength(1);
+  });
+
   test("UI repair advice points to the canonical driver policy", () => {
     const hits = denylistHits("playbook.md", "Drive with control-ui.", RULES.denylist);
     expect(hits).toHaveLength(1);

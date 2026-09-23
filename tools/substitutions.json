@@ -41,6 +41,11 @@
       "rationale": "model defaults live in models.json and are stamped into Models sections, never hard-coded in prose"
     },
     {
+      "pattern": "(default `grok-4.7-xhigh-fast`)",
+      "replacement": "(default in poteto-mode's Models section)",
+      "rationale": "same as the Fable default above; upstream moved the code playbooks to Grok in #365 and #414"
+    },
+    {
       "pattern": ".cursor/skills/",
       "replacement": ".claude/skills/",
       "rationale": "personal skills directory"
@@ -57,6 +62,18 @@
     }
   ],
   "denylist": [
+    {
+      "token": "grok-",
+      "hint": "Cursor model slug; point at the Models section, or add a substitution rule for the phrase"
+    },
+    {
+      "token": "pstack-models.mdc",
+      "hint": "Cursor's rule file; the port's override sheet is ~/.claude/pstack-models.md"
+    },
+    {
+      "token": "gpt-5.6-",
+      "hint": "Cursor model slug; point at the Models section, or add a substitution rule for the phrase"
+    },
     {
       "token": "`verify` skill (UIs)",
       "hint": "use the driver policy in poteto-mode/SKILL.md Non-negotiables"

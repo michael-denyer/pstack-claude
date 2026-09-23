@@ -114,4 +114,17 @@ describe("find-transcript", () => {
       expect(miss.stderr).toContain("no transcript");
     },
   );
+
+  test.skipIf(spawnSync("node", ["--version"]).status !== 0)(
+    "imports under node when argv[1] is not a file (skipped without node)",
+    () => {
+      const run = spawnSync(
+        "node",
+        ["-e", `import(${JSON.stringify(script)}).then((m) => console.log(typeof m.findTranscript))`, "not-a-file"],
+        { encoding: "utf8" },
+      );
+      expect(run.stderr).toBe("");
+      expect(run.stdout.trim()).toBe("function");
+    },
+  );
 });

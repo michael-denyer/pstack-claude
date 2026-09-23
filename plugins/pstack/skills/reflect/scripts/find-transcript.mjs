@@ -84,6 +84,16 @@ async function main(argv) {
   return 0;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
+// node leaves argv[1] unresolved and may set it to a non-file (`node -e ... arg`).
+function invokedDirectly() {
+  if (!process.argv[1]) return false;
+  try {
+    return fileURLToPath(import.meta.url) === realpathSync(process.argv[1]);
+  } catch {
+    return false;
+  }
+}
+
+if (invokedDirectly()) {
   process.exitCode = await main(process.argv.slice(2));
 }

@@ -4,10 +4,10 @@ import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync 
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
-const auditScript = join(
-  process.cwd(),
-  'plugins/pstack/skills/poteto-mode/scripts/worktree-audit.sh',
+const auditScript = fileURLToPath(
+  new URL('../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.sh', import.meta.url),
 );
 const fixtures = [];
 afterEach(() => {

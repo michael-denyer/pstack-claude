@@ -86,6 +86,7 @@ describe("fenced plan evidence", () => {
     ["shorter inner tildes", "~~~~markdown", "~~~yaml\nmessage: “code”\n~~~", "~~~~"],
     ["different inner delimiter", "```markdown", "~~~yaml\nmessage: “code”\n~~~", "```"],
     ["indented delimiter", "   ~~~yaml", "message: “code”", "   ~~~"],
+    ["list item delimiter", "    ```yaml", "    PORT: 3000\n    message: “code”", "    ```"],
     ["longer closing delimiter", "~~~yaml", "message: “code”", "~~~~"],
     ["delimiter with trailing text", "```text", "```still code\nmessage: “code”", "```"],
   ]) {

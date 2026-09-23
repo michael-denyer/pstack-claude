@@ -26,11 +26,17 @@ jobs:
       # The generator stamps VERSION into the manifests, validates the plugin
       # layout, frontmatter flags and Codex marketplace pointer. A dirty tree
       # afterwards means a committed copy is stale (e.g. VERSION bumped
-      # without regenerating).
+      # without regenerating). git diff ignores untracked files, so a
+      # generated file that was never committed needs its own check.
       - name: Regenerate and assert clean tree
         run: |
           bun tools/generate.mjs
           git diff --exit-code
+          untracked=$(git ls-files --others --exclude-standard)
+          if [ -n "$untracked" ]; then
+            printf 'FAIL: the generator created files that are not committed:\n%s\n' "$untracked"
+            exit 1
+          fi
       - name: Tool and invariant fixture tests
         run: bun test tests/
 

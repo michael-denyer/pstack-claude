@@ -89,9 +89,10 @@ const BINARY = /\.(png|jpe?g|gif|webp|ico|woff2?|lock)$/;
 const isBinary = (rel, raw) => BINARY.test(rel) || raw.includes(0) || !Buffer.from(raw.toString("utf8")).equals(raw);
 
 // Three-way merge one file's text. `git merge-file -p` prints the result and
-// exits with the conflict count, so status 0 is a clean merge and a positive
-// status is that many hunks. A negative status or a missing git is an error,
-// not a conflict, and rethrows.
+// exits with the conflict count, capped at 127, so status 0 is a clean merge and
+// 1-127 is that many hunks. Git's own errors exit above 127 (-1 for "Cannot
+// merge binary files" reads as 255, a usage error as 129); those and a missing
+// git are errors, not conflicts, and rethrow.
 export function mergeFile(ours, base, theirs) {
   const scratch = mkdtempSync(join(tmpdir(), "pstack-merge-"));
   try {
@@ -102,7 +103,7 @@ export function mergeFile(ours, base, theirs) {
       const merged = execFileSync("git", args, { stdio: ["ignore", "pipe", "inherit"] });
       return { clean: true, buffer: merged };
     } catch (error) {
-      if (!(error.status > 0)) throw error;
+      if (!(error.status >= 1 && error.status <= 127)) throw error;
       return { clean: false, hunks: error.status };
     }
   } finally {

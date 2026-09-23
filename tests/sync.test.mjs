@@ -157,6 +157,11 @@ describe("mergeFile", () => {
     );
     expect(merged).toEqual({ clean: false, hunks: 1 });
   });
+
+  test("throws when git fails instead of reporting its exit status as a hunk count", () => {
+    const nul = (s) => Buffer.from(`${s}\0\n`);
+    expect(() => mergeFile(nul("ours"), nul("base"), nul("theirs"))).toThrow("Command failed");
+  });
 });
 
 describe("syncComponent", () => {

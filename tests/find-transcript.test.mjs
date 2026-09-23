@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import { candidates, findTranscript, openingPrompt } from "../plugins/pstack/skills/reflect/scripts/find-transcript.mjs";
 
@@ -97,4 +97,21 @@ describe("find-transcript", () => {
     expect(miss.status).toBe(1);
     expect(miss.stderr).toContain("no transcript");
   });
+
+  // node resolves the script's own URL through symlinks but not argv[1]; bun resolves both.
+  test.skipIf(spawnSync("node", ["--version"]).status !== 0)(
+    "the CLI runs under node through a symlinked path (skipped without node)",
+    () => {
+      const dir = tempDir();
+      const path = transcript(dir, "s/s.jsonl", [meta, user("ship the release")], 100);
+      symlinkSync(dirname(script), join(dir, "link"));
+      const linked = join(dir, "link", basename(script));
+      const hit = spawnSync("node", [linked, dir, "ship the"], { encoding: "utf8" });
+      expect(hit.status).toBe(0);
+      expect(hit.stdout.trim()).toBe(path);
+      const miss = spawnSync("node", [linked, dir, "absent"], { encoding: "utf8" });
+      expect(miss.status).toBe(1);
+      expect(miss.stderr).toContain("no transcript");
+    },
+  );
 });

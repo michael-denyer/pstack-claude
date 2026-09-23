@@ -8,7 +8,7 @@
 // <id>/<id>.jsonl, and subagent <id>/subagents/<child>.jsonl. Each candidate is
 // streamed line by line and abandoned at its first `user` record; the first
 // line is session metadata and files run to megabytes.
-import { createReadStream, readdirSync, statSync } from "node:fs";
+import { createReadStream, readdirSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 import { createInterface } from "node:readline";
@@ -84,6 +84,6 @@ async function main(argv) {
   return 0;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   process.exitCode = await main(process.argv.slice(2));
 }

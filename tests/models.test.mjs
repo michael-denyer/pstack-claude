@@ -24,6 +24,13 @@ describe("models.json shape", () => {
     expect(new Set(models.panel).size).toBe(models.panel.length);
   });
 
+  test("available models are names the Claude Code Agent tool accepts", () => {
+    // The Agent tool's `model` parameter is an enum of family names; a full ID
+    // such as claude-opus-5-5 is rejected before the subagent starts.
+    const agentModels = new Set(["opus", "fable", "sonnet", "haiku"]);
+    for (const slug of available) expect(agentModels.has(slug)).toBe(true);
+  });
+
   test("every role names an available model or the panel, and a skill directory that exists", () => {
     const labels = new Set();
     for (const role of raw.roles) {

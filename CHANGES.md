@@ -2,6 +2,12 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.40 - name models the way the Agent tool accepts them
+
+The Claude Code `Agent` tool takes `opus`, `fable`, `sonnet`, or `haiku` as `model` and rejects full IDs such as `claude-opus-5-5`, checked against the tool schema on Claude Code 2.1.281. Every default in `models.json` was a full ID, so each subagent's first dispatch failed and the skills recovered through their rejection fallback. `models.json` now names the four family names, and the generator restamped the `## Models` sections, the interrogate reviewer table, and setup-pstack's override sheet and available-model line. `tests/models.test.mjs` fails if `available` names anything the tool does not accept.
+
+A family name runs that family's current model, so a role can no longer pick between Opus versions. `/setup-pstack` rewrites full IDs in an existing sheet to their family names and lists the rewrites. Until it is rerun, an old sheet still costs one rejected dispatch per subagent before the fallback.
+
 ## 0.9.39 - sync to upstream 12d587d (v0.15.5)
 
 The upstream pin moves from `e8d856f` to `12d587d`, upstream v0.15.5. The range carries upstream's punctuation pass (semicolons, long dashes, and connector colons become periods or commas), operator-neutral pronouns, cuts of instructions that current models no longer need, code-ready rounds and multiple audit lanes in the autopilot and multi-phase playbooks, a patch-id noise rule in shipping, and role-line reads for the panel skills with an alias and rejection fallback. `how` and `why` name the override-sheet role line each spawn reads. Measured with `bun tools/sync.mjs pstack 12d587d`: 37 files written clean, 13 merged three-way, 22 unchanged, 35 excluded, 23 forked with upstream untouched, and 28 conflicted files resolved by hand.

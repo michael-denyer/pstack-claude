@@ -298,7 +298,7 @@ export function slashCommands(markdown, skillNames) {
 export function promptStub({ name, menu }) {
   return (
     `---\nname: ${name}\ndescription: ${menu}\ndisable-model-invocation: true\n---\n\n` +
-    `Invoke the \`${name}\` skill and follow it. Resolve Claude tool names, \`claude-*\` model slugs, and ` +
+    `Invoke the \`${name}\` skill and follow it. Resolve Claude tool names, Claude model names, and ` +
     "Claude built-in skills through `poteto-mode/references/codex-tools.md`, including its Per-skill notes.\n"
   );
 }

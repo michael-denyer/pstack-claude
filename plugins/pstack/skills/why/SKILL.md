@@ -162,5 +162,5 @@ After the Sources Consulted block, if the user's `why` question is a precursor t
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
-- why investigators: `claude-opus-5-5`
-- why synthesizer: `claude-opus-5-5`
+- why investigators: `opus`
+- why synthesizer: `opus`

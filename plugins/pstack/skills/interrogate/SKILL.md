@@ -38,9 +38,9 @@ Launch all reviewers in a single message using the `Agent` tool. Use the `interr
 
 | Subagent | Default model |
 |----------|---------------|
-| Reviewer A | `claude-opus-5-5` |
-| Reviewer B | `claude-fable-5-1` |
-| Reviewer C | `claude-sonnet-5` |
+| Reviewer A | `opus` |
+| Reviewer B | `fable` |
+| Reviewer C | `sonnet` |
 
 For each reviewer:
 - `subagent_type`: `general-purpose`

@@ -84,6 +84,10 @@ export function denylistHits(path, text, denylist) {
 
 const BINARY = /\.(png|jpe?g|gif|webp|ico|woff2?|lock)$/;
 
+// Binary by extension, by a NUL byte (git's own test), or by bytes that are
+// not UTF-8, which a decode and re-encode would replace with U+FFFD.
+const isBinary = (rel, raw) => BINARY.test(rel) || raw.includes(0) || !Buffer.from(raw.toString("utf8")).equals(raw);
+
 // Three-way merge one file's text. `git merge-file -p` prints the result and
 // exits with the conflict count, so status 0 is a clean merge and a positive
 // status is that many hunks. A negative status or a missing git is an error,
@@ -142,7 +146,7 @@ export function syncComponent({
   const operations = [];
   const addCounts = (counts) => counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
   const portForm = (rel, raw) => {
-    if (BINARY.test(rel)) return { buffer: raw, counts: new Map() };
+    if (isBinary(rel, raw)) return { buffer: raw, counts: new Map(), binary: true };
     const sub = applySubstitutions(raw.toString("utf8"), rules, rel);
     return { buffer: Buffer.from(derive(rel, sub.text)), counts: sub.counts };
   };
@@ -152,7 +156,7 @@ export function syncComponent({
   };
   const modeOf = (file) => statSync(file).mode & 0o777;
   const scan = (rel, buffer) => {
-    if (!BINARY.test(rel)) report.hits.push(...denylistHits(rel, buffer.toString("utf8"), denylist));
+    if (!isBinary(rel, buffer)) report.hits.push(...denylistHits(rel, buffer.toString("utf8"), denylist));
   };
   const planWrite = (rel, kind, next) => {
     operations.push({ kind: "write", rel, buffer: next });
@@ -186,7 +190,7 @@ export function syncComponent({
     } else if (old && old.equals(next.buffer) && modeOf(join(oldDir, rel)) === modeOf(newFile)) {
       report.forked.push(rel);
       scan(rel, local);
-    } else if (BINARY.test(rel)) {
+    } else if (next.binary) {
       report.conflicts.push({ rel, reason: "binary" });
     } else {
       // A file new upstream that the port already wrote has no common ancestor.

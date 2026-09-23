@@ -448,6 +448,36 @@ describe("syncComponent", () => {
     expect(readFileSync(join(local, "logo.png")).equals(bytes)).toBe(true);
   });
 
+  test("a binary file of any extension is copied byte for byte and never substituted", () => {
+    const invalidUtf8 = Buffer.concat([Buffer.from("AskQuestion "), Buffer.from([0xff, 0xfe, 0x80])]);
+    const withNul = Buffer.from("AskQuestion\0");
+    const oldUp = tree({});
+    const newUp = tree({});
+    writeFileSync(join(newUp, "doc.pdf"), invalidUtf8);
+    writeFileSync(join(newUp, "blob.bin"), withNul);
+    const local = tree({});
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.counts).toEqual(new Map());
+    expect(readFileSync(join(local, "doc.pdf")).equals(invalidUtf8)).toBe(true);
+    expect(readFileSync(join(local, "blob.bin")).equals(withNul)).toBe(true);
+  });
+
+  test("a binary file of any extension differing three ways is reported as unmergeable", () => {
+    const oldUp = tree({});
+    const newUp = tree({});
+    const local = tree({});
+    writeFileSync(join(oldUp, "font.ttf"), Buffer.from([0x00, 0xff, 0x01]));
+    writeFileSync(join(newUp, "font.ttf"), Buffer.from([0x00, 0xff, 0x02]));
+    writeFileSync(join(local, "font.ttf"), Buffer.from([0x00, 0xff, 0x03]));
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.conflicts).toEqual([{ rel: "font.ttf", reason: "binary" }]);
+    expect(readFileSync(join(local, "font.ttf")).equals(Buffer.from([0x00, 0xff, 0x03]))).toBe(true);
+  });
+
   test("a written file takes upstream's mode, and a mode-only upstream change is written", () => {
     const oldUp = tree({ "same.sh": "echo\n", "forked.sh": "echo\n" });
     const newUp = tree({ "same.sh": "echo\n", "forked.sh": "echo\n", "added.sh": "echo\n" });

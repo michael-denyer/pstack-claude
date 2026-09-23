@@ -37,6 +37,13 @@ describe("models.json shape", () => {
     }
   });
 
+  test("effort levels are unique and each one Claude Code accepts in agent frontmatter", () => {
+    const accepted = new Set(["low", "medium", "high", "xhigh", "max"]);
+    expect(Array.isArray(models.efforts) && models.efforts.length > 0).toBe(true);
+    expect(new Set(models.efforts).size).toBe(models.efforts.length);
+    for (const level of models.efforts) expect(accepted.has(level)).toBe(true);
+  });
+
   test("the panel is written once and resolved by reference", () => {
     const literal = raw.roles.filter((r) => Array.isArray(r.models) && r.models.join() === raw.panel.join());
     expect(literal).toEqual([]);

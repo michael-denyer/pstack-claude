@@ -372,6 +372,13 @@ export function regions(models) {
       locate: tableRows("| Subagent | Default model |", "| Reviewer "),
       render: () => reviewers.map((m, i) => `| Reviewer ${String.fromCharCode(65 + i)} | ${code(m)} |`),
     },
+    ...[...rolesBySkill].map(([skill]) => ({
+      file: skillFile(skill),
+      name: "Reasoning effort section",
+      locate: section("Reasoning effort"),
+      appendHeading: "## Reasoning effort",
+      render: () => blankPadded(effortSection(models.efforts)),
+    })),
     {
       file: skillFile("setup-pstack"),
       name: "Models section",
@@ -456,12 +463,54 @@ export function modelsSection(roles) {
   );
 }
 
+// An override value may name a reasoning effort after its slug. Claude Code has
+// no per-call effort parameter, but a subagent definition's `effort` frontmatter
+// overrides the session's effort, so each level ships as an agent the role is
+// dispatched through, with the model still passed on the call.
+export function effortSection(levels) {
+  return (
+    "A role value in `~/.claude/pstack-models.md` may name a reasoning effort after its slug, as in " +
+    "`claude-opus-5-5 @xhigh`. Levels: " + codeList(levels) + "; which ones apply depends on the model. " +
+    "For such an entry, dispatch through the effort agent of that level: `subagent_type: \"pstack:effort-<level>\"` " +
+    "where this skill prescribes `general-purpose`, or `subagent_type: \"pstack:poteto-agent-<level>\"` where it " +
+    "prescribes `pstack:poteto-agent`. Pass the slug without the suffix as `model`. The effort agents set only " +
+    "`effort`, so the model you pass still decides the model. A value without `@` keeps the prescribed " +
+    "`subagent_type` and the session's effort. The suffix is never part of the slug when you validate it."
+  );
+}
+
+// The effort agents: one general-purpose worker and one poteto-agent per level.
+// The poteto variants carry poteto-agent's body, so the routing contract is
+// written once in plugins/pstack/agents/poteto-agent.md.
+export function effortAgents(levels, potetoAgent) {
+  const body = potetoAgent.replace(/^---\n[\s\S]*?\n---\n/, "");
+  return levels.flatMap((level) => [
+    {
+      name: `effort-${level}`,
+      text:
+        `---\nname: effort-${level}\ndescription: General-purpose pstack subagent that runs at ${level} reasoning effort. ` +
+        `Dispatched in place of \`general-purpose\` when a pstack role's override names \`@${level}\`; the caller passes the model.\n` +
+        `effort: ${level}\n---\n\n# General-purpose subagent (${level} effort)\n\n` +
+        "Do the task in your prompt with the full tool set, exactly as a general-purpose subagent would. " +
+        "Nothing about the task changes with the effort level; only how long you reason does.\n",
+    },
+    {
+      name: `poteto-agent-${level}`,
+      text:
+        `---\nname: poteto-agent-${level}\ndescription: \`pstack:poteto-agent\` at ${level} reasoning effort. ` +
+        `Dispatched in place of \`pstack:poteto-agent\` when a pstack role's override names \`@${level}\`; the caller passes the model.\n` +
+        `effort: ${level}\n---\n` + body,
+    },
+  ]);
+}
+
 export function setupModelsSection(models) {
   const avail = models.available.map((m) => `${m.label} (${code(m.slug)})`).join(", ");
   return (
     "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
     `- Available Claude models: ${avail}\n` +
     `- Default panel: ${codeList(models.panel)}\n` +
+    `- Reasoning effort levels: ${codeList(models.efforts)}\n` +
     `- Single-role default: ${code(models.singleRoleDefault)}`
   );
 }
@@ -476,6 +525,8 @@ export function overrideSheetBlock(models) {
     "the values here override those defaults. Delete a line to fall back to the skill default. " +
     "A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); " +
     "an alias entry in a panel list still counts toward that panel's fan-out. " +
+    "A slug may carry a reasoning effort, as in `claude-opus-5-5 @xhigh` (levels: " + models.efforts.join(", ") + "); " +
+    "the role then runs through the pstack effort agent of that level, each entry of a panel list on its own. " +
     "`session hook: off` stops the Claude Code or Codex SessionStart hook from injecting the poteto-mode mandate; " +
     "any other value, or no line, leaves it on.\n\n" +
     rows +
@@ -608,6 +659,20 @@ function main() {
     console.log(`removed orphan: .codex-plugin/prompts/${file}`);
   }
   if (promptsChanged === 0) console.log(`ok: ${skills.length} Codex prompts current`);
+
+  const agentsDir = join(repo, "plugins/pstack/agents");
+  const agents = effortAgents(models.efforts, readFileSync(join(agentsDir, "poteto-agent.md"), "utf8"));
+  let agentsChanged = 0;
+  for (const agent of agents) {
+    if (stampFile(join(agentsDir, `${agent.name}.md`), agent.text, `agents/${agent.name}.md`)) agentsChanged++;
+  }
+  const expectedAgents = new Set(agents.map((a) => `${a.name}.md`));
+  for (const file of readdirSync(agentsDir)) {
+    if (!/^(effort|poteto-agent)-[a-z]+\.md$/.test(file) || expectedAgents.has(file)) continue;
+    unlinkSync(join(agentsDir, file));
+    console.log(`removed stale effort agent: agents/${file}`);
+  }
+  if (agentsChanged === 0) console.log(`ok: ${agents.length} effort agents current`);
 
   const portable = syncPortableAssets(repo, skillsDir);
   if (portable.stamped === 0 && portable.removed === 0) {

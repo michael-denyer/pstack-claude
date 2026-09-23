@@ -1,6 +1,7 @@
 {
   "singleRoleDefault": "claude-opus-5-5",
   "panel": ["claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5"],
+  "efforts": ["low", "medium", "high", "xhigh", "max"],
   "available": [
     { "label": "Opus 5.5", "slug": "claude-opus-5-5" },
     { "label": "Opus 5", "slug": "claude-opus-5" },

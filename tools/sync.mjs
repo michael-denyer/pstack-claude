@@ -11,14 +11,17 @@
 // frontmatter and generator stamps via deriveSkill) and compared three ways:
 //
 //   - local copy is missing -> new file, written
-//   - local copy matches the derived NEW text -> unchanged
+//   - local copy matches the derived NEW text and mode -> unchanged
 //   - local copy matches the derived OLD text -> clean update, written
-//   - upstream did not touch it and local differs -> forked, left alone, counted
+//   - upstream did not touch its text or mode and local differs -> forked,
+//     left alone, counted
 //   - all three differ and git merge-file succeeds -> merged, written
 //   - all three differ and the merge conflicts -> left alone, reported with its
-//     hunk count under conflicts, alongside binaries and files upstream deleted
-//     that the port had edited
+//     hunk count under conflicts, alongside binaries, upstream symlinks (never
+//     followed), and files upstream deleted that the port had edited
 //   - upstream deleted it and local matches the derived OLD text -> deleted
+//
+// A written file takes the new upstream file's mode.
 //
 // Every effective text file is denylist-scanned; a hit fails the run with file,
 // line, and the hint for that token, leaving the tree for inspection. The pin
@@ -27,7 +30,18 @@
 // under --dry-run prints the ownership map (which files the port has forked).
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -71,10 +85,15 @@ export function denylistHits(path, text, denylist) {
 
 const BINARY = /\.(png|jpe?g|gif|webp|ico|woff2?|lock)$/;
 
+// Binary by extension, by a NUL byte (git's own test), or by bytes that are
+// not UTF-8, which a decode and re-encode would replace with U+FFFD.
+const isBinary = (rel, raw) => BINARY.test(rel) || raw.includes(0) || !Buffer.from(raw.toString("utf8")).equals(raw);
+
 // Three-way merge one file's text. `git merge-file -p` prints the result and
-// exits with the conflict count, so status 0 is a clean merge and a positive
-// status is that many hunks. A negative status or a missing git is an error,
-// not a conflict, and rethrows.
+// exits with the conflict count, capped at 127, so status 0 is a clean merge and
+// 1-127 is that many hunks. Git's own errors exit above 127 (-1 for "Cannot
+// merge binary files" reads as 255, a usage error as 129); those and a missing
+// git are errors, not conflicts, and rethrow.
 export function mergeFile(ours, base, theirs) {
   const scratch = mkdtempSync(join(tmpdir(), "pstack-merge-"));
   try {
@@ -85,7 +104,7 @@ export function mergeFile(ours, base, theirs) {
       const merged = execFileSync("git", args, { stdio: ["ignore", "pipe", "inherit"] });
       return { clean: true, buffer: merged };
     } catch (error) {
-      if (!(error.status > 0)) throw error;
+      if (!(error.status >= 1 && error.status <= 127)) throw error;
       return { clean: false, hunks: error.status };
     }
   } finally {
@@ -129,16 +148,17 @@ export function syncComponent({
   const operations = [];
   const addCounts = (counts) => counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
   const portForm = (rel, raw) => {
-    if (BINARY.test(rel)) return { buffer: raw, counts: new Map() };
+    if (isBinary(rel, raw)) return { buffer: raw, counts: new Map(), binary: true };
     const sub = applySubstitutions(raw.toString("utf8"), rules, rel);
     return { buffer: Buffer.from(derive(rel, sub.text)), counts: sub.counts };
   };
   const derivedOld = (rel) => {
     const oldFile = join(oldDir, rel);
-    return existsSync(oldFile) ? portForm(rel, readFileSync(oldFile)).buffer : null;
+    return lstatSync(oldFile, { throwIfNoEntry: false })?.isFile() ? portForm(rel, readFileSync(oldFile)).buffer : null;
   };
+  const modeOf = (file) => statSync(file).mode & 0o777;
   const scan = (rel, buffer) => {
-    if (!BINARY.test(rel)) report.hits.push(...denylistHits(rel, buffer.toString("utf8"), denylist));
+    if (!isBinary(rel, buffer)) report.hits.push(...denylistHits(rel, buffer.toString("utf8"), denylist));
   };
   const planWrite = (rel, kind, next) => {
     operations.push({ kind: "write", rel, buffer: next });
@@ -153,6 +173,12 @@ export function syncComponent({
   for (const rel of carriedNew) {
     const localFile = join(localDir, rel);
     const newFile = join(newDir, rel);
+    // Following a link would copy whatever it points at, even outside the
+    // clone, into the port.
+    if (lstatSync(newFile).isSymbolicLink()) {
+      report.conflicts.push({ rel, reason: "symlink" });
+      continue;
+    }
     const next = portForm(rel, readFileSync(newFile));
     if (!existsSync(localFile)) {
       planWrite(rel, "added", next.buffer);
@@ -160,7 +186,7 @@ export function syncComponent({
       continue;
     }
     const local = readFileSync(localFile);
-    if (local.equals(next.buffer)) {
+    if (local.equals(next.buffer) && modeOf(localFile) === modeOf(newFile)) {
       report.unchanged++;
       scan(rel, next.buffer);
       continue;
@@ -169,10 +195,10 @@ export function syncComponent({
     if (old && local.equals(old)) {
       planWrite(rel, "updated", next.buffer);
       addCounts(next.counts);
-    } else if (old && old.equals(next.buffer)) {
+    } else if (old && old.equals(next.buffer) && modeOf(join(oldDir, rel)) === modeOf(newFile)) {
       report.forked.push(rel);
       scan(rel, local);
-    } else if (BINARY.test(rel)) {
+    } else if (next.binary) {
       report.conflicts.push({ rel, reason: "binary" });
     } else {
       // A file new upstream that the port already wrote has no common ancestor.
@@ -190,7 +216,7 @@ export function syncComponent({
 
   for (const rel of carried(oldDir)) {
     const localFile = join(localDir, rel);
-    if (existsSync(join(newDir, rel)) || !existsSync(localFile)) continue;
+    if (carriedNew.includes(rel) || !existsSync(localFile)) continue;
     const local = readFileSync(localFile);
     const old = derivedOld(rel);
     if (old && local.equals(old)) {
@@ -208,6 +234,7 @@ export function syncComponent({
     if (operation.kind === "write") {
       mkdirSync(dirname(localFile), { recursive: true });
       writeFileSync(localFile, operation.buffer);
+      chmodSync(localFile, modeOf(join(newDir, operation.rel)));
     } else {
       unlinkSync(localFile);
     }
@@ -272,7 +299,8 @@ function main() {
     if (report.hits.length) {
       console.error(`\nFAIL: Cursor-isms in synced files; add a substitution or rewrite by hand, then rerun:`);
       for (const h of report.hits) console.error(`  ${spec.localPath}/${h}`);
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     if (dryRun) return;
 

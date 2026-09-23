@@ -30,10 +30,11 @@ Say exactly: SKILL-RAN
 Then stop. Do not invoke any skill or tool.
 EOF
 
-out="$(claude -p --plugin-dir "$scratch" --model haiku --max-turns 3 '/testplug:foo' < /dev/null 2>&1)"
-if [[ "$out" == *SKILL-RAN* ]]; then
+status=0
+out="$(claude -p --plugin-dir "$scratch" --model haiku --max-turns 3 '/testplug:foo' < /dev/null 2>&1)" || status=$?
+if [[ "$status" -eq 0 && "$out" == *SKILL-RAN* ]]; then
   printf '%s\n' "ok: user-typed /plugin:name reaches the skill with no commands/ present"
 else
-  printf '%s\n' "FAIL: /testplug:foo did not run the skill, got: $out"
+  printf '%s\n' "FAIL (claude exit $status): /testplug:foo did not run the skill, got: $out"
   exit 1
 fi

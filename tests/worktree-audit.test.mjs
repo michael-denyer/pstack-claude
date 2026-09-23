@@ -1,13 +1,13 @@
 import { afterEach, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
-const auditScript = join(
-  process.cwd(),
-  'plugins/pstack/skills/poteto-mode/scripts/worktree-audit.sh',
+const auditScript = fileURLToPath(
+  new URL('../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.sh', import.meta.url),
 );
 const fixtures = [];
 afterEach(() => {
@@ -30,32 +30,32 @@ if [ "$1" = fetch ]; then
 fi
 exec /usr/bin/git "$@"
 `;
+  // Merged and closed PRs drop out of the default open-only listing.
   const gh = `#!/bin/sh
 if [ "$AUDIT_FAIL_GH" = 1 ]; then exit 1; fi
+case " $* " in
+  *" --state all "*) ;;
+  *) echo "gh stub: expected --state all, got: $*" >&2; exit 3 ;;
+esac
 printf '%s\\n' "$AUDIT_GH_RESPONSE"
 `;
-  const jq = `#!/usr/bin/env node
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-const branch = args[args.indexOf('--arg') + 2];
-const records = JSON.parse(fs.readFileSync(0, 'utf8'));
-const match = records.find((record) => record.headRefName === branch);
-if (match) console.log([match.number, match.state, match.headRefOid ?? ''].join('\\t'));
-`;
+  // GitHub's ubuntu-latest image ships jq but not rg; grep -r honours the same
+  // fixed-string patterns and exit codes. grep reads no ignore files or config,
+  // so the stub checks for the flags that make rg match that, then drops them.
   const rg = `#!/bin/sh
 if [ "$AUDIT_FAIL_RG" = 2 ]; then exit 2; fi
-if [ -n "$AUDIT_RG_MATCH" ]; then
-  printf '%s\\n' "$AUDIT_RG_MATCH"
+if [ "$1" != --no-config ] || [ "$2" != -uu ]; then
+  echo "rg stub: expected --no-config -uu first, got: $*" >&2
+  exit 3
 fi
-if [ -n "$AUDIT_RG_MATCH" ]; then exit 0; fi
-exit 1
+shift 2
+exec grep -r "$@"
 `;
   execFileSync('/bin/mkdir', ['-p', bin]);
   writeFileSync(join(bin, 'git'), realGit);
   writeFileSync(join(bin, 'gh'), gh);
-  writeFileSync(join(bin, 'jq'), jq);
   writeFileSync(join(bin, 'rg'), rg);
-  for (const name of ['git', 'gh', 'jq', 'rg']) {
+  for (const name of ['git', 'gh', 'rg']) {
     chmodSync(join(bin, name), 0o755);
   }
   return bin;
@@ -108,7 +108,6 @@ function runAudit(fixture, prs = [], extraEnv = {}) {
       ...process.env,
       PATH: `${fixture.bin}:${process.env.PATH}`,
       AUDIT_GH_RESPONSE: JSON.stringify(prs),
-      AUDIT_RG_MATCH: '',
       AUDIT_FAIL_STATUS_PATH: '',
       AUDIT_FAIL_FETCH: '0',
       AUDIT_FAIL_GH: '0',
@@ -265,11 +264,33 @@ test('reviews an ancestor when transcript search fails', () => {
   assert.equal(row[7], 'review');
 });
 
-test('keeps the recent-chat hold with an isolated transcript fixture', () => {
+test('reviews an ancestor when the transcripts directory is missing', () => {
   const fixture = createRepo();
   const candidate = addWorktree(fixture, 'candidate', 'candidate');
-  const transcript = join(fixture.transcripts, 'fixture.jsonl');
-  writeFileSync(transcript, '{}\n');
-  const row = rowFor(runAudit(fixture, [], { AUDIT_RG_MATCH: transcript }), candidate);
-  assert.equal(row[7], 'verify-recent-chat');
+  rmSync(fixture.transcripts, { recursive: true });
+  assert.equal(rowFor(runAudit(fixture), candidate)[7], 'review');
+});
+
+// The stub cannot model rg's ignore files, so this leg needs the real binary.
+test.skipIf(spawnSync('rg', ['--version']).status !== 0)(
+  'finds a recent chat in transcripts that a .gitignore hides (skipped without rg)', () => {
+    const fixture = createRepo();
+    rmSync(join(fixture.bin, 'rg'));
+    git('init', fixture.transcripts);
+    writeFileSync(join(fixture.transcripts, '.gitignore'), '*.jsonl\n');
+    const candidate = addWorktree(fixture, 'candidate', 'candidate');
+    writeFileSync(join(fixture.transcripts, 'fixture.jsonl'), `${JSON.stringify({ cwd: candidate })}\n`);
+    assert.equal(rowFor(runAudit(fixture), candidate)[7], 'verify-recent-chat');
+  },
+);
+
+test('keeps the recent-chat hold with an isolated transcript fixture', () => {
+  const fixture = createRepo();
+  const candidate = addWorktree(fixture, 'candidate-long', 'candidate-long');
+  // A path prefix of the chatted worktree must not inherit its chat.
+  const prefix = addWorktree(fixture, 'candidate', 'candidate');
+  writeFileSync(join(fixture.transcripts, 'fixture.jsonl'), `${JSON.stringify({ cwd: candidate })}\n`);
+  const output = runAudit(fixture);
+  assert.equal(rowFor(output, candidate)[7], 'verify-recent-chat');
+  assert.equal(rowFor(output, prefix)[7], 'safe');
 });

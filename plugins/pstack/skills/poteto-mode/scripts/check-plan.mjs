@@ -48,7 +48,7 @@ let fence = null;
 for (let i = start; i < raw.length; i++) {
 	const text = raw[i];
 	const n = i + 1;
-	const delimiter = text.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+	const delimiter = text.match(/^[ \t]*(`{3,}|~{3,})(.*)$/);
 	let code = fence !== null;
 	if (fence !== null) {
 		if (delimiter && delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length && /^[ \t]*$/.test(delimiter[2])) {

@@ -4,10 +4,10 @@
 // user writes and the prose that tells the agent which role to look up.
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadModels, resolveModels, section } from "../tools/generate.mjs";
+import { loadModels, regions, resolveModels } from "../tools/generate.mjs";
 import { markdownFiles } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -75,15 +75,17 @@ describe("role labels reach the prose", () => {
     return markdownFiles(join(skillsDir, skill))
       .map((file) => {
         const lines = readFileSync(file, "utf8").split("\n");
-        const owned = section("Models")(lines);
-        if (owned) lines.splice(owned[0] - 1, owned[1] - owned[0] + 1);
-        return lines.join("\n");
+        const owned = regions(models)
+          .filter((r) => r.file === relative(repoRoot, file))
+          .map((r) => r.locate(lines))
+          .filter(Boolean);
+        return lines.filter((_, i) => !owned.some(([s, e]) => i >= s && i < e)).join("\n");
       })
       .join("\n");
   }
 
   for (const role of models.roles) {
-    test(`"${role.role}" is named by the ${role.skill} skill outside its stamped section`, () => {
+    test(`"${role.role}" is named by the ${role.skill} skill outside its stamped regions`, () => {
       const needle = normalize(role.role.split(",")[0]);
       expect(normalize(skillProse(role.skill))).toContain(needle);
     });

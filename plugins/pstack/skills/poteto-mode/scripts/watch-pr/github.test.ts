@@ -2,8 +2,10 @@ import { describe, expect, it } from "bun:test";
 import {
   ChecksUnavailable,
   WatcherQueryError,
+  discoverStack,
   mapRollupNode,
   orderStack,
+  parseFastCheck,
   parsePullRequest,
   parseReviewThreads,
   resolveChecks,
@@ -135,6 +137,33 @@ describe("rollup node mapping", () => {
       }),
     ).toMatchObject({ kind: "failed", reportedState: "FUTURE_VALUE" });
     expect(mapRollupNode({ __typename: "FutureNode" })).toBeNull();
+  });
+});
+
+describe("fast-path check mapping", () => {
+  // gh's aggregate.go files every state it does not name into the pending
+  // bucket, including completed conclusions.
+  it("fails completed conclusions that gh buckets as pending", () => {
+    for (const state of ["STARTUP_FAILURE", "STALE"]) {
+      expect(
+        parseFastCheck({ name: "ci", state, bucket: "pending" }),
+      ).toMatchObject({ kind: "failed", reportedState: state });
+    }
+  });
+
+  it("keeps in-flight states pending", () => {
+    for (const state of [
+      "EXPECTED",
+      "REQUESTED",
+      "WAITING",
+      "QUEUED",
+      "PENDING",
+      "IN_PROGRESS",
+    ]) {
+      expect(
+        parseFastCheck({ name: "ci", state, bucket: "pending" }),
+      ).toMatchObject({ kind: "pending", reportedState: state });
+    }
   });
 });
 
@@ -284,6 +313,31 @@ describe("context and stack discovery", () => {
     expect(reader.calls).toEqual(["originRepo"]);
   });
 
+  it("refuses to pair the checkout's PR number with a different explicit repository", async () => {
+    const reader = fakeReader({
+      current: { owner: "acme", repo: "web", number: parsePrNumber(57) },
+    });
+    const resolved = resolveContext({
+      reader,
+      owner: "acme",
+      repo: "api",
+      pr: null,
+    });
+    await expect(resolved).rejects.toBeInstanceOf(WatcherQueryError);
+    await expect(resolved).rejects.toMatchObject({
+      failure: { retryable: false },
+    });
+  });
+
+  it("accepts an explicit repository that matches the checkout's PR", async () => {
+    const reader = fakeReader({
+      current: { owner: "acme", repo: "web", number: parsePrNumber(57) },
+    });
+    expect(
+      await resolveContext({ reader, owner: "ACME", repo: "Web", pr: null }),
+    ).toEqual({ owner: "ACME", repo: "Web", number: parsePrNumber(57) });
+  });
+
   it("orders the connected stack bottom-to-top", () => {
     const ordered = orderStack(context, [
       {
@@ -306,5 +360,24 @@ describe("context and stack discovery", () => {
       },
     ]);
     expect(ordered.map((item) => Number(item.number))).toEqual([41, 42, 43]);
+  });
+
+  it("refuses a full open-PR page, which may have cut the stack", async () => {
+    const openPrs = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        number: parsePrNumber(index + 1),
+        headRepository: { owner: "owner", repo: "repo" },
+        headRefName: `branch-${index + 1}`,
+        baseRefName: "main",
+      }));
+    await expect(
+      discoverStack(fakeReader({ openPullRequests: openPrs(300) }), context),
+    ).rejects.toMatchObject({ failure: { kind: "invalid-stack" } });
+    expect(
+      await discoverStack(
+        fakeReader({ openPullRequests: openPrs(299) }),
+        context,
+      ),
+    ).toEqual([context]);
   });
 });

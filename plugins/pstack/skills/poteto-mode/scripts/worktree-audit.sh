@@ -115,6 +115,10 @@ fi
 # session's cwd with every "/" turned into "-". A session run inside a worktree lives
 # under that worktree's own directory, so scan the whole projects tree, not one repo's.
 transcripts="${2:-$HOME/.claude/projects}"
+if [ ! -d "$transcripts" ]; then
+    discovery_known=no
+    echo "warn: $transcripts not found; LAST_CHAT column will be empty" >&2
+fi
 now=$(date +%s)
 
 printf "SIZE\tAGE\tMERGED\tDIRTY\tREMOTE\tPR\tLAST_CHAT\tBUCKET\tWORKTREE\n"
@@ -229,10 +233,11 @@ parse_worktrees | while IFS= read -r -d '' wt && IFS= read -r -d '' state; do
     fi
 
     # Match paths literally so regex metacharacters in a worktree path are inert.
+    # Ignore files and user rg config must not hide a transcript.
     last="-"
     last_ts=0
     if [ -d "$transcripts" ] && command -v rg >/dev/null 2>&1; then
-        if matches=$(rg -F -l -e "${wt}/" -e "${wt}\"" -- "$transcripts"); then
+        if matches=$(rg --no-config -uu -F -l -e "${wt}/" -e "${wt}\"" -- "$transcripts"); then
             while IFS= read -r f; do
                 [ -z "$f" ] && continue
                 if timestamp=$(mtime "$f"); then

@@ -1,13 +1,32 @@
-import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { afterEach, describe, expect, test } from "bun:test";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applySubstitutions, denylistHits, mergeFile, syncComponent } from "../tools/sync.mjs";
 
 const RULES = JSON.parse(readFileSync(join(import.meta.dir, "../tools/substitutions.json"), "utf8"));
 
+const fixtures = [];
+afterEach(() => {
+  for (const dir of fixtures.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
 function tree(files) {
   const dir = mkdtempSync(join(tmpdir(), "sync-fixture-"));
+  fixtures.push(dir);
   for (const [rel, text] of Object.entries(files)) {
     mkdirSync(join(dir, rel, ".."), { recursive: true });
     writeFileSync(join(dir, rel), text);
@@ -145,6 +164,11 @@ describe("mergeFile", () => {
       Buffer.from(base.replace("l3", "theirs")),
     );
     expect(merged).toEqual({ clean: false, hunks: 1 });
+  });
+
+  test("throws when git fails instead of reporting its exit status as a hunk count", () => {
+    const nul = (s) => Buffer.from(`${s}\0\n`);
+    expect(() => mergeFile(nul("ours"), nul("base"), nul("theirs"))).toThrow("Command failed");
   });
 });
 
@@ -437,6 +461,79 @@ describe("syncComponent", () => {
     expect(readFileSync(join(local, "logo.png")).equals(bytes)).toBe(true);
   });
 
+  test("a binary file of any extension is copied byte for byte and never substituted", () => {
+    const invalidUtf8 = Buffer.concat([Buffer.from("AskQuestion "), Buffer.from([0xff, 0xfe, 0x80])]);
+    const withNul = Buffer.from("AskQuestion\0");
+    const oldUp = tree({});
+    const newUp = tree({});
+    writeFileSync(join(newUp, "doc.pdf"), invalidUtf8);
+    writeFileSync(join(newUp, "blob.bin"), withNul);
+    const local = tree({});
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.counts).toEqual(new Map());
+    expect(readFileSync(join(local, "doc.pdf")).equals(invalidUtf8)).toBe(true);
+    expect(readFileSync(join(local, "blob.bin")).equals(withNul)).toBe(true);
+  });
+
+  test("a binary file of any extension differing three ways is reported as unmergeable", () => {
+    const oldUp = tree({});
+    const newUp = tree({});
+    const local = tree({});
+    writeFileSync(join(oldUp, "font.ttf"), Buffer.from([0x00, 0xff, 0x01]));
+    writeFileSync(join(newUp, "font.ttf"), Buffer.from([0x00, 0xff, 0x02]));
+    writeFileSync(join(local, "font.ttf"), Buffer.from([0x00, 0xff, 0x03]));
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.conflicts).toEqual([{ rel: "font.ttf", reason: "binary" }]);
+    expect(readFileSync(join(local, "font.ttf")).equals(Buffer.from([0x00, 0xff, 0x03]))).toBe(true);
+  });
+
+  test("an upstream symlink is reported, never followed", () => {
+    const outside = tree({ "secret.txt": "local secret\n", "dir/inner.md": "inner\n" });
+    const oldUp = tree({ "was-file.md": "body\n" });
+    const newUp = tree({});
+    symlinkSync(join(outside, "secret.txt"), join(newUp, "file-link.md"));
+    symlinkSync(join(outside, "dir"), join(newUp, "dir-link"));
+    symlinkSync(join(outside, "missing.md"), join(newUp, "was-file.md"));
+    symlinkSync(join(outside, "secret.txt"), join(oldUp, "old-link.md"));
+    const local = tree({ "was-file.md": "body\n", "old-link.md": "local secret\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.conflicts).toEqual([
+      { rel: "dir-link", reason: "symlink" },
+      { rel: "file-link.md", reason: "symlink" },
+      { rel: "was-file.md", reason: "symlink" },
+      { rel: "old-link.md", reason: "removed-upstream" },
+    ]);
+    expect(report.written).toEqual([]);
+    expect(report.deleted).toEqual([]);
+    expect(existsSync(join(local, "file-link.md"))).toBe(false);
+    expect(readFileSync(join(local, "was-file.md"), "utf8")).toBe("body\n");
+    expect(readFileSync(join(local, "old-link.md"), "utf8")).toBe("local secret\n");
+  });
+
+  test("a written file takes upstream's mode, and a mode-only upstream change is written", () => {
+    const oldUp = tree({ "same.sh": "echo\n", "forked.sh": "echo\n" });
+    const newUp = tree({ "same.sh": "echo\n", "forked.sh": "echo\n", "added.sh": "echo\n" });
+    const local = tree({ "same.sh": "echo\n", "forked.sh": "echo port\n" });
+    const scripts = ["same.sh", "forked.sh", "added.sh"];
+    for (const rel of scripts) chmodSync(join(newUp, rel), 0o755);
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.written).toEqual([
+      { kind: "added", rel: "added.sh" },
+      { kind: "merged", rel: "forked.sh" },
+      { kind: "updated", rel: "same.sh" },
+    ]);
+    for (const rel of scripts) expect(statSync(join(local, rel)).mode & 0o777).toBe(0o755);
+    expect(readFileSync(join(local, "forked.sh"), "utf8")).toBe("echo port\n");
+  });
+
   test("a file upstream never touched is forked, not conflicted", () => {
     const body = "shared line\n";
     const oldUp = tree({ "s.md": body });
@@ -519,5 +616,49 @@ describe("syncComponent", () => {
     expect(report.conflicts).toEqual([{ rel: "logo.png", reason: "binary" }]);
     expect(report.written).toEqual([]);
     expect(readFileSync(join(local, "logo.png")).equals(Buffer.from([0x89, 0x50, 0x00, 0x03]))).toBe(true);
+  });
+});
+
+describe("sync CLI", () => {
+  test("a denylist failure exits 1 and removes its scratch clone", () => {
+    const root = tree({});
+    const upstream = join(root, "upstream");
+    mkdirSync(join(upstream, "skills"), { recursive: true });
+    const git = (...args) => execFileSync("git", ["-C", upstream, ...args], { encoding: "utf8" }).trim();
+    git("init", "-b", "main");
+    const commit = (text) => {
+      writeFileSync(join(upstream, "skills/s.md"), text);
+      git("add", ".");
+      git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "update");
+      return git("rev-parse", "HEAD");
+    };
+    const oldSha = commit("one\n");
+    const newSha = commit("run control-cli\n");
+
+    const port = join(root, "port");
+    for (const file of ["sync.mjs", "generate.mjs", "validate-skills.mjs", "substitutions.json"]) {
+      cpSync(join(import.meta.dir, "../tools", file), join(port, "tools", file));
+    }
+    cpSync(join(import.meta.dir, "../plugins/pstack/models.json"), join(port, "plugins/pstack/models.json"));
+    mkdirSync(join(port, "plugins/pstack/skills"));
+    writeFileSync(join(port, "plugins/pstack/skills/s.md"), "one\n");
+    writeFileSync(
+      join(port, "tools/upstream.json"),
+      JSON.stringify({
+        remote: upstream,
+        components: { kit: { upstreamPath: "skills", localPath: "plugins/pstack/skills", sha: oldSha } },
+      }),
+    );
+    const scratch = join(root, "tmp");
+    mkdirSync(scratch);
+
+    const result = spawnSync(process.execPath, [join(port, "tools/sync.mjs"), "kit", newSha, "--dry-run"], {
+      encoding: "utf8",
+      env: { ...process.env, TMPDIR: scratch },
+    });
+
+    expect(result.stderr).toContain("FAIL: Cursor-isms");
+    expect(result.status).toBe(1);
+    expect(readdirSync(scratch).filter((name) => name.startsWith("pstack-"))).toEqual([]);
   });
 });

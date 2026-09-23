@@ -114,7 +114,11 @@ function renderBlocker(blocker: T.MergeBlocker | StatusQueryBlocker): string {
           ? "restore or remove the closed PR from the queued stack"
           : blocker.reason === "draft-pr"
             ? "mark the PR ready for review before waiting for the merge queue"
-            : "resolve the changes-requested review before waiting for the merge queue";
+            : blocker.reason === "review-required"
+              ? "get the required approving review"
+              : blocker.reason === "merge-blocked"
+                ? "find the branch protection rule holding the merge (mergeStateStatus=BLOCKED with clean CI)"
+                : "resolve the changes-requested review before waiting for the merge queue";
       return [
         `BLOCKER: ${blocker.reason}`,
         `pr=${blocker.pr.number}`,
@@ -141,8 +145,6 @@ export function renderPretty(verdict: T.WatcherVerdict): string {
     case "STATUS":
       return renderStatusTable(verdict.rows);
     case "WAITING":
-      if (verdict.reason.kind === "review")
-        return `WAITING: frontier=#${verdict.frontier.number}; review gate not satisfied\nreviewDecision=${verdict.reason.reviewDecision}\nmergeStateStatus=${verdict.reason.mergeStateStatus}\n`;
       return verdict.reason.kind === "pending-checks"
         ? `WAITING: frontier=#${verdict.frontier.number}; ${verdict.reason.pending.length} check${verdict.reason.pending.length === 1 ? "" : "s"} pending\n`
         : `WAITING: frontier=#${verdict.frontier.number} is blocker-free; waiting for merge queue (${verdict.reason.unmergedCount} PR${verdict.reason.unmergedCount === 1 ? "" : "s"} unmerged)\n`;
@@ -164,8 +166,6 @@ export function renderPretty(verdict: T.WatcherVerdict): string {
     case "TIMEOUT":
       if (verdict.reason.kind === "pending-checks")
         return "TIMEOUT: checks still pending\n";
-      if (verdict.reason.kind === "review")
-        return `TIMEOUT: review gate still not satisfied (reviewDecision=${verdict.reason.reviewDecision}, mergeStateStatus=${verdict.reason.mergeStateStatus})\n`;
       if (verdict.reason.kind === "status-unavailable")
         return "TIMEOUT: GitHub status remained unavailable\n";
       return `TIMEOUT: queued stack still has ${verdict.reason.unmergedCount} PR${verdict.reason.unmergedCount === 1 ? "" : "s"} unmerged; frontier=#${verdict.reason.frontier.number}\n`;

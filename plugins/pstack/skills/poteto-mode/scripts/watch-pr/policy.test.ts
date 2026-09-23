@@ -194,7 +194,7 @@ it("attributes a stack wait to the PR whose checks are pending, not the bottom",
   expect(decision).toMatchObject({
     kind: "waiting",
     frontier: { number: 21 },
-    reason: { kind: "pending-checks", pending: [{ name: "upstack-build" }] },
+    pending: [{ name: "upstack-build" }],
   });
 });
 
@@ -421,7 +421,7 @@ it("uses the specified retry floor and cap", () => {
 });
 
 describe("review gate", () => {
-  it("waits on a required review instead of reporting a blocked PR ready", async () => {
+  it("blocks on a required review instead of reporting a blocked PR ready", async () => {
     const snapshot = await readSnapshot({
       reader: fakeReader({
         facts: { reviewDecision: "REVIEW_REQUIRED", mergeStateStatus: "BLOCKED" },
@@ -431,20 +431,18 @@ describe("review gate", () => {
       allowDraft: false,
     });
     expect(classifyPr(snapshot)).toEqual({
-      kind: "waiting",
-      frontier: context(23),
-      reason: {
-        kind: "review",
-        reviewDecision: "REVIEW_REQUIRED",
-        mergeStateStatus: "BLOCKED",
-      },
+      kind: "blocker",
+      blocker: { kind: "merge-gate", pr: context(23), reason: "review-required" },
     });
     expect(
       selectTierMajorStackDecision([snapshot] as NonEmpty<typeof snapshot>),
-    ).toMatchObject({ kind: "waiting", reason: { kind: "review" } });
+    ).toMatchObject({
+      kind: "blocker",
+      blocker: { kind: "merge-gate", reason: "review-required" },
+    });
   });
 
-  it("waits when branch protection blocks an approved PR with clean CI", async () => {
+  it("blocks when branch protection holds an approved PR with clean CI", async () => {
     const snapshot = await readSnapshot({
       reader: fakeReader({ facts: { mergeStateStatus: "BLOCKED" } }),
       context: context(24),
@@ -452,9 +450,22 @@ describe("review gate", () => {
       allowDraft: false,
     });
     expect(classifyPr(snapshot)).toMatchObject({
-      kind: "waiting",
-      reason: { kind: "review", mergeStateStatus: "BLOCKED" },
+      kind: "blocker",
+      blocker: { kind: "merge-gate", reason: "merge-blocked" },
     });
+  });
+
+  it("waits for pending checks before reporting the review gate", async () => {
+    const snapshot = await readSnapshot({
+      reader: fakeReader({
+        facts: { reviewDecision: "REVIEW_REQUIRED", mergeStateStatus: "BLOCKED" },
+        fastPath: { kind: "checks", checks: [pendingCheck()] },
+      }),
+      context: context(26),
+      pendingHistory: "omit",
+      allowDraft: false,
+    });
+    expect(classifyPr(snapshot)).toMatchObject({ kind: "waiting" });
   });
 
   it("still reports changes requested as a merge-gate blocker", async () => {

@@ -181,34 +181,30 @@ function gateReason(
   if (row.kind === "merged") return null;
   if (row.kind === "closed") return "closed-without-merge";
   if (row.facts.isDraft && !allowDraft) return "draft-pr";
-  return row.facts.reviewDecision === "CHANGES_REQUESTED"
-    ? "changes-requested"
-    : null;
+  if (row.facts.reviewDecision === "CHANGES_REQUESTED")
+    return "changes-requested";
+  if (row.facts.reviewDecision === "REVIEW_REQUIRED") return "review-required";
+  // BLOCKED with clean CI is some other branch protection rule, such as signed
+  // commits or a required check that never reported. GitHub will not merge it.
+  return row.facts.mergeStateStatus === "BLOCKED" ? "merge-blocked" : null;
 }
+// Gates that pending checks can still explain wait for the checks first.
+const DEFERRED_WHILE_PENDING: ReadonlySet<T.MergeGateReason> = new Set([
+  "draft-pr",
+  "review-required",
+  "merge-blocked",
+]);
 function gateBlocker(
   row: T.PrSnapshot,
   allowDraft: boolean,
 ): T.MergeBlocker | null {
   const reason = gateReason(row, allowDraft);
   return reason === null ||
-    (reason === "draft-pr" &&
+    (DEFERRED_WHILE_PENDING.has(reason) &&
       row.kind === "open" &&
       row.ci.kind === "ci-pending")
     ? null
     : { kind: "merge-gate", pr: row.context, reason };
-}
-function waitReason(row: T.PrSnapshot): T.WaitReason | null {
-  if (row.kind !== "open") return null;
-  if (row.ci.kind === "ci-pending")
-    return { kind: "pending-checks", pending: row.ci.pending };
-  return row.facts.reviewDecision === "REVIEW_REQUIRED" ||
-    row.facts.mergeStateStatus === "BLOCKED"
-    ? {
-        kind: "review",
-        reviewDecision: row.facts.reviewDecision,
-        mergeStateStatus: row.facts.mergeStateStatus,
-      }
-    : null;
 }
 function readyContribution(
   row: T.PrSnapshot,
@@ -225,8 +221,7 @@ function readyContribution(
     row.ci.kind !== "ci-clean" ||
     row.threads.length !== 0 ||
     conflictBlocker(row) !== null ||
-    gateReason(row, allowDraft) !== null ||
-    waitReason(row) !== null
+    gateReason(row, allowDraft) !== null
   )
     return null;
   const reviewDecision = row.facts.reviewDecision;
@@ -267,9 +262,8 @@ export function classifyPr(
     gateBlocker(row, allowDraft),
   ])
     if (blocker !== null) return { kind: "blocker", blocker };
-  const reason = waitReason(row);
-  if (reason !== null)
-    return { kind: "waiting", frontier: row.context, reason };
+  if (row.kind === "open" && row.ci.kind === "ci-pending")
+    return { kind: "waiting", frontier: row.context, pending: row.ci.pending };
   const ready = readyContribution(row, allowDraft);
   if (ready === null) throw new Error("snapshot has no classified decision");
   return ready.kind === "merged-pr"
@@ -289,11 +283,13 @@ export function selectTierMajorStackDecision(
     const blocker = gateBlocker(row, allowDraft);
     if (blocker !== null) return { kind: "blocker", blocker };
   }
-  for (const row of rows) {
-    const reason = waitReason(row);
-    if (reason !== null)
-      return { kind: "waiting", frontier: row.context, reason };
-  }
+  for (const row of rows)
+    if (row.kind === "open" && row.ci.kind === "ci-pending")
+      return {
+        kind: "waiting",
+        frontier: row.context,
+        pending: row.ci.pending,
+      };
   const prs = nonEmpty(
     rows
       .map((row) => readyContribution(row, allowDraft))
@@ -554,7 +550,7 @@ export async function runSimple(args: {
         kind: "WAITING",
         terminal: false,
         frontier: decision.frontier,
-        reason: decision.reason,
+        reason: { kind: "pending-checks", pending: decision.pending },
       }),
     );
     return {
@@ -565,7 +561,7 @@ export async function runSimple(args: {
           kind: "TIMEOUT",
           terminal: true,
           exitCode: 5,
-          reason: decision.reason,
+          reason: { kind: "pending-checks", pending: decision.pending },
         }),
     };
   };
@@ -685,7 +681,10 @@ export type QueueEvaluation =
       readonly state: QueueState;
       readonly frontier: T.PrContext;
       readonly reason:
-        | T.WaitReason
+        | {
+            readonly kind: "pending-checks";
+            readonly pending: T.NonEmpty<T.PendingCheck>;
+          }
         | { readonly kind: "merge-queue"; readonly unmergedCount: number };
       readonly emit: boolean;
     };
@@ -725,16 +724,17 @@ export function evaluateQueue(
       frontier,
       remaining: active.length,
     };
-  const reason = waitReason(rows[0]) ?? {
-    kind: "merge-queue" as const,
-    unmergedCount: active.length,
-  };
+  const row = rows[0];
+  const pending =
+    row.kind === "open" && row.ci.kind === "ci-pending" ? row.ci.pending : null;
+  const reason =
+    pending === null
+      ? ({ kind: "merge-queue", unmergedCount: active.length } as const)
+      : ({ kind: "pending-checks", pending } as const);
   const key =
     reason.kind === "pending-checks"
       ? `pending:${frontier.number}:${reason.pending.length}`
-      : reason.kind === "review"
-        ? `review:${frontier.number}:${reason.reviewDecision}:${reason.mergeStateStatus}`
-        : `queue:${frontier.number}:${reason.unmergedCount}`;
+      : `queue:${frontier.number}:${reason.unmergedCount}`;
   return {
     kind: "waiting",
     state: { ...state, frontier, lastWaitKey: key },

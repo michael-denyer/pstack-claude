@@ -409,12 +409,15 @@ export function applyRegions(file, text, models, { strict = true } = {}) {
   return lines.join("\n");
 }
 
-// A role's "models" is a list of slugs or the string "panel", which resolves to
-// the shared diverse-model panel so the panel is written once.
+// A role's "models" names a tier (default, strongest, panel) or lists slugs.
+// A tier resolves to its models and stays on the role as `tier`, so moving a
+// tier is one edit and the Codex mapping can follow the same keys.
 export function resolveModels(models) {
   return {
     ...models,
-    roles: models.roles.map((r) => (r.models === "panel" ? { ...r, models: models.panel } : r)),
+    roles: models.roles.map((r) =>
+      typeof r.models === "string" ? { ...r, tier: r.models, models: [models.tiers[r.models]].flat() } : r,
+    ),
   };
 }
 
@@ -460,8 +463,8 @@ export function setupModelsSection(models) {
   return (
     "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
     `- Available Claude models: ${codeList(models.available)}\n` +
-    `- Default panel: ${codeList(models.panel)}\n` +
-    `- Single-role default: ${code(models.singleRoleDefault)}`
+    `- Default panel: ${codeList(models.tiers.panel)}\n` +
+    `- Single-role default: ${code(models.tiers.default)}`
   );
 }
 
@@ -483,16 +486,14 @@ export function overrideSheetBlock(models) {
 }
 
 export function codexModelNamesSection(models) {
-  const strongest = models.roles.filter(
-    (r) => r.models.length === 1 && r.models[0] !== models.singleRoleDefault,
-  );
+  const strongest = models.roles.filter((r) => r.tier === "strongest");
   return (
     "Skills name Claude defaults (a single-role default for code/prose/judgment plus a diverse-model panel for " +
     "diverse-model panels; each model-consuming skill lists its own in a Models section). These slugs do not " +
     "resolve on Codex. Substitute your configured Codex models:\n\n" +
-    `- Single-model roles: your primary Codex model (for example ${code(models.codex.singleRoleExample)}).\n` +
+    `- Single-model roles: your primary Codex model (for example ${code(models.codex.default)}).\n` +
     `- Roles that default to the strongest Claude model (${strongest.map((r) => code(r.role)).join(", ")}): ` +
-    `your strongest Codex model (for example ${code(models.codex.strongestRoleExample)}).\n` +
+    `your strongest Codex model (for example ${code(models.codex.strongest)}).\n` +
     "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
     "signal comes from model diversity, so use the distinct Codex models available to you. A good default panel " +
     `on ChatGPT is ${codeList(models.codex.panel)}. If only one model family is reachable, vary reasoning ` +

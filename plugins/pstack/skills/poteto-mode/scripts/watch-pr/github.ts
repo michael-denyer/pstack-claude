@@ -775,6 +775,20 @@ export async function resolveContext(args: {
       };
   }
   const inferred = await args.reader.currentPr(args.pr);
+  if (args.pr === null) {
+    // The checkout's PR number means nothing in another repository.
+    const found = `${inferred.owner}/${inferred.repo}`;
+    const requested = `${args.owner ?? inferred.owner}/${args.repo ?? inferred.repo}`;
+    if (requested.toLowerCase() !== found.toLowerCase()) {
+      const url = `https://github.com/${found}/pull/${inferred.number}`;
+      throw new WatcherQueryError({
+        kind: "invalid-context-url",
+        retryable: false,
+        rawValue: url,
+        detail: `the current branch's PR ${url} is not in ${requested}; pass --pr`,
+      });
+    }
+  }
   return {
     owner: args.owner ?? inferred.owner,
     repo: args.repo ?? inferred.repo,

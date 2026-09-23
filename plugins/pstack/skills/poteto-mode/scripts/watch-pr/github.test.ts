@@ -312,6 +312,31 @@ describe("context and stack discovery", () => {
     expect(reader.calls).toEqual(["originRepo"]);
   });
 
+  it("refuses to pair the checkout's PR number with a different explicit repository", async () => {
+    const reader = fakeReader({
+      current: { owner: "acme", repo: "web", number: parsePrNumber(57) },
+    });
+    const resolved = resolveContext({
+      reader,
+      owner: "acme",
+      repo: "api",
+      pr: null,
+    });
+    await expect(resolved).rejects.toBeInstanceOf(WatcherQueryError);
+    await expect(resolved).rejects.toMatchObject({
+      failure: { retryable: false },
+    });
+  });
+
+  it("accepts an explicit repository that matches the checkout's PR", async () => {
+    const reader = fakeReader({
+      current: { owner: "acme", repo: "web", number: parsePrNumber(57) },
+    });
+    expect(
+      await resolveContext({ reader, owner: "ACME", repo: "Web", pr: null }),
+    ).toEqual({ owner: "ACME", repo: "Web", number: parsePrNumber(57) });
+  });
+
   it("orders the connected stack bottom-to-top", () => {
     const ordered = orderStack(context, [
       {

@@ -1,7 +1,7 @@
 import { afterEach, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -40,9 +40,15 @@ esac
 printf '%s\\n' "$AUDIT_GH_RESPONSE"
 `;
   // GitHub's ubuntu-latest image ships jq but not rg; grep -r honours the same
-  // fixed-string patterns and exit codes.
+  // fixed-string patterns and exit codes. grep reads no ignore files or config,
+  // so the stub checks for the flags that make rg match that, then drops them.
   const rg = `#!/bin/sh
 if [ "$AUDIT_FAIL_RG" = 2 ]; then exit 2; fi
+if [ "$1" != --no-config ] || [ "$2" != -uu ]; then
+  echo "rg stub: expected --no-config -uu first, got: $*" >&2
+  exit 3
+fi
+shift 2
 exec grep -r "$@"
 `;
   execFileSync('/bin/mkdir', ['-p', bin]);
@@ -257,6 +263,26 @@ test('reviews an ancestor when transcript search fails', () => {
   const row = rowFor(runAudit(fixture, [], { AUDIT_FAIL_RG: '2' }), candidate);
   assert.equal(row[7], 'review');
 });
+
+test('reviews an ancestor when the transcripts directory is missing', () => {
+  const fixture = createRepo();
+  const candidate = addWorktree(fixture, 'candidate', 'candidate');
+  rmSync(fixture.transcripts, { recursive: true });
+  assert.equal(rowFor(runAudit(fixture), candidate)[7], 'review');
+});
+
+// The stub cannot model rg's ignore files, so this leg needs the real binary.
+test.skipIf(spawnSync('rg', ['--version']).status !== 0)(
+  'finds a recent chat in transcripts that a .gitignore hides (skipped without rg)', () => {
+    const fixture = createRepo();
+    rmSync(join(fixture.bin, 'rg'));
+    git('init', fixture.transcripts);
+    writeFileSync(join(fixture.transcripts, '.gitignore'), '*.jsonl\n');
+    const candidate = addWorktree(fixture, 'candidate', 'candidate');
+    writeFileSync(join(fixture.transcripts, 'fixture.jsonl'), `${JSON.stringify({ cwd: candidate })}\n`);
+    assert.equal(rowFor(runAudit(fixture), candidate)[7], 'verify-recent-chat');
+  },
+);
 
 test('keeps the recent-chat hold with an isolated transcript fixture', () => {
   const fixture = createRepo();

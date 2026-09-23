@@ -272,7 +272,8 @@ function main() {
     if (report.hits.length) {
       console.error(`\nFAIL: Cursor-isms in synced files; add a substitution or rewrite by hand, then rerun:`);
       for (const h of report.hits) console.error(`  ${spec.localPath}/${h}`);
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     if (dryRun) return;
 

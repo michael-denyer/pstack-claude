@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applySubstitutions, denylistHits, mergeFile, syncComponent } from "../tools/sync.mjs";
@@ -519,5 +520,49 @@ describe("syncComponent", () => {
     expect(report.conflicts).toEqual([{ rel: "logo.png", reason: "binary" }]);
     expect(report.written).toEqual([]);
     expect(readFileSync(join(local, "logo.png")).equals(Buffer.from([0x89, 0x50, 0x00, 0x03]))).toBe(true);
+  });
+});
+
+describe("sync CLI", () => {
+  test("a denylist failure exits 1 and removes its scratch clone", () => {
+    const root = tree({});
+    const upstream = join(root, "upstream");
+    mkdirSync(join(upstream, "skills"), { recursive: true });
+    const git = (...args) => execFileSync("git", ["-C", upstream, ...args], { encoding: "utf8" }).trim();
+    git("init", "-b", "main");
+    const commit = (text) => {
+      writeFileSync(join(upstream, "skills/s.md"), text);
+      git("add", ".");
+      git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "update");
+      return git("rev-parse", "HEAD");
+    };
+    const oldSha = commit("one\n");
+    const newSha = commit("run control-cli\n");
+
+    const port = join(root, "port");
+    for (const file of ["sync.mjs", "generate.mjs", "validate-skills.mjs", "substitutions.json"]) {
+      cpSync(join(import.meta.dir, "../tools", file), join(port, "tools", file));
+    }
+    cpSync(join(import.meta.dir, "../plugins/pstack/models.json"), join(port, "plugins/pstack/models.json"));
+    mkdirSync(join(port, "plugins/pstack/skills"));
+    writeFileSync(join(port, "plugins/pstack/skills/s.md"), "one\n");
+    writeFileSync(
+      join(port, "tools/upstream.json"),
+      JSON.stringify({
+        remote: upstream,
+        components: { kit: { upstreamPath: "skills", localPath: "plugins/pstack/skills", sha: oldSha } },
+      }),
+    );
+    const scratch = join(root, "tmp");
+    mkdirSync(scratch);
+
+    const result = spawnSync(process.execPath, [join(port, "tools/sync.mjs"), "kit", newSha, "--dry-run"], {
+      encoding: "utf8",
+      env: { ...process.env, TMPDIR: scratch },
+    });
+
+    expect(result.stderr).toContain("FAIL: Cursor-isms");
+    expect(result.status).toBe(1);
+    expect(readdirSync(scratch).filter((name) => name.startsWith("pstack-"))).toEqual([]);
   });
 });

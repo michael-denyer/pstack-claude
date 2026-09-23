@@ -369,10 +369,10 @@ describe("Codex model names", () => {
 
     expect(strongestLine).not.toContain("swarm workers");
 
-    expect(section).toContain("gpt-6-astra");
+    expect(strongestLine).toContain(`\`${raw.codex.strongest}\``);
     for (const role of ["bug-fix", "perf-issue", "hillclimb", "strongest judgment"]) {
       expect(section).toContain(role);
     }
-    expect(section).not.toContain("claude-opus-5");
+    for (const family of raw.available) expect(section).not.toContain(`\`${family}\``);
   });
 });

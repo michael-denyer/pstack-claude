@@ -9,6 +9,7 @@ import {
   readdirSync,
   readFileSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -481,6 +482,31 @@ describe("syncComponent", () => {
 
     expect(report.conflicts).toEqual([{ rel: "font.ttf", reason: "binary" }]);
     expect(readFileSync(join(local, "font.ttf")).equals(Buffer.from([0x00, 0xff, 0x03]))).toBe(true);
+  });
+
+  test("an upstream symlink is reported, never followed", () => {
+    const outside = tree({ "secret.txt": "local secret\n", "dir/inner.md": "inner\n" });
+    const oldUp = tree({ "was-file.md": "body\n" });
+    const newUp = tree({});
+    symlinkSync(join(outside, "secret.txt"), join(newUp, "file-link.md"));
+    symlinkSync(join(outside, "dir"), join(newUp, "dir-link"));
+    symlinkSync(join(outside, "missing.md"), join(newUp, "was-file.md"));
+    symlinkSync(join(outside, "secret.txt"), join(oldUp, "old-link.md"));
+    const local = tree({ "was-file.md": "body\n", "old-link.md": "local secret\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.conflicts).toEqual([
+      { rel: "dir-link", reason: "symlink" },
+      { rel: "file-link.md", reason: "symlink" },
+      { rel: "was-file.md", reason: "symlink" },
+      { rel: "old-link.md", reason: "removed-upstream" },
+    ]);
+    expect(report.written).toEqual([]);
+    expect(report.deleted).toEqual([]);
+    expect(existsSync(join(local, "file-link.md"))).toBe(false);
+    expect(readFileSync(join(local, "was-file.md"), "utf8")).toBe("body\n");
+    expect(readFileSync(join(local, "old-link.md"), "utf8")).toBe("local secret\n");
   });
 
   test("a written file takes upstream's mode, and a mode-only upstream change is written", () => {

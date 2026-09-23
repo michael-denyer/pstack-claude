@@ -17,8 +17,8 @@
 //     left alone, counted
 //   - all three differ and git merge-file succeeds -> merged, written
 //   - all three differ and the merge conflicts -> left alone, reported with its
-//     hunk count under conflicts, alongside binaries and files upstream deleted
-//     that the port had edited
+//     hunk count under conflicts, alongside binaries, upstream symlinks (never
+//     followed), and files upstream deleted that the port had edited
 //   - upstream deleted it and local matches the derived OLD text -> deleted
 //
 // A written file takes the new upstream file's mode.
@@ -33,6 +33,7 @@ import { execFileSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -153,7 +154,7 @@ export function syncComponent({
   };
   const derivedOld = (rel) => {
     const oldFile = join(oldDir, rel);
-    return existsSync(oldFile) ? portForm(rel, readFileSync(oldFile)).buffer : null;
+    return lstatSync(oldFile, { throwIfNoEntry: false })?.isFile() ? portForm(rel, readFileSync(oldFile)).buffer : null;
   };
   const modeOf = (file) => statSync(file).mode & 0o777;
   const scan = (rel, buffer) => {
@@ -172,6 +173,12 @@ export function syncComponent({
   for (const rel of carriedNew) {
     const localFile = join(localDir, rel);
     const newFile = join(newDir, rel);
+    // Following a link would copy whatever it points at, even outside the
+    // clone, into the port.
+    if (lstatSync(newFile).isSymbolicLink()) {
+      report.conflicts.push({ rel, reason: "symlink" });
+      continue;
+    }
     const next = portForm(rel, readFileSync(newFile));
     if (!existsSync(localFile)) {
       planWrite(rel, "added", next.buffer);
@@ -209,7 +216,7 @@ export function syncComponent({
 
   for (const rel of carried(oldDir)) {
     const localFile = join(localDir, rel);
-    if (existsSync(join(newDir, rel)) || !existsSync(localFile)) continue;
+    if (carriedNew.includes(rel) || !existsSync(localFile)) continue;
     const local = readFileSync(localFile);
     const old = derivedOld(rel);
     if (old && local.equals(old)) {

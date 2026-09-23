@@ -11,14 +11,17 @@
 // frontmatter and generator stamps via deriveSkill) and compared three ways:
 //
 //   - local copy is missing -> new file, written
-//   - local copy matches the derived NEW text -> unchanged
+//   - local copy matches the derived NEW text and mode -> unchanged
 //   - local copy matches the derived OLD text -> clean update, written
-//   - upstream did not touch it and local differs -> forked, left alone, counted
+//   - upstream did not touch its text or mode and local differs -> forked,
+//     left alone, counted
 //   - all three differ and git merge-file succeeds -> merged, written
 //   - all three differ and the merge conflicts -> left alone, reported with its
 //     hunk count under conflicts, alongside binaries and files upstream deleted
 //     that the port had edited
 //   - upstream deleted it and local matches the derived OLD text -> deleted
+//
+// A written file takes the new upstream file's mode.
 //
 // Every effective text file is denylist-scanned; a hit fails the run with file,
 // line, and the hint for that token, leaving the tree for inspection. The pin
@@ -27,7 +30,17 @@
 // under --dry-run prints the ownership map (which files the port has forked).
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -137,6 +150,7 @@ export function syncComponent({
     const oldFile = join(oldDir, rel);
     return existsSync(oldFile) ? portForm(rel, readFileSync(oldFile)).buffer : null;
   };
+  const modeOf = (file) => statSync(file).mode & 0o777;
   const scan = (rel, buffer) => {
     if (!BINARY.test(rel)) report.hits.push(...denylistHits(rel, buffer.toString("utf8"), denylist));
   };
@@ -160,7 +174,7 @@ export function syncComponent({
       continue;
     }
     const local = readFileSync(localFile);
-    if (local.equals(next.buffer)) {
+    if (local.equals(next.buffer) && modeOf(localFile) === modeOf(newFile)) {
       report.unchanged++;
       scan(rel, next.buffer);
       continue;
@@ -169,7 +183,7 @@ export function syncComponent({
     if (old && local.equals(old)) {
       planWrite(rel, "updated", next.buffer);
       addCounts(next.counts);
-    } else if (old && old.equals(next.buffer)) {
+    } else if (old && old.equals(next.buffer) && modeOf(join(oldDir, rel)) === modeOf(newFile)) {
       report.forked.push(rel);
       scan(rel, local);
     } else if (BINARY.test(rel)) {
@@ -208,6 +222,7 @@ export function syncComponent({
     if (operation.kind === "write") {
       mkdirSync(dirname(localFile), { recursive: true });
       writeFileSync(localFile, operation.buffer);
+      chmodSync(localFile, modeOf(join(newDir, operation.rel)));
     } else {
       unlinkSync(localFile);
     }

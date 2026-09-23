@@ -1,6 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applySubstitutions, denylistHits, mergeFile, syncComponent } from "../tools/sync.mjs";
@@ -436,6 +446,23 @@ describe("syncComponent", () => {
     const local = tree({});
     sync({ oldDir: oldUp, newDir: newUp, localDir: local });
     expect(readFileSync(join(local, "logo.png")).equals(bytes)).toBe(true);
+  });
+
+  test("a written file takes upstream's mode, and a mode-only upstream change is written", () => {
+    const oldUp = tree({ "same.sh": "echo\n", "forked.sh": "echo\n" });
+    const newUp = tree({ "same.sh": "echo\n", "forked.sh": "echo\n", "added.sh": "echo\n" });
+    const local = tree({ "same.sh": "echo\n", "forked.sh": "echo port\n" });
+    for (const rel of ["same.sh", "forked.sh", "added.sh"]) chmodSync(join(newUp, rel), 0o755);
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.written).toEqual([
+      { kind: "added", rel: "added.sh" },
+      { kind: "merged", rel: "forked.sh" },
+      { kind: "updated", rel: "same.sh" },
+    ]);
+    for (const rel of ["same.sh", "forked.sh", "added.sh"]) expect(statSync(join(local, rel)).mode & 0o777).toBe(0o755);
+    expect(readFileSync(join(local, "forked.sh"), "utf8")).toBe("echo port\n");
   });
 
   test("a file upstream never touched is forked, not conflicted", () => {

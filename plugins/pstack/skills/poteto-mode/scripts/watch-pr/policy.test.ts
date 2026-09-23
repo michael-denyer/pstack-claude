@@ -194,7 +194,7 @@ it("attributes a stack wait to the PR whose checks are pending, not the bottom",
   expect(decision).toMatchObject({
     kind: "waiting",
     frontier: { number: 21 },
-    pending: [{ name: "upstack-build" }],
+    reason: { kind: "pending-checks", pending: [{ name: "upstack-build" }] },
   });
 });
 
@@ -418,4 +418,57 @@ it("uses the specified retry floor and cap", () => {
   expect(queryBackoffSeconds(1, 1)).toBe(60);
   expect(queryBackoffSeconds(1, 2)).toBe(120);
   expect(queryBackoffSeconds(60, 4)).toBe(300);
+});
+
+describe("review gate", () => {
+  it("waits on a required review instead of reporting a blocked PR ready", async () => {
+    const snapshot = await readSnapshot({
+      reader: fakeReader({
+        facts: { reviewDecision: "REVIEW_REQUIRED", mergeStateStatus: "BLOCKED" },
+      }),
+      context: context(23),
+      pendingHistory: "omit",
+      allowDraft: false,
+    });
+    expect(classifyPr(snapshot)).toEqual({
+      kind: "waiting",
+      frontier: context(23),
+      reason: {
+        kind: "review",
+        reviewDecision: "REVIEW_REQUIRED",
+        mergeStateStatus: "BLOCKED",
+      },
+    });
+    expect(
+      selectTierMajorStackDecision([snapshot] as NonEmpty<typeof snapshot>),
+    ).toMatchObject({ kind: "waiting", reason: { kind: "review" } });
+  });
+
+  it("waits when branch protection blocks an approved PR with clean CI", async () => {
+    const snapshot = await readSnapshot({
+      reader: fakeReader({ facts: { mergeStateStatus: "BLOCKED" } }),
+      context: context(24),
+      pendingHistory: "omit",
+      allowDraft: false,
+    });
+    expect(classifyPr(snapshot)).toMatchObject({
+      kind: "waiting",
+      reason: { kind: "review", mergeStateStatus: "BLOCKED" },
+    });
+  });
+
+  it("still reports changes requested as a merge-gate blocker", async () => {
+    const snapshot = await readSnapshot({
+      reader: fakeReader({
+        facts: { reviewDecision: "CHANGES_REQUESTED", mergeStateStatus: "BLOCKED" },
+      }),
+      context: context(25),
+      pendingHistory: "omit",
+      allowDraft: false,
+    });
+    expect(classifyPr(snapshot)).toMatchObject({
+      kind: "blocker",
+      blocker: { kind: "merge-gate", reason: "changes-requested" },
+    });
+  });
 });

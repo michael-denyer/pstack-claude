@@ -167,7 +167,10 @@ export interface ReadyPr {
     readonly ci: CiClean;
     readonly gate: {
       readonly state: "OPEN";
-      readonly reviewDecision: Exclude<ReviewDecision, "CHANGES_REQUESTED">;
+      readonly reviewDecision: Exclude<
+        ReviewDecision,
+        "CHANGES_REQUESTED" | "REVIEW_REQUIRED"
+      >;
       readonly draft: "not-draft" | "draft-allowed";
     };
   };
@@ -252,10 +255,20 @@ export type QueryFailure =
  * checks do not block the frontier's merge. That is the Python watcher's
  * contract, not an attribution bug.
  */
+export type WaitReason =
+  | {
+      readonly kind: "pending-checks";
+      readonly pending: NonEmpty<PendingCheck>;
+    }
+  | {
+      readonly kind: "review";
+      readonly reviewDecision: ReviewDecision;
+      readonly mergeStateStatus: MergeStateStatus;
+    };
 export interface WaitingDecision {
   readonly kind: "waiting";
   readonly frontier: PrContext;
-  readonly pending: NonEmpty<PendingCheck>;
+  readonly reason: WaitReason;
 }
 export type PrDecision =
   | { readonly kind: "blocker"; readonly blocker: MergeBlocker }
@@ -297,10 +310,7 @@ export type ProgressVerdict =
   | (Progress<"WAITING"> & {
       readonly frontier: PrContext;
       readonly reason:
-        | {
-            readonly kind: "pending-checks";
-            readonly pending: NonEmpty<PendingCheck>;
-          }
+        | WaitReason
         | { readonly kind: "merge-queue"; readonly unmergedCount: number };
     })
   | (Progress<"ADVANCE", "queued-stack"> & {
@@ -344,10 +354,7 @@ export type BlockerVerdict =
     });
 export type TimeoutVerdict = Terminal<"TIMEOUT", 5> & {
   readonly reason:
-    | {
-        readonly kind: "pending-checks";
-        readonly pending: NonEmpty<PendingCheck>;
-      }
+    | WaitReason
     | { readonly kind: "status-unavailable"; readonly failure: QueryFailure }
     | {
         readonly kind: "queued-stack";

@@ -2,6 +2,16 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.42 - watch-pr waits on the review gate
+
+`watch-pr` reported READY with exit 0 for a PR that GitHub would not merge. Its readiness proof checked conflicts, review threads, CI, draft state, and `CHANGES_REQUESTED`, but not `REVIEW_REQUIRED`. `assessGitHubMerge` also accepts `mergeStateStatus: BLOCKED` when the head rollup is not failing, so a PR held only by a required approval passed every check. The Review column printed ✅ because it looked only at threads and review automation.
+
+A new wait reason, `review`, carries `reviewDecision` and `mergeStateStatus`. An open PR with clean CI waits on it when `reviewDecision` is `REVIEW_REQUIRED` or `mergeStateStatus` is `BLOCKED`, in single, `--stack`, and `--queued-stack` mode. The wait emits `WAITING` and, at the deadline, `TIMEOUT` with exit 5. `CHANGES_REQUESTED` stays a terminal `merge-gate` blocker. `WaitingDecision` now holds a `reason` in place of `pending`, and `ReadyPr`'s `reviewDecision` type excludes `REVIEW_REQUIRED`. The status table shows 👀 review required and ⛔ blocked.
+
+This is a port-local edit to upstream's vendored `watch-pr`. It belongs upstream as well, and the next sync that touches `policy.ts` must keep it.
+
+**Verified.** `bun test orch watch-pr` gives 112 pass, 0 fail, including three new `review gate` cases in `policy.test.ts`. `bun run typecheck` is clean. On a live PR with `REVIEW_REQUIRED` and `BLOCKED`, the 0.9.36 watcher printed READY with exit 0, and this build printed WAITING and then TIMEOUT with exit 5.
+
 ## 0.9.41 - model tiers and shape-based sync rules
 
 `plugins/pstack/models.json` names three tiers, `default`, `strongest`, and `panel`, and each role names the tier it runs on. The Codex mapping reads the same keys from the `codex` block, so it no longer infers the strongest roles from which single-model roles differ from the default. Under that inference, moving a role to `haiku` listed it as a strongest-model role. `available` is a plain list of the family names the `Agent` tool accepts. Stamped output is unchanged.

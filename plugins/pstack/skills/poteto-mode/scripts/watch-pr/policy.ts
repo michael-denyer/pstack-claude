@@ -197,6 +197,19 @@ function gateBlocker(
     ? null
     : { kind: "merge-gate", pr: row.context, reason };
 }
+function waitReason(row: T.PrSnapshot): T.WaitReason | null {
+  if (row.kind !== "open") return null;
+  if (row.ci.kind === "ci-pending")
+    return { kind: "pending-checks", pending: row.ci.pending };
+  return row.facts.reviewDecision === "REVIEW_REQUIRED" ||
+    row.facts.mergeStateStatus === "BLOCKED"
+    ? {
+        kind: "review",
+        reviewDecision: row.facts.reviewDecision,
+        mergeStateStatus: row.facts.mergeStateStatus,
+      }
+    : null;
+}
 function readyContribution(
   row: T.PrSnapshot,
   allowDraft: boolean,
@@ -212,11 +225,16 @@ function readyContribution(
     row.ci.kind !== "ci-clean" ||
     row.threads.length !== 0 ||
     conflictBlocker(row) !== null ||
-    gateReason(row, allowDraft) !== null
+    gateReason(row, allowDraft) !== null ||
+    waitReason(row) !== null
   )
     return null;
   const reviewDecision = row.facts.reviewDecision;
-  if (reviewDecision === "CHANGES_REQUESTED") return null;
+  if (
+    reviewDecision === "CHANGES_REQUESTED" ||
+    reviewDecision === "REVIEW_REQUIRED"
+  )
+    return null;
   return {
     kind: "ready-pr",
     context: row.context,
@@ -249,8 +267,9 @@ export function classifyPr(
     gateBlocker(row, allowDraft),
   ])
     if (blocker !== null) return { kind: "blocker", blocker };
-  if (row.kind === "open" && row.ci.kind === "ci-pending")
-    return { kind: "waiting", frontier: row.context, pending: row.ci.pending };
+  const reason = waitReason(row);
+  if (reason !== null)
+    return { kind: "waiting", frontier: row.context, reason };
   const ready = readyContribution(row, allowDraft);
   if (ready === null) throw new Error("snapshot has no classified decision");
   return ready.kind === "merged-pr"
@@ -270,13 +289,11 @@ export function selectTierMajorStackDecision(
     const blocker = gateBlocker(row, allowDraft);
     if (blocker !== null) return { kind: "blocker", blocker };
   }
-  for (const row of rows)
-    if (row.kind === "open" && row.ci.kind === "ci-pending")
-      return {
-        kind: "waiting",
-        frontier: row.context,
-        pending: row.ci.pending,
-      };
+  for (const row of rows) {
+    const reason = waitReason(row);
+    if (reason !== null)
+      return { kind: "waiting", frontier: row.context, reason };
+  }
   const prs = nonEmpty(
     rows
       .map((row) => readyContribution(row, allowDraft))
@@ -537,7 +554,7 @@ export async function runSimple(args: {
         kind: "WAITING",
         terminal: false,
         frontier: decision.frontier,
-        reason: { kind: "pending-checks", pending: decision.pending },
+        reason: decision.reason,
       }),
     );
     return {
@@ -548,7 +565,7 @@ export async function runSimple(args: {
           kind: "TIMEOUT",
           terminal: true,
           exitCode: 5,
-          reason: { kind: "pending-checks", pending: decision.pending },
+          reason: decision.reason,
         }),
     };
   };
@@ -668,10 +685,7 @@ export type QueueEvaluation =
       readonly state: QueueState;
       readonly frontier: T.PrContext;
       readonly reason:
-        | {
-            readonly kind: "pending-checks";
-            readonly pending: T.NonEmpty<T.PendingCheck>;
-          }
+        | T.WaitReason
         | { readonly kind: "merge-queue"; readonly unmergedCount: number };
       readonly emit: boolean;
     };
@@ -711,17 +725,16 @@ export function evaluateQueue(
       frontier,
       remaining: active.length,
     };
-  const row = rows[0];
-  const pending =
-    row.kind === "open" && row.ci.kind === "ci-pending" ? row.ci.pending : null;
-  const reason =
-    pending === null
-      ? ({ kind: "merge-queue", unmergedCount: active.length } as const)
-      : ({ kind: "pending-checks", pending } as const);
+  const reason = waitReason(rows[0]) ?? {
+    kind: "merge-queue" as const,
+    unmergedCount: active.length,
+  };
   const key =
     reason.kind === "pending-checks"
       ? `pending:${frontier.number}:${reason.pending.length}`
-      : `queue:${frontier.number}:${reason.unmergedCount}`;
+      : reason.kind === "review"
+        ? `review:${frontier.number}:${reason.reviewDecision}:${reason.mergeStateStatus}`
+        : `queue:${frontier.number}:${reason.unmergedCount}`;
   return {
     kind: "waiting",
     state: { ...state, frontier, lastWaitKey: key },

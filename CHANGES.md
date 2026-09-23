@@ -2,6 +2,14 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.42 - watcher check states and script edge cases
+
+`watch-pr` fails a check whose state is a completed conclusion that gh puts in its pending bucket, such as `STARTUP_FAILURE` or `STALE`. Before, the watcher waited on such a check until its timeout, and forever under the default `--timeout 0`. When `--pr` is omitted, it refuses to pair the checkout's PR number with a different `--owner` or `--repo`. It also refuses stack discovery when `gh pr list` returns a full page of 300 open PRs, because a full page may have cut the bottom of the stack.
+
+`worktree-audit.sh` searches transcripts with `rg --no-config -uu`, so an ignore file or a user rg config can no longer hide a live chat. A missing transcripts directory prints a warning and moves a worktree from `safe` to `review`. `check-plan.mjs` treats a fence indented inside a list item as a fence. `find-transcript.mjs` runs under node when it is invoked through a symlinked path. `log.sh` prefixes a cell that starts with `"`, which a quote-aware TSV reader would otherwise unwrap. This release forks `find-transcript.mjs` and `log.sh` from upstream.
+
+`tools/sync.mjs` gives a written file the upstream file's mode, detects binaries by content, and reports an upstream symlink as a conflict without following it. It rethrows git errors instead of counting them as conflict hunks. `tools/upstream.json` excludes the eleven `cursor-team-kit` skills the port does not carry.
+
 ## 0.9.41 - model tiers and shape-based sync rules
 
 `plugins/pstack/models.json` names three tiers, `default`, `strongest`, and `panel`, and each role names the tier it runs on. The Codex mapping reads the same keys from the `codex` block, so it no longer infers the strongest roles from which single-model roles differ from the default. Under that inference, moving a role to `haiku` listed it as a strongest-model role. `available` is a plain list of the family names the `Agent` tool accepts. Stamped output is unchanged.

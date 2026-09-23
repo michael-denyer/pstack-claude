@@ -129,7 +129,14 @@ try {
 } finally {
   rmSync(scratch, { recursive: true, force: true });
   if (created) {
-    gh('repo', 'delete', repository, '--yes');
-    console.log(`Deleted private disposable fixture ${repository}`);
+    // A throw here would replace the error that got us into finally.
+    try {
+      gh('repo', 'delete', repository, '--yes');
+      console.log(`Deleted private disposable fixture ${repository}`);
+    } catch (error) {
+      console.error(`Could not delete private fixture ${repository}: ${String(error.stderr ?? error.message).trim()}`);
+      console.error(`Delete it by hand:\n  gh repo delete ${repository} --yes`);
+      process.exitCode = 1;
+    }
   }
 }

@@ -37,23 +37,33 @@ import { walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-export function applySubstitutions(text, rules) {
+// A rule matches a literal `pattern` or a `regex`, optionally only in files
+// whose upstream-relative path matches `files`. The replacement is always
+// literal, and counts are keyed by the pattern or regex source.
+export function applySubstitutions(text, rules, rel = "") {
   const counts = new Map();
   let out = text;
   for (const rule of rules) {
-    const n = out.split(rule.pattern).length - 1;
-    if (n === 0) continue;
-    out = out.split(rule.pattern).join(rule.replacement);
-    counts.set(rule.pattern, (counts.get(rule.pattern) ?? 0) + n);
+    if (rule.files && !new RegExp(rule.files).test(rel)) continue;
+    let n = 0;
+    out = out.replaceAll(rule.pattern ?? new RegExp(rule.regex, "g"), () => (n++, rule.replacement));
+    const key = rule.pattern ?? rule.regex;
+    if (n) counts.set(key, (counts.get(key) ?? 0) + n);
   }
   return { text: out, counts };
 }
 
+// An entry is a literal `token` or a `regex`; either fails the line it matches.
 export function denylistHits(path, text, denylist) {
+  const entries = denylist.map(({ token, regex, hint }) => ({
+    label: token ?? regex,
+    hit: token ? (line) => line.includes(token) : (line) => new RegExp(regex).test(line),
+    hint,
+  }));
   const hits = [];
   text.split("\n").forEach((line, i) => {
-    for (const { token, hint } of denylist) {
-      if (line.includes(token)) hits.push(`${path}:${i + 1}: "${token}" — ${hint}`);
+    for (const { label, hit, hint } of entries) {
+      if (hit(line)) hits.push(`${path}:${i + 1}: "${label}" — ${hint}`);
     }
   });
   return hits;
@@ -120,7 +130,7 @@ export function syncComponent({
   const addCounts = (counts) => counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
   const portForm = (rel, raw) => {
     if (BINARY.test(rel)) return { buffer: raw, counts: new Map() };
-    const sub = applySubstitutions(raw.toString("utf8"), rules);
+    const sub = applySubstitutions(raw.toString("utf8"), rules, rel);
     return { buffer: Buffer.from(derive(rel, sub.text)), counts: sub.counts };
   };
   const derivedOld = (rel) => {

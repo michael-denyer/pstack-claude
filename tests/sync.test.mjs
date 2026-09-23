@@ -52,8 +52,6 @@ describe("applySubstitutions", () => {
         "Drive via the relevant control skill and through its control skill.",
         "<control skill path> and the control skill's commands",
         "Multiple `Task` calls in the Task tool.",
-        "your configured bug-fix model (default `claude-fable-5-1-thinking-max`)",
-        "your configured hillclimb model (default `grok-4.7-xhigh-fast`)",
         "on \"restart Cursor\"",
       ].join("\n"),
       RULES.substitutions,
@@ -65,10 +63,23 @@ describe("applySubstitutions", () => {
         "Drive via the relevant driver skill and through its driver skill.",
         "<driver skill path> and the driver skill's commands",
         "Multiple `Agent` calls in the Agent tool.",
-        "your configured bug-fix model (default in poteto-mode's Models section)",
-        "your configured hillclimb model (default in poteto-mode's Models section)",
         "on \"restart Claude Code\"",
       ].join("\n"),
+    );
+  });
+
+  test("a model default points at the Models section that owns the file, whatever the slug", () => {
+    const line = (slug) => `your configured hillclimb model (default \`${slug}\`)`;
+    for (const slug of ["grok-4.7-xhigh-fast", "claude-fable-5-1-thinking-max", "gpt-6-sol-max"]) {
+      expect(applySubstitutions(line(slug), RULES.substitutions, "skills/poteto-mode/playbooks/hillclimb.md").text).toBe(
+        "your configured hillclimb model (default in poteto-mode's Models section)",
+      );
+      expect(applySubstitutions(line(slug), RULES.substitutions, "skills/reflect/SKILL.md").text).toBe(
+        "your configured hillclimb model (default in [Models](#models))",
+      );
+    }
+    expect(applySubstitutions("(default `true`)", RULES.substitutions, "skills/reflect/SKILL.md").text).toBe(
+      "(default `true`)",
     );
   });
 
@@ -83,7 +94,13 @@ describe("denylistHits", () => {
   test("a Cursor model slug fails the scan", () => {
     expect(denylistHits("playbook.md", "default `grok-4.8-fast`", RULES.denylist)).toHaveLength(1);
     expect(denylistHits("playbook.md", "default `gpt-5.6-sol-max`", RULES.denylist)).toHaveLength(1);
+    expect(denylistHits("playbook.md", "default `gpt-6-sol-max`", RULES.denylist)).toHaveLength(1);
+    expect(denylistHits("arena.md", "one each on `claude-opus-5-5-max`", RULES.denylist)).toHaveLength(1);
     expect(denylistHits("how.md", "the role line in the `pstack-models.mdc` rule", RULES.denylist)).toHaveLength(1);
+  });
+
+  test("a model name in an example is not a Cursor slug", () => {
+    expect(denylistHits("synthesizer.md", "we renamed `gpt-4` to `gpt-4o` in `encodingForModel`", RULES.denylist)).toEqual([]);
   });
 
   test("UI repair advice points to the canonical driver policy", () => {

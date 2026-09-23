@@ -13,12 +13,12 @@ test("cells a spreadsheet or TSV reader would reinterpret are written with a lea
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
   try {
     const log = join(dir, "log.tsv");
-    const cells = ['"=HYPERLINK(""http://x"")"', '"unterminated', "=1+1", "+1", "-1", "@SUM(A1)", "plain"];
-    for (const cell of cells) {
+    const risky = ['"=HYPERLINK(""http://x"")"', '"unterminated', "=1+1", "+1", "-1", "@SUM(A1)"];
+    for (const cell of [...risky, "plain"]) {
       execFileSync("bash", [logScript, log, "phase", cell, "why", "evidence", "result"]);
     }
     const rows = readFileSync(log, "utf8").trimEnd().split("\n").slice(1).map((line) => line.split("\t"));
-    expect(rows.map((row) => row[2])).toEqual([...cells.slice(0, -1).map((cell) => `'${cell}`), "plain"]);
+    expect(rows.map((row) => row[2])).toEqual([...risky.map((cell) => `'${cell}`), "plain"]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

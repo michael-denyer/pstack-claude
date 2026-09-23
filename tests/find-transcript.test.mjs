@@ -7,6 +7,7 @@ import { basename, dirname, join } from "node:path";
 import { candidates, findTranscript, openingPrompt } from "../plugins/pstack/skills/reflect/scripts/find-transcript.mjs";
 
 const script = join(import.meta.dir, "../plugins/pstack/skills/reflect/scripts/find-transcript.mjs");
+const noNode = spawnSync("node", ["--version"]).status !== 0;
 
 const meta = JSON.stringify({ type: "bridge-session", sessionId: "abc" });
 const summary = JSON.stringify({ type: "summary", summary: "earlier work" });
@@ -99,7 +100,7 @@ describe("find-transcript", () => {
   });
 
   // node resolves the script's own URL through symlinks but not argv[1]; bun resolves both.
-  test.skipIf(spawnSync("node", ["--version"]).status !== 0)(
+  test.skipIf(noNode)(
     "the CLI runs under node through a symlinked path (skipped without node)",
     () => {
       const dir = tempDir();
@@ -115,7 +116,7 @@ describe("find-transcript", () => {
     },
   );
 
-  test.skipIf(spawnSync("node", ["--version"]).status !== 0)(
+  test.skipIf(noNode)(
     "imports under node when argv[1] is not a file (skipped without node)",
     () => {
       const run = spawnSync(

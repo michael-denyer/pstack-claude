@@ -265,6 +265,10 @@ export function publicSkills(skillsDir) {
 
 const COMMANDS_DOC = "docs/reference.md";
 const COMMAND_TABLE_HEADER = "| command | use it when |";
+// promptStub writes the menu text unquoted into YAML frontmatter, where ": " or
+// a trailing ":" starts a mapping, " #" starts a comment, and a leading
+// indicator character is a parse error or a different node.
+const UNSAFE_PLAIN_YAML = /:\s|:$|\s#|^(?:[,[\]{}#&*!|>'"%@`]|[-?:](?:\s|$))/;
 
 // The reference table is the source of the Codex slash-menu one-liners and their
 // order. Returns [{ name, menu }] in row order; throws when the row set and the
@@ -276,6 +280,12 @@ export function slashCommands(markdown, skillNames) {
   const rows = lines.slice(range[0], range[1]).map((line, i) => {
     const m = line.match(/^\| `\/([^`]+)` \| (.+) \|$/);
     if (!m) throw new Error(`${COMMANDS_DOC}: slash-command row ${i + 1} is not "| \`/name\` | text |": ${line}`);
+    if (UNSAFE_PLAIN_YAML.test(m[2])) {
+      throw new Error(
+        `${COMMANDS_DOC}: slash-command row ${i + 1} text is not a plain YAML value ` +
+          `(no ": ", " #", trailing ":", or leading indicator): ${line}`,
+      );
+    }
     return { name: m[1], menu: m[2] };
   });
   const rowNames = new Set(rows.map((r) => r.name));

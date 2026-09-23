@@ -217,6 +217,37 @@ describe("slashCommands", () => {
     expect(() => slashCommands("# R\n\nno table\n", ["a"])).toThrow("table header not found");
   });
 
+  test("rejects menu text that the prompt's YAML frontmatter would not read back, naming file and row", () => {
+    expect(() => slashCommands(reference(["| `/a` | fine |", "| `/b` | fix CI: then ship |"]), ["a", "b"])).toThrow(
+      "docs/reference.md: slash-command row 2 text is not a plain YAML value",
+    );
+    const samples = [
+      "fix CI: then ship",
+      "run it # carefully",
+      "ends with colon:",
+      "`/x` first",
+      "*star",
+      "[a] b",
+      "- item",
+      "a:b ratio, issue#12, [x] {y}",
+      "-mode skill",
+      "monitor an open PR, fix CI/comments, keep it merge-ready",
+    ];
+    for (const menu of samples) {
+      let parsed;
+      try {
+        parsed = Bun.YAML.parse(promptStub({ name: "b", menu }).split("---\n")[1]).description;
+      } catch {}
+      let accepted = true;
+      try {
+        slashCommands(reference([`| \`/b\` | ${menu} |`]), ["b"]);
+      } catch {
+        accepted = false;
+      }
+      expect({ menu, accepted }).toEqual({ menu, accepted: parsed === menu });
+    }
+  });
+
   test("the live reference names exactly the public skills and matches the generated prompts", () => {
     const text = readFileSync(join(repoRoot, "docs/reference.md"), "utf8");
     const rows = slashCommands(text, publicSkills(join(repoRoot, "plugins/pstack/skills")));

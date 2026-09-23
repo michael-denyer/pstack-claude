@@ -108,6 +108,13 @@ describe("strayModelSlugs", () => {
     expect(strays).toHaveLength(1);
     expect(strays[0]).toContain("Prefer claude-sonnet-4-6.");
   });
+
+  test("a backticked family name outside an owned region is a stray", () => {
+    const text = "# other\n\nDelegate to `fable` for this.\n";
+    expect(strayModelSlugs("plugins/pstack/skills/other/SKILL.md", text, models)).toEqual([
+      "plugins/pstack/skills/other/SKILL.md:3: Delegate to `fable` for this.",
+    ]);
+  });
 });
 
 describe("stampVersion", () => {

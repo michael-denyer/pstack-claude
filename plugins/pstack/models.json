@@ -1,12 +1,7 @@
 {
   "singleRoleDefault": "opus",
   "panel": ["opus", "fable", "sonnet"],
-  "available": [
-    { "label": "Opus", "slug": "opus" },
-    { "label": "Fable", "slug": "fable" },
-    { "label": "Sonnet", "slug": "sonnet" },
-    { "label": "Haiku", "slug": "haiku" }
-  ],
+  "available": ["opus", "fable", "sonnet", "haiku"],
   "roles": [
     { "role": "feature, refactoring", "models": ["opus"], "skill": "poteto-mode" },
     { "role": "bug-fix", "models": ["fable"], "skill": "poteto-mode" },

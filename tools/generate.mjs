@@ -457,10 +457,9 @@ export function modelsSection(roles) {
 }
 
 export function setupModelsSection(models) {
-  const avail = models.available.map((m) => `${m.label} (${code(m.slug)})`).join(", ");
   return (
     "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
-    `- Available Claude models: ${avail}\n` +
+    `- Available Claude models: ${codeList(models.available)}\n` +
     `- Default panel: ${codeList(models.panel)}\n` +
     `- Single-role default: ${code(models.singleRoleDefault)}`
   );
@@ -502,11 +501,12 @@ export function codexModelNamesSection(models) {
   );
 }
 
-// After stamping, no claude-* model slug may survive in skill prose outside
-// the regions the generator owns in that file.
-const SLUG_RE = /claude-(?:opus|fable|sonnet|haiku)[0-9a-z.-]*/;
-
+// After stamping, skill prose outside the regions the generator owns may name
+// no model: a full claude-* ID is rejected by the Agent tool, and a backticked
+// family name hard-codes a default that belongs in models.json.
 export function strayModelSlugs(file, text, models) {
+  const families = models.available.join("|");
+  const SLUG_RE = new RegExp(`claude-(?:${families})[0-9a-z.-]*|\`(?:${families})\``);
   const lines = text.split("\n");
   const owned = regions(models)
     .filter((r) => r.file === file)
@@ -585,7 +585,7 @@ function main() {
   );
   if (strays.length) {
     throw new Error(
-      `claude-* model slugs outside generator-owned regions (move the fact into models.json or reference the role):\n` +
+      `model names outside generator-owned regions (reference the role and its Models section instead):\n` +
         strays.join("\n"),
     );
   }

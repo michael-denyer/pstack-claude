@@ -14,7 +14,7 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const skillsDir = join(repoRoot, "plugins/pstack/skills");
 const raw = JSON.parse(readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8"));
 const models = loadModels();
-const available = new Set(models.available.map((m) => m.slug));
+const available = new Set(models.available);
 
 describe("models.json shape", () => {
   test("available slugs are unique and the defaults are among them", () => {
@@ -24,11 +24,10 @@ describe("models.json shape", () => {
     expect(new Set(models.panel).size).toBe(models.panel.length);
   });
 
-  test("available models are names the Claude Code Agent tool accepts", () => {
+  test("available models are the names the Claude Code Agent tool accepts", () => {
     // The Agent tool's `model` parameter is an enum of family names; a full ID
     // such as claude-opus-5-5 is rejected before the subagent starts.
-    const agentModels = new Set(["opus", "fable", "sonnet", "haiku"]);
-    for (const slug of available) expect(agentModels.has(slug)).toBe(true);
+    expect([...available].sort()).toEqual(["fable", "haiku", "opus", "sonnet"]);
   });
 
   test("every role names an available model or the panel, and a skill directory that exists", () => {
@@ -54,9 +53,8 @@ describe("models.json shape", () => {
 
   test("the file stays one row per entry so a role change is a one-line diff", () => {
     const text = readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8");
-    const rows = raw.available.length + raw.roles.length;
-    expect(text.split("\n").length).toBeLessThan(rows * 2);
-    expect(text.match(/^\s*\{ "/gm)).toHaveLength(rows);
+    expect(text.split("\n").length).toBeLessThan(raw.roles.length * 2);
+    expect(text.match(/^\s*\{ "/gm)).toHaveLength(raw.roles.length);
   });
 
   test("the codex examples name distinct models", () => {

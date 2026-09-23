@@ -279,6 +279,17 @@ function checkDetails(value: Record<string, unknown>, nameKey: string) {
     workflow: typeof value.workflow === "string" ? value.workflow : "",
   };
 }
+// gh buckets every state it does not name as pending, including completed
+// conclusions like STALE and STARTUP_FAILURE. Only these are in flight, the
+// same states mapRollupNode treats as pending.
+const IN_FLIGHT_STATES = new Set([
+  "EXPECTED",
+  "REQUESTED",
+  "WAITING",
+  "QUEUED",
+  "PENDING",
+  "IN_PROGRESS",
+]);
 export function parseFastCheck(value: unknown): T.Check {
   const object = record(value, "check");
   const details = checkDetails(object, "name");
@@ -289,7 +300,8 @@ export function parseFastCheck(value: unknown): T.Check {
     ["FAILURE", "ERROR", "ACTION_REQUIRED"].includes(state)
   )
     return { ...details, kind: "failed", reportedState: state };
-  if (bucket === "pending") return pendingOrGate(details, state);
+  if (bucket === "pending" && IN_FLIGHT_STATES.has(state))
+    return pendingOrGate(details, state);
   if (bucket === "pass")
     return { ...details, kind: "passed", reportedState: state };
   if (bucket === "skipping")

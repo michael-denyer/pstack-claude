@@ -4,6 +4,7 @@ import {
   WatcherQueryError,
   mapRollupNode,
   orderStack,
+  parseFastCheck,
   parsePullRequest,
   parseReviewThreads,
   resolveChecks,
@@ -135,6 +136,33 @@ describe("rollup node mapping", () => {
       }),
     ).toMatchObject({ kind: "failed", reportedState: "FUTURE_VALUE" });
     expect(mapRollupNode({ __typename: "FutureNode" })).toBeNull();
+  });
+});
+
+describe("fast-path check mapping", () => {
+  // gh's aggregate.go files every state it does not name into the pending
+  // bucket, including completed conclusions.
+  it("fails completed conclusions that gh buckets as pending", () => {
+    for (const state of ["STARTUP_FAILURE", "STALE"]) {
+      expect(
+        parseFastCheck({ name: "ci", state, bucket: "pending" }),
+      ).toMatchObject({ kind: "failed", reportedState: state });
+    }
+  });
+
+  it("keeps in-flight states pending", () => {
+    for (const state of [
+      "EXPECTED",
+      "REQUESTED",
+      "WAITING",
+      "QUEUED",
+      "PENDING",
+      "IN_PROGRESS",
+    ]) {
+      expect(
+        parseFastCheck({ name: "ci", state, bucket: "pending" }),
+      ).toMatchObject({ kind: "pending", reportedState: state });
+    }
   });
 });
 

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -8,6 +8,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  rmSync,
   statSync,
   symlinkSync,
   writeFileSync,
@@ -18,8 +19,14 @@ import { applySubstitutions, denylistHits, mergeFile, syncComponent } from "../t
 
 const RULES = JSON.parse(readFileSync(join(import.meta.dir, "../tools/substitutions.json"), "utf8"));
 
+const fixtures = [];
+afterEach(() => {
+  for (const dir of fixtures.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
 function tree(files) {
   const dir = mkdtempSync(join(tmpdir(), "sync-fixture-"));
+  fixtures.push(dir);
   for (const [rel, text] of Object.entries(files)) {
     mkdirSync(join(dir, rel, ".."), { recursive: true });
     writeFileSync(join(dir, rel), text);

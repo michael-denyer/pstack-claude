@@ -2,8 +2,8 @@
 // that quietly matches nothing looks identical to a pass, and that already
 // happened once (the 0.9.10 quad check hunted a retired slug for a whole
 // release), so every check gets a fixture that must trip it.
-import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -22,8 +22,14 @@ function agent(root, name) {
   writeFileSync(join(root, "agents", `${name}.md`), `---\nname: ${name}\ndescription: fixture\n---\n`);
 }
 
+const fixtures = [];
+afterEach(() => {
+  for (const root of fixtures.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
 function plugin(mutate = () => {}) {
   const root = mkdtempSync(join(tmpdir(), "invariants-"));
+  fixtures.push(root);
   skill(root, "good", "");
   skill(root, "principle-good", "user-invocable: false\n");
   mutate(root);

@@ -19,7 +19,20 @@
     "cursor-team-kit": {
       "upstreamPath": "cursor-team-kit/skills",
       "localPath": "plugins/pstack/skills",
-      "sha": "e46364b8be46000b7df0f260550cd712afbb8d36"
+      "sha": "e46364b8be46000b7df0f260550cd712afbb8d36",
+      "exclude": [
+        "check-compiler-errors/",
+        "control-cli/",
+        "control-ui/",
+        "loop-on-ci/",
+        "new-branch-and-pr/",
+        "pr-review-canvas/",
+        "review-and-ship/",
+        "run-smoke-tests/",
+        "verify-this/",
+        "weekly-review/",
+        "workflow-from-chats/"
+      ]
     }
   }
 }

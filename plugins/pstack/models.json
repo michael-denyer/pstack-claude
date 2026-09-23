@@ -4,6 +4,7 @@
     "strongest": "fable",
     "panel": ["opus", "fable", "sonnet"]
   },
+  "efforts": ["low", "medium", "high", "xhigh", "max"],
   "available": ["opus", "fable", "sonnet", "haiku"],
   "roles": [
     { "role": "feature, refactoring", "models": "default", "skill": "poteto-mode" },

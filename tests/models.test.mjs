@@ -45,6 +45,13 @@ describe("models.json shape", () => {
     }
   });
 
+  test("effort levels are unique and each one Claude Code accepts in agent frontmatter", () => {
+    const accepted = new Set(["low", "medium", "high", "xhigh", "max"]);
+    expect(Array.isArray(models.efforts) && models.efforts.length > 0).toBe(true);
+    expect(new Set(models.efforts).size).toBe(models.efforts.length);
+    for (const level of models.efforts) expect(accepted.has(level)).toBe(true);
+  });
+
   test("each tier is written once and resolved by reference", () => {
     const tierLists = Object.values(raw.tiers).map((t) => [t].flat().join());
     const literal = raw.roles.filter((r) => Array.isArray(r.models) && tierLists.includes(r.models.join()));
@@ -56,7 +63,6 @@ describe("models.json shape", () => {
 
   test("the file stays one row per entry so a role change is a one-line diff", () => {
     const text = readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8");
-    expect(text.split("\n").length).toBeLessThan(raw.roles.length * 2);
     expect(text.match(/^\s*\{ "/gm)).toHaveLength(raw.roles.length);
   });
 

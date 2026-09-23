@@ -79,3 +79,7 @@ Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `too
 
 - reflect tooling: `opus`
 - reflect judgment, divergent, synthesizer: `opus`
+
+## Reasoning effort
+
+A role value in `~/.claude/pstack-models.md` may name a reasoning effort after its slug, as in `claude-opus-5-5 @xhigh`. Levels: `low`, `medium`, `high`, `xhigh`, `max`; which ones apply depends on the model. For such an entry, dispatch through the effort agent of that level: `subagent_type: "pstack:effort-<level>"` where this skill prescribes `general-purpose`, or `subagent_type: "pstack:poteto-agent-<level>"` where it prescribes `pstack:poteto-agent`. Pass the slug without the suffix as `model`. The effort agents set only `effort`, so the model you pass still decides the model. A value without `@` keeps the prescribed `subagent_type` and the session's effort. The suffix is never part of the slug when you validate it.

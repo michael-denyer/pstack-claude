@@ -50,6 +50,7 @@ describe("models.json shape", () => {
     expect(Array.isArray(models.efforts) && models.efforts.length > 0).toBe(true);
     expect(new Set(models.efforts).size).toBe(models.efforts.length);
     for (const level of models.efforts) expect(accepted.has(level)).toBe(true);
+    expect(models.efforts).toContain(models.defaultEffort);
   });
 
   test("each tier is written once and resolved by reference", () => {

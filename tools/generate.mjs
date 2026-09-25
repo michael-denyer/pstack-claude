@@ -388,7 +388,7 @@ export function regions(models) {
       name: "Reasoning effort section",
       locate: section("Reasoning effort"),
       appendHeading: "## Reasoning effort",
-      render: () => blankPadded(effortSection(models.efforts)),
+      render: () => blankPadded(effortSection(models.efforts, models.defaultEffort)),
     })),
     {
       file: skillFile("setup-pstack"),
@@ -481,7 +481,7 @@ export function modelsSection(roles) {
 // no per-call effort parameter, but a subagent definition's `effort` frontmatter
 // overrides the session's effort, so each level ships as an agent the role is
 // dispatched through, with the model still passed on the call.
-export function effortSection(levels) {
+export function effortSection(levels, defaultEffort) {
   return (
     "A role value in `~/.claude/pstack-models.md` may name a reasoning effort after its model, as in " +
     "`opus @xhigh`. Levels: " + codeList(levels) + ". Which ones apply depends on the model. " +
@@ -489,7 +489,9 @@ export function effortSection(levels) {
     "would otherwise use. `pstack:poteto-agent` becomes `subagent_type: \"pstack:poteto-agent-<level>\"`. " +
     "`general-purpose`, or no `subagent_type`, becomes `subagent_type: \"pstack:effort-<level>\"`. " +
     "Pass the model without the suffix as `model`. The effort agents set only `effort`, so the model you pass " +
-    "still decides the model. A value without `@` keeps the usual `subagent_type` and the session's effort. " +
+    "still decides the model. A value without `@` runs at the level on the sheet's `default effort` line, or " +
+    `${code(defaultEffort)} when the sheet has no such line. \`default effort: session\` keeps the usual ` +
+    "`subagent_type` and the session's effort for a value without `@`. " +
     "The suffix is never part of the model name when you validate it."
   );
 }
@@ -563,6 +565,7 @@ export function setupModelsSection(models) {
     `- Available Claude models: ${codeList(models.available)}\n` +
     `- Default panel: ${codeList(models.tiers.panel)}\n` +
     `- Reasoning effort levels: ${codeList(models.efforts)}\n` +
+    `- Default reasoning effort: ${code(models.defaultEffort)}\n` +
     `- Single-role default: ${code(models.tiers.default)}`
   );
 }
@@ -579,10 +582,11 @@ export function overrideSheetBlock(models) {
     "an alias entry in a panel list still counts toward that panel's fan-out. " +
     "A model may carry a reasoning effort, as in `opus @xhigh` (levels: " + models.efforts.join(", ") + "); " +
     "the role then runs through the pstack effort agent of that level, each entry of a panel list on its own. " +
+    "`default effort` sets the level for a value without one; `session` keeps the parent session's effort. " +
     "`session hook: off` stops the Claude Code or Codex SessionStart hook from injecting the poteto-mode mandate; " +
     "any other value, or no line, leaves it on.\n\n" +
     rows +
-    "\n\nsession hook: on"
+    `\n\ndefault effort: ${models.defaultEffort}\nsession hook: on`
   );
 }
 

@@ -6,11 +6,13 @@ This port applies the Cursor → Claude Code substitutions in skill bodies. Earl
 
 A role value in `~/.claude/pstack-models.md` may name a reasoning effort after its model, as in `arena runners: opus @xhigh, fable @max`. Each panel entry takes its own level. The Claude Code `Agent` call has no effort parameter, but a custom subagent's `effort` frontmatter overrides the session's effort while it runs. The generator therefore writes two agents per level in the new `models.json` `efforts` list: `agents/effort-<level>.md`, a full-tool pstack subagent with its own one-line prompt, and `agents/poteto-agent-<level>.md`, which carries poteto-agent's body. Neither sets `model`, so the caller still passes the role's model. Codex and the skills-only harnesses ignore the agents, and a sheet without `@` behaves as before. Contributed by @marcelormendes in #90.
 
+A role value without a level runs at the default effort, `medium`, set by `defaultEffort` in `models.json`. The sheet's `default effort` line changes it for every role, and `default effort: session` keeps the parent session's effort, which was the behaviour before this release. `setup-pstack` asks for the default and writes the line.
+
 Every skill that owns a role gets a stamped `## Reasoning effort` section, which `deriveSkill` appends on sync like the Models section. The section picks the agent from the `subagent_type` the caller would otherwise use. `pstack:poteto-agent` becomes `pstack:poteto-agent-<level>`, and `general-purpose` or no type becomes `pstack:effort-<level>`. That covers `arena` and `architect`, which name no type, whether they run alone or under poteto-mode. `setup-pstack` asks for an optional level per role and validates it, and the override-sheet preamble documents the suffix.
 
 The generator lists the agents it wrote in `tools/effort-agents.json`. It removes a stale agent only when the list names it, and it refuses to overwrite an agent file it did not write, so a hand-written agent such as `poteto-agent-review.md` is never touched.
 
-**Verified.** `bun test tests/` and `bun tools/generate.mjs` results are in the PR. Live effort per turn on Claude Code 2.1.280 was read from session transcripts in #90 for `swarm`, `interrogate`, and direct spawns. `arena` and `architect` were not run live.
+**Verified.** `bun test tests/` and `bun tools/generate.mjs` results are in the PR. Live effort per turn on Claude Code 2.1.280 was read from session transcripts in #90 for `swarm`, `interrogate`, and direct spawns. A `swarm` run with no sheet line, on `opus` in a `--effort low` session, dispatched `pstack:effort-medium`, and the worker's turns ran at `medium`. The same run on `haiku` dispatched `general-purpose`, so the stamped rule depends on the parent model following it. `arena` and `architect` were not run live.
 
 ## 0.9.43 - watch-pr stops at the review gate
 

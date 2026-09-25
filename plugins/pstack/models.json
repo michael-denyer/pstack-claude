@@ -5,6 +5,7 @@
     "panel": ["opus", "fable", "sonnet"]
   },
   "efforts": ["low", "medium", "high", "xhigh", "max"],
+  "defaultEffort": "medium",
   "available": ["opus", "fable", "sonnet", "haiku"],
   "roles": [
     { "role": "feature, refactoring", "models": "default", "skill": "poteto-mode" },

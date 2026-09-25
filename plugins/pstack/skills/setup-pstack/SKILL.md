@@ -19,6 +19,8 @@ Claude Code has no auto-applied "rules" mechanism like Cursor's `.mdc`. Inclusio
 
 so the file is loaded as context for every session.
 
+Paths below use the default config directories. When `CLAUDE_CONFIG_DIR` is set on Claude Code, or `CODEX_HOME` on Codex, run `echo "$CLAUDE_CONFIG_DIR"` or `echo "$CODEX_HOME"` and use that directory in place of `~/.claude` or `~/.codex`, for both the sheet and the file that loads it, and write the include with the resolved absolute path. The plugin hook reads the sheet from the same directory.
+
 ## Steps
 
 ### 1. Detect available models
@@ -90,8 +92,8 @@ The role lines are the same everywhere. What differs is the sheet path, how the 
 
 | Runtime | Sheet | Load | List models | Status |
 | --- | --- | --- | --- | --- |
-| Claude Code | `~/.claude/pstack-models.md` | `@~/.claude/pstack-models.md` in `~/.claude/CLAUDE.md` | the `Agent` tool's model parameter | verified live |
-| Codex | `~/.codex/pstack-models.md` | model rows: paste into `~/.codex/AGENTS.md`; hook setting: read by the plugin | your configured Codex models, see [codex-tools.md](../poteto-mode/references/codex-tools.md#model-names) | hook contract tested; discovery verified |
+| Claude Code | `~/.claude/pstack-models.md`, or under `$CLAUDE_CONFIG_DIR` when set | `@~/.claude/pstack-models.md` in `~/.claude/CLAUDE.md` | the `Agent` tool's model parameter | verified live |
+| Codex | `~/.codex/pstack-models.md`, or under `$CODEX_HOME` when set | model rows: paste into `~/.codex/AGENTS.md`; hook setting: read by the plugin | your configured Codex models, see [codex-tools.md](../poteto-mode/references/codex-tools.md#model-names) | hook contract tested; discovery verified |
 | opencode | `~/.config/opencode/pstack-models.md` | add the path to the `instructions` array in `opencode.json` | the `models` slash command in the session | from published docs, no live session |
 | Gemini CLI | `~/.gemini/pstack-models.md` | `@~/.gemini/pstack-models.md` in `~/.gemini/GEMINI.md` | the `model` slash command in the session | from published docs, no live session |
 | Prime Agent | no documented sheet path; Prime's configuration chooses models | | | no live session |

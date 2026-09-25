@@ -2,6 +2,10 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.45 - respect CLAUDE_CONFIG_DIR for the model sheet
+
+The Claude Code `SessionStart` hook reads the sheet from `$CLAUDE_CONFIG_DIR/pstack-models.md` when that variable is set, falling back to `~/.claude`, so `session hook: off` works under a relocated config directory. `setup-pstack` resolves `CLAUDE_CONFIG_DIR` on Claude Code and `CODEX_HOME` on Codex before writing the sheet and the file that loads it, instead of editing the default profile. `tests/session-hook.test.mjs` runs the hook with `CLAUDE_CONFIG_DIR` set. Reported by @gordon-marx-included in #102.
+
 ## 0.9.44 - reasoning effort per role through effort agents
 
 A role value in `~/.claude/pstack-models.md` may name a reasoning effort after its model, as in `arena runners: opus @xhigh, fable @max`. Each panel entry takes its own level. The Claude Code `Agent` call has no effort parameter, but a custom subagent's `effort` frontmatter overrides the session's effort while it runs. The generator therefore writes two agents per level in the new `models.json` `efforts` list: `effort-agents/effort-<level>.md`, a full-tool pstack subagent with its own one-line prompt, and `effort-agents/poteto-agent-<level>.md`, which carries poteto-agent's body. Neither sets `model`, so the caller still passes the role's model. Codex and the skills-only harnesses ignore the agents, and a sheet without `@` behaves as before. Contributed by @marcelormendes in #90.

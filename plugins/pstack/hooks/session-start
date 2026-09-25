@@ -6,7 +6,7 @@ set -eu
 if [ -n "${PLUGIN_ROOT:-}" ]; then
   sheet="${CODEX_HOME:-$HOME/.codex}/pstack-models.md"
 else
-  sheet="$HOME/.claude/pstack-models.md"
+  sheet="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md"
 fi
 
 if grep -qs '^session hook: off$' "$sheet"; then

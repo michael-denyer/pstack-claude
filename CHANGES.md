@@ -2,6 +2,14 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.45 - respect CLAUDE_CONFIG_DIR for the override sheet
+
+The Claude Code SessionStart hook read `$HOME/.claude/pstack-models.md` even when `CLAUDE_CONFIG_DIR` pointed Claude Code at another directory. A `session hook: off` line in the active configuration therefore had no effect. The hook now reads `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md`, the same fallback the Codex branch uses for `CODEX_HOME`. `setup-pstack` writes the sheet and its `CLAUDE.md` include under `$CLAUDE_CONFIG_DIR` when it is set, and `docs/reference.md` names that path. Reported in #102.
+
+This is a port-local change. The Claude Code hook and the Claude Code rows of `setup-pstack` exist only in this port. Other skills still name `~/.claude/pstack-models.md` through the `tools/substitutions.json` rewrite. They read the sheet through the `CLAUDE.md` include, so this change leaves that text alone.
+
+**Verified.** `tests/session-hook.test.mjs` gains a `claude with CLAUDE_CONFIG_DIR` runtime. Its `session hook: off` case fails on 0.9.44 and passes here.
+
 ## 0.9.44 - reasoning effort per role through effort agents
 
 A role value in `~/.claude/pstack-models.md` may name a reasoning effort after its model, as in `arena runners: opus @xhigh, fable @max`. Each panel entry takes its own level. The Claude Code `Agent` call has no effort parameter, but a custom subagent's `effort` frontmatter overrides the session's effort while it runs. The generator therefore writes two agents per level in the new `models.json` `efforts` list: `effort-agents/effort-<level>.md`, a full-tool pstack subagent with its own one-line prompt, and `effort-agents/poteto-agent-<level>.md`, which carries poteto-agent's body. Neither sets `model`, so the caller still passes the role's model. Codex and the skills-only harnesses ignore the agents, and a sheet without `@` behaves as before. Contributed by @marcelormendes in #90.

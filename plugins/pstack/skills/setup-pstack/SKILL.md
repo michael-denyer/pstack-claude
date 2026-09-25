@@ -76,7 +76,7 @@ session hook: on
 
 ### 7. Wire it in
 
-On Claude Code, if `~/.claude/CLAUDE.md` does not already include `~/.claude/pstack-models.md`, append the `@~/.claude/pstack-models.md` line so the model rows load on every session. If the user prefers project scope, add the include to the project's `CLAUDE.md` instead.
+On Claude Code, if `~/.claude/CLAUDE.md` does not already include `~/.claude/pstack-models.md`, append the `@~/.claude/pstack-models.md` line so the model rows load on every session. When `CLAUDE_CONFIG_DIR` is set, Claude Code reads its configuration from that directory instead, so put the sheet and the `CLAUDE.md` include there, and write the include with the full sheet path. If the user prefers project scope, add the include to the project's `CLAUDE.md` instead.
 
 On Codex, paste the model rows and the `default effort` line into `~/.codex/AGENTS.md`; Codex has no `@` include. Do not paste the `session hook` line there: the plugin hook reads it directly from `~/.codex/pstack-models.md`.
 
@@ -90,7 +90,7 @@ The role lines are the same everywhere. What differs is the sheet path, how the 
 
 | Runtime | Sheet | Load | List models | Status |
 | --- | --- | --- | --- | --- |
-| Claude Code | `~/.claude/pstack-models.md` | `@~/.claude/pstack-models.md` in `~/.claude/CLAUDE.md` | the `Agent` tool's model parameter | verified live |
+| Claude Code | `~/.claude/pstack-models.md`, or `$CLAUDE_CONFIG_DIR/pstack-models.md` when set | `@~/.claude/pstack-models.md` in `~/.claude/CLAUDE.md` | the `Agent` tool's model parameter | verified live |
 | Codex | `~/.codex/pstack-models.md` | model rows: paste into `~/.codex/AGENTS.md`; hook setting: read by the plugin | your configured Codex models, see [codex-tools.md](../poteto-mode/references/codex-tools.md#model-names) | hook contract tested; discovery verified |
 | opencode | `~/.config/opencode/pstack-models.md` | add the path to the `instructions` array in `opencode.json` | the `models` slash command in the session | from published docs, no live session |
 | Gemini CLI | `~/.gemini/pstack-models.md` | `@~/.gemini/pstack-models.md` in `~/.gemini/GEMINI.md` | the `model` slash command in the session | from published docs, no live session |

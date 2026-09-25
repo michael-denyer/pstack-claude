@@ -59,7 +59,7 @@ describe("applySubstitutions", () => {
       RULES.substitutions,
     );
     expect(text).toBe(
-      "Use `arena runners` from `~/.claude/pstack-models.md` when present. Rules in CLAUDE.md imports apply.",
+      "Use `arena runners` from `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md` when present. Rules in CLAUDE.md imports apply.",
     );
   });
 

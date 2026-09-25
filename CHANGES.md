@@ -4,9 +4,11 @@ This port applies the Cursor → Claude Code substitutions in skill bodies. Earl
 
 ## 0.9.45 - respect CLAUDE_CONFIG_DIR for the override sheet
 
-The Claude Code SessionStart hook read `$HOME/.claude/pstack-models.md` even when `CLAUDE_CONFIG_DIR` pointed Claude Code at another directory. A `session hook: off` line in the active configuration therefore had no effect. The hook now reads `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md`, the same fallback the Codex branch uses for `CODEX_HOME`. `setup-pstack` writes the sheet and its `CLAUDE.md` include under `$CLAUDE_CONFIG_DIR` when it is set, and `docs/reference.md` names that path. Reported in #102.
+The Claude Code SessionStart hook read `$HOME/.claude/pstack-models.md` even when `CLAUDE_CONFIG_DIR` pointed Claude Code at another directory, so a `session hook: off` line in the active configuration had no effect. The skills named the same fixed path, so an agent that read the sheet directly fell back to the defaults. Reported in #102.
 
-This is a port-local change. The Claude Code hook and the Claude Code rows of `setup-pstack` exist only in this port. Other skills still name `~/.claude/pstack-models.md` through the `tools/substitutions.json` rewrite. They read the sheet through the `CLAUDE.md` include, so this change leaves that text alone.
+The hook now reads `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md`, the same fallback the Codex branch uses for `CODEX_HOME`. The `tools/substitutions.json` rewrite for Cursor's `~/.cursor/rules/pstack-models.mdc` now produces that expression, and so does the stamped Models section in `tools/generate.mjs`. The skills that name the sheet (`arena`, `architect`, `how`, `interrogate`, `poteto-mode`, `reflect`, `swarm`, `why`) carry it too. They are forked from upstream, so a sync at the pinned SHA does not rewrite them, and this change edits them directly. `setup-pstack` calls the directory `<config>` and writes the sheet and its `CLAUDE.md` include there. `CONTEXT.md` and `docs/reference.md` name the same path.
+
+This is a port-local change. The paths are the port's translation of Cursor's rule file, and the Claude Code hook exists only in this port.
 
 **Verified.** `tests/session-hook.test.mjs` gains a `claude with CLAUDE_CONFIG_DIR` runtime. Its `session hook: off` case fails on 0.9.44 and passes here.
 

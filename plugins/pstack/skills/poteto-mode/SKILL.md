@@ -147,7 +147,7 @@ A large or cross-cutting effort (a migration across many call sites, an ambitiou
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
 
 - feature, refactoring: `opus`
 - bug-fix: `fable`

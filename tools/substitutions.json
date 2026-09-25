@@ -2,7 +2,7 @@
   "substitutions": [
     {
       "pattern": "~/.cursor/rules/pstack-models.mdc",
-      "replacement": "~/.claude/pstack-models.md",
+      "replacement": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md",
       "rationale": "the per-role override sheet; must precede the generic .cursor/rules/ rule or that rule mangles the path"
     },
     {
@@ -74,7 +74,7 @@
     },
     {
       "token": "pstack-models.mdc",
-      "hint": "Cursor's rule file; the port's override sheet is ~/.claude/pstack-models.md"
+      "hint": "Cursor's rule file; the port's override sheet is ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md"
     },
     {
       "token": "`verify` skill (UIs)",

@@ -472,7 +472,7 @@ export function modelsSection(roles) {
   const bullets = roles.map((r) => `- ${r.role}: ${codeList(r.models)}`).join("\n");
   return (
     "Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). " +
-    "A matching role line in `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md` overrides each at runtime; see `/setup-pstack`.\n\n" +
+    "A matching role line in the `pstack-models.md` override sheet overrides each at runtime; `/setup-pstack` writes it and lists its path per runtime.\n\n" +
     bullets
   );
 }

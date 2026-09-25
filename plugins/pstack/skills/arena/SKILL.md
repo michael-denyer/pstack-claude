@@ -26,7 +26,7 @@ The N candidates will receive the same prompt, so the prompt is the contract.
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric. State what success looks like for *this* task, then turn it into 3-6 concrete gradeable criteria. The rubric is the picker's tool in Phase D. Candidates only see the task.
-3. Pick the runners. Use the `arena runners` line in `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md`. If the sheet or that line is missing, run one each on the defaults in [Models](#models). An `auto` or `inherit-parent` entry in this line or the cross-judge line means the parent model, so omit `model` for it. If the `Agent` tool rejects a configured entry, run that seat on its family's default and say so. Families go by model name, such as Opus, Fable, or Sonnet. With no family match, use the single-role default in [Models](#models). If it rejects a default, use the closest valid slug of the same family from its error message. Spawn more when the arena covers multiple design directions. Same model N times when the work is generation-bound rather than judgment-sensitive.
+3. Pick the runners. Use the `arena runners` line in `pstack-models.md`. If the sheet or that line is missing, run one each on the defaults in [Models](#models). An `auto` or `inherit-parent` entry in this line or the cross-judge line means the parent model, so omit `model` for it. If the `Agent` tool rejects a configured entry, run that seat on its family's default and say so. Families go by model name, such as Opus, Fable, or Sonnet. With no family match, use the single-role default in [Models](#models). If it rejects a default, use the closest valid slug of the same family from its error message. Spawn more when the arena covers multiple design directions. Same model N times when the work is generation-bound rather than judgment-sensitive.
 4. Assign output paths. Each candidate writes to its own location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`), per the **separate-before-serializing-shared-state** principle skill.
 
 ## Phase B: Fan out
@@ -39,7 +39,7 @@ If a candidate fails to produce output, proceed with N-1 and note the dropout in
 
 ## Phase C: Cross-judge
 
-After all Phase B candidates complete, choose one model from the `arena cross-judge pool` line in `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md`. If the sheet or that line is missing, choose from the runner defaults in [Models](#models). Prefer a different model family from the parent's. Spawn one readonly judge subagent on that model. It sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale. It runs in parallel with the parent's reading in Phase D, not with the candidates themselves. Don't spawn the judge while candidates are still writing.
+After all Phase B candidates complete, choose one model from the `arena cross-judge pool` line in `pstack-models.md`. If the sheet or that line is missing, choose from the runner defaults in [Models](#models). Prefer a different model family from the parent's. Spawn one readonly judge subagent on that model. It sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale. It runs in parallel with the parent's reading in Phase D, not with the candidates themselves. Don't spawn the judge while candidates are still writing.
 
 ## Phase D: Pick a base
 
@@ -73,7 +73,7 @@ One synthesized artifact. One short synthesis note alongside, naming the base, t
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in the `pstack-models.md` override sheet overrides each at runtime; `/setup-pstack` writes it and lists its path per runtime.
 
 - arena runners: `opus`, `fable`, `sonnet`
 - arena cross-judge pool: `opus`, `fable`, `sonnet`

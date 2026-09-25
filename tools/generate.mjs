@@ -20,6 +20,10 @@
 //     -> each model-consuming skill's "## Models" section
 //     -> setup-pstack's override-sheet block and interrogate's reviewer table
 //     -> the "## Model names" section of poteto-mode/references/codex-tools.md
+//     -> one effort agent pair per level in plugins/pstack/effort-agents/
+//   plugins/pstack/{agents,effort-agents}/*.md -> the "agents" list in
+//     plugins/pstack/.claude-plugin/plugin.json (a list replaces the default
+//     agents/ directory, so it names every agent)
 //   plugins/pstack/agents/{poteto-agent,comment-sicko}.md, LICENSE,
 //   LICENSE-cursor-team-kit, and NOTICE-skills.md
 //     -> portable copies under poteto-mode/references/{agents,licenses}/
@@ -236,10 +240,7 @@ export function validatePluginLayout(pluginRoot) {
   }
   // #58: a plugin's agents register under the plugin namespace, so a dispatch
   // of the bare name errors at runtime with "Agent type 'x' not found".
-  const agentsDir = join(pluginRoot, "agents");
-  const agents = existsSync(agentsDir)
-    ? readdirSync(agentsDir).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3))
-    : [];
+  const agents = pluginAgentPaths(pluginRoot).map((p) => basename(p, ".md"));
   const problems = [];
   for (const file of markdownFiles(join(pluginRoot, "skills"))) {
     readFileSync(file, "utf8").split("\n").forEach((line, i) => {
@@ -264,7 +265,6 @@ export function publicSkills(skillsDir) {
 }
 
 const COMMANDS_DOC = "docs/reference.md";
-const EFFORT_AGENTS_MANIFEST = "tools/effort-agents.json";
 const COMMAND_TABLE_HEADER = "| command | use it when |";
 // promptStub writes the menu text unquoted into YAML frontmatter, where ": " or
 // a trailing ":" starts a mapping, " #" starts a comment, and a leading
@@ -523,28 +523,19 @@ export function effortAgents(levels, potetoAgent) {
   ]);
 }
 
-// The effort agents share plugins/pstack/agents/ with hand-written agents, so
-// the generator records the files it wrote in `manifestPath` and removes or
-// overwrites only those.
-export function syncEffortAgents(agentsDir, manifestPath, agents, { log = console.log } = {}) {
-  const owned = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf8")) : [];
-  for (const file of owned) {
-    if (basename(file) !== file) throw new Error(`${manifestPath}: ${file} is not a file name`);
+// The effort agents live in a directory the generator owns outright, apart
+// from the hand-written agents in plugins/pstack/agents/. Any other entry in it
+// is removed, and a symlink is never written through.
+export function syncEffortAgents(outDir, agents, { log = console.log } = {}) {
+  const dirName = basename(outDir);
+  if (lstatSync(outDir, { throwIfNoEntry: false })?.isSymbolicLink()) {
+    throw new Error(`${dirName}/ is a symlink; refusing to write through it`);
   }
-  const files = agents.map((a) => ({ file: `${a.name}.md`, path: join(agentsDir, `${a.name}.md`), text: a.text }));
-  const expected = files.map((f) => f.file);
-  const stale = owned.filter((f) => !expected.includes(f));
-  for (const file of [...expected, ...stale]) {
-    const st = lstatSync(join(agentsDir, file), { throwIfNoEntry: false });
-    if (st && !st.isFile()) throw new Error(`agents/${file} is not a regular file; refusing to write or remove it`);
-  }
-  for (const { file, path, text } of files) {
-    if (!owned.includes(file) && existsSync(path) && readFileSync(path, "utf8") !== text) {
-      throw new Error(
-        `agents/${file} exists and ${relative(repo, manifestPath)} does not list it; ` +
-          "restore the list from git if the generator wrote it, otherwise rename or remove the file",
-      );
-    }
+  mkdirSync(outDir, { recursive: true });
+  const files = agents.map((a) => ({ file: `${a.name}.md`, path: join(outDir, `${a.name}.md`), text: a.text }));
+  for (const { file, path } of files) {
+    const st = lstatSync(path, { throwIfNoEntry: false });
+    if (st && !st.isFile()) throw new Error(`${dirName}/${file} is not a regular file; refusing to overwrite it`);
   }
 
   let stamped = 0;
@@ -553,19 +544,34 @@ export function syncEffortAgents(agentsDir, manifestPath, agents, { log = consol
     if (existsSync(path) && readFileSync(path, "utf8") === text) continue;
     writeFileSync(path, text);
     stamped += 1;
-    log(`stamped: agents/${file}`);
+    log(`stamped: ${dirName}/${file}`);
   }
-  for (const file of stale) {
-    rmSync(join(agentsDir, file), { force: true });
+  const expected = new Set(files.map((f) => f.file));
+  for (const entry of readdirSync(outDir)) {
+    if (expected.has(entry)) continue;
+    rmSync(join(outDir, entry), { recursive: true, force: true });
     removed += 1;
-    log(`removed stale effort agent: agents/${file}`);
-  }
-  const manifest = JSON.stringify(expected, null, 2) + "\n";
-  if (!existsSync(manifestPath) || readFileSync(manifestPath, "utf8") !== manifest) {
-    writeFileSync(manifestPath, manifest);
-    log(`stamped: ${relative(repo, manifestPath)}`);
+    log(`removed orphan: ${dirName}/${entry}`);
   }
   return { stamped, removed, total: files.length };
+}
+
+const AGENT_DIRS = ["agents", "effort-agents"];
+
+// Every agent file the plugin ships, as plugin.json's "agents" list names them.
+export function pluginAgentPaths(pluginRoot) {
+  return AGENT_DIRS.flatMap((dir) =>
+    existsSync(join(pluginRoot, dir))
+      ? readdirSync(join(pluginRoot, dir))
+          .filter((f) => f.endsWith(".md"))
+          .sort()
+          .map((f) => `./${dir}/${f}`)
+      : [],
+  );
+}
+
+export function stampAgentPaths(manifestText, paths) {
+  return JSON.stringify({ ...JSON.parse(manifestText), agents: paths }, null, 2) + "\n";
 }
 
 export function setupModelsSection(models) {
@@ -724,10 +730,15 @@ function main() {
   }
   if (promptsChanged === 0) console.log(`ok: ${skills.length} Codex prompts current`);
 
-  const agentsDir = join(repo, "plugins/pstack/agents");
-  const agents = effortAgents(models.efforts, readFileSync(join(agentsDir, "poteto-agent.md"), "utf8"));
-  const effort = syncEffortAgents(agentsDir, join(repo, EFFORT_AGENTS_MANIFEST), agents);
+  const pluginRoot = join(repo, "plugins/pstack");
+  const agents = effortAgents(models.efforts, readFileSync(join(pluginRoot, "agents/poteto-agent.md"), "utf8"));
+  const effort = syncEffortAgents(join(pluginRoot, "effort-agents"), agents);
   if (effort.stamped === 0 && effort.removed === 0) console.log(`ok: ${effort.total} effort agents current`);
+  const manifestPath = join(pluginRoot, ".claude-plugin/plugin.json");
+  const agentPaths = pluginAgentPaths(pluginRoot);
+  if (!stampFile(manifestPath, stampAgentPaths(readFileSync(manifestPath, "utf8"), agentPaths), "plugin.json agents")) {
+    console.log(`ok: plugin.json lists ${agentPaths.length} agents`);
+  }
 
   const portable = syncPortableAssets(repo, skillsDir);
   if (portable.stamped === 0 && portable.removed === 0) {
@@ -747,7 +758,6 @@ function main() {
   });
   console.log("ok: .agents/plugins/marketplace.json names the plugin and points at a real path");
 
-  const pluginRoot = join(repo, "plugins/pstack");
   validatePluginLayout(pluginRoot);
   console.log("ok: no commands/ directory; plugin agents dispatched by namespaced name");
   validateHooks(readFileSync(join(pluginRoot, "hooks/hooks.json"), "utf8"), {

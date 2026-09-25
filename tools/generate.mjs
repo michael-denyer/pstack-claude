@@ -20,6 +20,10 @@
 //     -> each model-consuming skill's "## Models" section
 //     -> setup-pstack's override-sheet block and interrogate's reviewer table
 //     -> the "## Model names" section of poteto-mode/references/codex-tools.md
+//     -> one effort agent pair per level in plugins/pstack/effort-agents/
+//   plugins/pstack/{agents,effort-agents}/*.md -> the "agents" list in
+//     plugins/pstack/.claude-plugin/plugin.json (a list replaces the default
+//     agents/ directory, so it names every agent)
 //   plugins/pstack/agents/{poteto-agent,comment-sicko}.md, LICENSE,
 //   LICENSE-cursor-team-kit, and NOTICE-skills.md
 //     -> portable copies under poteto-mode/references/{agents,licenses}/
@@ -236,10 +240,7 @@ export function validatePluginLayout(pluginRoot) {
   }
   // #58: a plugin's agents register under the plugin namespace, so a dispatch
   // of the bare name errors at runtime with "Agent type 'x' not found".
-  const agentsDir = join(pluginRoot, "agents");
-  const agents = existsSync(agentsDir)
-    ? readdirSync(agentsDir).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3))
-    : [];
+  const agents = pluginAgentPaths(pluginRoot).map((p) => basename(p, ".md"));
   const problems = [];
   for (const file of markdownFiles(join(pluginRoot, "skills"))) {
     readFileSync(file, "utf8").split("\n").forEach((line, i) => {
@@ -382,6 +383,13 @@ export function regions(models) {
       locate: tableRows("| Subagent | Default model |", "| Reviewer "),
       render: () => reviewers.map((m, i) => `| Reviewer ${String.fromCharCode(65 + i)} | ${code(m)} |`),
     },
+    ...[...rolesBySkill].map(([skill]) => ({
+      file: skillFile(skill),
+      name: "Reasoning effort section",
+      locate: section("Reasoning effort"),
+      appendHeading: "## Reasoning effort",
+      render: () => blankPadded(effortSection(models.efforts, models.defaultEffort)),
+    })),
     {
       file: skillFile("setup-pstack"),
       name: "Models section",
@@ -469,11 +477,110 @@ export function modelsSection(roles) {
   );
 }
 
+// An override value may name a reasoning effort after its slug. Claude Code has
+// no per-call effort parameter, but a subagent definition's `effort` frontmatter
+// overrides the session's effort, so each level ships as an agent the role is
+// dispatched through, with the model still passed on the call.
+export function effortSection(levels, defaultEffort) {
+  return (
+    "A role value in the override sheet may name a reasoning effort after its model, as in `opus @xhigh`. " +
+    "Levels on Claude Code: " + codeList(levels) + ". Which ones apply depends on the model. " +
+    "A value without `@` takes the sheet's `default effort` line, a level or `session`, " +
+    `and ${code(defaultEffort)} when the sheet has no such line. \`session\` sets no effort, so the dispatch ` +
+    "is the usual one. Strip the suffix before reading the model: `inherit-parent` or `auto` still omits `model` " +
+    "at every level, and a model name is passed as `model`. " +
+    "On Claude Code, a level picks the effort agent from the `subagent_type` you would otherwise use. " +
+    "`pstack:poteto-agent` becomes `subagent_type: \"pstack:poteto-agent-<level>\"`. " +
+    "`general-purpose`, or no `subagent_type`, becomes `subagent_type: \"pstack:effort-<level>\"`. " +
+    "The effort agents set only `effort`, so the model you pass still decides the model. " +
+    "On Codex, pass the level as `spawn_agent`'s `reasoning_effort` and keep the usual instructions."
+  );
+}
+
+// The effort agents: one general-purpose worker and one poteto-agent per level.
+// The poteto variants carry poteto-agent's body, so the routing contract is
+// written once in plugins/pstack/agents/poteto-agent.md.
+export function effortAgents(levels, potetoAgent) {
+  const body = potetoAgent.replace(/^---\n[\s\S]*?\n---\n/, "");
+  return levels.flatMap((level) => [
+    {
+      name: `effort-${level}`,
+      text:
+        `---\nname: effort-${level}\ndescription: pstack subagent with the full tool set that runs at ${level} reasoning effort. ` +
+        `Its system prompt is this file, not the built-in \`general-purpose\` prompt. Dispatched in place of ` +
+        `\`general-purpose\` when a pstack role's override names \`@${level}\`. The caller passes the model.\n` +
+        `effort: ${level}\n---\n\n# pstack subagent (${level} effort)\n\n` +
+        "Do the task in your prompt. You have the full tool set. " +
+        "The effort level changes how long you reason, not the task.\n",
+    },
+    {
+      name: `poteto-agent-${level}`,
+      text:
+        `---\nname: poteto-agent-${level}\ndescription: \`pstack:poteto-agent\` at ${level} reasoning effort. ` +
+        `Dispatched in place of \`pstack:poteto-agent\` when a pstack role's override names \`@${level}\`. The caller passes the model.\n` +
+        `effort: ${level}\n---\n` + body,
+    },
+  ]);
+}
+
+// The effort agents live in a directory the generator owns outright, apart
+// from the hand-written agents in plugins/pstack/agents/. Any other entry in it
+// is removed, and a symlink is never written through.
+export function syncEffortAgents(outDir, agents, { log = console.log } = {}) {
+  const dirName = basename(outDir);
+  if (lstatSync(outDir, { throwIfNoEntry: false })?.isSymbolicLink()) {
+    throw new Error(`${dirName}/ is a symlink; refusing to write through it`);
+  }
+  mkdirSync(outDir, { recursive: true });
+  const files = agents.map((a) => ({ file: `${a.name}.md`, path: join(outDir, `${a.name}.md`), text: a.text }));
+  for (const { file, path } of files) {
+    const st = lstatSync(path, { throwIfNoEntry: false });
+    if (st && !st.isFile()) throw new Error(`${dirName}/${file} is not a regular file; refusing to overwrite it`);
+  }
+
+  let stamped = 0;
+  let removed = 0;
+  for (const { file, path, text } of files) {
+    if (existsSync(path) && readFileSync(path, "utf8") === text) continue;
+    writeFileSync(path, text);
+    stamped += 1;
+    log(`stamped: ${dirName}/${file}`);
+  }
+  const expected = new Set(files.map((f) => f.file));
+  for (const entry of readdirSync(outDir)) {
+    if (expected.has(entry)) continue;
+    rmSync(join(outDir, entry), { recursive: true, force: true });
+    removed += 1;
+    log(`removed orphan: ${dirName}/${entry}`);
+  }
+  return { stamped, removed, total: files.length };
+}
+
+const AGENT_DIRS = ["agents", "effort-agents"];
+
+// Every agent file the plugin ships, as plugin.json's "agents" list names them.
+export function pluginAgentPaths(pluginRoot) {
+  return AGENT_DIRS.flatMap((dir) =>
+    existsSync(join(pluginRoot, dir))
+      ? readdirSync(join(pluginRoot, dir))
+          .filter((f) => f.endsWith(".md"))
+          .sort()
+          .map((f) => `./${dir}/${f}`)
+      : [],
+  );
+}
+
+export function stampAgentPaths(manifestText, paths) {
+  return JSON.stringify({ ...JSON.parse(manifestText), agents: paths }, null, 2) + "\n";
+}
+
 export function setupModelsSection(models) {
   return (
     "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
     `- Available Claude models: ${codeList(models.available)}\n` +
     `- Default panel: ${codeList(models.tiers.panel)}\n` +
+    `- Reasoning effort levels: ${codeList(models.efforts)}\n` +
+    `- Default reasoning effort: ${code(models.defaultEffort)}\n` +
     `- Single-role default: ${code(models.tiers.default)}`
   );
 }
@@ -488,10 +595,13 @@ export function overrideSheetBlock(models) {
     "the values here override those defaults. Delete a line to fall back to the skill default. " +
     "A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); " +
     "an alias entry in a panel list still counts toward that panel's fan-out. " +
+    "A model may carry a reasoning effort, as in `opus @xhigh` (levels: " + models.efforts.join(", ") + "); " +
+    "the role then runs through the pstack effort agent of that level, each entry of a panel list on its own. " +
+    "`default effort` sets the level for a value without one; `session` keeps the parent session's effort. " +
     "`session hook: off` stops the Claude Code or Codex SessionStart hook from injecting the poteto-mode mandate; " +
     "any other value, or no line, leaves it on.\n\n" +
     rows +
-    "\n\nsession hook: on"
+    `\n\ndefault effort: ${models.defaultEffort}\nsession hook: on`
   );
 }
 
@@ -620,6 +730,16 @@ function main() {
   }
   if (promptsChanged === 0) console.log(`ok: ${skills.length} Codex prompts current`);
 
+  const pluginRoot = join(repo, "plugins/pstack");
+  const agents = effortAgents(models.efforts, readFileSync(join(pluginRoot, "agents/poteto-agent.md"), "utf8"));
+  const effort = syncEffortAgents(join(pluginRoot, "effort-agents"), agents);
+  if (effort.stamped === 0 && effort.removed === 0) console.log(`ok: ${effort.total} effort agents current`);
+  const manifestPath = join(pluginRoot, ".claude-plugin/plugin.json");
+  const agentPaths = pluginAgentPaths(pluginRoot);
+  if (!stampFile(manifestPath, stampAgentPaths(readFileSync(manifestPath, "utf8"), agentPaths), "plugin.json agents")) {
+    console.log(`ok: plugin.json lists ${agentPaths.length} agents`);
+  }
+
   const portable = syncPortableAssets(repo, skillsDir);
   if (portable.stamped === 0 && portable.removed === 0) {
     console.log(`ok: ${portable.total} portable assets current`);
@@ -638,7 +758,6 @@ function main() {
   });
   console.log("ok: .agents/plugins/marketplace.json names the plugin and points at a real path");
 
-  const pluginRoot = join(repo, "plugins/pstack");
   validatePluginLayout(pluginRoot);
   console.log("ok: no commands/ directory; plugin agents dispatched by namespaced name");
   validateHooks(readFileSync(join(pluginRoot, "hooks/hooks.json"), "utf8"), {

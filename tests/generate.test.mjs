@@ -2,7 +2,8 @@
 // model policy into skills, the version stamp, and the validators. The
 // end-to-end contract (regenerate, then git diff --exit-code) lives in CI.
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +11,11 @@ import {
   applyRegions,
   assertChangesHeading,
   deriveSkill,
+  effortAgents,
+  effortSection,
+  pluginAgentPaths,
+  stampAgentPaths,
+  syncEffortAgents,
   fenceUnder,
   loadModels,
   promptStub,
@@ -57,17 +63,19 @@ describe("locators", () => {
 });
 
 describe("regions", () => {
-  test("every skill in models.json owns exactly one stamped region", () => {
+  test("every skill in models.json owns one model region and one Reasoning effort region", () => {
     const skills = new Set(models.roles.map((r) => r.skill));
     for (const skill of skills) {
       const owned = regions(models).filter((r) => r.file === `plugins/pstack/skills/${skill}/SKILL.md`);
-      expect(owned).toHaveLength(1);
+      expect(owned.map((r) => r.name).sort()).toEqual(
+        ["Reasoning effort section", skill === "interrogate" ? "reviewer table" : "Models section"].sort(),
+      );
     }
   });
 
   test("applyRegions stamps in place and is idempotent", () => {
     const file = "plugins/pstack/skills/how/SKILL.md";
-    const text = "# how\n\n## Models\n\nstale\n\n## After\nkeep\n";
+    const text = "# how\n\n## Models\n\nstale\n\n## After\nkeep\n\n## Reasoning effort\n";
     const once = applyRegions(file, text, models);
     expect(once).not.toContain("stale");
     expect(once).toContain("## After\nkeep\n");
@@ -76,7 +84,7 @@ describe("regions", () => {
   });
 
   test("applyRegions throws when an owned file lost its anchor", () => {
-    expect(() => applyRegions("plugins/pstack/skills/how/SKILL.md", "# how\n\nno section\n", models)).toThrow(
+    expect(() => applyRegions("plugins/pstack/skills/how/SKILL.md", "# how\n\n## Reasoning effort\n", models)).toThrow(
       "plugins/pstack/skills/how/SKILL.md: no anchor for the Models section to stamp",
     );
   });
@@ -90,7 +98,7 @@ describe("regions", () => {
 describe("strayModelSlugs", () => {
   test("a slug inside an owned region is exempt", () => {
     const file = "plugins/pstack/skills/how/SKILL.md";
-    const text = applyRegions(file, "# how\n\n## Models\n\nx\n", models);
+    const text = applyRegions(file, "# how\n\n## Models\n\nx\n\n## Reasoning effort\n", models);
     expect(strayModelSlugs(file, text, models)).toEqual([]);
   });
 
@@ -103,7 +111,7 @@ describe("strayModelSlugs", () => {
 
   test("a slug outside the owned region of an owned file is a stray", () => {
     const file = "plugins/pstack/skills/how/SKILL.md";
-    const text = applyRegions(file, "# how\n\n## Models\n\nx\n\n## Setup\n\nPrefer claude-sonnet-4-6.\n", models);
+    const text = applyRegions(file, "# how\n\n## Models\n\nx\n\n## Setup\n\nPrefer claude-sonnet-4-6.\n\n## Reasoning effort\n", models);
     const strays = strayModelSlugs(file, text, models);
     expect(strays).toHaveLength(1);
     expect(strays[0]).toContain("Prefer claude-sonnet-4-6.");
@@ -287,11 +295,119 @@ describe("deriveSkill", () => {
 
   test("leaves a region whose anchor upstream lacks unstamped instead of throwing", () => {
     const text = front("disable-model-invocation: true\n") + "no reviewer table here\n";
-    expect(deriveSkill("plugins/pstack/skills/interrogate/SKILL.md", text, models)).toBe(front("") + "no reviewer table here\n");
+    const out = deriveSkill("plugins/pstack/skills/interrogate/SKILL.md", text, models);
+    expect(out.startsWith(front("") + "no reviewer table here\n")).toBe(true);
+    expect(out).not.toContain("| Reviewer A");
+    expect(out).toContain("\n## Reasoning effort\n\nA role value in");
+  });
+
+  test("appends the Reasoning effort section after the Models section", () => {
+    const out = deriveSkill("plugins/pstack/skills/how/SKILL.md", front("disable-model-invocation: true\n"), models);
+    expect(out.indexOf("## Models")).toBeLessThan(out.indexOf("## Reasoning effort"));
+    expect(out).toContain("subagent_type: \"pstack:effort-<level>\"");
   });
 
   test("a file the generator does not own passes through", () => {
     const text = "# plain\n\nreference text\n";
     expect(deriveSkill("plugins/pstack/skills/how/references/x.md", text, models)).toBe(text);
+  });
+});
+
+describe("effort agents", () => {
+  const poteto = "---\nname: poteto-agent\ndescription: d\n---\n\n# Poteto subagent\n\nRead the skill.\n";
+  const agents = effortAgents(["high", "max"], poteto);
+
+  test("one general-purpose and one poteto agent per level, each setting only effort", () => {
+    expect(agents.map((a) => a.name)).toEqual(["effort-high", "poteto-agent-high", "effort-max", "poteto-agent-max"]);
+    for (const agent of agents) {
+      const level = agent.name.split("-").at(-1);
+      expect(agent.text).toContain(`\nname: ${agent.name}\n`);
+      expect(agent.text).toContain(`\neffort: ${level}\n---\n`);
+      expect(agent.text).not.toMatch(/^model:/m);
+    }
+  });
+
+  test("the poteto variant carries poteto-agent's body verbatim", () => {
+    expect(agents[1].text.endsWith("---\n\n# Poteto subagent\n\nRead the skill.\n")).toBe(true);
+    expect(agents[1].text.match(/^---$/gm)).toHaveLength(2);
+  });
+
+  const pluginRoot = join(fileURLToPath(new URL("..", import.meta.url)), "plugins/pstack");
+
+  test("the committed agents are exactly what the generator writes", () => {
+    const expected = effortAgents(models.efforts, readFileSync(join(pluginRoot, "agents/poteto-agent.md"), "utf8"));
+    const dir = join(pluginRoot, "effort-agents");
+    expect(readdirSync(dir).sort()).toEqual(expected.map((a) => `${a.name}.md`).sort());
+    for (const agent of expected) expect(readFileSync(join(dir, `${agent.name}.md`), "utf8")).toBe(agent.text);
+  });
+
+  test("plugin.json lists every hand-written and generated agent file", () => {
+    const listed = JSON.parse(readFileSync(join(pluginRoot, ".claude-plugin/plugin.json"), "utf8")).agents;
+    expect(listed).toEqual(pluginAgentPaths(pluginRoot));
+    expect(listed).toContain("./agents/poteto-agent.md");
+    expect(listed).toContain("./effort-agents/effort-high.md");
+  });
+
+  const outDirFixture = (files) => {
+    const dir = join(mkdtempSync(join(tmpdir(), "effort-agents-")), "effort-agents");
+    mkdirSync(dir);
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
+    return dir;
+  };
+  const quiet = { log: () => {} };
+
+  test("writes the agents and removes every other entry in its directory", () => {
+    const dir = outDirFixture({ "effort-low.md": "stale", "effort-high.md": "old" });
+    mkdirSync(join(dir, "leftover"));
+    expect(syncEffortAgents(dir, agents, quiet)).toEqual({ stamped: 4, removed: 2, total: 4 });
+    expect(readdirSync(dir).sort()).toEqual(agents.map((a) => `${a.name}.md`).sort());
+    expect(readFileSync(join(dir, "effort-high.md"), "utf8")).toBe(agents[0].text);
+  });
+
+  test("refuses a symlink at an agent path and leaves its target unchanged", () => {
+    const dir = outDirFixture({});
+    const outside = join(mkdtempSync(join(tmpdir(), "effort-outside-")), "target.md");
+    writeFileSync(outside, "original");
+    symlinkSync(outside, join(dir, "effort-high.md"));
+    expect(() => syncEffortAgents(dir, agents, quiet)).toThrow("effort-agents/effort-high.md is not a regular file");
+    expect(readFileSync(outside, "utf8")).toBe("original");
+    expect(existsSync(join(dir, "effort-max.md"))).toBe(false);
+  });
+
+  test("removes a stray symlink without touching its target", () => {
+    const dir = outDirFixture({});
+    const outside = join(mkdtempSync(join(tmpdir(), "effort-outside-")), "target.md");
+    writeFileSync(outside, "original");
+    symlinkSync(outside, join(dir, "stray.md"));
+    syncEffortAgents(dir, agents, quiet);
+    expect(existsSync(join(dir, "stray.md"))).toBe(false);
+    expect(readFileSync(outside, "utf8")).toBe("original");
+  });
+
+  test("refuses an output directory that is a symlink", () => {
+    const real = outDirFixture({});
+    const link = join(mkdtempSync(join(tmpdir(), "effort-link-")), "effort-agents");
+    symlinkSync(real, link);
+    expect(() => syncEffortAgents(link, agents, quiet)).toThrow("effort-agents/ is a symlink");
+    expect(readdirSync(real)).toEqual([]);
+  });
+
+  test("stamping the agents list keeps every other manifest field", () => {
+    const text = '{\n  "name": "pstack",\n  "version": "1.0.0"\n}\n';
+    const out = stampAgentPaths(text, ["./agents/a.md"]);
+    expect(JSON.parse(out)).toEqual({ name: "pstack", version: "1.0.0", agents: ["./agents/a.md"] });
+    expect(stampAgentPaths(out, ["./agents/a.md"])).toBe(out);
+  });
+
+  test("the stamped section names every level and both dispatch targets", () => {
+    const text = effortSection(models.efforts, "medium");
+    for (const level of models.efforts) expect(text).toContain(`\`${level}\``);
+    expect(text).toContain('subagent_type: "pstack:effort-<level>"');
+    expect(text).toContain('subagent_type: "pstack:poteto-agent-<level>"');
+    expect(text).toContain('`general-purpose`, or no `subagent_type`, becomes `subagent_type: "pstack:effort-<level>"`');
+    expect(text).toContain("`default effort` line, a level or `session`, and `medium` when the sheet has no such line");
+    expect(text).toContain("`session` sets no effort, so the dispatch is the usual one");
+    expect(text).toContain("`inherit-parent` or `auto` still omits `model` at every level");
+    expect(text).toContain("On Codex, pass the level as `spawn_agent`'s `reasoning_effort`");
   });
 });

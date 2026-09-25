@@ -483,16 +483,17 @@ export function modelsSection(roles) {
 // dispatched through, with the model still passed on the call.
 export function effortSection(levels, defaultEffort) {
   return (
-    "A role value in `~/.claude/pstack-models.md` may name a reasoning effort after its model, as in " +
-    "`opus @xhigh`. Levels: " + codeList(levels) + ". Which ones apply depends on the model. " +
-    "For such an entry, dispatch through the effort agent of that level, chosen from the `subagent_type` you " +
-    "would otherwise use. `pstack:poteto-agent` becomes `subagent_type: \"pstack:poteto-agent-<level>\"`. " +
+    "A role value in the override sheet may name a reasoning effort after its model, as in `opus @xhigh`. " +
+    "Levels on Claude Code: " + codeList(levels) + ". Which ones apply depends on the model. " +
+    "A value without `@` takes the sheet's `default effort` line, a level or `session`, " +
+    `and ${code(defaultEffort)} when the sheet has no such line. \`session\` sets no effort, so the dispatch ` +
+    "is the usual one. Strip the suffix before reading the model: `inherit-parent` or `auto` still omits `model` " +
+    "at every level, and a model name is passed as `model`. " +
+    "On Claude Code, a level picks the effort agent from the `subagent_type` you would otherwise use. " +
+    "`pstack:poteto-agent` becomes `subagent_type: \"pstack:poteto-agent-<level>\"`. " +
     "`general-purpose`, or no `subagent_type`, becomes `subagent_type: \"pstack:effort-<level>\"`. " +
-    "Pass the model without the suffix as `model`. The effort agents set only `effort`, so the model you pass " +
-    "still decides the model. A value without `@` takes the sheet's `default effort` line, a level or `session`, " +
-    `and ${code(defaultEffort)} when the sheet has no such line. \`session\` keeps the usual \`subagent_type\` ` +
-    "and the session's effort. " +
-    "The suffix is never part of the model name when you validate it."
+    "The effort agents set only `effort`, so the model you pass still decides the model. " +
+    "On Codex, pass the level as `spawn_agent`'s `reasoning_effort` and keep the usual instructions."
   );
 }
 
@@ -531,9 +532,18 @@ export function syncEffortAgents(agentsDir, manifestPath, agents, { log = consol
     if (basename(file) !== file) throw new Error(`${manifestPath}: ${file} is not a file name`);
   }
   const files = agents.map((a) => ({ file: `${a.name}.md`, path: join(agentsDir, `${a.name}.md`), text: a.text }));
+  const expected = files.map((f) => f.file);
+  const stale = owned.filter((f) => !expected.includes(f));
+  for (const file of [...expected, ...stale]) {
+    const st = lstatSync(join(agentsDir, file), { throwIfNoEntry: false });
+    if (st && !st.isFile()) throw new Error(`agents/${file} is not a regular file; refusing to write or remove it`);
+  }
   for (const { file, path, text } of files) {
     if (!owned.includes(file) && existsSync(path) && readFileSync(path, "utf8") !== text) {
-      throw new Error(`agents/${file} exists and the generator did not write it; rename it or remove it`);
+      throw new Error(
+        `agents/${file} exists and ${relative(repo, manifestPath)} does not list it; ` +
+          "restore the list from git if the generator wrote it, otherwise rename or remove the file",
+      );
     }
   }
 
@@ -545,8 +555,7 @@ export function syncEffortAgents(agentsDir, manifestPath, agents, { log = consol
     stamped += 1;
     log(`stamped: agents/${file}`);
   }
-  const expected = files.map((f) => f.file);
-  for (const file of owned.filter((f) => !expected.includes(f))) {
+  for (const file of stale) {
     rmSync(join(agentsDir, file), { force: true });
     removed += 1;
     log(`removed stale effort agent: agents/${file}`);

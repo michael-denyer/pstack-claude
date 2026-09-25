@@ -2,7 +2,7 @@
 // model policy into skills, the version stamp, and the validators. The
 // end-to-end contract (regenerate, then git diff --exit-code) lives in CI.
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -370,6 +370,23 @@ describe("effort agents", () => {
     expect(existsSync(join(dir, "effort-high.md"))).toBe(false);
   });
 
+  test("refuses a symlink at an owned path and leaves its target unchanged", () => {
+    const { dir, manifest } = agentsFixture({}, ["effort-high.md", "effort-old.md"]);
+    const outside = join(mkdtempSync(join(tmpdir(), "effort-outside-")), "target.md");
+    writeFileSync(outside, "original");
+    symlinkSync(outside, join(dir, "effort-high.md"));
+    expect(() => syncEffortAgents(dir, manifest, agents, quiet)).toThrow("agents/effort-high.md is not a regular file");
+    expect(readFileSync(outside, "utf8")).toBe("original");
+    expect(existsSync(join(dir, "effort-max.md"))).toBe(false);
+  });
+
+  test("refuses a directory at a stale owned path before writing anything", () => {
+    const { dir, manifest } = agentsFixture({}, ["effort-old.md"]);
+    mkdirSync(join(dir, "effort-old.md"));
+    expect(() => syncEffortAgents(dir, manifest, agents, quiet)).toThrow("agents/effort-old.md is not a regular file");
+    expect(existsSync(join(dir, "effort-high.md"))).toBe(false);
+  });
+
   test("rejects a manifest entry that is a path", () => {
     const { dir, manifest } = agentsFixture({}, ["../poteto-agent.md"]);
     expect(() => syncEffortAgents(dir, manifest, agents, quiet)).toThrow("is not a file name");
@@ -382,6 +399,8 @@ describe("effort agents", () => {
     expect(text).toContain('subagent_type: "pstack:poteto-agent-<level>"');
     expect(text).toContain('`general-purpose`, or no `subagent_type`, becomes `subagent_type: "pstack:effort-<level>"`');
     expect(text).toContain("`default effort` line, a level or `session`, and `medium` when the sheet has no such line");
-    expect(text).toContain("`session` keeps the usual `subagent_type` and the session's effort");
+    expect(text).toContain("`session` sets no effort, so the dispatch is the usual one");
+    expect(text).toContain("`inherit-parent` or `auto` still omits `model` at every level");
+    expect(text).toContain("On Codex, pass the level as `spawn_agent`'s `reasoning_effort`");
   });
 });

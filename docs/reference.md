@@ -66,7 +66,7 @@ The Claude Code and Codex plugins share a [SessionStart hook](../plugins/pstack/
 
 Smaller tasks proceed directly. The full skill loads when invoked, and explicit user instructions take precedence.
 
-To disable routing, run `setup-pstack` and turn off the session hook. In Claude Code, use `/pstack:setup-pstack`. You can also write `session hook: off` in the runtime's sheet: `~/.claude/pstack-models.md` for Claude Code or `~/.codex/pstack-models.md` for Codex. The hook reads that setting before injecting its instruction. Without the setting, routing stays on.
+To disable routing, run `setup-pstack` and turn off the session hook. In Claude Code, use `/pstack:setup-pstack`. You can also write `session hook: off` in the runtime's sheet: `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md` for Claude Code or `~/.codex/pstack-models.md` for Codex. The hook reads that setting before injecting its instruction. Without the setting, routing stays on.
 
 Skills-only installs and other runtimes do not include the hook. Request `poteto-mode` explicitly, or add a standing instruction to the runtime's instruction file.
 

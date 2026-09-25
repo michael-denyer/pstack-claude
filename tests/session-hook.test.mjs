@@ -13,10 +13,14 @@ const command = sessionStart.hooks[0].command;
 const mandate = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
 const codexManifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8"));
 
-// Codex sets PLUGIN_ROOT; CODEX_HOME is only present when the user has
-// relocated their Codex directory.
+// Codex sets PLUGIN_ROOT; CODEX_HOME and CLAUDE_CONFIG_DIR are only present
+// when the user has relocated that runtime's directory.
 const runtimes = {
   claude: { sheetDir: ".claude", env: () => ({}) },
+  "claude with CLAUDE_CONFIG_DIR": {
+    sheetDir: "claude-config",
+    env: (sheetRoot) => ({ CLAUDE_CONFIG_DIR: sheetRoot }),
+  },
   codex: { sheetDir: ".codex", env: () => ({ PLUGIN_ROOT: pluginRoot }) },
   "codex with CODEX_HOME": {
     sheetDir: "codex-home",

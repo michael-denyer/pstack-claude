@@ -2,6 +2,18 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.45 - respect CLAUDE_CONFIG_DIR for the override sheet
+
+The Claude Code SessionStart hook read `$HOME/.claude/pstack-models.md` even when `CLAUDE_CONFIG_DIR` pointed Claude Code at another directory, so a `session hook: off` line in the active configuration had no effect. The skills named the same fixed path, so an agent that read the sheet directly fell back to the defaults. Reported in #102.
+
+The hook now reads `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md`, the same fallback the Codex branch uses for `CODEX_HOME`. `setup-pstack` calls the directory `<config>` and writes the sheet and its `CLAUDE.md` include there.
+
+The shared skills no longer name a runtime's path. They are shared by Claude Code, Codex, opencode, and Gemini CLI, so `~/.claude/pstack-models.md` was wrong on three of them, and a shell expression would have needed a gated shell step before `Read`. The skills that use the sheet (`arena`, `architect`, `how`, `interrogate`, `poteto-mode`, `reflect`, `swarm`, `why`) now call it `pstack-models.md`. The stamped Models section in `tools/generate.mjs` says `/setup-pstack` lists its path per runtime, and the `tools/substitutions.json` rewrite for Cursor's `~/.cursor/rules/pstack-models.mdc` produces the same name. The path lives only in `setup-pstack`'s runtime table and the hook. The eight skills are forked from upstream, so a sync at the pinned SHA does not rewrite them, and this change edits them directly.
+
+This is a port-local change. The sheet name is the port's translation of Cursor's rule file, and the Claude Code hook exists only in this port.
+
+**Verified.** `tests/session-hook.test.mjs` gains a `claude with CLAUDE_CONFIG_DIR` runtime. Its `session hook: off` case fails on 0.9.44 and passes here.
+
 ## 0.9.44 - reasoning effort per role through effort agents
 
 A role value in `~/.claude/pstack-models.md` may name a reasoning effort after its model, as in `arena runners: opus @xhigh, fable @max`. Each panel entry takes its own level. The Claude Code `Agent` call has no effort parameter, but a custom subagent's `effort` frontmatter overrides the session's effort while it runs. The generator therefore writes two agents per level in the new `models.json` `efforts` list: `effort-agents/effort-<level>.md`, a full-tool pstack subagent with its own one-line prompt, and `effort-agents/poteto-agent-<level>.md`, which carries poteto-agent's body. Neither sets `model`, so the caller still passes the role's model. Codex and the skills-only harnesses ignore the agents, and a sheet without `@` behaves as before. Contributed by @marcelormendes in #90.

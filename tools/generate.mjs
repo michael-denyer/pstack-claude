@@ -489,9 +489,9 @@ export function effortSection(levels, defaultEffort) {
     "would otherwise use. `pstack:poteto-agent` becomes `subagent_type: \"pstack:poteto-agent-<level>\"`. " +
     "`general-purpose`, or no `subagent_type`, becomes `subagent_type: \"pstack:effort-<level>\"`. " +
     "Pass the model without the suffix as `model`. The effort agents set only `effort`, so the model you pass " +
-    "still decides the model. A value without `@` runs at the level on the sheet's `default effort` line, or " +
-    `${code(defaultEffort)} when the sheet has no such line. \`default effort: session\` keeps the usual ` +
-    "`subagent_type` and the session's effort for a value without `@`. " +
+    "still decides the model. A value without `@` takes the sheet's `default effort` line, a level or `session`, " +
+    `and ${code(defaultEffort)} when the sheet has no such line. \`session\` keeps the usual \`subagent_type\` ` +
+    "and the session's effort. " +
     "The suffix is never part of the model name when you validate it."
   );
 }

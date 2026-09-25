@@ -381,7 +381,7 @@ describe("effort agents", () => {
     expect(text).toContain('subagent_type: "pstack:effort-<level>"');
     expect(text).toContain('subagent_type: "pstack:poteto-agent-<level>"');
     expect(text).toContain('`general-purpose`, or no `subagent_type`, becomes `subagent_type: "pstack:effort-<level>"`');
-    expect(text).toContain("`default effort` line, or `medium` when the sheet has no such line");
-    expect(text).toContain("`default effort: session` keeps the usual `subagent_type` and the session's effort");
+    expect(text).toContain("`default effort` line, a level or `session`, and `medium` when the sheet has no such line");
+    expect(text).toContain("`session` keeps the usual `subagent_type` and the session's effort");
   });
 });

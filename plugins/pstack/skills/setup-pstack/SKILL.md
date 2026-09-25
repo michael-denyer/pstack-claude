@@ -33,7 +33,7 @@ The default role-to-model mapping is the rule shape shown in the Write the overr
 
 Show every role with its current model, marking any real slug not in the detected set as needing a choice. Also list each line step 2 dropped or rewrote. Ask whether to accept as-is or change specific roles, offering the detected models plus `inherit-parent` and `auto` as the options. Prefer `AskUserQuestion` over free text. For panel roles (arena runners, architect runners, interrogate reviewers) the value is a list, and one subagent runs per entry, alias entries included, so the list length sets the count. `arena cross-judge pool` is also a list, but Arena selects one value from it whose model family differs from the parent's when possible. `swarm workers` is the default model for every worker unless a race or comparison assigns another model per arm.
 
-Then ask for the default reasoning effort, the `default effort` line. It is one of the levels in [Models](#models), starting from the default listed there, or `session` to keep the parent session's effort. Every role value without a suffix runs at it. Then ask whether any role should run at another level. On Claude Code a role value may carry one after its slug, as in `<slug> @xhigh`; panel entries take their own, as in `<slug> @xhigh, <slug> @max`. Each level dispatches through the plugin's effort agent of that level, so the choice holds without changing the session. Leave the suffix off for the default effort.
+Then ask for the default reasoning effort, the `default effort` line. It is `session`, which keeps the parent session's effort, or one of the levels in [Models](#models). Start from the default listed there. Every role value without a suffix runs at it. Then ask whether any role should run at another level. On Claude Code a role value may carry one after its slug, as in `<slug> @xhigh`; panel entries take their own, as in `<slug> @xhigh, <slug> @max`. Each level dispatches through the plugin's effort agent of that level, so the choice holds without changing the session. Leave the suffix off for the default effort.
 
 ### 4. Choose whether the session hook routes tasks
 
@@ -70,7 +70,7 @@ swarm workers: opus
 architect runners: opus, fable, sonnet
 interrogate reviewers: opus, fable, sonnet
 
-default effort: medium
+default effort: session
 session hook: on
 ```
 
@@ -103,5 +103,5 @@ Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs
 - Available Claude models: `opus`, `fable`, `sonnet`, `haiku`
 - Default panel: `opus`, `fable`, `sonnet`
 - Reasoning effort levels: `low`, `medium`, `high`, `xhigh`, `max`
-- Default reasoning effort: `medium`
+- Default reasoning effort: `session`
 - Single-role default: `opus`

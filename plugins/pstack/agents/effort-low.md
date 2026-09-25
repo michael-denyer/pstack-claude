@@ -1,9 +1,9 @@
 ---
 name: effort-low
-description: General-purpose pstack subagent that runs at low reasoning effort. Dispatched in place of `general-purpose` when a pstack role's override names `@low`; the caller passes the model.
+description: pstack subagent with the full tool set that runs at low reasoning effort. Its system prompt is this file, not the built-in `general-purpose` prompt. Dispatched in place of `general-purpose` when a pstack role's override names `@low`. The caller passes the model.
 effort: low
 ---
 
-# General-purpose subagent (low effort)
+# pstack subagent (low effort)
 
-Do the task in your prompt with the full tool set, exactly as a general-purpose subagent would. Nothing about the task changes with the effort level; only how long you reason does.
+Do the task in your prompt. You have the full tool set. The effort level changes how long you reason, not the task.

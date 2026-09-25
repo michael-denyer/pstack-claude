@@ -1,9 +1,9 @@
 ---
 name: effort-max
-description: General-purpose pstack subagent that runs at max reasoning effort. Dispatched in place of `general-purpose` when a pstack role's override names `@max`; the caller passes the model.
+description: pstack subagent with the full tool set that runs at max reasoning effort. Its system prompt is this file, not the built-in `general-purpose` prompt. Dispatched in place of `general-purpose` when a pstack role's override names `@max`. The caller passes the model.
 effort: max
 ---
 
-# General-purpose subagent (max effort)
+# pstack subagent (max effort)
 
-Do the task in your prompt with the full tool set, exactly as a general-purpose subagent would. Nothing about the task changes with the effort level; only how long you reason does.
+Do the task in your prompt. You have the full tool set. The effort level changes how long you reason, not the task.

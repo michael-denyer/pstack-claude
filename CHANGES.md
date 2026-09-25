@@ -2,6 +2,16 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.44 - reasoning effort per role through effort agents
+
+A role value in `~/.claude/pstack-models.md` may name a reasoning effort after its model, as in `arena runners: opus @xhigh, fable @max`. Each panel entry takes its own level. The Claude Code `Agent` call has no effort parameter, but a custom subagent's `effort` frontmatter overrides the session's effort while it runs. The generator therefore writes two agents per level in the new `models.json` `efforts` list: `agents/effort-<level>.md`, a full-tool pstack subagent with its own one-line prompt, and `agents/poteto-agent-<level>.md`, which carries poteto-agent's body. Neither sets `model`, so the caller still passes the role's model. Codex and the skills-only harnesses ignore the agents, and a sheet without `@` behaves as before. Contributed by @marcelormendes in #90.
+
+Every skill that owns a role gets a stamped `## Reasoning effort` section, which `deriveSkill` appends on sync like the Models section. The section picks the agent from the `subagent_type` the caller would otherwise use. `pstack:poteto-agent` becomes `pstack:poteto-agent-<level>`, and `general-purpose` or no type becomes `pstack:effort-<level>`. That covers `arena` and `architect`, which name no type, whether they run alone or under poteto-mode. `setup-pstack` asks for an optional level per role and validates it, and the override-sheet preamble documents the suffix.
+
+The generator lists the agents it wrote in `tools/effort-agents.json`. It removes a stale agent only when the list names it, and it refuses to overwrite an agent file it did not write, so a hand-written agent such as `poteto-agent-review.md` is never touched.
+
+**Verified.** `bun test tests/` and `bun tools/generate.mjs` results are in the PR. Live effort per turn on Claude Code 2.1.280 was read from session transcripts in #90 for `swarm`, `interrogate`, and direct spawns. `arena` and `architect` were not run live.
+
 ## 0.9.43 - watch-pr stops at the review gate
 
 `watch-pr` reported READY with exit 0 for a PR that GitHub would not merge. Its readiness proof checked conflicts, review threads, CI, draft state, and `CHANGES_REQUESTED`, but not `REVIEW_REQUIRED`. `assessGitHubMerge` also accepts `mergeStateStatus: BLOCKED` when the head rollup is not failing, so a PR held only by a required approval passed every check. The Review column printed ✅ because it looked only at threads and review automation.

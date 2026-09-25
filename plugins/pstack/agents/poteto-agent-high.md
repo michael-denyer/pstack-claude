@@ -1,6 +1,6 @@
 ---
 name: poteto-agent-high
-description: `pstack:poteto-agent` at high reasoning effort. Dispatched in place of `pstack:poteto-agent` when a pstack role's override names `@high`; the caller passes the model.
+description: `pstack:poteto-agent` at high reasoning effort. Dispatched in place of `pstack:poteto-agent` when a pstack role's override names `@high`. The caller passes the model.
 effort: high
 ---
 

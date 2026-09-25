@@ -2,7 +2,8 @@
 // model policy into skills, the version stamp, and the validators. The
 // end-to-end contract (regenerate, then git diff --exit-code) lives in CI.
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +13,7 @@ import {
   deriveSkill,
   effortAgents,
   effortSection,
+  syncEffortAgents,
   fenceUnder,
   loadModels,
   promptStub,
@@ -334,10 +336,50 @@ describe("effort agents", () => {
     for (const agent of expected) expect(readFileSync(join(dir, `${agent.name}.md`), "utf8")).toBe(agent.text);
   });
 
+  test("the manifest lists exactly the committed effort agents", () => {
+    const root = fileURLToPath(new URL("..", import.meta.url));
+    const listed = JSON.parse(readFileSync(join(root, "tools/effort-agents.json"), "utf8"));
+    expect(listed).toEqual(effortAgents(models.efforts, poteto).map((a) => `${a.name}.md`));
+  });
+
+  const agentsFixture = (files, owned) => {
+    const dir = mkdtempSync(join(tmpdir(), "effort-agents-"));
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
+    const manifest = join(dir, "manifest.json");
+    if (owned) writeFileSync(manifest, JSON.stringify(owned));
+    return { dir, manifest };
+  };
+  const quiet = { log: () => {} };
+
+  test("removes a stale agent it wrote and keeps a hand-written agent with a matching name", () => {
+    const { dir, manifest } = agentsFixture(
+      { "effort-low.md": "old", "poteto-agent-review.md": "hand-written" },
+      ["effort-low.md"],
+    );
+    const result = syncEffortAgents(dir, manifest, agents, quiet);
+    expect(result).toEqual({ stamped: 4, removed: 1, total: 4 });
+    expect(existsSync(join(dir, "effort-low.md"))).toBe(false);
+    expect(readFileSync(join(dir, "poteto-agent-review.md"), "utf8")).toBe("hand-written");
+    expect(JSON.parse(readFileSync(manifest, "utf8"))).toEqual(agents.map((a) => `${a.name}.md`));
+  });
+
+  test("refuses to overwrite an agent it did not write, before writing anything", () => {
+    const { dir, manifest } = agentsFixture({ "effort-max.md": "hand-written" }, []);
+    expect(() => syncEffortAgents(dir, manifest, agents, quiet)).toThrow("agents/effort-max.md exists");
+    expect(readFileSync(join(dir, "effort-max.md"), "utf8")).toBe("hand-written");
+    expect(existsSync(join(dir, "effort-high.md"))).toBe(false);
+  });
+
+  test("rejects a manifest entry that is a path", () => {
+    const { dir, manifest } = agentsFixture({}, ["../poteto-agent.md"]);
+    expect(() => syncEffortAgents(dir, manifest, agents, quiet)).toThrow("is not a file name");
+  });
+
   test("the stamped section names every level and both dispatch targets", () => {
     const text = effortSection(models.efforts);
     for (const level of models.efforts) expect(text).toContain(`\`${level}\``);
     expect(text).toContain('subagent_type: "pstack:effort-<level>"');
     expect(text).toContain('subagent_type: "pstack:poteto-agent-<level>"');
+    expect(text).toContain('`general-purpose`, or no `subagent_type`, becomes `subagent_type: "pstack:effort-<level>"`');
   });
 });

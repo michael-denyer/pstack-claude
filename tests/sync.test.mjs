@@ -117,6 +117,14 @@ describe("applySubstitutions", () => {
     }
   });
 
+  test("no rule rewrites another rule's output", () => {
+    for (const rel of ["skills/x/SKILL.md", "skills/poteto-mode/playbooks/x.md"]) {
+      for (const rule of RULES.substitutions) {
+        expect(applySubstitutions(rule.replacement, RULES.substitutions, rel).text).toBe(rule.replacement);
+      }
+    }
+  });
+
   // One upstream sentence per rule that reaches more than one upstream file,
   // and the one form the port writes for it.
   test.each([

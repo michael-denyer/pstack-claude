@@ -228,6 +228,12 @@ describe("classify", () => {
       { old: upstream(base), new: upstream(base.replace("l5", "l5 upstream")), local: port(base.replace("l1", "l1 port")) },
       written("merged", base.replace("l1", "l1 port").replace("l5", "l5 upstream")),
     ],
+    ["a port mode change under an upstream edit", { old: upstream("a\n"), new: upstream("b\n"), local: port("a\n", 0o755) }, written("merged", "b\n", 0o755)],
+    [
+      "a port edit and mode change under an upstream edit",
+      { old: upstream(base), new: upstream(base.replace("l5", "l5 upstream")), local: port(base.replace("l1", "l1 port"), 0o755) },
+      written("merged", base.replace("l1", "l1 port").replace("l5", "l5 upstream"), 0o755),
+    ],
     [
       "edits on both sides that overlap",
       { old: upstream(base), new: upstream(base.replace("l3", "l3 upstream")), local: port(base.replace("l3", "l3 port")) },
@@ -690,6 +696,21 @@ describe("syncComponent", () => {
 
     expect(report.forked).toEqual([{ rel: "run.sh", changed: 0, modeOnly: true }]);
     expect(report.written).toEqual([]);
+    expect(statSync(join(local, "run.sh")).mode & 0o777).toBe(0o755);
+  });
+
+  test("a merge keeps a mode the port changed when upstream left the mode alone", () => {
+    const oldUp = tree({ "run.sh": "echo\n" });
+    const newUp = tree({ "run.sh": "echo upstream\n" });
+    const local = tree({ "run.sh": "echo\n" });
+    chmodSync(join(oldUp, "run.sh"), 0o644);
+    chmodSync(join(newUp, "run.sh"), 0o644);
+    chmodSync(join(local, "run.sh"), 0o755);
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.written).toEqual([{ kind: "merged", rel: "run.sh" }]);
+    expect(readFileSync(join(local, "run.sh"), "utf8")).toBe("echo upstream\n");
     expect(statSync(join(local, "run.sh")).mode & 0o777).toBe(0o755);
   });
 

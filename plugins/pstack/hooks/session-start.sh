@@ -1,13 +1,15 @@
 #!/bin/sh
 set -eu
 
-# Codex exports PLUGIN_ROOT; Claude Code exports only CLAUDE_PLUGIN_ROOT, which
-# Codex also sets as an alias, so PLUGIN_ROOT is the only usable runtime tell.
-if [ -n "${PLUGIN_ROOT:-}" ]; then
-  sheet="${CODEX_HOME:-$HOME/.codex}/pstack-models.md"
-else
-  sheet="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md"
-fi
+# Each runtime's hooks file passes its own name.
+case "${1:-}" in
+  claude) sheet="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md" ;;
+  codex) sheet="${CODEX_HOME:-$HOME/.codex}/pstack-models.md" ;;
+  *)
+    echo "session-start.sh: unknown runtime '${1:-}' (expected claude or codex)" >&2
+    exit 2
+    ;;
+esac
 
 if grep -qs '^session hook: off$' "$sheet"; then
   exit 0

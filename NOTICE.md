@@ -47,7 +47,7 @@ Port-authored files covered by this notice include:
 - `plugins/pstack/skills/poteto-mode/references/codex-tools.md`
 - `plugins/pstack/.codex-plugin/prompts/*.md`
 - `plugins/pstack/skills/babysit/SKILL.md` (independently authored; workflow informed by Cursor's public `/babysit` behavior)
-- `plugins/pstack/hooks/hooks.json` and `plugins/pstack/hooks/session-start-context.md` (the auto-fire hook and its mandate)
+- `plugins/pstack/hooks/hooks.json`, `plugins/pstack/hooks/codex-hooks.json`, and `plugins/pstack/hooks/session-start-context.md` (each runtime's auto-fire hook and its mandate)
 - `NOTICE.md` (this file)
 - `NOTICE-skills.md`
 - `README.md`

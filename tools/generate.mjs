@@ -645,7 +645,7 @@ export function strayModelSlugs(file, text, models) {
 // Every ${CLAUDE_PLUGIN_ROOT}/<path> a hook command names must exist in the
 // plugin, and one the command executes directly must be executable, or the
 // SessionStart hook fails silently for every user.
-export function validateHooks(hooksJson, { statOf }) {
+export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json" }) {
   const problems = [];
   for (const [event, groups] of Object.entries(JSON.parse(hooksJson).hooks ?? {})) {
     for (const group of groups) {
@@ -664,7 +664,7 @@ export function validateHooks(hooksJson, { statOf }) {
       }
     }
   }
-  if (problems.length) throw new Error(`hooks.json:\n  ${problems.join("\n  ")}`);
+  if (problems.length) throw new Error(`${file}:\n  ${problems.join("\n  ")}`);
 }
 
 // Write `next` to `path` only when it differs; returns whether it wrote.
@@ -760,10 +760,12 @@ function main() {
 
   validatePluginLayout(pluginRoot);
   console.log("ok: no commands/ directory; plugin agents dispatched by namespaced name");
-  validateHooks(readFileSync(join(pluginRoot, "hooks/hooks.json"), "utf8"), {
-    statOf: (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null),
-  });
-  console.log("ok: hooks.json commands point at files that exist in the plugin");
+  const statOf = (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null);
+  const codexHooks = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8")).hooks;
+  for (const file of ["hooks/hooks.json", codexHooks]) {
+    validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file });
+    console.log(`ok: ${file} commands point at files that exist in the plugin`);
+  }
 }
 
 // Guarded so importing the generator's validation and rendering functions does

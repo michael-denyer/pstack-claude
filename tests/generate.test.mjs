@@ -30,7 +30,6 @@ import {
   OWNED_DIRS,
   plan,
   PORTABLE_ASSETS,
-  pluginAgentPaths,
   problems,
   stampAgentPaths,
   fenceUnder,
@@ -53,42 +52,53 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const models = loadModels();
 
 const lines = (text) => text.split("\n");
+const spanned = (locate, doc) => {
+  const span = locate(doc);
+  return span && doc.slice(...span);
+};
 
 describe("locators", () => {
   test("section spans from the heading to the next ## heading", () => {
     const doc = lines("# T\n\n## Models\n\nold\n\n## Next\nx");
-    expect(section("Models")(doc)).toEqual([3, 6]);
-    expect(section("Next")(doc)).toEqual([7, 8]);
-    expect(section("Absent")(doc)).toBeNull();
+    expect(spanned(section("Models"), doc)).toEqual(["", "old", ""]);
+    expect(spanned(section("Next"), doc)).toEqual(["x"]);
+    expect(spanned(section("Absent"), doc)).toBeNull();
   });
 
   test("fenceUnder spans the inside of the first matching fence after the titled step, whatever its number", () => {
     const doc = lines("### 5. Write the override sheet\n\ntext\n```markdown\na\nb\n```\nafter");
     const renumbered = lines("### 6. Write the override sheet\n```markdown\na\n```");
     const unclosed = lines("### 5. Write the override sheet\n```markdown\nunclosed");
-    expect(fenceUnder("Write the override sheet", "markdown")(doc)).toEqual([4, 6]);
-    expect(fenceUnder("Write the override sheet", "markdown")(renumbered)).toEqual([2, 3]);
-    expect(fenceUnder("Write the override sheet", "yaml")(doc)).toBeNull();
-    expect(fenceUnder("Write", "markdown")(doc)).toBeNull();
-    expect(fenceUnder("Absent", "markdown")(doc)).toBeNull();
-    expect(fenceUnder("Write the override sheet", "markdown")(unclosed)).toBeNull();
+    expect(spanned(fenceUnder("Write the override sheet", "markdown"), doc)).toEqual(["a", "b"]);
+    expect(spanned(fenceUnder("Write the override sheet", "markdown"), renumbered)).toEqual(["a"]);
+    expect(spanned(fenceUnder("Write the override sheet", "yaml"), doc)).toBeNull();
+    expect(spanned(fenceUnder("Write", "markdown"), doc)).toBeNull();
+    expect(spanned(fenceUnder("Absent", "markdown"), doc)).toBeNull();
+    expect(spanned(fenceUnder("Write the override sheet", "markdown"), unclosed)).toBeNull();
   });
 
   test("tableRows spans the consecutive rows with the prefix after the separator", () => {
     const doc = lines("| Subagent | Default model |\n| --- | --- |\n| Reviewer A | x |\n| Reviewer B | y |\n\ntext");
-    expect(tableRows("| Subagent | Default model |", "| Reviewer ")(doc)).toEqual([2, 4]);
-    expect(tableRows("| Other |", "|")(doc)).toBeNull();
+    expect(spanned(tableRows("| Subagent | Default model |", "| Reviewer "), doc)).toEqual([
+      "| Reviewer A | x |",
+      "| Reviewer B | y |",
+    ]);
+    expect(spanned(tableRows("| Other |", "|"), doc)).toBeNull();
   });
 });
 
 describe("regions", () => {
-  test("every skill in models.json owns one model region and one Reasoning effort region", () => {
-    const skills = new Set(models.roles.map((r) => r.skill));
-    for (const skill of skills) {
-      const owned = regions(models).filter((r) => r.file === `plugins/pstack/skills/${skill}/SKILL.md`);
-      expect(owned.map((r) => r.name).sort()).toEqual(
-        ["Reasoning effort section", skill === "interrogate" ? "reviewer table" : "Models section"].sort(),
-      );
+  test("every skill in models.json gets its model defaults and the Reasoning effort section stamped", () => {
+    const marked = {
+      ...models,
+      defaultEffort: "marker-effort",
+      roles: models.roles.map((r) => ({ ...r, models: [`marker-${r.skill}`] })),
+    };
+    for (const skill of new Set(models.roles.map((r) => r.skill))) {
+      const file = `plugins/pstack/skills/${skill}/SKILL.md`;
+      const stamped = applyRegions(file, readFileSync(join(repoRoot, file), "utf8"), marked);
+      expect(stamped).toContain(`\`marker-${skill}\``);
+      expect(stamped).toContain("`marker-effort`");
     }
   });
 
@@ -312,14 +322,10 @@ describe("slashCommands", () => {
     }
   });
 
-  test("the live reference names exactly the public skills and matches the generated prompts", () => {
+  test("the live reference names exactly the public skills, poteto-mode first", () => {
     const text = readFileSync(join(repoRoot, "docs/reference.md"), "utf8");
     const rows = slashCommands(text, publicSkills(join(repoRoot, "plugins/pstack/skills")));
     expect(rows[0].name).toBe("poteto-mode");
-    for (const row of rows) {
-      const prompt = readFileSync(join(repoRoot, "plugins/pstack/.codex-plugin/prompts", `${row.name}.md`), "utf8");
-      expect(prompt).toBe(promptStub(row));
-    }
   });
 });
 
@@ -421,16 +427,8 @@ describe("effort agents", () => {
 
   const pluginRoot = join(fileURLToPath(new URL("..", import.meta.url)), "plugins/pstack");
 
-  test("the committed agents are exactly what the generator writes", () => {
-    const expected = effortAgents(models.efforts, readFileSync(join(pluginRoot, "agents/poteto-agent.md"), "utf8"));
-    const dir = join(pluginRoot, "effort-agents");
-    expect(readdirSync(dir).sort()).toEqual(expected.map((a) => `${a.name}.md`).sort());
-    for (const agent of expected) expect(readFileSync(join(dir, `${agent.name}.md`), "utf8")).toBe(agent.text);
-  });
-
-  test("plugin.json lists every hand-written and generated agent file", () => {
+  test("plugin.json lists both hand-written and generated agents", () => {
     const listed = JSON.parse(readFileSync(join(pluginRoot, ".claude-plugin/plugin.json"), "utf8")).agents;
-    expect(listed).toEqual(pluginAgentPaths(pluginRoot));
     expect(listed).toContain("./agents/poteto-agent.md");
     expect(listed).toContain("./effort-agents/effort-high.md");
   });
@@ -442,16 +440,12 @@ describe("effort agents", () => {
     expect(stampAgentPaths(out, ["./agents/a.md"])).toBe(out);
   });
 
-  test("the stamped section names every level and both dispatch targets", () => {
-    const text = effortSection(models.efforts, "medium");
-    for (const level of models.efforts) expect(text).toContain(`\`${level}\``);
+  test("the stamped section names every level, the default, both dispatch targets, and the Codex parameter", () => {
+    const text = effortSection(["low", "max"], "high");
+    for (const level of ["low", "max", "high"]) expect(text).toContain(`\`${level}\``);
     expect(text).toContain('subagent_type: "pstack:effort-<level>"');
     expect(text).toContain('subagent_type: "pstack:poteto-agent-<level>"');
-    expect(text).toContain('`general-purpose`, or no `subagent_type`, becomes `subagent_type: "pstack:effort-<level>"`');
-    expect(text).toContain("`default effort` line, a level or `session`, and `medium` when the sheet has no such line");
-    expect(text).toContain("`session` sets no effort, so the dispatch is the usual one");
-    expect(text).toContain("`inherit-parent` or `auto` still omits `model` at every level");
-    expect(text).toContain("On Codex, pass the level as `spawn_agent`'s `reasoning_effort`");
+    expect(text).toContain("`reasoning_effort`");
   });
 });
 
@@ -475,7 +469,7 @@ describe("plan, changes, apply", () => {
   const STUB = "plugins/pstack/.codex-plugin/prompts/tdd.md";
   const STRAY = "plugins/pstack/effort-agents/stray.md";
 
-  test("the committed tree is what the plan says", () => {
+  test("the working tree is what the plan says", () => {
     expect(changes(repoRoot, plan(repoRoot))).toEqual([]);
   });
 

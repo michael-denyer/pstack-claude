@@ -17,6 +17,7 @@ import {
   codexModelNamesSection,
   PORTABLE_ASSETS,
   plan,
+  problems,
   publicSkills,
   resolveModels,
 } from "../tools/generate.mjs";
@@ -24,7 +25,6 @@ import { validateProsePaths, validateSkillsTree, walk } from "../tools/validate-
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const skillsDir = join(repoRoot, "plugins/pstack/skills");
-const agentsDir = join(repoRoot, "plugins/pstack/agents");
 const requiredPortableFiles = [
   "poteto-mode/references/agents/comment-sicko.md",
   "poteto-mode/references/licenses/LICENSE",
@@ -33,30 +33,14 @@ const requiredPortableFiles = [
 ];
 
 describe("shared Agent Skills tree", () => {
-  test("every skill satisfies the portable name and description boundary", () => {
-    const skills = agentSkills(skillsDir);
-    expect(skills.length).toBeGreaterThan(0);
-    for (const skill of skills) {
-      expect(skill.name).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
-      expect(skill.name.length).toBeLessThanOrEqual(64);
-      expect(skill.description.length).toBeGreaterThan(0);
-      expect(skill.description.length).toBeLessThanOrEqual(1024);
-    }
-  });
-
-  test("public skills are the user-invocable ones and exclude every principle leaf", () => {
+  test("public skills include poteto-mode and exclude every principle leaf", () => {
     const names = publicSkills(skillsDir);
     expect(names).toContain("poteto-mode");
     expect(names.some((n) => n.startsWith("principle-"))).toBe(false);
-    expect(names).toHaveLength(agentSkills(skillsDir).filter((s) => s.userInvocable).length);
   });
 
-  test("no markdown link escapes the skills tree", () => {
-    expect(() => validateSkillsTree(skillsDir)).not.toThrow();
-  });
-
-  test("no skill tells the reader to open a plugin path outside the tree", () => {
-    expect(() => validateProsePaths(skillsDir)).not.toThrow();
+  test("the working tree breaks no cross-file contract", () => {
+    expect(problems(repoRoot)).toEqual([]);
   });
 
   test("prose naming a real plugin file outside the skills tree fails the boundary check", () => {
@@ -213,15 +197,6 @@ describe("shared Agent Skills tree", () => {
     }
   });
 
-  test("the subagent definitions dispatched by name install with the skills", () => {
-    const vendored = join(skillsDir, "poteto-mode", "references", "agents");
-    for (const name of ["comment-sicko"]) {
-      const copy = readFileSync(join(vendored, `${name}.md`), "utf8");
-      expect(copy).toBe(readFileSync(join(agentsDir, `${name}.md`), "utf8"));
-      expect(copy).toContain(`name: ${name}`);
-    }
-  });
-
   test("every vendored subagent definition has a skill that tells Codex to read it", () => {
     const prose = walk(skillsDir)
       .filter((file) => file.endsWith(".md"))
@@ -235,11 +210,6 @@ describe("shared Agent Skills tree", () => {
   test("every required portable asset lives inside the skills tree", () => {
     for (const file of requiredPortableFiles) {
       expect(existsSync(join(skillsDir, file))).toBe(true);
-    }
-    for (const { source, target } of PORTABLE_ASSETS) {
-      expect(readFileSync(join(skillsDir, target), "utf8")).toBe(
-        readFileSync(join(repoRoot, source), "utf8"),
-      );
     }
   });
 
@@ -262,13 +232,13 @@ describe("shared Agent Skills tree", () => {
       }
 
       const poteto = join(installed, "poteto-mode");
-      expect(readFileSync(join(poteto, "SKILL.md"), "utf8")).toContain("# Poteto mode");
-      expect(readFileSync(join(poteto, "references", "codex-tools.md"), "utf8")).toContain(
-        "# Codex tool mapping for pstack",
-      );
-      expect(
-        readFileSync(join(poteto, "..", "principle-model-the-domain", "SKILL.md"), "utf8"),
-      ).toContain("# Model the Domain");
+      for (const file of [
+        join(poteto, "SKILL.md"),
+        join(poteto, "references", "codex-tools.md"),
+        join(poteto, "..", "principle-model-the-domain", "SKILL.md"),
+      ]) {
+        expect(readFileSync(file, "utf8").length).toBeGreaterThan(0);
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -11,19 +11,14 @@
       "rationale": "Claude Code's fixed-choice question tool; upstream Cursor names it AskQuestion"
     },
     {
-      "pattern": "the `Task` tool",
-      "replacement": "the `Agent` tool",
-      "rationale": "Claude Code dispatches subagents with the Agent tool; Cursor calls it Task"
-    },
-    {
       "pattern": "the Task tool",
-      "replacement": "the Agent tool",
-      "rationale": "same tool, unbackticked"
+      "replacement": "the `Agent` tool",
+      "rationale": "Claude Code dispatches subagents with the Agent tool; Cursor calls it Task. The port writes the tool name in backticks"
     },
     {
-      "pattern": "`Task` call",
-      "replacement": "`Agent` call",
-      "rationale": "same tool, as a noun for one dispatch (also matches `Task` calls)"
+      "pattern": "`Task`",
+      "replacement": "`Agent`",
+      "rationale": "same tool, backticked; covers `Task` call, `Task` prompts, and the `Task` response body"
     },
     {
       "pattern": "control skill",
@@ -48,6 +43,37 @@
       "rationale": "same rule for a skill body, which carries its own Models section"
     },
     {
+      "regex": ", default `(?:claude|gpt|grok|gemini|composer)-[^`]+`",
+      "files": "/SKILL\\.md$",
+      "replacement": ", default in [Models](#models)",
+      "rationale": "a role bullet's default model is stamped into the skill's Models section, never hard-coded in prose"
+    },
+    {
+      "pattern": "the `pstack-models.mdc` rule and a default.",
+      "replacement": "`pstack-models.md` and a default in [Models](#models).",
+      "rationale": "the override sheet and the stamped defaults a spawn falls back to; must precede the shorter `pstack-models.mdc` rule phrase"
+    },
+    {
+      "pattern": "the `pstack-models.mdc` rule",
+      "replacement": "`pstack-models.md`",
+      "rationale": "the override sheet is a file the user includes, not a Cursor rule"
+    },
+    {
+      "pattern": "the rule or that line is missing",
+      "replacement": "the sheet or that line is missing",
+      "rationale": "the override sheet, not a Cursor rule"
+    },
+    {
+      "pattern": "the rule or the line is missing",
+      "replacement": "the sheet or the line is missing",
+      "rationale": "same sentence, the other wording upstream uses"
+    },
+    {
+      "pattern": "Families go by prefix: `claude-*`, `gpt-*`, and `grok-*`.",
+      "replacement": "Families go by model name, such as Opus, Fable, or Sonnet.",
+      "rationale": "Claude Code names models by family, not by slug prefix"
+    },
+    {
       "pattern": ".cursor/skills/",
       "replacement": ".claude/skills/",
       "rationale": "personal skills directory"
@@ -58,9 +84,84 @@
       "rationale": "Claude Code has no auto-applied rules directory; inclusion is explicit via CLAUDE.md"
     },
     {
+      "pattern": "`~/.cursor/projects/*/`",
+      "replacement": "`~/.claude/projects/`",
+      "rationale": "Claude Code keeps every project's transcripts under ~/.claude/projects/"
+    },
+    {
+      "regex": "the active workspace's `agent-transcripts/` directory(?: \\(the system prompt names (?:the|this) path\\))?",
+      "replacement": "Claude Code's per-project transcripts directory at `~/.claude/projects/<encoded-cwd>/`",
+      "rationale": "Cursor's system prompt names its agent-transcripts directory; Claude Code's does not, so the port names the path"
+    },
+    {
+      "pattern": "~/.cursor/plugins/",
+      "replacement": "~/.claude/plugins/",
+      "rationale": "Claude Code installs plugins under ~/.claude/plugins/"
+    },
+    {
       "pattern": "`generalPurpose`",
       "replacement": "`general-purpose`",
       "rationale": "Claude Code's built-in agent type is general-purpose"
+    },
+    {
+      "pattern": "subagent_type: generalPurpose",
+      "replacement": "subagent_type: \"general-purpose\"",
+      "rationale": "the built-in agent type, unbackticked inside a backticked parameter list"
+    },
+    {
+      "pattern": "subagent_type: \"poteto-agent\"",
+      "replacement": "subagent_type: \"pstack:poteto-agent\"",
+      "rationale": "plugin agents register under the plugin namespace; the bare name errors (#58)"
+    },
+    {
+      "regex": "Cursor's built-in `create-skill`(?: skill)?",
+      "replacement": "the **plugin-dev:skill-development** skill",
+      "rationale": "Claude Code's skill-authoring guidance ships in the plugin-dev plugin; must precede the bare create-skill rule"
+    },
+    {
+      "pattern": "(Cursor's built-in for authoring SKILL.md files)",
+      "replacement": "(Claude Code's authoring guidance for SKILL.md files)",
+      "rationale": "the parenthetical that follows the skill name"
+    },
+    {
+      "pattern": "create-skill",
+      "replacement": "plugin-dev:skill-development",
+      "rationale": "the same skill, named bare or in backticks"
+    },
+    {
+      "pattern": "Cursor's `/loop` command",
+      "replacement": "Claude Code's `loop` skill",
+      "rationale": "Claude Code ships /loop as a bundled skill"
+    },
+    {
+      "pattern": "a Cursor restart",
+      "replacement": "a session restart",
+      "rationale": "the host application"
+    },
+    {
+      "pattern": "Cursor's built-in babysit skill",
+      "replacement": "the bundled **babysit** skill",
+      "rationale": "Claude Code bundles its own babysit skill with the same trigger words"
+    },
+    {
+      "pattern": "One Cursor cloud agent per PR",
+      "replacement": "One background subagent per PR, in its own worktree,",
+      "rationale": "Claude Code runs subagents locally; a worktree per writer gives the isolation a cloud VM gave"
+    },
+    {
+      "pattern": "arm a `/goal` with the full program objective. The goal continues across turns",
+      "replacement": "write the full program objective into the standing orders and restate it in your todolist. That objective stands across turns",
+      "rationale": "Cursor's /goal has no Claude Code equivalent"
+    },
+    {
+      "pattern": "bugbot comments",
+      "replacement": "review-bot comments",
+      "rationale": "the port routes any automated PR-review bot, not only Cursor's Bugbot"
+    },
+    {
+      "pattern": "skeptical Bugbot triage",
+      "replacement": "skeptical review-bot triage",
+      "rationale": "same routing, in the autopilot owner loop"
     }
   ],
   "denylist": [

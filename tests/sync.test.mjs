@@ -90,7 +90,7 @@ describe("applySubstitutions", () => {
         "Reproduce via the driver skill.",
         "Drive via the relevant driver skill and through its driver skill.",
         "<driver skill path> and the driver skill's commands",
-        "Multiple `Agent` calls in the Agent tool.",
+        "Multiple `Agent` calls in the `Agent` tool.",
         "on \"restart Claude Code\"",
       ].join("\n"),
     );
@@ -115,6 +115,100 @@ describe("applySubstitutions", () => {
     for (const rule of RULES.substitutions) {
       expect(denylistHits("rule", rule.replacement, RULES.denylist)).toEqual([]);
     }
+  });
+
+  // One upstream sentence per rule that reaches more than one upstream file,
+  // and the one form the port writes for it.
+  test.each([
+    [
+      "skills/how/SKILL.md",
+      "Each spawn below names a role line in the `pstack-models.mdc` rule and a default. Set `model` to that line's value, or to the default if the rule or the line is missing.",
+      "Each spawn below names a role line in `pstack-models.md` and a default in [Models](#models). Set `model` to that line's value, or to the default if the sheet or the line is missing.",
+    ],
+    [
+      "skills/how/SKILL.md",
+      "If the Task tool rejects a slug, use the default and say so.",
+      "If the `Agent` tool rejects a slug, use the default and say so.",
+    ],
+    [
+      "skills/how/SKILL.md",
+      "- `model`: the `how explorer` line, default `grok-4.7-xhigh-fast`",
+      "- `model`: the `how explorer` line, default in [Models](#models)",
+    ],
+    [
+      "skills/architect/SKILL.md",
+      "Take the runners from the `architect runners` line in the `pstack-models.mdc` rule, in place of the `arena runners` line. If the rule or that line is missing, use",
+      "Take the runners from the `architect runners` line in `pstack-models.md`, in place of the `arena runners` line. If the sheet or that line is missing, use",
+    ],
+    [
+      "skills/arena/SKILL.md",
+      "Families go by prefix: `claude-*`, `gpt-*`, and `grok-*`.",
+      "Families go by model name, such as Opus, Fable, or Sonnet.",
+    ],
+    [
+      "skills/reflect/SKILL.md",
+      "One message, three `Task` calls, `subagent_type: generalPurpose`, with `model` set as below.",
+      'One message, three `Agent` calls, `subagent_type: "general-purpose"`, with `model` set as below.',
+    ],
+    [
+      "skills/reflect/references/judgment-reviewer.md",
+      "plugin-installed paths under `~/.cursor/plugins/`)\n- `Task` prompts that name a skill path",
+      "plugin-installed paths under `~/.claude/plugins/`)\n- `Agent` prompts that name a skill path",
+    ],
+    [
+      "skills/show-me-your-work/SKILL.md",
+      "Read this run's transcript under the active workspace's `agent-transcripts/` directory (the system prompt names the path). Don't glob across `~/.cursor/projects/*/`.",
+      "Read this run's transcript under Claude Code's per-project transcripts directory at `~/.claude/projects/<encoded-cwd>/`. Don't glob across `~/.claude/projects/`.",
+    ],
+    [
+      "skills/poteto-mode/playbooks/eval.md",
+      "Read each candidate's local transcript under the active workspace's `agent-transcripts/` directory (the system prompt names this path).",
+      "Read each candidate's local transcript under Claude Code's per-project transcripts directory at `~/.claude/projects/<encoded-cwd>/`.",
+    ],
+    [
+      "skills/poteto-mode/playbooks/multi-phase-plan.md",
+      'Explore in subagents with `subagent_type: "poteto-agent"` and an explicit model.',
+      'Explore in subagents with `subagent_type: "pstack:poteto-agent"` and an explicit model.',
+    ],
+    [
+      "skills/automate-me/SKILL.md",
+      "an inline mining pass, Cursor's built-in `create-skill` (authoring), and the **unslop** skill. Use Cursor's built-in `create-skill` skill to author the skill. Follow `create-skill`'s YAML rules.",
+      "an inline mining pass, the **plugin-dev:skill-development** skill (authoring), and the **unslop** skill. Use the **plugin-dev:skill-development** skill to author the skill. Follow `plugin-dev:skill-development`'s YAML rules.",
+    ],
+    [
+      "skills/poteto-mode/playbooks/authoring-a-skill.md",
+      "1. Use the **create-skill** skill (Cursor's built-in for authoring SKILL.md files).",
+      "1. Use the **plugin-dev:skill-development** skill (Claude Code's authoring guidance for SKILL.md files).",
+    ],
+    [
+      "skills/poteto-mode/playbooks/autonomous-run.md",
+      "Pick the wake mechanism using Cursor's `/loop` command (a built-in, not a pstack skill).",
+      "Pick the wake mechanism using Claude Code's `loop` skill (a built-in, not a pstack skill).",
+    ],
+    [
+      "skills/poteto-mode/SKILL.md",
+      "on an explicit pause, going offline, a Cursor restart, or imminent context compaction.",
+      "on an explicit pause, going offline, a session restart, or imminent context compaction.",
+    ],
+    [
+      "skills/poteto-mode/playbooks/babysit.md",
+      'This playbook replaces Cursor\'s built-in babysit skill for these requests, for "address the bugbot comments".',
+      'This playbook replaces the bundled **babysit** skill for these requests, for "address the review-bot comments".',
+    ],
+    [
+      "skills/poteto-mode/playbooks/autopilot-full.md",
+      "One Cursor cloud agent per PR owns build, skeptical Bugbot triage, and the fixes.",
+      "One background subagent per PR, in its own worktree, owns build, skeptical review-bot triage, and the fixes.",
+    ],
+    [
+      "skills/poteto-mode/playbooks/autopilot-stack.md",
+      "On the operator's explicit go, arm a `/goal` with the full program objective. The goal continues across turns until the chain is done.",
+      "On the operator's explicit go, write the full program objective into the standing orders and restate it in your todolist. That objective stands across turns until the chain is done.",
+    ],
+  ])("%s: an upstream sentence takes the port's one form", (rel, upstream, port) => {
+    const { text } = applySubstitutions(upstream, RULES.substitutions, rel);
+    expect(text).toBe(port);
+    expect(denylistHits(rel, text, RULES.denylist)).toEqual([]);
   });
 });
 
@@ -481,17 +575,18 @@ describe("syncComponent", () => {
     const local = tree({ "s.md": "old\n" });
 
     const failed = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+    const rules = [parseRule({ pattern: "run control-cli", replacement: "run cli", rationale: "fixture" }, 0)];
     const recovered = sync({
       oldDir: oldUp,
       newDir: newUp,
       localDir: local,
-      rules: [parseRule({ pattern: "run control-cli", replacement: "run cli", rationale: "fixture" }, 0)],
+      rules,
     });
     const unchanged = sync({
       oldDir: oldUp,
       newDir: newUp,
       localDir: local,
-      rules: [parseRule({ pattern: "run control-cli", replacement: "run cli", rationale: "fixture" }, 0)],
+      rules,
     });
 
     expect(failed.hits).toHaveLength(1);

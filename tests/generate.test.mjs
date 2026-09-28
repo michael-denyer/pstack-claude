@@ -350,24 +350,43 @@ describe("parseFrontmatter", () => {
 });
 
 describe("deriveSkill", () => {
-  const front = (flags) => `---\nname: x\ndescription: d\n${flags}---\n\nbody\n`;
+  const front = (flags, name = "x") => `---\nname: ${name}\ndescription: d\n${flags}---\n\nbody\n`;
 
   test("drops disable-model-invocation on a public skill and swaps it on a principle leaf", () => {
-    expect(deriveSkill("plugins/pstack/skills/tdd/SKILL.md", front("disable-model-invocation: true\n"), models)).toBe(
+    expect(deriveSkill("plugins/pstack/skills/x/SKILL.md", front("disable-model-invocation: true\n"), models)).toBe(
       front(""),
     );
     expect(
-      deriveSkill("plugins/pstack/skills/principle-x/SKILL.md", front("disable-model-invocation: true\n"), models),
-    ).toBe(front("user-invocable: false\n"));
+      deriveSkill(
+        "plugins/pstack/skills/principle-x/SKILL.md",
+        front("disable-model-invocation: true\n", "principle-x"),
+        models,
+      ),
+    ).toBe(front("user-invocable: false\n", "principle-x"));
+  });
+
+  test("names a skill after its directory and an agent after its file, and drops Cursor-only keys", () => {
+    const cursorKeys = "mode: true\nicon: crown\ncolor: yellow\nreminder: >-\n  New task?\n  Apply it.\n";
+    expect(
+      deriveSkill("plugins/pstack/skills/x/SKILL.md", front(`${cursorKeys}disable-model-invocation: true\n`, "X Mode"), models),
+    ).toBe(front(""));
+    expect(deriveSkill("plugins/pstack/agents/comment-sicko.md", front("is_background: true\n", "Comment Sicko"), models)).toBe(
+      front("", "comment-sicko"),
+    );
+  });
+
+  test("leaves a reference file's frontmatter alone", () => {
+    const text = front("mode: true\n", "Some Reference");
+    expect(deriveSkill("plugins/pstack/skills/x/references/y.md", text, models)).toBe(text);
   });
 
   test("leaves a prose mention of the flag alone", () => {
-    const text = front("") + "Never write `disable-model-invocation: true` on a skill.\n";
+    const text = front("", "automate-me") + "Never write `disable-model-invocation: true` on a skill.\n";
     expect(deriveSkill("plugins/pstack/skills/automate-me/SKILL.md", text, models)).toBe(text);
   });
 
   test("leaves a flag line in the body alone when the frontmatter has none", () => {
-    const text = front("") + "disable-model-invocation: true\n";
+    const text = front("", "automate-me") + "disable-model-invocation: true\n";
     expect(deriveSkill("plugins/pstack/skills/automate-me/SKILL.md", text, models)).toBe(text);
   });
 
@@ -383,7 +402,7 @@ describe("deriveSkill", () => {
   test("leaves a region whose anchor upstream lacks unstamped instead of throwing", () => {
     const text = front("disable-model-invocation: true\n") + "no reviewer table here\n";
     const out = deriveSkill("plugins/pstack/skills/interrogate/SKILL.md", text, models);
-    expect(out.startsWith(front("") + "no reviewer table here\n")).toBe(true);
+    expect(out.startsWith(front("", "interrogate") + "no reviewer table here\n")).toBe(true);
     expect(out).not.toContain("| Reviewer A");
     expect(out).toContain("\n## Reasoning effort\n\nA role value in");
   });

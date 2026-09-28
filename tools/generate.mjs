@@ -478,24 +478,41 @@ export function loadModels(root = repo) {
   );
 }
 
-// The port's derivation of an upstream file, as tools/sync.mjs applies it
-// before comparing with the local copy. Upstream ships
+// Frontmatter keys only Cursor reads. The port drops each with any indented
+// continuation lines.
+const CURSOR_ONLY_KEYS = /^(?:mode|icon|color|reminder|is_background):/;
+
+// The port's frontmatter for an upstream skill or plugin agent: `name` is the
+// skill's directory or the agent's file name, which is how Claude Code
+// registers it; Cursor-only keys go. Upstream ships
 // disable-model-invocation: true on every skill; the port drops it on public
 // skills and swaps it for user-invocable: false on principle leaves (CHANGES
-// 0.9.8, 0.9.9). Then the generator's own stamps: a Models section is
-// appended as the last H2 when upstream has none, which is where every
-// hand-added one already sits. A region whose anchor upstream lacks is left
-// unstamped, so the file surfaces as forked or conflicted instead of
-// aborting the sync.
-export function deriveSkill(file, text, models) {
-  let out = text;
+// 0.9.8, 0.9.9).
+function portFrontmatter(file, text) {
   const skill = file.match(/^plugins\/pstack\/skills\/([^/]+)\/SKILL\.md$/)?.[1];
-  if (skill) {
-    const swap = skill.startsWith("principle-") ? "\nuser-invocable: false\n" : "\n";
-    const { body } = parseFrontmatter(out);
-    const head = out.slice(0, out.length - body.length);
-    out = head.replace("\ndisable-model-invocation: true\n", swap) + body;
+  const name = skill ?? file.match(/^plugins\/pstack\/agents\/([^/]+)\.md$/)?.[1];
+  if (!name) return text;
+  const { body } = parseFrontmatter(text);
+  const kept = [];
+  let dropping = false;
+  for (const line of text.slice(0, text.length - body.length).split("\n")) {
+    dropping = CURSOR_ONLY_KEYS.test(line) || (dropping && /^\s/.test(line));
+    if (!dropping) kept.push(line.startsWith("name:") ? `name: ${name}` : line);
   }
+  const head = kept.join("\n");
+  if (!skill) return head + body;
+  const swap = skill.startsWith("principle-") ? "\nuser-invocable: false\n" : "\n";
+  return head.replace("\ndisable-model-invocation: true\n", swap) + body;
+}
+
+// The port's derivation of an upstream file, as tools/sync.mjs applies it
+// before comparing with the local copy: the port's frontmatter, then the
+// generator's own stamps. A Models section is appended as the last H2 when
+// upstream has none, which is where every hand-added one already sits. A
+// region whose anchor upstream lacks is left unstamped, so the file surfaces
+// as forked or conflicted instead of aborting the sync.
+export function deriveSkill(file, text, models) {
+  const out = portFrontmatter(file, text);
   const lines = out.split("\n");
   for (const region of regions(models).filter((r) => r.file === file && r.appendHeading)) {
     if (region.locate(lines)) continue;

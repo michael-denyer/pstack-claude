@@ -1,0 +1,282 @@
+{
+  "pstack": {
+    "plugins/pstack/skills/architect/SKILL.md": {
+      "kind": "policy",
+      "why": "Requires comparing accepted deviations with the saved sketch and rationale, and updating them, before each implementation unit closes.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/architect/references/rationale-template.md": {
+      "kind": "policy",
+      "why": "Adds an Implementation reconciliation section that records accepted deviations and their acceptance sources.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/blast-radius/SKILL.md": {
+      "kind": "policy",
+      "why": "Extends the trigger to run before design when a brief asserts something about existing code.",
+      "since": "0.9.21",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/bro/SKILL.md": {
+      "kind": "policy",
+      "why": "Adds a /bro and say-it-plainly trigger to the description.",
+      "since": "0.9.10",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/create-verification-skill/SKILL.md": {
+      "kind": "port-feature",
+      "why": "Names the generated project skill verify so it replaces Claude Code's bundled user-only /verify and the playbooks can invoke it.",
+      "since": "0.9.29",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/SKILL.md": {
+      "kind": "policy",
+      "why": "Adds the deploy-platform and defect-severity triggers and the port's principle summaries beside the Claude Code Platform Adaptation section and run-or-verify driver line.",
+      "since": "0.9.2",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/autopilot-full.md": {
+      "kind": "policy",
+      "why": "Owners stop at merge-ready and the operator clicks every merge, instead of each owner merging after a clean verdict.",
+      "since": "0.9.39",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/autopilot-stack.md": {
+      "kind": "policy",
+      "why": "Records each verdict's base SHA and patch-id and cancels pending merges before the root rewrites or retargets the chain.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/babysit.md": {
+      "kind": "policy",
+      "why": "Requires confirming that the first status read reports the requested PR or stack, and naming the merge frontier, before acting on it.",
+      "since": "0.9.39",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/bug-fix.md": {
+      "kind": "policy",
+      "why": "The reply quotes the decisive failing and passing output trimmed to the assertion and counts, not the whole repro verbatim.",
+      "since": "0.9.10",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/feature.md": {
+      "kind": "policy",
+      "why": "Gives every file-writing delegate its own worktree and forbids writing in a worktree a delegate still holds.",
+      "since": "0.9.39",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/multi-phase-plan.md": {
+      "kind": "port-feature",
+      "why": "Plans read skills from the installed plugin, keep the store under ~/.claude/orchestrate, and write the goal into standing orders because Claude Code has no /goal, and they leave rebase and merge authority to the execution playbook.",
+      "since": "0.9.19",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/opening-a-pr.md": {
+      "kind": "policy",
+      "why": "Requires stopping every live agent that holds a worktree before committing, merging, or deploying from it.",
+      "since": "0.9.10",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/orchestrate.md": {
+      "kind": "port-feature",
+      "why": "Runs workers as background subagents in per-writer worktrees under a ~/.claude/orchestrate store because Claude Code has no cloud worker environment, and keeps human rulings in their original wording.",
+      "since": "0.9.29",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/pause-safely.md": {
+      "kind": "policy",
+      "why": "Writes the resume note to the canonical checkpoint directory and preserves artifacts the user asked to keep across the resume.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/session-pickup.md": {
+      "kind": "policy",
+      "why": "Reads the project checkpoint first and applies the human-rulings epistemics when reconstructing state.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/shipping.md": {
+      "kind": "policy",
+      "why": "Lands one PR at a time, cancelling pending merges before any chain change and merging only under a service-enforced head condition.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/bootstrap.ts": {
+      "kind": "policy",
+      "why": "Exits with a clear message when run without bun and installs production dependencies without re-executing itself.",
+      "since": "0.9.11",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/check-plan.mjs": {
+      "kind": "port-feature",
+      "why": "Checks for the port's plan skeleton markers (standing orders, installed-plugin reads, the configured swarm workers model) and tracks code fences by delimiter character and length.",
+      "since": "0.9.19",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/orch/orch.test.ts": {
+      "kind": "policy",
+      "why": "Covers the guards the port adds to orch/store.ts.",
+      "since": "0.9.47",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/orch/store.ts": {
+      "kind": "policy",
+      "why": "Adds four guards: temp-file cleanup that cannot mask the write error, single-line status table cells, rejection of nested-paren gt status rows, and rejection of leading-dash branch names.",
+      "since": "0.9.13",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/package.json": {
+      "kind": "policy",
+      "why": "Typechecks through the root tsconfig.json so the port-only modules are covered.",
+      "since": "0.9.23",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/watch-pr/cli.test.ts": {
+      "kind": "policy",
+      "why": "Supplies the shared deadline and landing revision the port's watcher requires.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/watch-pr/cli.ts": {
+      "kind": "policy",
+      "why": "Threads one WatchDeadline through discovery, commands, and polling, and reports a deadline verdict instead of throwing.",
+      "since": "0.9.24",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/watch-pr/fakes.test-helper.ts": {
+      "kind": "policy",
+      "why": "Extends the fake reader with the revision and review fields the port's watcher reads.",
+      "since": "0.9.10",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/watch-pr/github.test.ts": {
+      "kind": "policy",
+      "why": "Covers the port's check-bucket mapping, repository pairing, and revision fields in the GitHub reader.",
+      "since": "0.9.24",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/watch-pr/github.ts": {
+      "kind": "policy",
+      "why": "Reads review decision, merge state, and head and base revisions under the shared deadline, and refuses a checkout PR paired with a different explicit repository.",
+      "since": "0.9.24",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.test.ts": {
+      "kind": "policy",
+      "why": "Covers the review gate and the shared deadline in the poll loop.",
+      "since": "0.9.24",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.ts": {
+      "kind": "policy",
+      "why": "Stops at the review gate, binds readiness to one head and base revision, and honours the shared deadline in the poll loop.",
+      "since": "0.9.24",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/watch-pr/render.ts": {
+      "kind": "policy",
+      "why": "Renders the review-required, merge-blocked, and changes-requested states with their next action.",
+      "since": "0.9.43",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/watch-pr/types.compile.ts": {
+      "kind": "policy",
+      "why": "Adds the landing revision to the compile-time type fixture.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/scripts/watch-pr/types.ts": {
+      "kind": "policy",
+      "why": "Adds the merge gate, landing revision, and deadline failure types the port's watcher reports.",
+      "since": "0.9.24",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/principle-attack-the-premise/SKILL.md": {
+      "kind": "policy",
+      "why": "Replaces the mandatory per-actor census with stating the shared assumption and choosing an observation that can challenge it.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/principle-prove-it-works/SKILL.md": {
+      "kind": "policy",
+      "why": "Adds checks that the process behind a result was sound and that a failing check fails for the predicted reason.",
+      "since": "0.1.0",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/principle-test-behavior-not-implementation/SKILL.md": {
+      "kind": "policy",
+      "why": "Replaces the every-import-returns-undefined check with naming a relevant defect and confirming the test detects it.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/recall/SKILL.md": {
+      "kind": "policy",
+      "why": "Sweeps the locations the project's standing rules name before reporting anything as never recorded and applies the human-rulings epistemics, on top of Claude Code's transcript path.",
+      "since": "0.9.2",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/reflect/SKILL.md": {
+      "kind": "port-feature",
+      "why": "Finds the session transcript with the port's find-transcript.mjs under Claude Code's projects directory and drops Cursor's readonly agent mode and inline model column.",
+      "since": "0.1.0",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/setup-pstack/SKILL.md": {
+      "kind": "port-feature",
+      "why": "Writes the override sheet at the Claude Code or Codex config path and loads it by @-include, since neither runtime has Cursor's always-applied rules or its reasoning-budget step.",
+      "since": "0.9.2",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/show-me-your-work/SKILL.md": {
+      "kind": "policy",
+      "why": "Documents that log.sh also neutralizes a cell opening with a double quote.",
+      "since": "0.9.41",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/show-me-your-work/scripts/log.sh": {
+      "kind": "policy",
+      "why": "Prefixes a cell opening with a double quote so a spreadsheet or TSV reader cannot parse it as a quoted field.",
+      "since": "0.9.41",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/tdd/SKILL.md": {
+      "kind": "policy",
+      "why": "Requires quoting the failure content, not the assertion line, as evidence that the new test fails for the intended reason.",
+      "since": "0.9.21",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/why/references/epistemics.md": {
+      "kind": "policy",
+      "why": "Adds the Claims about human decisions section that five other files cite for keeping a ruling's original wording and scope.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/why/references/investigator-prompt.md": {
+      "kind": "policy",
+      "why": "Tells investigators to return a human ruling's attributable original wording per the epistemics section.",
+      "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/why/references/sources/databricks.md": {
+      "kind": "policy",
+      "why": "Keeps a sentence upstream deleted that points at a databricks-use-dbt-models skill neither tree carries.",
+      "since": "0.9.39",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/why/references/synthesizer-prompt.md": {
+      "kind": "policy",
+      "why": "Adds a step that applies the human-rulings epistemics, and gives the Direct-claim example a URL the link validator resolves.",
+      "since": "0.9.17",
+      "upstream": "not-proposed"
+    }
+  },
+  "cursor-team-kit": {
+    "plugins/pstack/skills/thermo-nuclear-code-quality-review/SKILL.md": {
+      "kind": "policy",
+      "why": "Adds a Report Format section requiring one summary report plus one detail file per subsystem or reviewer.",
+      "since": "0.9.11",
+      "upstream": "not-proposed"
+    }
+  }
+}

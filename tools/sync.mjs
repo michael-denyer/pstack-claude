@@ -6,7 +6,8 @@
 // Reads tools/upstream.json (remote, per-component pin, and the `exclude`
 // list of upstream paths the port deliberately does not carry) and
 // tools/substitutions.json (mechanical Cursor->Claude rewrites plus a denylist
-// of Cursor-isms that need a human sentence, not a token swap). Each upstream
+// of Cursor-isms that need a human sentence, not a token swap), and
+// tools/forks.json (each path the port forks on purpose). Each upstream
 // file is derived into its port form (substitutions, then the port's own
 // frontmatter and generator stamps via deriveSkill) and compared three ways:
 //
@@ -30,7 +31,9 @@
 //
 // Every effective text file, a conflict's marked bytes included, is
 // denylist-scanned; a hit fails the run with file, line, and the hint for that
-// token. A failed run writes nothing, leaving the tree for inspection.
+// token. A forked, merged, or conflicted path with no forks.json entry fails
+// the run too, and an entry whose path is no longer forked prints a warning.
+// A failed run writes nothing, leaving the tree for inspection.
 // The pin in upstream.json is advanced only when the run succeeds, which it
 // can with conflicts: the markers are in the tree, and generate.mjs fails on
 // any marker line under plugins/pstack, so CI rejects an unresolved sync.
@@ -102,6 +105,43 @@ export function parseSubstitutions({ substitutions, denylist }) {
     }
   });
   return { substitutions: rules, denylist };
+}
+
+const FORK_FIELDS = ["kind", "why", "since", "upstream"];
+const FORK_KINDS = new Set(["port-feature", "policy"]);
+const UPSTREAM_LINK = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/(pull|issues)\/\d+$/;
+
+// tools/forks.json maps each component to the repo-relative paths it forks on
+// purpose. Returns, per component, a Map from the component-relative path the
+// sync compares to that path's entry.
+export function parseForks(registry, components) {
+  return Object.fromEntries(
+    Object.entries(registry).map(([component, entries]) => {
+      const spec = components[component];
+      if (!spec) throw new Error(`forks.json: unknown component "${component}"`);
+      const prefix = `${spec.localPath}/`;
+      const forks = new Map();
+      for (const [path, entry] of Object.entries(entries)) {
+        const fail = (message) => {
+          throw new Error(`forks.json ${component} "${path}": ${message}`);
+        };
+        if (!path.startsWith(prefix)) fail(`not under ${spec.localPath}`);
+        if (entry === null || typeof entry !== "object" || Array.isArray(entry)) fail("must be an object");
+        const unknown = Object.keys(entry).filter((field) => !FORK_FIELDS.includes(field));
+        if (unknown.length) fail(`unknown field ${unknown.map((f) => `"${f}"`).join(", ")}`);
+        const missing = FORK_FIELDS.filter((field) => entry[field] == null);
+        if (missing.length) fail(`missing field ${missing.map((f) => `"${f}"`).join(", ")}`);
+        if (!FORK_KINDS.has(entry.kind)) fail(`unknown kind "${entry.kind}"; use port-feature or policy`);
+        if (typeof entry.why !== "string" || !entry.why.trim()) fail("why must be a sentence");
+        if (!/^\d+\.\d+\.\d+$/.test(entry.since)) fail(`since "${entry.since}" is not a version`);
+        if (entry.upstream !== "not-proposed" && !UPSTREAM_LINK.test(entry.upstream)) {
+          fail(`upstream "${entry.upstream}" is neither not-proposed nor a GitHub pull or issue URL`);
+        }
+        forks.set(path.slice(prefix.length), entry);
+      }
+      return [component, forks];
+    }),
+  );
 }
 
 // `rules` come from parseSubstitutions.
@@ -231,9 +271,15 @@ export function classify({ old = null, new: next = null, local = null }) {
   return { ...writing("conflicted", merged.buffer, mode), hunks: merged.hunks };
 }
 
+// Outcomes that leave port edits on top of upstream's text or mode.
+const FORK_OUTCOMES = new Set(["forked", "mode-only", "merged", "conflicted"]);
+
 // Compare old-upstream vs new-upstream vs local for one component tree.
 // `derive(rel, text)` turns substituted upstream text into the port's form;
-// the default is identity. Returns the report and, unless dryRun, applies it.
+// the default is identity. `forks`, from parseForks, adds the registry check:
+// an undeclared fork lands in `undeclared` and blocks every write, and an entry
+// whose path is not forked lands in `stale`. Returns the report and, unless
+// dryRun, applies it.
 export function syncComponent({
   oldDir,
   newDir,
@@ -243,6 +289,7 @@ export function syncComponent({
   exclude = [],
   carriedElsewhere = [],
   derive = (_, t) => t,
+  forks = null,
   dryRun = false,
 }) {
   const report = {
@@ -252,6 +299,8 @@ export function syncComponent({
     portOnly: [],
     conflicts: [],
     binaryConflicts: [],
+    undeclared: [],
+    stale: [],
     unchanged: 0,
     excluded: 0,
     counts: new Map(),
@@ -311,8 +360,18 @@ export function syncComponent({
     else if (!["added", "updated", "merged"].includes(kind)) throw new Error(`${rel}: no report entry for ${kind}`);
   }
   report.forked.sort((a, b) => b.changed - a.changed);
+  if (forks) {
+    const outcomeOfPath = new Map(outcomes.map(({ rel, kind }) => [rel, kind]));
+    report.undeclared = outcomes.filter(({ rel, kind }) => FORK_OUTCOMES.has(kind) && !forks.has(rel)).map(({ rel }) => rel);
+    for (const rel of forks.keys()) {
+      const kind = outcomeOfPath.get(rel);
+      if (FORK_OUTCOMES.has(kind)) continue;
+      const reason = localPaths.has(rel) ? `is no longer forked${kind ? ` (${kind})` : ""}` : "no longer exists";
+      report.stale.push({ rel, reason });
+    }
+  }
 
-  if (report.hits.length || report.binaryConflicts.length || dryRun) return report;
+  if (report.hits.length || report.binaryConflicts.length || report.undeclared.length || dryRun) return report;
   for (const { rel, kind, write } of outcomes) {
     const localFile = join(localDir, rel);
     if (write) {
@@ -360,6 +419,9 @@ function main() {
   const { substitutions, denylist } = parseSubstitutions(
     JSON.parse(readFileSync(join(repo, "tools/substitutions.json"), "utf8")),
   );
+  const forks =
+    parseForks(JSON.parse(readFileSync(join(repo, "tools/forks.json"), "utf8")), upstream.components)[component] ??
+    new Map();
   const models = loadModels(repo);
   const leads = loadLeadLines(repo);
 
@@ -383,6 +445,7 @@ function main() {
       exclude: spec.exclude ?? [],
       carriedElsewhere: pathsOtherComponentsCarry(join(scratch, "clone"), upstream.components, component),
       derive: (rel, text) => deriveSkill(join(spec.localPath, rel), text, models, leads),
+      forks,
       dryRun,
     });
 
@@ -393,9 +456,12 @@ function main() {
     if (report.forked.length) {
       const total = report.forked.reduce((sum, fork) => sum + fork.changed, 0);
       const width = Math.max("mode".length, String(total).length);
+      const kindOf = (rel) => forks.get(rel)?.kind ?? "undeclared";
+      const kindWidth = Math.max(...report.forked.map(({ rel }) => kindOf(rel).length));
       console.log(`\nforked (upstream untouched): ${report.forked.length}`);
       for (const { rel, changed, modeOnly } of report.forked) {
-        console.log(`  ${String(modeOnly ? "mode" : changed).padStart(width)} ${spec.localPath}/${rel}`);
+        const count = String(modeOnly ? "mode" : changed).padStart(width);
+        console.log(`  ${count} ${kindOf(rel).padEnd(kindWidth)} ${spec.localPath}/${rel}`);
       }
       console.log(`  ${String(total).padStart(width)} total changed lines`);
     }
@@ -419,7 +485,14 @@ function main() {
       console.error(`\nFAIL: Cursor-isms in synced files; add a substitution or rewrite by hand, then rerun:`);
       for (const h of report.hits) console.error(`  ${spec.localPath}/${h}`);
     }
-    if (report.binaryConflicts.length || report.hits.length) {
+    for (const { rel, reason } of report.stale) {
+      console.error(`warning: tools/forks.json declares ${spec.localPath}/${rel} under ${component}, but it ${reason}; delete the entry`);
+    }
+    if (report.undeclared.length) {
+      console.error(`\nFAIL: forks with no entry under ${component} in tools/forks.json; declare each or restore upstream's form, then rerun:`);
+      for (const rel of report.undeclared) console.error(`  ${spec.localPath}/${rel}`);
+    }
+    if (report.binaryConflicts.length || report.hits.length || report.undeclared.length) {
       process.exitCode = 1;
       return;
     }

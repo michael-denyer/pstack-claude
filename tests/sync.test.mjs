@@ -22,6 +22,7 @@ import {
   classify,
   denylistHits,
   mergeFile,
+  parseForks,
   parseRule,
   parseSubstitutions,
   syncComponent,
@@ -259,6 +260,30 @@ describe("parseSubstitutions", () => {
     });
     expect([...applySubstitutions("aa", substitutions, "one/x.md").counts.keys()]).toEqual(["a+ in ^one/"]);
     expect([...applySubstitutions("aa", substitutions, "two/x.md").counts.keys()]).toEqual(["a+ in ^two/"]);
+  });
+});
+
+describe("parseForks", () => {
+  const components = { kit: { localPath: "plugins/pstack/skills" } };
+  const path = "plugins/pstack/skills/s.md";
+  const entry = { kind: "policy", why: "Fixture fork.", since: "0.9.48", upstream: "not-proposed" };
+  const parse = (fields) => parseForks({ kit: { [path]: { ...entry, ...fields } } }, components);
+
+  test("keys each entry by its path under the component", () => {
+    expect(parse({}).kit).toEqual(new Map([["s.md", entry]]));
+  });
+
+  test("a malformed entry fails naming the component and path", () => {
+    expect(() => parse({ reason: "x" })).toThrow(`forks.json kit "${path}": unknown field "reason"`);
+    expect(() => parse({ why: undefined })).toThrow(`forks.json kit "${path}": missing field "why"`);
+    expect(() => parse({ kind: "translation" })).toThrow(`forks.json kit "${path}": unknown kind "translation"`);
+    expect(() => parse({ since: "latest" })).toThrow(`forks.json kit "${path}": since "latest" is not a version`);
+    expect(() => parse({ upstream: "maybe" })).toThrow(`forks.json kit "${path}": upstream "maybe"`);
+  });
+
+  test("an unknown component or a path outside the component fails", () => {
+    expect(() => parseForks({ other: {} }, components)).toThrow('forks.json: unknown component "other"');
+    expect(() => parseForks({ kit: { "tools/s.md": entry } }, components)).toThrow("not under plugins/pstack/skills");
   });
 });
 
@@ -531,6 +556,50 @@ describe("syncComponent", () => {
       expect(report.hits).toHaveLength(1);
       expect(readFileSync(join(local, "s.md"), "utf8")).toBe("run control-cli\n");
     }
+  });
+
+  test("an undeclared fork blocks every write, and a declared one does not", () => {
+    const oldUp = tree({ "forked.md": "a\n", "updated.md": "old\n" });
+    const newUp = tree({ "forked.md": "a\n", "updated.md": "new\n" });
+    const local = tree({ "forked.md": "a\nport\n", "updated.md": "old\n" });
+    const declared = new Map([["forked.md", { kind: "policy" }]]);
+
+    const blocked = sync({ oldDir: oldUp, newDir: newUp, localDir: local, forks: new Map() });
+
+    expect(blocked.undeclared).toEqual(["forked.md"]);
+    expect(readFileSync(join(local, "updated.md"), "utf8")).toBe("old\n");
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, forks: declared });
+
+    expect(report.undeclared).toEqual([]);
+    expect(report.stale).toEqual([]);
+    expect(readFileSync(join(local, "updated.md"), "utf8")).toBe("new\n");
+  });
+
+  test("a declared path that is merged or conflicted still counts as forked", () => {
+    const oldUp = tree({ "merged.md": "a\nb\nc\nd\ne\n", "conflicted.md": "one\n" });
+    const newUp = tree({ "merged.md": "a\nb\nc\nd\nE\n", "conflicted.md": "two\n" });
+    const local = tree({ "merged.md": "A\nb\nc\nd\ne\n", "conflicted.md": "port\n" });
+    const forks = new Map([["merged.md", {}], ["conflicted.md", {}]]);
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, forks, dryRun: true });
+
+    expect(report.written.map(({ kind, rel }) => `${kind} ${rel}`).sort()).toEqual(["conflicted conflicted.md", "merged merged.md"]);
+    expect(report.undeclared).toEqual([]);
+    expect(report.stale).toEqual([]);
+  });
+
+  test("a declaration whose path is no longer forked or no longer exists is stale", () => {
+    const up = tree({ "clean.md": "same\n" });
+    const local = tree({ "clean.md": "same\n" });
+    const forks = new Map([["clean.md", {}], ["gone.md", {}]]);
+
+    const report = sync({ oldDir: up, newDir: up, localDir: local, forks, dryRun: true });
+
+    expect(report.stale).toEqual([
+      { rel: "clean.md", reason: "is no longer forked (unchanged)" },
+      { rel: "gone.md", reason: "no longer exists" },
+    ]);
   });
 
   test("a hit prevents valid sibling additions, updates, and deletions", () => {
@@ -986,7 +1055,11 @@ describe("syncComponent", () => {
 });
 
 describe("sync CLI", () => {
-  function cli({ oldText, newText, localText }) {
+  const declareS = (kind) => ({
+    "plugins/pstack/skills/s.md": { kind, why: "Fixture fork.", since: "0.9.48", upstream: "not-proposed" },
+  });
+
+  function cli({ oldText, newText, localText, forks = {} }) {
     const root = tree({});
     const upstream = join(root, "upstream");
     mkdirSync(join(upstream, "skills"), { recursive: true });
@@ -1022,6 +1095,7 @@ describe("sync CLI", () => {
         components: { kit: { upstreamPath: "skills", localPath: "plugins/pstack/skills", sha: oldSha } },
       }),
     );
+    writeFileSync(join(port, "tools/forks.json"), JSON.stringify({ kit: forks }));
     const scratch = join(root, "tmp");
     mkdirSync(scratch);
     const run = (...flags) =>
@@ -1045,7 +1119,12 @@ describe("sync CLI", () => {
   });
 
   test("a run with a text conflict writes the markers and advances the pin", () => {
-    const { run, pin, local, newSha } = cli({ oldText: "one\n", newText: "two\n", localText: "port\n" });
+    const { run, pin, local, newSha } = cli({
+      oldText: "one\n",
+      newText: "two\n",
+      localText: "port\n",
+      forks: declareS("policy"),
+    });
 
     const result = run();
 
@@ -1065,7 +1144,7 @@ describe("sync CLI", () => {
   });
 
   test("a dry run prints each fork's changed lines with a total, then the port-only files", () => {
-    const { run } = cli({ oldText: "one\n", newText: "one\n", localText: "one\nport\n" });
+    const { run } = cli({ oldText: "one\n", newText: "one\n", localText: "one\nport\n", forks: declareS("policy") });
     const models = JSON.parse(readFileSync(join(import.meta.dir, "../plugins/pstack/models.json"), "utf8"));
     const roleSkills = [...new Set(models.roles.map((r) => r.skill))];
 
@@ -1073,20 +1152,47 @@ describe("sync CLI", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain(
-      "\nforked (upstream untouched): 1\n     1 plugins/pstack/skills/s.md\n     1 total changed lines\n",
+      "\nforked (upstream untouched): 1\n     1 policy plugins/pstack/skills/s.md\n     1 total changed lines\n",
     );
+    expect(result.stderr).not.toContain("tools/forks.json");
     const portOnly = [...roleSkills.map((skill) => `${skill}/SKILL.md`), "poteto-mode/references/codex-tools.md"];
     expect(result.stdout).toContain(`\nport-only: ${portOnly.length} files\n`);
     for (const rel of portOnly) expect(result.stdout).toContain(`\n  plugins/pstack/skills/${rel}\n`);
   });
 
   test("a dry run prints mode in place of a count for a mode-only fork", () => {
-    const { run, port } = cli({ oldText: "one\n", newText: "one\n", localText: "one\n" });
+    const { run, port } = cli({ oldText: "one\n", newText: "one\n", localText: "one\n", forks: declareS("port-feature") });
     chmodSync(join(port, "plugins/pstack/skills/s.md"), 0o755);
 
     const result = run("--dry-run");
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("  mode plugins/pstack/skills/s.md\n     0 total changed lines\n");
+    expect(result.stdout).toContain("  mode port-feature plugins/pstack/skills/s.md\n     0 total changed lines\n");
+  });
+
+  test("an undeclared fork fails the dry run and the real run naming its path, and nothing is written", () => {
+    const { run, pin, local, oldSha } = cli({ oldText: "one\n", newText: "two\n", localText: "port\n" });
+    const failure = "FAIL: forks with no entry under kit in tools/forks.json";
+
+    const dryRun = run("--dry-run");
+    const actual = run();
+
+    for (const result of [dryRun, actual]) {
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(`${failure}; declare each or restore upstream's form, then rerun:\n  plugins/pstack/skills/s.md\n`);
+    }
+    expect(pin()).toBe(oldSha);
+    expect(local()).toBe("port\n");
+  });
+
+  test("a declaration whose path is no longer forked warns and passes", () => {
+    const { run } = cli({ oldText: "one\n", newText: "one\n", localText: "one\n", forks: declareS("policy") });
+
+    const result = run("--dry-run");
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain(
+      "warning: tools/forks.json declares plugins/pstack/skills/s.md under kit, but it is no longer forked (unchanged); delete the entry\n",
+    );
   });
 });

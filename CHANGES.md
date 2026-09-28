@@ -2,6 +2,14 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.47 - directory listing metadata and a plugin-root README
+
+The Claude plugin directory reads four listing URLs from `plugin.json` that the manifest did not carry: `documentationUrl`, `supportUrl`, `privacyPolicyUrl`, and `termsOfServiceUrl`. They now point at `docs/reference.md`, the issue tracker, the README's Data handling section, and the MIT license. Claude Code ignores the keys at load time, as it does `icon`.
+
+The directory shows the README in the plugin folder as the listing description, and `plugins/pstack/` had none; the repository README sat one level up with relative links that do not resolve from the plugin folder. `plugins/pstack/README.md` now describes the plugin, what it contains, and what it touches, with absolute links.
+
+The repository README's Data handling section names each part that reads or calls anything: the hook reads one sheet from the runtime's config directory, the PR scripts call `gh` with the user's own login and install one pinned dependency on first use, and the audit script and two playbooks read local transcripts. The directory's security scan compares disclosed behavior with the source, and the earlier one-sentence version disclosed none of it.
+
 ## 0.9.46 - plugin directory submission holds
 
 The Claude plugin directory validator held the submission on two files it could not read statically. The SessionStart hook resolved its mandate file through `$(dirname "$0")`, which a static reader of `hooks.json` cannot follow; it now names `${CLAUDE_PLUGIN_ROOT}/hooks/session-start-context.md` literally and carries a `.sh` extension so CI's shellcheck job lints it too. `hooks.json` points at the renamed file. Both runtimes export `CLAUDE_PLUGIN_ROOT`, so the behavior is unchanged and `tests/session-hook.test.mjs` still runs the shipped command under each.

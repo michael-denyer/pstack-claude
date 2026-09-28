@@ -2,7 +2,7 @@
   "name": "pstack",
   "displayName": "pstack (Claude Code port)",
   "icon": "./assets/pstack-icon.png",
-  "version": "0.9.46",
+  "version": "0.9.47",
   "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Ported from cursor/plugins/pstack to Claude Code. Original pstack by Lauren Tan (poteto).",
   "author": {
     "name": "Michael Denyer",
@@ -11,6 +11,10 @@
   },
   "homepage": "https://github.com/michael-denyer/pstack-claude",
   "repository": "https://github.com/michael-denyer/pstack-claude",
+  "documentationUrl": "https://github.com/michael-denyer/pstack-claude/blob/main/docs/reference.md",
+  "supportUrl": "https://github.com/michael-denyer/pstack-claude/issues",
+  "privacyPolicyUrl": "https://github.com/michael-denyer/pstack-claude/blob/main/README.md#data-handling",
+  "termsOfServiceUrl": "https://github.com/michael-denyer/pstack-claude/blob/main/LICENSE",
   "license": "MIT",
   "keywords": [
     "pstack",

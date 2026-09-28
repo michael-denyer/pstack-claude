@@ -28,7 +28,10 @@ export function parseContext(value: unknown): PrContext {
   return { owner, repo, number: parsePrNumber(fields.number) };
 }
 
-export function parseLandingRevision(value: unknown, context?: PrContext): LandingRevision {
+export function parseLandingRevision(
+  value: unknown,
+  context?: PrContext
+): LandingRevision {
   const fields = object(value, "landing revision");
   return {
     context: context ?? parseContext(fields.context),
@@ -38,9 +41,16 @@ export function parseLandingRevision(value: unknown, context?: PrContext): Landi
   };
 }
 
-export function sameLandingRevision(a: LandingRevision, b: LandingRevision): boolean {
-  return a.context.owner.toLowerCase() === b.context.owner.toLowerCase() &&
+export function sameLandingRevision(
+  a: LandingRevision,
+  b: LandingRevision
+): boolean {
+  return (
+    a.context.owner.toLowerCase() === b.context.owner.toLowerCase() &&
     a.context.repo.toLowerCase() === b.context.repo.toLowerCase() &&
-    a.context.number === b.context.number && a.headRefOid === b.headRefOid &&
-    a.baseRefName === b.baseRefName && a.baseRefOid === b.baseRefOid;
+    a.context.number === b.context.number &&
+    a.headRefOid === b.headRefOid &&
+    a.baseRefName === b.baseRefName &&
+    a.baseRefOid === b.baseRefOid
+  );
 }

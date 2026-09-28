@@ -10,7 +10,7 @@ export class WatchDeadline {
   private readonly expiresAt: number;
   constructor(
     timeout: number,
-    private readonly now: () => number,
+    private readonly now: () => number
   ) {
     this.expiresAt = timeout > 0 ? now() + timeout : Infinity;
   }

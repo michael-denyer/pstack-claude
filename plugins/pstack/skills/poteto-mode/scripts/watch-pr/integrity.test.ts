@@ -26,7 +26,7 @@ describe("commit identity", () => {
       commitRollups: [{ oid: "new", state: "FAILURE" }],
     });
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
-      WatcherQueryError,
+      WatcherQueryError
     );
   });
 
@@ -35,16 +35,25 @@ describe("commit identity", () => {
       commitRollups: [{ oid: "head", state: null }],
     });
     expect(
-      classifyPr(await readSnapshot({ ...snapshotArgs, reader })).kind,
+      classifyPr(await readSnapshot({ ...snapshotArgs, reader })).kind
     ).toBe("ready");
   });
 
   it("includes the checked commit in a ready proof", async () => {
     expect(
-      classifyPr(await readSnapshot({ ...snapshotArgs, reader: fakeReader() })),
+      classifyPr(await readSnapshot({ ...snapshotArgs, reader: fakeReader() }))
     ).toMatchObject({
       kind: "ready",
-      pr: { proof: { revision: { context, headRefOid: "head", baseRefName: "main", baseRefOid: "base" } } },
+      pr: {
+        proof: {
+          revision: {
+            context,
+            headRefOid: "head",
+            baseRefName: "main",
+            baseRefOid: "base",
+          },
+        },
+      },
     });
   });
 
@@ -52,11 +61,16 @@ describe("commit identity", () => {
     const reader = {
       ...fakeReader(),
       async revision() {
-        return { context, headRefOid: "replacement", baseRefName: "main", baseRefOid: "base" };
+        return {
+          context,
+          headRefOid: "replacement",
+          baseRefName: "main",
+          baseRefOid: "base",
+        };
       },
     };
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
-      "PR head or destination changed",
+      "PR head or destination changed"
     );
   });
 
@@ -64,11 +78,16 @@ describe("commit identity", () => {
     const reader = {
       ...fakeReader(),
       async revision() {
-        return { context, headRefOid: "head", baseRefName: "release", baseRefOid: "base" };
+        return {
+          context,
+          headRefOid: "head",
+          baseRefName: "release",
+          baseRefOid: "base",
+        };
       },
     };
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
-      "PR head or destination changed",
+      "PR head or destination changed"
     );
   });
 
@@ -76,11 +95,16 @@ describe("commit identity", () => {
     const reader = {
       ...fakeReader(),
       async revision() {
-        return { context, headRefOid: "head", baseRefName: "main", baseRefOid: "advanced" };
+        return {
+          context,
+          headRefOid: "head",
+          baseRefName: "main",
+          baseRefOid: "advanced",
+        };
       },
     };
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
-      "PR head or destination changed",
+      "PR head or destination changed"
     );
   });
 
@@ -89,7 +113,9 @@ describe("commit identity", () => {
       ...fakeReader(),
       async revision() {
         throw new WatcherQueryError({
-          kind: "command-exit", retryable: true, code: 1,
+          kind: "command-exit",
+          retryable: true,
+          code: 1,
           detail: "destination unavailable",
         });
       },
@@ -106,7 +132,8 @@ describe("commit identity", () => {
       options: { ...options, timeout: 0, maxQueryErrors: 1 },
     });
     expect(verdict).toMatchObject({
-      kind: "BLOCKER", blocker: { kind: "status-query" },
+      kind: "BLOCKER",
+      blocker: { kind: "status-query" },
     });
   });
 
@@ -116,7 +143,8 @@ describe("commit identity", () => {
       ...fakeReader(),
       async revision() {
         return {
-          context, baseRefOid: "base",
+          context,
+          baseRefOid: "base",
           headRefOid: ++reads === 1 ? "replacement" : "head",
           baseRefName: "main",
         };
@@ -136,7 +164,18 @@ describe("commit identity", () => {
     expect(reads).toBe(2);
     expect(verdict).toMatchObject({
       kind: "READY",
-      scope: { pr: { proof: { revision: { context, headRefOid: "head", baseRefName: "main", baseRefOid: "base" } } } },
+      scope: {
+        pr: {
+          proof: {
+            revision: {
+              context,
+              headRefOid: "head",
+              baseRefName: "main",
+              baseRefOid: "base",
+            },
+          },
+        },
+      },
     });
   });
 });
@@ -163,27 +202,30 @@ describe("stack branch ambiguity", () => {
   });
 
   it("keeps a missing seed independent of unrelated duplicate heads", () => {
-    expect(orderStack(context, [
-      pr(2, "hotfix", "main"),
-      pr(3, "hotfix", "release"),
-    ])).toEqual([context]);
+    expect(
+      orderStack(context, [pr(2, "hotfix", "main"), pr(3, "hotfix", "release")])
+    ).toEqual([context]);
   });
 
   it("rejects an ambiguous downstack parent", () => {
-    expect(() => orderStack(context, [
-      pr(1, "feature", "hotfix"),
-      pr(2, "hotfix", "main"),
-      pr(3, "hotfix", "release"),
-    ])).toThrow("multiple PRs have the same repository branch: hotfix");
+    expect(() =>
+      orderStack(context, [
+        pr(1, "feature", "hotfix"),
+        pr(2, "hotfix", "main"),
+        pr(3, "hotfix", "release"),
+      ])
+    ).toThrow("multiple PRs have the same repository branch: hotfix");
   });
 
   it("rejects an ambiguous parent when traversing descendants", () => {
-    expect(() => orderStack(context, [
-      pr(1, "feature", "main"),
-      pr(2, "hotfix", "feature"),
-      pr(3, "hotfix", "release"),
-      pr(4, "child", "hotfix"),
-    ])).toThrow("multiple PRs have the same repository branch: hotfix");
+    expect(() =>
+      orderStack(context, [
+        pr(1, "feature", "main"),
+        pr(2, "hotfix", "feature"),
+        pr(3, "hotfix", "release"),
+        pr(4, "child", "hotfix"),
+      ])
+    ).toThrow("multiple PRs have the same repository branch: hotfix");
   });
 });
 
@@ -202,7 +244,7 @@ it("rejects a repository-local cycle without walking forever", () => {
         headRefName: "b",
         baseRefName: "a",
       },
-    ]),
+    ])
   ).toThrow("cycle in PR stack");
 });
 
@@ -279,7 +321,7 @@ describe("deadline", () => {
       expect(sleeps).toEqual([1]);
       expect(now).toBe(1);
       expect(
-        reader.calls.filter((call) => call === "pullRequest"),
+        reader.calls.filter((call) => call === "pullRequest")
       ).toHaveLength(1);
     });
   }
@@ -322,7 +364,7 @@ describe("deadline", () => {
   });
 
   function dependenciesWithReadOutlivingBudget(
-    readerOptions: FakeReaderOptions = {},
+    readerOptions: FakeReaderOptions = {}
   ) {
     let now = 0;
     const base = fakeReader(readerOptions);
@@ -374,11 +416,13 @@ describe("deadline", () => {
               options,
             })
           : await runQueued({ dependencies, contexts: [context], options });
-      expect(result).toMatchObject({ kind: "TIMEOUT", reason: { kind: reason } });
+      expect(result).toMatchObject({
+        kind: "TIMEOUT",
+        reason: { kind: reason },
+      });
     });
   }
 });
-
 
 it("keeps queued pending checks waiting and stops when they fail without advancing", async () => {
   let failed = false;
@@ -387,7 +431,11 @@ it("keeps queued pending checks waiting and stops when they fail without advanci
     async checksFastPath() {
       return {
         kind: "checks" as const,
-        checks: [failed ? failedCheck("required-build") : pendingCheck("required-build")],
+        checks: [
+          failed
+            ? failedCheck("required-build")
+            : pendingCheck("required-build"),
+        ],
       };
     },
   };
@@ -395,11 +443,15 @@ it("keeps queued pending checks waiting and stops when they fail without advanci
   const verdict = await runQueued({
     dependencies: {
       reader,
-      emit(event) { events.push(event.kind); },
+      emit(event) {
+        events.push(event.kind);
+      },
       clock: {
         now: () => 0,
         observedAt: () => "fixture",
-        async sleep() { failed = true; },
+        async sleep() {
+          failed = true;
+        },
       },
     },
     contexts: [context],
@@ -409,6 +461,7 @@ it("keeps queued pending checks waiting and stops when they fail without advanci
   expect(events).not.toContain("ADVANCE");
   expect(events).not.toContain("COMPLETE");
   expect(verdict).toMatchObject({
-    kind: "BLOCKER", blocker: { kind: "failing-checks" },
+    kind: "BLOCKER",
+    blocker: { kind: "failing-checks" },
   });
 });

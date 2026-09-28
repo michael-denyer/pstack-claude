@@ -57,7 +57,7 @@ export function failedCheck(name = "ci"): Check {
 }
 
 export function fakeReader(
-  options: FakeReaderOptions = {},
+  options: FakeReaderOptions = {}
 ): GitHubReader & { readonly calls: readonly string[] } {
   const calls: string[] = [];
   const context = options.current ?? {

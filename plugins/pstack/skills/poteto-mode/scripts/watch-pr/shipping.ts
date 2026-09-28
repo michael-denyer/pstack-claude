@@ -1,5 +1,11 @@
 import { runJson } from "./github.ts";
-import { object, text, parseLandingRevision, sameLandingRevision, type LandingRevision } from "./landing.ts";
+import {
+  object,
+  text,
+  parseLandingRevision,
+  sameLandingRevision,
+  type LandingRevision,
+} from "./landing.ts";
 import type { PrContext } from "./types.ts";
 
 export interface LandingRecord {
@@ -21,8 +27,15 @@ export interface ShippingService {
 
 export type ShippingResult =
   | { readonly kind: "inspected" | "cancelled"; readonly record: LandingRecord }
-  | { readonly kind: "changed"; readonly expected: LandingRecord; readonly observed: LandingRecord }
-  | { readonly kind: "not-open" | "still-pending"; readonly record: LandingRecord }
+  | {
+      readonly kind: "changed";
+      readonly expected: LandingRecord;
+      readonly observed: LandingRecord;
+    }
+  | {
+      readonly kind: "not-open" | "still-pending";
+      readonly record: LandingRecord;
+    }
   | { readonly kind: "unavailable"; readonly detail: string };
 
 function state(value: unknown): LandingRecord["state"] {
@@ -36,7 +49,8 @@ const nullableText = (value: unknown, label: string): string | null =>
 export function parseLandingRecord(value: unknown): LandingRecord {
   const record = object(value, "landing record");
   const pending = object(record.pending, "pending merges");
-  if (typeof pending.autoMerge !== "boolean") throw new Error("missing autoMerge state");
+  if (typeof pending.autoMerge !== "boolean")
+    throw new Error("missing autoMerge state");
   return {
     revision: parseLandingRevision(record.revision),
     pullRequestId: text(record.pullRequestId, "pullRequestId"),
@@ -50,10 +64,16 @@ export function parseLandingRecord(value: unknown): LandingRecord {
 }
 
 function unavailable(error: unknown): ShippingResult {
-  return { kind: "unavailable", detail: error instanceof Error ? error.message : String(error) };
+  return {
+    kind: "unavailable",
+    detail: error instanceof Error ? error.message : String(error),
+  };
 }
 
-export async function inspectLanding(service: ShippingService, context: PrContext): Promise<ShippingResult> {
+export async function inspectLanding(
+  service: ShippingService,
+  context: PrContext
+): Promise<ShippingResult> {
   try {
     return { kind: "inspected", record: await service.inspect(context) };
   } catch (error) {
@@ -61,11 +81,16 @@ export async function inspectLanding(service: ShippingService, context: PrContex
   }
 }
 
-export async function cancelPending(service: ShippingService, expected: LandingRecord): Promise<ShippingResult> {
+export async function cancelPending(
+  service: ShippingService,
+  expected: LandingRecord
+): Promise<ShippingResult> {
   const mismatch = (record: LandingRecord): ShippingResult | null => {
     if (record.state !== "OPEN") return { kind: "not-open", record };
-    if (record.pullRequestId !== expected.pullRequestId ||
-        !sameLandingRevision(record.revision, expected.revision))
+    if (
+      record.pullRequestId !== expected.pullRequestId ||
+      !sameLandingRevision(record.revision, expected.revision)
+    )
       return { kind: "changed", expected, observed: record };
     return null;
   };
@@ -115,40 +140,83 @@ export class GhShippingService implements ShippingService {
   constructor(private readonly execute: typeof runJson = runJson) {}
 
   async inspect(context: PrContext): Promise<LandingRecord> {
-    const response = data(await this.execute([
-      "gh", "api", "graphql", "-f", `query=${INSPECT_QUERY}`,
-      "-f", `owner=${context.owner}`, "-f", `repo=${context.repo}`, "-F", `pr=${context.number}`,
-    ]));
-    const fields = object(object(response.repository, "repository").pullRequest, "pullRequest");
-    const autoMerge = fields.autoMergeRequest === null ? false :
-      Boolean(text(object(fields.autoMergeRequest, "autoMergeRequest").enabledAt, "enabledAt"));
-    const queueEntryId = fields.mergeQueueEntry === null ? null :
-      text(object(fields.mergeQueueEntry, "mergeQueueEntry").id, "queue entry id");
+    const response = data(
+      await this.execute([
+        "gh",
+        "api",
+        "graphql",
+        "-f",
+        `query=${INSPECT_QUERY}`,
+        "-f",
+        `owner=${context.owner}`,
+        "-f",
+        `repo=${context.repo}`,
+        "-F",
+        `pr=${context.number}`,
+      ])
+    );
+    const fields = object(
+      object(response.repository, "repository").pullRequest,
+      "pullRequest"
+    );
+    const autoMerge =
+      fields.autoMergeRequest === null
+        ? false
+        : Boolean(
+            text(
+              object(fields.autoMergeRequest, "autoMergeRequest").enabledAt,
+              "enabledAt"
+            )
+          );
+    const queueEntryId =
+      fields.mergeQueueEntry === null
+        ? null
+        : text(
+            object(fields.mergeQueueEntry, "mergeQueueEntry").id,
+            "queue entry id"
+          );
     return {
       revision: parseLandingRevision(fields, context),
       pullRequestId: text(fields.id, "pull request id"),
       state: state(fields.state),
       pending: { autoMerge, queueEntryId },
-      mergeCommitOid: fields.mergeCommit === null ? null :
-        text(object(fields.mergeCommit, "mergeCommit").oid, "merge commit oid"),
+      mergeCommitOid:
+        fields.mergeCommit === null
+          ? null
+          : text(
+              object(fields.mergeCommit, "mergeCommit").oid,
+              "merge commit oid"
+            ),
     };
   }
 
   async disableAutoMerge(id: string): Promise<void> {
-    const result = data(await this.execute([
-      "gh", "api", "graphql", "-f",
-      "query=mutation($id:ID!) { disablePullRequestAutoMerge(input:{pullRequestId:$id}) { clientMutationId } }",
-      "-f", `id=${id}`,
-    ]));
+    const result = data(
+      await this.execute([
+        "gh",
+        "api",
+        "graphql",
+        "-f",
+        "query=mutation($id:ID!) { disablePullRequestAutoMerge(input:{pullRequestId:$id}) { clientMutationId } }",
+        "-f",
+        `id=${id}`,
+      ])
+    );
     object(result.disablePullRequestAutoMerge, "disablePullRequestAutoMerge");
   }
 
   async dequeue(id: string): Promise<void> {
-    const result = data(await this.execute([
-      "gh", "api", "graphql", "-f",
-      "query=mutation($id:ID!) { dequeuePullRequest(input:{pullRequestId:$id}) { clientMutationId } }",
-      "-f", `id=${id}`,
-    ]));
+    const result = data(
+      await this.execute([
+        "gh",
+        "api",
+        "graphql",
+        "-f",
+        "query=mutation($id:ID!) { dequeuePullRequest(input:{pullRequestId:$id}) { clientMutationId } }",
+        "-f",
+        `id=${id}`,
+      ])
+    );
     object(result.dequeuePullRequest, "dequeuePullRequest");
   }
 }

@@ -47,7 +47,7 @@ const firstLine = (value: string): string =>
   value.trim().split(/\r?\n/, 1)[0]?.slice(0, 240) ?? "";
 function run(
   argv: readonly [string, ...string[]],
-  deadline?: WatchDeadline,
+  deadline?: WatchDeadline
 ): Promise<CommandResult> {
   const remaining = deadline?.remaining() ?? Infinity;
   if (remaining === 0) return Promise.reject(new DeadlineExceeded());
@@ -68,7 +68,7 @@ function run(
       } else {
         timer = setTimeout(
           scheduleDeadline,
-          Math.min(seconds * 1_000, 2_147_483_647),
+          Math.min(seconds * 1_000, 2_147_483_647)
         );
       }
     };
@@ -105,7 +105,7 @@ function parseJson(text: string, label: string): unknown {
 }
 export async function runJson(
   argv: readonly [string, ...string[]],
-  deadline?: WatchDeadline,
+  deadline?: WatchDeadline
 ): Promise<unknown> {
   const result = await run(argv, deadline);
   if (result.code !== 0)
@@ -165,7 +165,7 @@ const optionalString = (value: unknown, path: string): string | null =>
 function enumValue<const V extends readonly string[]>(
   value: unknown,
   values: V,
-  path: string,
+  path: string
 ): V[number] {
   if (typeof value === "string")
     for (const candidate of values) if (candidate === value) return candidate;
@@ -174,7 +174,7 @@ function enumValue<const V extends readonly string[]>(
 const nullableEnum = <const V extends readonly string[]>(
   value: unknown,
   values: V,
-  path: string,
+  path: string
 ): V[number] | null => (value === null ? null : enumValue(value, values, path));
 const MERGE_STATES = [
   "BEHIND",
@@ -207,7 +207,7 @@ const reviewDecision = (value: unknown): T.ReviewDecision =>
   nullableEnum(
     value === "" ? null : value,
     REVIEW_DECISIONS,
-    "pull request.reviewDecision",
+    "pull request.reviewDecision"
   );
 function parseRemote(value: string): T.Repository | null {
   let normalized = value.trim();
@@ -319,7 +319,7 @@ function pendingOrGate(
     readonly link: string;
     readonly workflow: string;
   },
-  reportedState: string,
+  reportedState: string
 ): T.Check {
   return details.name === "Code Review Gate"
     ? {
@@ -336,7 +336,7 @@ export function mapRollupNode(value: unknown): T.Check | null {
   if (typename !== "CheckRun" && typename !== "StatusContext") return null;
   const details = checkDetails(
     object,
-    typename === "CheckRun" ? "name" : "context",
+    typename === "CheckRun" ? "name" : "context"
   );
   const link =
     typeof object.targetUrl === "string" ? object.targetUrl : details.link;
@@ -420,7 +420,7 @@ function passKey(comment: T.ReviewComment | null): string | null {
 export function parseReviewThreads(value: unknown): readonly T.ReviewThread[] {
   const nodes = list(
     at(value, ["data", "repository", "pullRequest", "reviewThreads", "nodes"]),
-    "reviewThreads.nodes",
+    "reviewThreads.nodes"
   );
   const threads: {
     readonly id: string;
@@ -433,7 +433,7 @@ export function parseReviewThreads(value: unknown): readonly T.ReviewThread[] {
       missing("review thread.isResolved", thread.isResolved);
     const comments = list(
       at(thread, ["comments", "nodes"]),
-      "review thread.comments.nodes",
+      "review thread.comments.nodes"
     );
     threads.push({
       id: string(thread.id, "review thread.id"),
@@ -459,16 +459,22 @@ export function parseReviewThreads(value: unknown): readonly T.ReviewThread[] {
       bugbotReviewPasses: passes,
     }));
 }
-function readLandingRevision(value: unknown, context: T.PrContext): LandingRevision {
+function readLandingRevision(
+  value: unknown,
+  context: T.PrContext
+): LandingRevision {
   try {
     return parseLandingRevision(value, context);
   } catch (error) {
-    return missing("landing revision", error instanceof Error ? error.message : String(error));
+    return missing(
+      "landing revision",
+      error instanceof Error ? error.message : String(error)
+    );
   }
 }
 export function parsePullRequest(
   value: unknown,
-  context: T.PrContext,
+  context: T.PrContext
 ): T.PullRequestFacts {
   const object = record(value, "pull request");
   if (typeof object.isDraft !== "boolean")
@@ -479,12 +485,12 @@ export function parsePullRequest(
     mergeable: enumValue(
       object.mergeable,
       ["MERGEABLE", "CONFLICTING", "UNKNOWN"] as const,
-      "pull request.mergeable",
+      "pull request.mergeable"
     ),
     mergeStateStatus: enumValue(
       object.mergeStateStatus,
       MERGE_STATES,
-      "pull request.mergeStateStatus",
+      "pull request.mergeStateStatus"
     ),
     reviewDecision: reviewDecision(object.reviewDecision),
     headRefOid: optionalString(object.headRefOid, "pull request.headRefOid"),
@@ -494,7 +500,7 @@ export function parsePullRequest(
     state: enumValue(
       object.state,
       ["OPEN", "CLOSED", "MERGED"] as const,
-      "pull request.state",
+      "pull request.state"
     ),
     mergedAt: optionalString(object.mergedAt, "pull request.mergedAt"),
     isDraft: object.isDraft,
@@ -502,7 +508,7 @@ export function parsePullRequest(
 }
 function graphqlArgs(
   query: string,
-  context: T.PrContext,
+  context: T.PrContext
 ): [string, ...string[]] {
   return [
     "gh",
@@ -554,12 +560,10 @@ export class GhGitHubReader implements T.GitHubReader {
         "--json",
         "mergeable,mergeStateStatus,reviewDecision,headRefOid,headRefName,baseRefName,baseRefOid,state,mergedAt,isDraft",
       ]),
-      context,
+      context
     );
   }
-  async revision(
-    context: T.PrContext,
-  ): Promise<LandingRevision> {
+  async revision(context: T.PrContext): Promise<LandingRevision> {
     const value = record(
       await this.runJson([
         "gh",
@@ -571,12 +575,12 @@ export class GhGitHubReader implements T.GitHubReader {
         "--json",
         "headRefOid,baseRefName,baseRefOid",
       ]),
-      "pull request head",
+      "pull request head"
     );
     return readLandingRevision(value, context);
   }
   async openPullRequests(
-    repository: T.Repository,
+    repository: T.Repository
   ): Promise<readonly T.OpenPullRequest[]> {
     const value = await this.runJson([
       "gh",
@@ -612,11 +616,11 @@ export class GhGitHubReader implements T.GitHubReader {
               },
         headRefName: string(
           object.headRefName,
-          `open PRs[${index}].headRefName`,
+          `open PRs[${index}].headRefName`
         ),
         baseRefName: string(
           object.baseRefName,
-          `open PRs[${index}].baseRefName`,
+          `open PRs[${index}].baseRefName`
         ),
       };
     });
@@ -645,25 +649,25 @@ export class GhGitHubReader implements T.GitHubReader {
   }
   async checkRollupPage(
     context: T.PrContext,
-    after: string | null,
+    after: string | null
   ): Promise<T.RollupPage> {
     const argv = graphqlArgs(PR_CHECK_ROLLUP_QUERY, context);
     if (after !== null) argv.push("-f", `after=${after}`);
     const value = await this.runJson(argv);
     const commits = list(
       at(value, ["data", "repository", "pullRequest", "commits", "nodes"]),
-      "commits.nodes",
+      "commits.nodes"
     );
     if (commits.length === 0) return { checks: [], endCursor: null };
     const commit = record(
       at(commits[commits.length - 1], ["commit"]),
-      "commit",
+      "commit"
     );
     if (commit.statusCheckRollup === null)
       return { checks: [], endCursor: null };
     const contexts = record(
       at(commit, ["statusCheckRollup", "contexts"]),
-      "contexts",
+      "contexts"
     );
     const checks = list(contexts.nodes, "contexts.nodes")
       .map(mapRollupNode)
@@ -673,12 +677,12 @@ export class GhGitHubReader implements T.GitHubReader {
       missing("contexts.pageInfo.hasNextPage", page.hasNextPage);
     const cursor = optionalString(
       page.endCursor,
-      "contexts.pageInfo.endCursor",
+      "contexts.pageInfo.endCursor"
     );
     return { checks, endCursor: page.hasNextPage && cursor ? cursor : null };
   }
   async reviewThreads(
-    context: T.PrContext,
+    context: T.PrContext
   ): Promise<readonly T.ReviewThread[]> {
     const nodes: unknown[] = [];
     const cursors = new Set<string>();
@@ -689,7 +693,7 @@ export class GhGitHubReader implements T.GitHubReader {
       const value = await this.runJson(argv);
       const connection = record(
         at(value, ["data", "repository", "pullRequest", "reviewThreads"]),
-        "reviewThreads",
+        "reviewThreads"
       );
       nodes.push(...list(connection.nodes, "reviewThreads.nodes"));
       const page = record(connection.pageInfo, "reviewThreads.pageInfo");
@@ -709,14 +713,14 @@ export class GhGitHubReader implements T.GitHubReader {
     });
   }
   async commitRollups(
-    context: T.PrContext,
+    context: T.PrContext
   ): Promise<readonly T.CommitRollup[]> {
     const value = await this.runJson(
-      graphqlArgs(PR_COMMIT_STATUS_QUERY, context),
+      graphqlArgs(PR_COMMIT_STATUS_QUERY, context)
     );
     const commits = list(
       at(value, ["data", "repository", "pullRequest", "commits", "nodes"]),
-      "commits.nodes",
+      "commits.nodes"
     );
     return commits.map((item, index) => {
       const commit = record(at(item, ["commit"]), `commits[${index}].commit`);
@@ -729,7 +733,7 @@ export class GhGitHubReader implements T.GitHubReader {
             : nullableEnum(
                 at(rollup, ["state"]),
                 ROLLUP_STATES,
-                `commits[${index}].statusCheckRollup.state`,
+                `commits[${index}].statusCheckRollup.state`
               ),
       };
     });
@@ -738,7 +742,7 @@ export class GhGitHubReader implements T.GitHubReader {
 
 export async function resolveChecks(
   reader: T.GitHubReader,
-  context: T.PrContext,
+  context: T.PrContext
 ): Promise<T.CheckRead> {
   const fast = await reader.checksFastPath(context);
   const direct = fast.kind === "checks" ? nonEmpty(fast.checks) : null;
@@ -798,7 +802,7 @@ export async function resolveContext(args: {
 }
 export function orderStack(
   context: T.PrContext,
-  open: readonly T.OpenPullRequest[],
+  open: readonly T.OpenPullRequest[]
 ): T.NonEmpty<T.PrContext> {
   const byNumber = new Map(open.map((pr) => [pr.number, pr]));
   const localHead = (pr: T.OpenPullRequest): boolean =>
@@ -819,9 +823,7 @@ export function orderStack(
   const parentFor = (branch: string): T.OpenPullRequest | undefined => {
     const candidates = byHead.get(branch) ?? [];
     if (candidates.length > 1)
-      invalid(
-        `multiple PRs have the same repository branch: ${branch}`,
-      );
+      invalid(`multiple PRs have the same repository branch: ${branch}`);
     return candidates[0];
   };
   const children = new Map<string, T.OpenPullRequest[]>();
@@ -865,13 +867,13 @@ export function orderStack(
       [...down.reverse(), start, ...up].map((pr) => ({
         ...context,
         number: pr.number,
-      })),
+      }))
     ) ?? [context]
   );
 }
 export async function discoverStack(
   reader: T.GitHubReader,
-  context: T.PrContext,
+  context: T.PrContext
 ): Promise<T.NonEmpty<T.PrContext>> {
   const open = await reader.openPullRequests(context);
   // gh returns the newest PRs with no truncation signal, so a full page may

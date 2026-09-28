@@ -18,6 +18,7 @@ import {
   syncEffortAgents,
   fenceUnder,
   loadModels,
+  parseFrontmatter,
   promptStub,
   publicSkills,
   slashCommands,
@@ -87,6 +88,11 @@ describe("regions", () => {
     expect(() => applyRegions("plugins/pstack/skills/how/SKILL.md", "# how\n\n## Reasoning effort\n", models)).toThrow(
       "plugins/pstack/skills/how/SKILL.md: no anchor for the Models section to stamp",
     );
+  });
+
+  test("a policy without the interrogate reviewers role throws naming it", () => {
+    const roles = models.roles.filter((r) => r.role !== "interrogate reviewers");
+    expect(() => regions({ ...models, roles })).toThrow('models.json: no "interrogate reviewers" role');
   });
 
   test("applyRegions leaves a file the generator does not own untouched", () => {
@@ -267,6 +273,26 @@ describe("slashCommands", () => {
   });
 });
 
+describe("parseFrontmatter", () => {
+  test("splits the YAML block from the body", () => {
+    expect(parseFrontmatter("---\nname: x\nflag: false \n---\n\nbody\n")).toEqual({
+      data: { name: "x", flag: false },
+      body: "\nbody\n",
+    });
+  });
+
+  test("reads a CRLF block", () => {
+    expect(parseFrontmatter("---\r\nname: x\r\n---\r\nbody\r\n")).toEqual({ data: { name: "x" }, body: "body\r\n" });
+  });
+
+  test("returns null data and the whole text when there is no block", () => {
+    expect(parseFrontmatter("# title\n---\nname: x\n---\n")).toEqual({
+      data: null,
+      body: "# title\n---\nname: x\n---\n",
+    });
+  });
+});
+
 describe("deriveSkill", () => {
   const front = (flags) => `---\nname: x\ndescription: d\n${flags}---\n\nbody\n`;
 
@@ -281,6 +307,11 @@ describe("deriveSkill", () => {
 
   test("leaves a prose mention of the flag alone", () => {
     const text = front("") + "Never write `disable-model-invocation: true` on a skill.\n";
+    expect(deriveSkill("plugins/pstack/skills/automate-me/SKILL.md", text, models)).toBe(text);
+  });
+
+  test("leaves a flag line in the body alone when the frontmatter has none", () => {
+    const text = front("") + "disable-model-invocation: true\n";
     expect(deriveSkill("plugins/pstack/skills/automate-me/SKILL.md", text, models)).toBe(text);
   });
 

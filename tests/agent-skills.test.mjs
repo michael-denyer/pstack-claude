@@ -360,6 +360,43 @@ describe("shared Agent Skills tree", () => {
   });
 });
 
+describe("agentSkills reads frontmatter as YAML", () => {
+  function readSkill(name, text) {
+    const root = mkdtempSync(join(tmpdir(), "pstack-frontmatter-"));
+    try {
+      mkdirSync(join(root, name));
+      writeFileSync(join(root, name, "SKILL.md"), text);
+      return agentSkills(root)[0];
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  test("a folded block scalar description is read as its folded value", () => {
+    const skill = readSkill("folded", "---\nname: folded\ndescription: >-\n  Use when\n  folding.\n---\n\nbody\n");
+    expect(skill.description).toBe("Use when folding.");
+  });
+
+  test("the 1024 limit measures the parsed description, not its YAML source", () => {
+    const value = "a".repeat(990) + '"'.repeat(30);
+    const quoted = readSkill("quoted", `---\nname: quoted\ndescription: ${JSON.stringify(value)}\n---\n`);
+    expect(quoted.description).toBe(value);
+    expect(() => readSkill("long", `---\nname: long\ndescription: >-\n  ${"a".repeat(1025)}\n---\n`)).toThrow(
+      "description exceeds the portable Agent Skills limit of 1024 characters",
+    );
+  });
+
+  test("a CRLF file yields its name", () => {
+    expect(readSkill("crlf", "---\r\nname: crlf\r\ndescription: d\r\n---\r\n\r\nbody\r\n").name).toBe("crlf");
+  });
+
+  test("user-invocable: false with a trailing space reads as not user-invocable", () => {
+    expect(readSkill("spaced", "---\nname: spaced\ndescription: d\nuser-invocable: false \n---\n").userInvocable).toBe(
+      false,
+    );
+  });
+});
+
 describe("Codex model names", () => {
   test("names a strongest Codex model for the roles that default to it on Claude", () => {
     const raw = JSON.parse(readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8"));

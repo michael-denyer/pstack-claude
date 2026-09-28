@@ -183,12 +183,12 @@ export function validateCodexMarketplace(text, { expectedName, pathExists }) {
   }
 }
 
-// Single-line frontmatter lookup; returns undefined when the key is absent.
-export function frontmatterValue(text, key) {
-  const block = text.match(/^---\n([\s\S]*?)\n---/);
-  if (!block) return undefined;
-  const line = block[1].split("\n").find((l) => l.startsWith(`${key}: `));
-  return line?.slice(key.length + 2);
+// Split a Markdown file into its YAML frontmatter and the text after it.
+// `data` is null when the file does not open with a frontmatter block.
+export function parseFrontmatter(text) {
+  const block = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  if (!block) return { data: null, body: text };
+  return { data: Bun.YAML.parse(block[1]) ?? {}, body: text.slice(block[0].length) };
 }
 
 // Validate the shared subset of the Agent Skills contract before deriving any
@@ -199,26 +199,26 @@ export function agentSkills(skillsDir) {
   for (const entry of readdirSync(skillsDir).sort()) {
     const path = join(skillsDir, entry, "SKILL.md");
     if (!statSync(join(skillsDir, entry)).isDirectory() || !existsSync(path)) continue;
-    const text = readFileSync(path, "utf8");
-    const front = text.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
-    const name = frontmatterValue(text, "name");
+    const front = parseFrontmatter(readFileSync(path, "utf8")).data ?? {};
+    const name = front.name;
     if (name !== entry) throw new Error(`${path}: frontmatter name "${name}" != directory "${entry}"`);
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || name.length > 64) {
       throw new Error(`${path}: frontmatter name "${name}" is not a portable Agent Skills name`);
     }
-    const description = frontmatterValue(text, "description");
-    if (!description) throw new Error(`${path}: skill has no description frontmatter`);
+    const description = front.description;
+    if (typeof description !== "string" || !description) {
+      throw new Error(`${path}: skill has no description frontmatter`);
+    }
     if (description.length > 1024) {
       throw new Error(`${path}: description exceeds the portable Agent Skills limit of 1024 characters`);
     }
-    const flags = front.split("\n");
     // CHANGES 0.9.8: on a skill the flag makes the Skill tool refuse the
     // invocation outright, which breaks the SessionStart mandate. Upstream
     // ships it on every skill; the sync derivation strips it.
-    if (flags.includes("disable-model-invocation: true")) {
+    if (front["disable-model-invocation"] === true) {
       throw new Error(`${path}: disable-model-invocation: true breaks model-initiated entry (CHANGES 0.9.8)`);
     }
-    const userInvocable = !flags.includes("user-invocable: false");
+    const userInvocable = front["user-invocable"] !== false;
     // CHANGES 0.9.9: principle leaves are read by path from poteto-mode and
     // stay out of the slash menu.
     if (name.startsWith("principle-") && userInvocable) {
@@ -356,6 +356,12 @@ export const tableRows = (header, rowPrefix) => (lines) => {
 
 const blankPadded = (body) => ["", ...body.split("\n"), ""];
 
+function requiredRole(models, label) {
+  const role = models.roles.find((r) => r.role === label);
+  if (!role) throw new Error(`models.json: no "${label}" role, which a stamped region renders from`);
+  return role;
+}
+
 // Every generator-owned region: the file it lives in (repo-relative), how to
 // find it, and what it renders from the model policy. Adding a stamped region
 // means adding a row here; the stray-slug scan exempts exactly these spans.
@@ -366,7 +372,7 @@ export function regions(models) {
     if (!rolesBySkill.has(r.skill)) rolesBySkill.set(r.skill, []);
     rolesBySkill.get(r.skill).push(r);
   }
-  const reviewers = models.roles.find((r) => r.role === "interrogate reviewers").models;
+  const reviewers = requiredRole(models, "interrogate reviewers").models;
   return [
     ...[...rolesBySkill]
       .filter(([skill]) => skill !== "interrogate")
@@ -439,8 +445,79 @@ export function resolveModels(models) {
   };
 }
 
+const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
+
+// Check models.json's shape and resolve its tiers, throwing with the offending
+// role, tier, or slug named. `skillExists(skill)` reports whether a role's
+// skill directory carries a SKILL.md.
+export function parseModels(raw, skillExists) {
+  const fail = (message) => {
+    throw new Error(`models.json: ${message}`);
+  };
+  const unique = (list, owner) => {
+    const seen = new Set();
+    for (const item of list) {
+      if (seen.has(item)) fail(`${owner} lists "${item}" twice`);
+      seen.add(item);
+    }
+  };
+  for (const key of ["available", "efforts", "roles"]) if (!Array.isArray(raw[key])) fail(`"${key}" must be a list`);
+  for (const key of ["tiers", "codex"]) {
+    if (!raw[key] || typeof raw[key] !== "object") fail(`"${key}" must be an object`);
+  }
+  const available = new Set(raw.available);
+  unique(raw.available, "available");
+  const tierLists = new Map();
+  for (const [tier, value] of Object.entries(raw.tiers)) {
+    const slugs = [value].flat();
+    unique(slugs, `tier "${tier}"`);
+    for (const slug of slugs) {
+      if (!available.has(slug)) fail(`tier "${tier}" names "${slug}", which is not in available`);
+    }
+    tierLists.set(slugs.join(), tier);
+  }
+  const labels = new Set();
+  for (const role of raw.roles) {
+    if (labels.has(role.role)) fail(`role "${role.role}" appears twice`);
+    labels.add(role.role);
+    if (!skillExists(role.skill)) fail(`role "${role.role}" names skill "${role.skill}", which has no SKILL.md`);
+    if (typeof role.models === "string") {
+      if (!Object.hasOwn(raw.tiers, role.models)) {
+        fail(`role "${role.role}" names tier "${role.models}", which tiers does not define`);
+      }
+      continue;
+    }
+    if (!Array.isArray(role.models) || role.models.length === 0) {
+      fail(`role "${role.role}" needs a tier name or a non-empty list of models`);
+    }
+    for (const slug of role.models) {
+      if (!available.has(slug)) fail(`role "${role.role}" names "${slug}", which is not in available`);
+    }
+    const tier = tierLists.get(role.models.join());
+    if (tier) fail(`role "${role.role}" lists tier "${tier}" literally; name the tier`);
+  }
+  unique(raw.efforts, "efforts");
+  for (const level of raw.efforts) {
+    if (!EFFORT_LEVELS.includes(level)) fail(`effort "${level}" is not one of ${EFFORT_LEVELS.join(", ")}`);
+  }
+  if (!raw.efforts.includes(raw.defaultEffort) && raw.defaultEffort !== "session") {
+    fail(`defaultEffort "${raw.defaultEffort}" is not an effort level or "session"`);
+  }
+  for (const tier of Object.keys(raw.tiers)) {
+    if (!Object.hasOwn(raw.codex, tier)) fail(`codex has no example for tier "${tier}"`);
+  }
+  for (const [tier, value] of Object.entries(raw.codex)) {
+    if (!Object.hasOwn(raw.tiers, tier)) fail(`codex names "${tier}", which is not a tier`);
+    unique([value].flat(), `codex "${tier}"`);
+  }
+  return resolveModels(raw);
+}
+
 export function loadModels() {
-  return resolveModels(JSON.parse(readFileSync(join(repo, "plugins/pstack/models.json"), "utf8")));
+  const skillsDir = join(repo, "plugins/pstack/skills");
+  return parseModels(JSON.parse(readFileSync(join(repo, "plugins/pstack/models.json"), "utf8")), (skill) =>
+    existsSync(join(skillsDir, skill, "SKILL.md")),
+  );
 }
 
 // The port's derivation of an upstream file, as tools/sync.mjs applies it
@@ -457,7 +534,9 @@ export function deriveSkill(file, text, models = loadModels()) {
   const skill = file.match(/^plugins\/pstack\/skills\/([^/]+)\/SKILL\.md$/)?.[1];
   if (skill) {
     const swap = skill.startsWith("principle-") ? "\nuser-invocable: false\n" : "\n";
-    out = out.replace("\ndisable-model-invocation: true\n", swap);
+    const { body } = parseFrontmatter(out);
+    const head = out.slice(0, out.length - body.length);
+    out = head.replace("\ndisable-model-invocation: true\n", swap) + body;
   }
   const lines = out.split("\n");
   for (const region of regions(models).filter((r) => r.file === file && r.appendHeading)) {
@@ -501,7 +580,7 @@ export function effortSection(levels, defaultEffort) {
 // The poteto variants carry poteto-agent's body, so the routing contract is
 // written once in plugins/pstack/agents/poteto-agent.md.
 export function effortAgents(levels, potetoAgent) {
-  const body = potetoAgent.replace(/^---\n[\s\S]*?\n---\n/, "");
+  const { body } = parseFrontmatter(potetoAgent);
   return levels.flatMap((level) => [
     {
       name: `effort-${level}`,

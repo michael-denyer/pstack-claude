@@ -642,6 +642,10 @@ describe("sync CLI", () => {
     cpSync(join(import.meta.dir, "../plugins/pstack/models.json"), join(port, "plugins/pstack/models.json"));
     mkdirSync(join(port, "plugins/pstack/skills"));
     writeFileSync(join(port, "plugins/pstack/skills/s.md"), "one\n");
+    for (const { skill } of JSON.parse(readFileSync(join(port, "plugins/pstack/models.json"), "utf8")).roles) {
+      mkdirSync(join(port, "plugins/pstack/skills", skill), { recursive: true });
+      writeFileSync(join(port, "plugins/pstack/skills", skill, "SKILL.md"), "");
+    }
     writeFileSync(
       join(port, "tools/upstream.json"),
       JSON.stringify({

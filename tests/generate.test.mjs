@@ -1,21 +1,35 @@
-// Unit tests for the generator's pure functions: the region model that stamps
-// model policy into skills, the version stamp, and the validators. The
-// end-to-end contract (regenerate, then git diff --exit-code) lives in CI.
-import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+// Unit tests for the generator: the region model that stamps model policy into
+// skills, the version stamp, the validators, and the plan it writes from.
+import { afterEach, describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  apply,
   applyRegions,
   assertChangesHeading,
+  changes,
   deriveSkill,
   effortAgents,
   effortSection,
+  plan,
   pluginAgentPaths,
   stampAgentPaths,
-  syncEffortAgents,
   fenceUnder,
   loadModels,
   parseFrontmatter,
@@ -30,6 +44,7 @@ import {
   validateCodexMarketplace,
   validateHooks,
 } from "../tools/generate.mjs";
+import { walk } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const models = loadModels();
@@ -389,50 +404,6 @@ describe("effort agents", () => {
     expect(listed).toContain("./effort-agents/effort-high.md");
   });
 
-  const outDirFixture = (files) => {
-    const dir = join(mkdtempSync(join(tmpdir(), "effort-agents-")), "effort-agents");
-    mkdirSync(dir);
-    for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
-    return dir;
-  };
-  const quiet = { log: () => {} };
-
-  test("writes the agents and removes every other entry in its directory", () => {
-    const dir = outDirFixture({ "effort-low.md": "stale", "effort-high.md": "old" });
-    mkdirSync(join(dir, "leftover"));
-    expect(syncEffortAgents(dir, agents, quiet)).toEqual({ stamped: 4, removed: 2, total: 4 });
-    expect(readdirSync(dir).sort()).toEqual(agents.map((a) => `${a.name}.md`).sort());
-    expect(readFileSync(join(dir, "effort-high.md"), "utf8")).toBe(agents[0].text);
-  });
-
-  test("refuses a symlink at an agent path and leaves its target unchanged", () => {
-    const dir = outDirFixture({});
-    const outside = join(mkdtempSync(join(tmpdir(), "effort-outside-")), "target.md");
-    writeFileSync(outside, "original");
-    symlinkSync(outside, join(dir, "effort-high.md"));
-    expect(() => syncEffortAgents(dir, agents, quiet)).toThrow("effort-agents/effort-high.md is not a regular file");
-    expect(readFileSync(outside, "utf8")).toBe("original");
-    expect(existsSync(join(dir, "effort-max.md"))).toBe(false);
-  });
-
-  test("removes a stray symlink without touching its target", () => {
-    const dir = outDirFixture({});
-    const outside = join(mkdtempSync(join(tmpdir(), "effort-outside-")), "target.md");
-    writeFileSync(outside, "original");
-    symlinkSync(outside, join(dir, "stray.md"));
-    syncEffortAgents(dir, agents, quiet);
-    expect(existsSync(join(dir, "stray.md"))).toBe(false);
-    expect(readFileSync(outside, "utf8")).toBe("original");
-  });
-
-  test("refuses an output directory that is a symlink", () => {
-    const real = outDirFixture({});
-    const link = join(mkdtempSync(join(tmpdir(), "effort-link-")), "effort-agents");
-    symlinkSync(real, link);
-    expect(() => syncEffortAgents(link, agents, quiet)).toThrow("effort-agents/ is a symlink");
-    expect(readdirSync(real)).toEqual([]);
-  });
-
   test("stamping the agents list keeps every other manifest field", () => {
     const text = '{\n  "name": "pstack",\n  "version": "1.0.0"\n}\n';
     const out = stampAgentPaths(text, ["./agents/a.md"]);
@@ -450,5 +421,130 @@ describe("effort agents", () => {
     expect(text).toContain("`session` sets no effort, so the dispatch is the usual one");
     expect(text).toContain("`inherit-parent` or `auto` still omits `model` at every level");
     expect(text).toContain("On Codex, pass the level as `spawn_agent`'s `reasoning_effort`");
+  });
+});
+
+describe("plan, changes, apply", () => {
+  const made = [];
+  afterEach(() => {
+    for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+  const scratch = (prefix) => {
+    const dir = mkdtempSync(join(tmpdir(), prefix));
+    made.push(dir);
+    return dir;
+  };
+  const repoCopy = () => {
+    const dir = scratch("pstack-generate-");
+    cpSync(repoRoot, dir, { recursive: true, filter: (src) => ![".git", "node_modules"].includes(basename(src)) });
+    return dir;
+  };
+  const snapshot = (dir) => Object.fromEntries(walk(dir).map((path) => [path, readFileSync(path, "utf8")]));
+  const quiet = { log: () => {} };
+  const STUB = "plugins/pstack/.codex-plugin/prompts/tdd.md";
+  const STRAY = "plugins/pstack/effort-agents/stray.md";
+
+  test("the committed tree is what the plan says", () => {
+    expect(changes(repoRoot, plan(repoRoot))).toEqual([]);
+  });
+
+  test("plan computes from the sources, repeats itself, and writes nothing", () => {
+    const root = repoCopy();
+    const current = readFileSync(join(root, STUB), "utf8");
+    writeFileSync(join(root, STUB), "stale\n");
+    writeFileSync(join(root, STRAY), "orphan\n");
+    const before = snapshot(root);
+    const first = plan(root);
+    expect(plan(root)).toEqual(first);
+    expect(first.files[STUB]).toBe(current);
+    expect(Object.hasOwn(first.files, STRAY)).toBe(false);
+    expect(snapshot(root)).toEqual(before);
+  });
+
+  test("--check on a stale tree exits 1 naming each stale path, writes nothing, and passes once regenerated", () => {
+    const root = repoCopy();
+    writeFileSync(join(root, STUB), "stale\n");
+    writeFileSync(join(root, STRAY), "orphan\n");
+    const before = snapshot(root);
+    const run = (...args) => spawnSync(process.execPath, [join(root, "tools/generate.mjs"), ...args], { encoding: "utf8" });
+    const stale = run("--check");
+    expect(stale.status).toBe(1);
+    expect(stale.stderr).toContain(
+      `FAIL: generated output is stale; run bun tools/generate.mjs:\n  write: ${STUB}\n  remove: ${STRAY}\n`,
+    );
+    expect(snapshot(root)).toEqual(before);
+    expect(run().status).toBe(0);
+    expect(run("--check").status).toBe(0);
+  });
+
+  test("apply rewrites only the files whose bytes differ", () => {
+    const root = repoCopy();
+    const intended = plan(root);
+    writeFileSync(join(root, STUB), "stale\n");
+    const past = new Date("2001-01-01T00:00:00Z");
+    for (const path of Object.keys(intended.files)) utimesSync(join(root, path), past, past);
+    expect(apply(root, intended, quiet)).toEqual([{ kind: "write", path: STUB }]);
+    expect(readFileSync(join(root, STUB), "utf8")).toBe(intended.files[STUB]);
+    const touched = Object.keys(intended.files).filter(
+      (path) => statSync(join(root, path)).mtimeMs !== past.getTime(),
+    );
+    expect(touched).toEqual([STUB]);
+  });
+
+  test("apply writes each planned file and removes every other entry in an owned directory", () => {
+    const root = scratch("pstack-apply-");
+    mkdirSync(join(root, "out/leftover"), { recursive: true });
+    writeFileSync(join(root, "out/a.md"), "old");
+    writeFileSync(join(root, "out/extra.md"), "orphan");
+    const intended = { files: { "out/a.md": "A", "out/b.md": "B", "top/c.json": "C" }, ownedDirs: ["out"] };
+    expect(apply(root, intended, quiet)).toEqual([
+      { kind: "write", path: "out/a.md" },
+      { kind: "write", path: "out/b.md" },
+      { kind: "write", path: "top/c.json" },
+      { kind: "remove", path: "out/extra.md" },
+      { kind: "remove", path: "out/leftover" },
+    ]);
+    expect(readdirSync(join(root, "out")).sort()).toEqual(["a.md", "b.md"]);
+    expect(readFileSync(join(root, "out/a.md"), "utf8")).toBe("A");
+    expect(readFileSync(join(root, "top/c.json"), "utf8")).toBe("C");
+    expect(changes(root, intended)).toEqual([]);
+  });
+
+  test("apply refuses a symlink at a planned path before writing anything", () => {
+    const root = scratch("pstack-apply-");
+    const outside = join(scratch("pstack-outside-"), "target.md");
+    writeFileSync(outside, "original");
+    mkdirSync(join(root, "out"));
+    symlinkSync(outside, join(root, "out/b.md"));
+    const intended = { files: { "out/a.md": "A", "out/b.md": "B" }, ownedDirs: ["out"] };
+    expect(() => apply(root, intended, quiet)).toThrow("out/b.md is a symlink; refusing to write through it");
+    expect(readFileSync(outside, "utf8")).toBe("original");
+    expect(existsSync(join(root, "out/a.md"))).toBe(false);
+  });
+
+  test("apply removes a stray symlink in an owned directory without touching its target", () => {
+    const root = scratch("pstack-apply-");
+    const outside = scratch("pstack-outside-");
+    writeFileSync(join(outside, "target.md"), "original");
+    mkdirSync(join(root, "out"));
+    symlinkSync(join(outside, "target.md"), join(root, "out/stray.md"));
+    symlinkSync(outside, join(root, "out/stray-dir"), "dir");
+    apply(root, { files: { "out/a.md": "A" }, ownedDirs: ["out"] }, quiet);
+    expect(readdirSync(join(root, "out"))).toEqual(["a.md"]);
+    expect(readFileSync(join(outside, "target.md"), "utf8")).toBe("original");
+  });
+
+  test("apply refuses a planned path under a symlinked directory", () => {
+    const root = scratch("pstack-apply-");
+    const outside = scratch("pstack-outside-");
+    mkdirSync(join(root, "skills"));
+    symlinkSync(outside, join(root, "skills/out"), "dir");
+    for (const intended of [
+      { files: { "skills/out/a.md": "A" }, ownedDirs: ["skills/out"] },
+      { files: { "skills/out/deep/a.md": "A" }, ownedDirs: [] },
+    ]) {
+      expect(() => apply(root, intended, quiet)).toThrow("skills/out is a symlink; refusing to write through it");
+    }
+    expect(readdirSync(outside)).toEqual([]);
   });
 });

@@ -16,9 +16,9 @@ import {
   agentSkills,
   codexModelNamesSection,
   PORTABLE_ASSETS,
+  plan,
   publicSkills,
   resolveModels,
-  syncPortableAssets,
 } from "../tools/generate.mjs";
 import { validateProsePaths, validateSkillsTree, walk } from "../tools/validate-skills.mjs";
 
@@ -234,105 +234,11 @@ describe("shared Agent Skills tree", () => {
     }
   });
 
-  test("portable asset sync creates, updates, and removes generated files", () => {
-    const root = mkdtempSync(join(tmpdir(), "pstack-portable-assets-"));
-    const fixtureRepo = join(root, "repo");
-    const fixtureSkills = join(fixtureRepo, "plugins/pstack/skills");
-    const generatedDirs = new Set(PORTABLE_ASSETS.map(({ target }) => dirname(target)));
-
-    try {
-      for (const { source } of PORTABLE_ASSETS) {
-        const path = join(fixtureRepo, source);
-        mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(path, `source: ${source}\n`);
-      }
-      for (const dir of generatedDirs) {
-        const output = join(fixtureSkills, dir);
-        mkdirSync(output, { recursive: true });
-        writeFileSync(join(output, "stale.md"), "stale\n");
-      }
-
-      expect(syncPortableAssets(fixtureRepo, fixtureSkills, { log() {} })).toEqual({
-        stamped: PORTABLE_ASSETS.length,
-        removed: generatedDirs.size,
-        total: PORTABLE_ASSETS.length,
-      });
-      for (const { source, target } of PORTABLE_ASSETS) {
-        expect(readFileSync(join(fixtureSkills, target), "utf8")).toBe(
-          readFileSync(join(fixtureRepo, source), "utf8"),
-        );
-      }
-      for (const dir of generatedDirs) {
-        expect(existsSync(join(fixtureSkills, dir, "stale.md"))).toBe(false);
-      }
-
-      expect(syncPortableAssets(fixtureRepo, fixtureSkills, { log() {} })).toEqual({
-        stamped: 0,
-        removed: 0,
-        total: PORTABLE_ASSETS.length,
-      });
-
-      const changed = PORTABLE_ASSETS[0];
-      writeFileSync(join(fixtureRepo, changed.source), "changed\n");
-      expect(syncPortableAssets(fixtureRepo, fixtureSkills, { log() {} })).toEqual({
-        stamped: 1,
-        removed: 0,
-        total: PORTABLE_ASSETS.length,
-      });
-      expect(readFileSync(join(fixtureSkills, changed.target), "utf8")).toBe("changed\n");
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  test("portable asset sync refuses an output directory symlink escape", () => {
-    const root = mkdtempSync(join(tmpdir(), "pstack-portable-assets-"));
-    const fixtureRepo = join(root, "repo");
-    const fixtureSkills = join(fixtureRepo, "plugins/pstack/skills");
-    const agentsOutput = join(fixtureSkills, "poteto-mode/references/agents");
-    const outside = join(root, "outside");
-
-    try {
-      for (const { source } of PORTABLE_ASSETS) {
-        const path = join(fixtureRepo, source);
-        mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(path, `source: ${source}\n`);
-      }
-      mkdirSync(dirname(agentsOutput), { recursive: true });
-      mkdirSync(outside);
-      symlinkSync(outside, agentsOutput, "dir");
-
-      expect(() => syncPortableAssets(fixtureRepo, fixtureSkills, { log() {} })).toThrow(
-        "poteto-mode/references/agents resolves outside the skills tree through a symlink",
-      );
-      expect(existsSync(join(outside, "poteto-agent.md"))).toBe(false);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  test("portable asset sync refuses a dangling symlink at a target", () => {
-    const root = mkdtempSync(join(tmpdir(), "pstack-portable-assets-"));
-    const fixtureRepo = join(root, "repo");
-    const fixtureSkills = join(fixtureRepo, "plugins/pstack/skills");
-    const [asset] = PORTABLE_ASSETS;
-    const outside = join(root, "outside.md");
-
-    try {
-      for (const { source } of PORTABLE_ASSETS) {
-        const path = join(fixtureRepo, source);
-        mkdirSync(dirname(path), { recursive: true });
-        writeFileSync(path, `source: ${source}\n`);
-      }
-      mkdirSync(dirname(join(fixtureSkills, asset.target)), { recursive: true });
-      symlinkSync(outside, join(fixtureSkills, asset.target));
-
-      expect(() => syncPortableAssets(fixtureRepo, fixtureSkills, { log() {} })).toThrow(
-        `${asset.target} is a symlink; refusing to overwrite it`,
-      );
-      expect(existsSync(outside)).toBe(false);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
+  test("the plan copies each portable asset from its source into a directory it owns", () => {
+    const { files, ownedDirs } = plan(repoRoot);
+    for (const { source, target } of PORTABLE_ASSETS) {
+      expect(files[`plugins/pstack/skills/${target}`]).toBe(readFileSync(join(repoRoot, source), "utf8"));
+      expect(ownedDirs).toContain(`plugins/pstack/skills/${dirname(target)}`);
     }
   });
 

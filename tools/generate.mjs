@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 // Stamps facts that live in one source file into every file that carries a
 // copy, and validates cross-file contracts. Idempotent; run it after editing
-// a source of truth. CI contract: `bun tools/generate.mjs && git diff --exit-code`,
-// so a stale committed copy fails the build instead of shipping.
+// a source of truth. CI contract: `bun tools/generate.mjs --check` writes
+// nothing and fails when a committed copy is stale, so it cannot ship.
 //
 // Sources of truth:
 //   VERSION  -> the "version" field in the three plugin manifests
@@ -42,15 +42,19 @@ import {
   realpathSync,
   rmSync,
   statSync,
-  unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+const PLUGIN = "plugins/pstack";
+const SKILLS = `${PLUGIN}/skills`;
+const PROMPTS = `${PLUGIN}/.codex-plugin/prompts`;
+const EFFORT_AGENTS = `${PLUGIN}/effort-agents`;
 
 const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
@@ -74,71 +78,6 @@ export const PORTABLE_ASSETS = [
   },
   { source: "NOTICE-skills.md", target: "poteto-mode/references/licenses/NOTICE.md" },
 ];
-
-const PORTABLE_OUTPUT_DIRS = [
-  "poteto-mode/references/agents",
-  "poteto-mode/references/licenses",
-];
-
-function resolveWithin(root, path) {
-  const base = resolve(root);
-  const resolved = resolve(base, path);
-  if (!pathIsInside(base, resolved)) {
-    throw new Error(`${path} resolves outside ${base}`);
-  }
-  return resolved;
-}
-
-export function syncPortableAssets(repoRoot, skillsRoot, { log = console.log } = {}) {
-  mkdirSync(skillsRoot, { recursive: true });
-  const realRepoRoot = realpathSync(repoRoot);
-  const realSkillsRoot = realpathSync(skillsRoot);
-  const expectedByDir = new Map(
-    PORTABLE_OUTPUT_DIRS.map((dir) => [resolveWithin(skillsRoot, dir), new Set()]),
-  );
-  for (const dir of expectedByDir.keys()) {
-    mkdirSync(dir, { recursive: true });
-    if (!pathIsInside(realSkillsRoot, realpathSync(dir))) {
-      throw new Error(`${relative(skillsRoot, dir)} resolves outside the skills tree through a symlink`);
-    }
-  }
-
-  const prepared = PORTABLE_ASSETS.map((asset) => {
-    const source = resolveWithin(repoRoot, asset.source);
-    const target = resolveWithin(skillsRoot, asset.target);
-    const targetDir = dirname(target);
-    if (!pathIsInside(realRepoRoot, realpathSync(source))) {
-      throw new Error(`${asset.source} resolves outside the repository through a symlink`);
-    }
-    const expected = expectedByDir.get(targetDir);
-    if (!expected) throw new Error(`${asset.target} has no declared generated output directory`);
-    expected.add(basename(target));
-    if (lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink()) {
-      throw new Error(`${asset.target} is a symlink; refusing to overwrite it`);
-    }
-    return { label: asset.target, target, next: readFileSync(source, "utf8") };
-  });
-
-  let stamped = 0;
-  let removed = 0;
-  for (const { label, target, next } of prepared) {
-    if (existsSync(target) && readFileSync(target, "utf8") === next) continue;
-    writeFileSync(target, next);
-    stamped += 1;
-    log(`stamped: ${label}`);
-  }
-
-  for (const [dir, expected] of expectedByDir) {
-    for (const entry of readdirSync(dir)) {
-      if (expected.has(entry)) continue;
-      rmSync(join(dir, entry), { recursive: true, force: true });
-      removed += 1;
-      log(`removed orphan: ${relative(skillsRoot, join(dir, entry))}`);
-    }
-  }
-
-  return { stamped, removed, total: PORTABLE_ASSETS.length };
-}
 
 // Replace the manifest's single "version" value, preserving all formatting.
 // Exactly one "version" field per manifest is a precondition: a second one
@@ -527,9 +466,9 @@ export function parseModels(raw, skillExists) {
   return resolveModels(raw);
 }
 
-export function loadModels() {
-  const skillsDir = join(repo, "plugins/pstack/skills");
-  return parseModels(JSON.parse(readFileSync(join(repo, "plugins/pstack/models.json"), "utf8")), (skill) =>
+export function loadModels(root = repo) {
+  const skillsDir = join(root, SKILLS);
+  return parseModels(JSON.parse(readFileSync(join(root, PLUGIN, "models.json"), "utf8")), (skill) =>
     existsSync(join(skillsDir, skill, "SKILL.md")),
   );
 }
@@ -614,39 +553,6 @@ export function effortAgents(levels, potetoAgent) {
         `effort: ${level}\n---\n` + body,
     },
   ]);
-}
-
-// The effort agents live in a directory the generator owns outright, apart
-// from the hand-written agents in plugins/pstack/agents/. Any other entry in it
-// is removed, and a symlink is never written through.
-export function syncEffortAgents(outDir, agents, { log = console.log } = {}) {
-  const dirName = basename(outDir);
-  if (lstatSync(outDir, { throwIfNoEntry: false })?.isSymbolicLink()) {
-    throw new Error(`${dirName}/ is a symlink; refusing to write through it`);
-  }
-  mkdirSync(outDir, { recursive: true });
-  const files = agents.map((a) => ({ file: `${a.name}.md`, path: join(outDir, `${a.name}.md`), text: a.text }));
-  for (const { file, path } of files) {
-    const st = lstatSync(path, { throwIfNoEntry: false });
-    if (st && !st.isFile()) throw new Error(`${dirName}/${file} is not a regular file; refusing to overwrite it`);
-  }
-
-  let stamped = 0;
-  let removed = 0;
-  for (const { file, path, text } of files) {
-    if (existsSync(path) && readFileSync(path, "utf8") === text) continue;
-    writeFileSync(path, text);
-    stamped += 1;
-    log(`stamped: ${dirName}/${file}`);
-  }
-  const expected = new Set(files.map((f) => f.file));
-  for (const entry of readdirSync(outDir)) {
-    if (expected.has(entry)) continue;
-    rmSync(join(outDir, entry), { recursive: true, force: true });
-    removed += 1;
-    log(`removed orphan: ${dirName}/${entry}`);
-  }
-  return { stamped, removed, total: files.length };
 }
 
 const AGENT_DIRS = ["agents", "effort-agents"];
@@ -760,105 +666,144 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json" }) 
   if (problems.length) throw new Error(`${file}:\n  ${problems.join("\n  ")}`);
 }
 
-// Write `next` to `path` only when it differs; returns whether it wrote.
-function stampFile(path, next, label) {
-  if (existsSync(path) && readFileSync(path, "utf8") === next) return false;
-  writeFileSync(path, next);
-  console.log(`stamped: ${label}`);
-  return true;
+// Every file the generator writes, as exact text by repo-relative path,
+// computed from the sources under `root` without writing. Any other entry in
+// an owned directory is an orphan. Throws when a source cannot be planned.
+export function plan(root) {
+  const read = (rel) => readFileSync(join(root, rel), "utf8");
+  const version = read("VERSION").trim();
+  if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`VERSION must be MAJOR.MINOR.PATCH, got "${version}"`);
+  assertChangesHeading(read("CHANGES.md"), version);
+  const models = loadModels(root);
+
+  const files = {};
+  for (const file of VERSIONED_MANIFESTS) files[file] = stampVersion(read(file), version, file);
+  for (const file of new Set(regions(models).map((r) => r.file))) files[file] = applyRegions(file, read(file), models);
+  for (const skill of slashCommands(read(COMMANDS_DOC), publicSkills(join(root, SKILLS)))) {
+    files[`${PROMPTS}/${skill.name}.md`] = promptStub(skill);
+  }
+  const agents = effortAgents(models.efforts, read(`${PLUGIN}/agents/poteto-agent.md`));
+  for (const agent of agents) files[`${EFFORT_AGENTS}/${agent.name}.md`] = agent.text;
+  const manifest = `${PLUGIN}/.claude-plugin/plugin.json`;
+  files[manifest] = stampAgentPaths(files[manifest], [
+    ...pluginAgentPaths(join(root, PLUGIN)).filter((path) => path.startsWith("./agents/")),
+    ...agents.map((agent) => `./effort-agents/${agent.name}.md`).sort(),
+  ]);
+  const realRoot = realpathSync(root);
+  for (const { source, target } of PORTABLE_ASSETS) {
+    if (!pathIsInside(realRoot, realpathSync(join(root, source)))) {
+      throw new Error(`${source} resolves outside the repository through a symlink`);
+    }
+    files[`${SKILLS}/${target}`] = read(source);
+  }
+  const portableDirs = new Set(PORTABLE_ASSETS.map(({ target }) => `${SKILLS}/${dirname(target)}`));
+  return { files, ownedDirs: [PROMPTS, EFFORT_AGENTS, ...portableDirs] };
+}
+
+function lstatNoSymlinks(root, path) {
+  let at = root;
+  let st = null;
+  for (const part of path.split("/")) {
+    at = join(at, part);
+    st = lstatSync(at, { throwIfNoEntry: false });
+    if (!st) return null;
+    if (st.isSymbolicLink()) throw new Error(`${relative(root, at)} is a symlink; refusing to write through it`);
+  }
+  return st;
+}
+
+export function changes(root, intended) {
+  const pending = [];
+  for (const [path, text] of Object.entries(intended.files)) {
+    const st = lstatNoSymlinks(root, path);
+    if (st && !st.isFile()) throw new Error(`${path} is not a regular file; refusing to overwrite it`);
+    if (!st || readFileSync(join(root, path), "utf8") !== text) pending.push({ kind: "write", path });
+  }
+  for (const dir of intended.ownedDirs) {
+    if (!lstatNoSymlinks(root, dir)) continue;
+    for (const entry of readdirSync(join(root, dir)).sort()) {
+      const path = `${dir}/${entry}`;
+      if (!Object.hasOwn(intended.files, path)) pending.push({ kind: "remove", path });
+    }
+  }
+  return pending;
+}
+
+export function apply(root, intended, { log = console.log } = {}) {
+  const pending = changes(root, intended);
+  for (const { kind, path } of pending) {
+    const full = join(root, path);
+    if (kind === "remove") {
+      rmSync(full, { recursive: true, force: true });
+    } else {
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, intended.files[path]);
+    }
+    log(`${kind}: ${path}`);
+  }
+  return pending;
+}
+
+// Every cross-file contract the tree under `root` breaks, one message per
+// failing check. The checks read the tree, not the plan, so on a stale tree
+// they see the stale copies.
+export function problems(root) {
+  const models = loadModels(root);
+  const pluginRoot = join(root, PLUGIN);
+  const skillsDir = join(root, SKILLS);
+  const codexManifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8"));
+  const statOf = (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null);
+  const checks = [
+    () => {
+      const strays = markdownFiles(skillsDir).flatMap((full) =>
+        strayModelSlugs(relative(root, full), readFileSync(full, "utf8"), models),
+      );
+      if (strays.length) {
+        throw new Error(
+          `model names outside generator-owned regions (reference the role and its Models section instead):\n` +
+            strays.join("\n"),
+        );
+      }
+    },
+    () => validateSkillsTree(skillsDir),
+    () => validateProsePaths(skillsDir),
+    () =>
+      validateCodexMarketplace(readFileSync(join(root, ".agents/plugins/marketplace.json"), "utf8"), {
+        expectedName: codexManifest.name,
+        pathExists: (p) => existsSync(join(root, p)),
+      }),
+    () => validatePluginLayout(pluginRoot),
+    ...["hooks/hooks.json", codexManifest.hooks].map(
+      (file) => () => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file }),
+    ),
+  ];
+  return checks.flatMap((check) => {
+    try {
+      check();
+      return [];
+    } catch (err) {
+      return [err.message];
+    }
+  });
 }
 
 function main() {
-  const version = readFileSync(join(repo, "VERSION"), "utf8").trim();
-  if (!/^\d+\.\d+\.\d+$/.test(version)) {
-    throw new Error(`VERSION must be MAJOR.MINOR.PATCH, got "${version}"`);
-  }
-
-  assertChangesHeading(readFileSync(join(repo, "CHANGES.md"), "utf8"), version);
-  console.log(`ok: CHANGES.md has a heading for ${version}`);
-
-  for (const file of VERSIONED_MANIFESTS) {
-    const path = join(repo, file);
-    if (!stampFile(path, stampVersion(readFileSync(path, "utf8"), version, file), `${file} -> ${version}`)) {
-      console.log(`ok: ${file} @ ${version}`);
-    }
-  }
-
-  const models = loadModels();
-  const skillsDir = join(repo, "plugins/pstack/skills");
-
-  let modelStamps = 0;
-  for (const file of new Set(regions(models).map((r) => r.file))) {
-    const path = join(repo, file);
-    if (stampFile(path, applyRegions(file, readFileSync(path, "utf8"), models), `${file} (models)`)) modelStamps++;
-  }
-  if (modelStamps === 0) console.log("ok: model-policy sections current");
-
-  const strays = markdownFiles(skillsDir).flatMap((full) =>
-    strayModelSlugs(full.slice(repo.length + 1), readFileSync(full, "utf8"), models),
-  );
-  if (strays.length) {
-    throw new Error(
-      `model names outside generator-owned regions (reference the role and its Models section instead):\n` +
-        strays.join("\n"),
+  const args = process.argv.slice(2);
+  if (args.some((arg) => arg !== "--check")) throw new Error("usage: bun tools/generate.mjs [--check]");
+  const check = args.includes("--check");
+  const intended = plan(repo);
+  const pending = check ? changes(repo, intended) : apply(repo, intended);
+  const failures = problems(repo);
+  if (check && pending.length) {
+    failures.push(
+      "generated output is stale; run bun tools/generate.mjs:\n" +
+        pending.map(({ kind, path }) => `  ${kind}: ${path}`).join("\n"),
     );
   }
-  console.log("ok: no stray model slugs in skill prose");
-
-  const skills = slashCommands(readFileSync(join(repo, COMMANDS_DOC), "utf8"), publicSkills(skillsDir));
-  console.log(`ok: ${COMMANDS_DOC} slash-command table names the ${skills.length} public skills`);
-
-  const promptsDir = join(repo, "plugins/pstack/.codex-plugin/prompts");
-  let promptsChanged = 0;
-  for (const skill of skills) {
-    if (stampFile(join(promptsDir, `${skill.name}.md`), promptStub(skill), `.codex-plugin/prompts/${skill.name}.md`)) {
-      promptsChanged++;
-    }
-  }
-  const expected = new Set(skills.map((s) => `${s.name}.md`));
-  for (const file of readdirSync(promptsDir)) {
-    if (!file.endsWith(".md") || expected.has(file)) continue;
-    unlinkSync(join(promptsDir, file));
-    console.log(`removed orphan: .codex-plugin/prompts/${file}`);
-  }
-  if (promptsChanged === 0) console.log(`ok: ${skills.length} Codex prompts current`);
-
-  const pluginRoot = join(repo, "plugins/pstack");
-  const agents = effortAgents(models.efforts, readFileSync(join(pluginRoot, "agents/poteto-agent.md"), "utf8"));
-  const effort = syncEffortAgents(join(pluginRoot, "effort-agents"), agents);
-  if (effort.stamped === 0 && effort.removed === 0) console.log(`ok: ${effort.total} effort agents current`);
-  const manifestPath = join(pluginRoot, ".claude-plugin/plugin.json");
-  const agentPaths = pluginAgentPaths(pluginRoot);
-  if (!stampFile(manifestPath, stampAgentPaths(readFileSync(manifestPath, "utf8"), agentPaths), "plugin.json agents")) {
-    console.log(`ok: plugin.json lists ${agentPaths.length} agents`);
-  }
-
-  const portable = syncPortableAssets(repo, skillsDir);
-  if (portable.stamped === 0 && portable.removed === 0) {
-    console.log(`ok: ${portable.total} portable assets current`);
-  }
-  validateSkillsTree(skillsDir);
-  console.log("ok: local markdown links stay inside the skills tree");
-  validateProsePaths(skillsDir);
-  console.log("ok: no skill prose points at a path outside the skills tree");
-
-  const codexName = JSON.parse(
-    readFileSync(join(repo, "plugins/pstack/.codex-plugin/plugin.json"), "utf8"),
-  ).name;
-  validateCodexMarketplace(readFileSync(join(repo, ".agents/plugins/marketplace.json"), "utf8"), {
-    expectedName: codexName,
-    pathExists: (p) => existsSync(join(repo, p)),
-  });
-  console.log("ok: .agents/plugins/marketplace.json names the plugin and points at a real path");
-
-  validatePluginLayout(pluginRoot);
-  console.log("ok: no commands/ directory; plugin agents dispatched by namespaced name; no conflict markers");
-  const statOf = (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null);
-  const codexHooks = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8")).hooks;
-  for (const file of ["hooks/hooks.json", codexHooks]) {
-    validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file });
-    console.log(`ok: ${file} commands point at files that exist in the plugin`);
-  }
+  if (!pending.length) console.log(`ok: ${Object.keys(intended.files).length} generated files current`);
+  for (const failure of failures) console.error(`FAIL: ${failure}`);
+  if (failures.length) process.exit(1);
+  console.log("ok: skill links, prose paths, model slugs, marketplace, plugin layout, and hooks pass their checks");
 }
 
 // Guarded so importing the generator's validation and rendering functions does

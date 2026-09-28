@@ -140,6 +140,31 @@ export function isExcluded(rel, exclude) {
   });
 }
 
+const same = (a, b) => Boolean(a?.bytes && b?.bytes?.equals(a.bytes) && a.mode === b.mode);
+const NO_COMMON_ANCESTOR = Buffer.alloc(0);
+
+export function classify({ old = null, new: next = null, local = null, excluded = false, elsewhere = false }) {
+  if (excluded) return next ? { kind: "excluded" } : null;
+  if (next?.symlink) return { kind: "symlink" };
+  if (!next) {
+    if (!old) return local && !elsewhere ? { kind: "port-only" } : null;
+    if (!local) return null;
+    return old.bytes?.equals(local.bytes) ? { kind: "deleted" } : { kind: "removed-upstream", kept: local.bytes };
+  }
+  const write = (kind, bytes = next.bytes) => ({ kind, write: { bytes, mode: next.mode }, counts: next.counts });
+  if (!local) return write("added");
+  if (same(local, next)) return { kind: "unchanged", kept: local.bytes };
+  if (same(local, old)) return write("updated");
+  if (same(old, next)) {
+    if (local.bytes.equals(old.bytes)) return { kind: "mode-only", kept: local.bytes };
+    return { kind: "forked", kept: local.bytes, base: old.bytes };
+  }
+  if (next.binary) return { kind: "binary-conflict" };
+  const merged = mergeFile(local.bytes, old?.bytes ?? NO_COMMON_ANCESTOR, next.bytes);
+  if (merged.clean) return write("merged", merged.buffer);
+  return { ...write("conflicted", merged.buffer), hunks: merged.hunks };
+}
+
 // Compare old-upstream vs new-upstream vs local for one component tree.
 // `derive(rel, text)` turns substituted upstream text into the port's form;
 // the default is identity. Returns the report and, unless dryRun, applies it.
@@ -166,99 +191,61 @@ export function syncComponent({
     counts: new Map(),
     hits: [],
   };
-  const operations = [];
-  const addCounts = (counts) => counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
   const portForm = (rel, raw) => {
-    if (isBinary(rel, raw)) return { buffer: raw, counts: new Map(), binary: true };
+    if (isBinary(rel, raw)) return { bytes: raw, counts: new Map(), binary: true };
     const sub = applySubstitutions(raw.toString("utf8"), rules, rel);
-    return { buffer: Buffer.from(derive(rel, sub.text)), counts: sub.counts };
+    return { bytes: Buffer.from(derive(rel, sub.text)), counts: sub.counts };
   };
-  const derivedOld = (rel) => {
-    const oldFile = join(oldDir, rel);
-    return lstatSync(oldFile, { throwIfNoEntry: false })?.isFile() ? portForm(rel, readFileSync(oldFile)).buffer : null;
+  const listed = (dir) => new Set(walk(dir).map((file) => relative(dir, file)));
+  const [oldPaths, newPaths, localPaths] = [listed(oldDir), listed(newDir), listed(localDir)];
+  const upstream = (dir, paths, rel, read) => {
+    if (!paths.has(rel)) return null;
+    const stat = lstatSync(join(dir, rel));
+    if (stat.isSymbolicLink()) return { symlink: true };
+    return read ? { ...portForm(rel, readFileSync(join(dir, rel))), mode: stat.mode & 0o777 } : { unread: true };
   };
-  const modeOf = (file) => statSync(file).mode & 0o777;
-  const scan = (rel, buffer) => {
-    if (!isBinary(rel, buffer)) report.hits.push(...denylistHits(rel, buffer.toString("utf8"), denylist));
+  const portCopy = (rel, read) => {
+    const file = join(localDir, rel);
+    if (!read) return localPaths.has(rel) ? { unread: true } : null;
+    return existsSync(file) ? { bytes: readFileSync(file), mode: statSync(file).mode & 0o777 } : null;
   };
-  const planWrite = (rel, kind, next) => {
-    operations.push({ kind: "write", rel, buffer: next });
-    report.written.push({ kind, rel });
-    scan(rel, next);
-  };
+  const elsewhere = new Set(carriedElsewhere);
+  const outcomes = [...new Set([...newPaths, ...oldPaths, ...localPaths])].flatMap((rel) => {
+    const excluded = isExcluded(rel, exclude);
+    const old = upstream(oldDir, oldPaths, rel, !excluded);
+    const next = upstream(newDir, newPaths, rel, !excluded);
+    const local = portCopy(rel, !excluded && Boolean(old || next));
+    const outcome = classify({ old, new: next, local, excluded, elsewhere: elsewhere.has(rel) });
+    return outcome ? [{ rel, ...outcome }] : [];
+  });
 
-  const carried = (dir) => walk(dir).map((file) => relative(dir, file)).filter((rel) => !isExcluded(rel, exclude));
-  const carriedNew = carried(newDir);
-  report.excluded = walk(newDir).length - carriedNew.length;
-
-  for (const rel of carriedNew) {
-    const localFile = join(localDir, rel);
-    const newFile = join(newDir, rel);
-    // Following a link would copy whatever it points at, even outside the
-    // clone, into the port.
-    if (lstatSync(newFile).isSymbolicLink()) {
-      report.conflicts.push({ rel, reason: "symlink" });
-      continue;
+  for (const { rel, kind, write, kept, counts, base, hunks } of outcomes) {
+    const scanned = write?.bytes ?? kept;
+    if (scanned && !isBinary(rel, scanned)) report.hits.push(...denylistHits(rel, scanned.toString("utf8"), denylist));
+    if (write) {
+      report.written.push({ kind, rel });
+      counts.forEach((n, p) => report.counts.set(p, (report.counts.get(p) ?? 0) + n));
     }
-    const next = portForm(rel, readFileSync(newFile));
-    if (!existsSync(localFile)) {
-      planWrite(rel, "added", next.buffer);
-      addCounts(next.counts);
-      continue;
-    }
-    const local = readFileSync(localFile);
-    if (local.equals(next.buffer) && modeOf(localFile) === modeOf(newFile)) {
-      report.unchanged++;
-      scan(rel, next.buffer);
-      continue;
-    }
-    const old = derivedOld(rel);
-    if (old && local.equals(old) && modeOf(localFile) === modeOf(join(oldDir, rel))) {
-      planWrite(rel, "updated", next.buffer);
-      addCounts(next.counts);
-    } else if (old && old.equals(next.buffer) && modeOf(join(oldDir, rel)) === modeOf(newFile)) {
-      report.forked.push(
-        local.equals(old) ? { rel, changed: 0, modeOnly: true } : { rel, changed: changedLines(old, localFile) },
-      );
-      scan(rel, local);
-    } else if (next.binary) {
-      report.binaryConflicts.push(rel);
-    } else {
-      // A file new upstream that the port already wrote has no common ancestor.
-      // An empty base makes every shared line a coincidence, which is what it is.
-      const merged = mergeFile(local, old ?? Buffer.alloc(0), next.buffer);
-      planWrite(rel, merged.clean ? "merged" : "conflicted", merged.buffer);
-      addCounts(next.counts);
-      if (!merged.clean) report.conflicts.push({ rel, reason: "conflict", hunks: merged.hunks });
-    }
+    if (kind === "unchanged") report.unchanged++;
+    else if (kind === "excluded") report.excluded++;
+    else if (kind === "forked") report.forked.push({ rel, changed: changedLines(base, join(localDir, rel)) });
+    else if (kind === "mode-only") report.forked.push({ rel, changed: 0, modeOnly: true });
+    else if (kind === "conflicted") report.conflicts.push({ rel, reason: "conflict", hunks });
+    else if (kind === "symlink" || kind === "removed-upstream") report.conflicts.push({ rel, reason: kind });
+    else if (kind === "binary-conflict") report.binaryConflicts.push(rel);
+    else if (kind === "deleted") report.deleted.push(rel);
+    else if (kind === "port-only") report.portOnly.push(rel);
   }
-
-  for (const rel of carried(oldDir)) {
-    const localFile = join(localDir, rel);
-    if (carriedNew.includes(rel) || !existsSync(localFile)) continue;
-    const local = readFileSync(localFile);
-    const old = derivedOld(rel);
-    if (old && local.equals(old)) {
-      operations.push({ kind: "delete", rel });
-      report.deleted.push(rel);
-    } else {
-      report.conflicts.push({ rel, reason: "removed-upstream" });
-      scan(rel, local);
-    }
-  }
-
   report.forked.sort((a, b) => b.changed - a.changed);
-  const upstreamPaths = new Set([...carriedNew, ...carried(oldDir), ...carriedElsewhere]);
-  report.portOnly = carried(localDir).filter((rel) => !upstreamPaths.has(rel));
 
   if (report.hits.length || report.binaryConflicts.length || dryRun) return report;
-  for (const operation of operations) {
-    const localFile = join(localDir, operation.rel);
-    if (operation.kind === "write") {
+  for (const { rel, kind, write } of outcomes) {
+    const localFile = join(localDir, rel);
+    if (write) {
       mkdirSync(dirname(localFile), { recursive: true });
-      writeFileSync(localFile, operation.buffer);
-      chmodSync(localFile, modeOf(join(newDir, operation.rel)));
-    } else {
+      writeFileSync(localFile, write.bytes);
+      chmodSync(localFile, write.mode);
+    } else if (kind === "deleted") {
       unlinkSync(localFile);
     }
   }

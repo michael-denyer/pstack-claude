@@ -15,7 +15,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applySubstitutions, changedLines, denylistHits, mergeFile, syncComponent } from "../tools/sync.mjs";
+import { applySubstitutions, changedLines, classify, denylistHits, mergeFile, syncComponent } from "../tools/sync.mjs";
 
 const RULES = JSON.parse(readFileSync(join(import.meta.dir, "../tools/substitutions.json"), "utf8"));
 
@@ -194,6 +194,63 @@ describe("changedLines", () => {
   });
 });
 
+describe("classify", () => {
+  const COUNTS = new Map([["AskQuestion", 1]]);
+  const bytes = (text) => Buffer.from(text);
+  const port = (text, mode = 0o644) => ({ bytes: bytes(text), mode });
+  const upstream = (text, mode = 0o644) => ({ ...port(text, mode), binary: false, counts: COUNTS });
+  const written = (kind, text, mode = 0o644) => ({ kind, write: { bytes: bytes(text), mode }, counts: COUNTS });
+  const base = ["l1", "l2", "l3", "l4", "l5"].join("\n") + "\n";
+
+  test.each([
+    ["an excluded path upstream still has", { excluded: true, new: { unread: true }, local: { unread: true } }, { kind: "excluded" }],
+    ["an excluded path upstream no longer has", { excluded: true, old: { unread: true }, local: { unread: true } }, null],
+    ["an upstream symlink", { old: upstream("a\n"), new: { symlink: true }, local: port("a\n") }, { kind: "symlink" }],
+    ["a local file no upstream revision has", { local: { unread: true } }, { kind: "port-only" }],
+    ["a local file another component carries", { local: { unread: true }, elsewhere: true }, null],
+    ["a new upstream file", { new: upstream("a\n") }, written("added", "a\n")],
+    ["a local copy equal to new", { old: upstream("a\n"), new: upstream("b\n"), local: port("b\n") }, { kind: "unchanged", kept: bytes("b\n") }],
+    ["a local copy equal to old", { old: upstream("a\n"), new: upstream("b\n"), local: port("a\n") }, written("updated", "b\n")],
+    ["an upstream mode change", { old: upstream("a\n"), new: upstream("a\n", 0o755), local: port("a\n") }, written("updated", "a\n", 0o755)],
+    [
+      "a port edit upstream left alone",
+      { old: upstream("a\n"), new: upstream("a\n"), local: port("a\nport\n") },
+      { kind: "forked", kept: bytes("a\nport\n"), base: bytes("a\n") },
+    ],
+    ["a port mode change upstream left alone", { old: upstream("a\n"), new: upstream("a\n"), local: port("a\n", 0o755) }, { kind: "mode-only", kept: bytes("a\n") }],
+    [
+      "a binary changed on both sides",
+      { old: upstream("\0old"), new: { ...upstream("\0new"), binary: true }, local: port("\0port") },
+      { kind: "binary-conflict" },
+    ],
+    [
+      "edits on both sides that do not overlap",
+      { old: upstream(base), new: upstream(base.replace("l5", "l5 upstream")), local: port(base.replace("l1", "l1 port")) },
+      written("merged", base.replace("l1", "l1 port").replace("l5", "l5 upstream")),
+    ],
+    [
+      "edits on both sides that overlap",
+      { old: upstream(base), new: upstream(base.replace("l3", "l3 upstream")), local: port(base.replace("l3", "l3 port")) },
+      { ...written("conflicted", "l1\nl2\n<<<<<<< local\nl3 port\n=======\nl3 upstream\n>>>>>>> upstream\nl4\nl5\n"), hunks: 1 },
+    ],
+    [
+      "a file new on both sides",
+      { new: upstream("upstream\n"), local: port("port\n") },
+      { ...written("conflicted", "<<<<<<< local\nport\n=======\nupstream\n>>>>>>> upstream\n"), hunks: 1 },
+    ],
+    [
+      "a file that replaced an upstream symlink",
+      { old: { symlink: true }, new: upstream("upstream\n"), local: port("port\n") },
+      { ...written("conflicted", "<<<<<<< local\nport\n=======\nupstream\n>>>>>>> upstream\n"), hunks: 1 },
+    ],
+    ["an upstream deletion the port never edited", { old: upstream("a\n"), local: port("a\n") }, { kind: "deleted" }],
+    ["an upstream deletion of a port edit", { old: upstream("a\n"), local: port("port\n") }, { kind: "removed-upstream", kept: bytes("port\n") }],
+    ["an upstream deletion the port already made", { old: upstream("a\n") }, null],
+  ])("%s", (_, input, outcome) => {
+    expect(classify(input)).toEqual(outcome);
+  });
+});
+
 describe("syncComponent", () => {
   test("installed plugin text passes sync validation without changes", () => {
     const plugin = join(import.meta.dir, "../plugins/pstack");
@@ -274,15 +331,6 @@ describe("syncComponent", () => {
     expect(report.conflicts).toEqual([{ rel: "forked.md", reason: "removed-upstream" }]);
     expect(existsSync(join(local, "gone.md"))).toBe(false);
     expect(existsSync(join(local, "forked.md"))).toBe(true);
-  });
-
-  test("a written file that still carries a Cursor-ism is reported as a hit", () => {
-    const oldUp = tree({ "s.md": "one\n" });
-    const newUp = tree({ "s.md": "one\nrun control-cli\n" });
-    const local = tree({ "s.md": "one\n" });
-    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
-    expect(report.hits).toHaveLength(1);
-    expect(report.hits[0]).toStartWith("s.md:2:");
   });
 
   test("a denylist hit leaves an update unapplied on every identical retry", () => {
@@ -473,16 +521,6 @@ describe("syncComponent", () => {
     expect(readFileSync(join(local, "s.md"), "utf8")).toBe("one\n");
     expect(existsSync(join(local, "gone.md"))).toBe(true);
     expect(existsSync(join(local, "new.md"))).toBe(false);
-  });
-
-  test("binary files are copied byte for byte", () => {
-    const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff]);
-    const oldUp = tree({});
-    const newUp = tree({});
-    writeFileSync(join(newUp, "logo.png"), bytes);
-    const local = tree({});
-    sync({ oldDir: oldUp, newDir: newUp, localDir: local });
-    expect(readFileSync(join(local, "logo.png")).equals(bytes)).toBe(true);
   });
 
   test("a binary file of any extension is copied byte for byte and never substituted", () => {
@@ -686,21 +724,6 @@ describe("syncComponent", () => {
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, exclude: ["docs/"], carriedElsewhere: ["kit/k.md"] });
 
     expect(report.portOnly).toEqual(["tools/extra.ts"]);
-  });
-
-  test("a binary file differing three ways is reported as unmergeable", () => {
-    const oldUp = tree({});
-    const newUp = tree({});
-    const local = tree({});
-    writeFileSync(join(oldUp, "logo.png"), Buffer.from([0x89, 0x50, 0x00, 0x01]));
-    writeFileSync(join(newUp, "logo.png"), Buffer.from([0x89, 0x50, 0x00, 0x02]));
-    writeFileSync(join(local, "logo.png"), Buffer.from([0x89, 0x50, 0x00, 0x03]));
-
-    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
-
-    expect(report.binaryConflicts).toEqual(["logo.png"]);
-    expect(report.written).toEqual([]);
-    expect(readFileSync(join(local, "logo.png")).equals(Buffer.from([0x89, 0x50, 0x00, 0x03]))).toBe(true);
   });
 });
 

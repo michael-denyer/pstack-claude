@@ -27,8 +27,11 @@ import {
   deriveSkill,
   effortAgents,
   effortSection,
+  OWNED_DIRS,
   plan,
+  PORTABLE_ASSETS,
   pluginAgentPaths,
+  problems,
   stampAgentPaths,
   fenceUnder,
   loadModels,
@@ -545,7 +548,7 @@ describe("plan, changes, apply", () => {
     mkdirSync(join(root, "out"));
     symlinkSync(outside, join(root, "out/b.md"));
     const intended = { files: { "out/a.md": "A", "out/b.md": "B" }, ownedDirs: ["out"] };
-    expect(() => apply(root, intended, quiet)).toThrow("out/b.md is a symlink; refusing to write through it");
+    expect(() => apply(root, intended, quiet)).toThrow("out/b.md is a symlink; the generator never writes through one");
     expect(readFileSync(outside, "utf8")).toBe("original");
     expect(existsSync(join(root, "out/a.md"))).toBe(false);
   });
@@ -571,8 +574,118 @@ describe("plan, changes, apply", () => {
       { files: { "skills/out/a.md": "A" }, ownedDirs: ["skills/out"] },
       { files: { "skills/out/deep/a.md": "A" }, ownedDirs: [] },
     ]) {
-      expect(() => apply(root, intended, quiet)).toThrow("skills/out is a symlink; refusing to write through it");
+      expect(() => apply(root, intended, quiet)).toThrow("skills/out is a symlink; the generator never writes through one");
     }
     expect(readdirSync(outside)).toEqual([]);
+  });
+
+  test("apply refuses a symlinked owned directory with no planned files and deletes nothing through it", () => {
+    const root = scratch("pstack-apply-");
+    const outside = scratch("pstack-outside-");
+    writeFileSync(join(outside, "keep.md"), "original");
+    symlinkSync(outside, join(root, "out"), "dir");
+    expect(() => apply(root, { files: {}, ownedDirs: ["out"] }, quiet)).toThrow(
+      "out is a symlink; the generator never writes through one",
+    );
+    expect(readFileSync(join(outside, "keep.md"), "utf8")).toBe("original");
+  });
+
+  test("changes refuses a directory at a planned path", () => {
+    const root = scratch("pstack-apply-");
+    mkdirSync(join(root, "out/a.md"), { recursive: true });
+    expect(() => changes(root, { files: { "out/a.md": "A" }, ownedDirs: ["out"] })).toThrow(
+      "out/a.md is not a regular file; the generator never overwrites one",
+    );
+  });
+
+  test("a planned file nested under an owned directory converges instead of being removed", () => {
+    const root = scratch("pstack-apply-");
+    const intended = { files: { "out/sub/a.md": "A" }, ownedDirs: ["out"] };
+    apply(root, intended, quiet);
+    expect(changes(root, intended)).toEqual([]);
+    expect(readFileSync(join(root, "out/sub/a.md"), "utf8")).toBe("A");
+  });
+
+  test("plan refuses a portable copy outside the owned directories and an owned directory nested in another", () => {
+    const cases = [
+      [
+        PORTABLE_ASSETS,
+        { source: "NOTICE-skills.md", target: "poteto-mode/references/NOTICE.md" },
+        "plugins/pstack/skills/poteto-mode/references/NOTICE.md is not directly inside a generator-owned directory",
+      ],
+      [
+        PORTABLE_ASSETS,
+        { source: "LICENSE", target: "poteto-mode/references/licenses/old/LICENSE" },
+        "plugins/pstack/skills/poteto-mode/references/licenses/old/LICENSE is not directly inside a generator-owned directory",
+      ],
+      [
+        OWNED_DIRS,
+        "plugins/pstack/effort-agents/nested",
+        "generator-owned directory plugins/pstack/effort-agents/nested is nested inside plugins/pstack/effort-agents",
+      ],
+    ];
+    for (const [list, entry, message] of cases) {
+      list.push(entry);
+      try {
+        expect(() => plan(repoRoot)).toThrow(message);
+      } finally {
+        list.pop();
+      }
+    }
+  });
+
+  const generate = (root, ...args) =>
+    spawnSync(process.execPath, [join(root, "tools/generate.mjs"), ...args], { encoding: "utf8" });
+  const append = (root, rel, text) => writeFileSync(join(root, rel), readFileSync(join(root, rel), "utf8") + text);
+  const STRAY_SLUG = ["plugins/pstack/skills/tdd/SKILL.md", "\nUse claude-opus-99 here.\n"];
+
+  test("problems reports every broken contract, and --check prints each and exits 1", () => {
+    const root = repoCopy();
+    append(root, ...STRAY_SLUG);
+    append(root, "plugins/pstack/skills/deslop/SKILL.md", "\n[gone](missing.md)\n");
+    append(root, "plugins/pstack/skills/unslop/SKILL.md", '\nsubagent_type: "poteto-agent"\n');
+    const failures = problems(root);
+    expect(failures).toEqual([
+      expect.stringContaining("plugins/pstack/skills/tdd/SKILL.md:"),
+      "invalid local markdown links:\ndeslop/SKILL.md -> missing.md (missing)",
+      expect.stringContaining('skills/unslop/SKILL.md:'),
+    ]);
+    const check = generate(root, "--check");
+    expect(check.status).toBe(1);
+    for (const failure of failures) expect(check.stderr).toContain(`FAIL: ${failure}\n`);
+  });
+
+  test("a write run regenerates before it validates, so a slug left only in a stale copy passes", () => {
+    const root = repoCopy();
+    const copy = "plugins/pstack/skills/poteto-mode/references/agents/poteto-agent.md";
+    append(root, copy, "\nUse claude-opus-99 here.\n");
+    expect(generate(root).status).toBe(0);
+    expect(readFileSync(join(root, copy), "utf8")).toBe(
+      readFileSync(join(root, "plugins/pstack/agents/poteto-agent.md"), "utf8"),
+    );
+  });
+
+  test("--check reports a symlink at a planned path alongside the other failures and writes nothing", () => {
+    const root = repoCopy();
+    const outside = join(scratch("pstack-outside-"), "target.md");
+    writeFileSync(outside, "original");
+    rmSync(join(root, STUB));
+    symlinkSync(outside, join(root, STUB));
+    append(root, ...STRAY_SLUG);
+    const check = generate(root, "--check");
+    expect(check.status).toBe(1);
+    expect(check.stderr).toContain(`FAIL: ${STUB} is a symlink; the generator never writes through one\n`);
+    expect(check.stderr).toContain("FAIL: model names outside generator-owned regions");
+    expect(readFileSync(outside, "utf8")).toBe("original");
+  });
+
+  test("problems reports a malformed Codex manifest as one failure and still runs the other checks", () => {
+    const root = repoCopy();
+    append(root, "plugins/pstack/.codex-plugin/plugin.json", "}\n");
+    append(root, ...STRAY_SLUG);
+    expect(problems(root)).toEqual([
+      expect.stringContaining("plugins/pstack/.codex-plugin/plugin.json: "),
+      expect.stringContaining("plugins/pstack/skills/tdd/SKILL.md:"),
+    ]);
   });
 });

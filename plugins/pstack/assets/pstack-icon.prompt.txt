@@ -1,0 +1,8 @@
+Generated with the built-in image_gen tool, with transparent_background enabled.
+
+Use case: logo-brand
+Asset type: finished square plugin icon for pstack-claude, a developer tool that organizes a stack of agent workflows.
+Create one polished, distinctive app icon, centered and filling most of a square canvas. A solid violet rounded square tile, using the existing brand violet #7C3AED, holds a bold ivory-white symbol of three stacked layers. Design the layers as clean, thick, gently rounded isometric chevrons or slabs, with clear violet gaps between them. The top layer is a complete rhombus; the lower two read as broad V-shaped stacked edges. The composition should be optically balanced and immediately legible at 32 pixels.
+Style: restrained, crisp vector-like graphic, precise geometry, generous internal padding, flat color, professional developer-tool identity. Subtle warmth in the white.
+Background outside the rounded square must be truly transparent.
+Constraints: single icon only, no wordmark, no letters, no text, no sparkle, no mascot, no code brackets, no outlines around the tile, no mockup, no extra symbols, no grain, no shadows outside the tile, no bevels or elaborate 3D lighting. Square output.

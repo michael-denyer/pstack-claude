@@ -46,6 +46,8 @@
       "Interrogate this diff with multiple models."
     ],
     "websiteURL": "https://github.com/michael-denyer/pstack-claude",
-    "brandColor": "#7C3AED"
+    "brandColor": "#7C3AED",
+    "composerIcon": "./assets/pstack-icon.png",
+    "logo": "./assets/pstack-icon.png"
   }
 }

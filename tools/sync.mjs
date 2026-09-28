@@ -59,21 +59,63 @@ import { walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
+const RULE_FIELDS = new Set(["pattern", "regex", "files", "replacement", "rationale"]);
+
 // A rule matches a literal `pattern` or a `regex`, optionally only in files
-// whose upstream-relative path matches `files`. The replacement is always
-// literal, and counts are keyed by the pattern or regex source.
+// whose upstream-relative path matches `files`, and rewrites each match to the
+// literal `replacement`. Its count is keyed by the pattern, or by the regex and
+// its `files` scope.
+export function parseRule(rule, i) {
+  const fail = (message) => {
+    throw new Error(`substitutions[${i}]: ${message}`);
+  };
+  const unknown = Object.keys(rule).filter((field) => !RULE_FIELDS.has(field));
+  if (unknown.length) fail(`unknown field ${unknown.map((f) => `"${f}"`).join(", ")}`);
+  const { pattern, regex, files, replacement, rationale } = rule;
+  const source = pattern ?? regex;
+  if ((pattern == null) === (regex == null) || typeof source !== "string" || !source) {
+    fail("needs exactly one of a non-empty pattern or regex");
+  }
+  if (typeof replacement !== "string") fail("needs a replacement string");
+  if (typeof rationale !== "string" || !rationale) fail("needs a rationale");
+  if (files != null && typeof files !== "string") fail("files must be a regex source string");
+  return {
+    key: pattern ?? (files ? `${regex} in ${files}` : regex),
+    match: pattern ?? new RegExp(regex, "g"),
+    files: files ? new RegExp(files) : null,
+    replacement,
+  };
+}
+
+// Rules apply in order, each to the output of the ones before it, so a rule
+// whose pattern contains an earlier rule's pattern could never match. Such a
+// pair fails here: put the longer, more specific pattern first.
+export function parseSubstitutions({ substitutions, denylist }) {
+  const rules = substitutions.map(parseRule);
+  substitutions.forEach((later, j) => {
+    const earlier = substitutions.slice(0, j).findIndex((r) => r.pattern && later.pattern?.includes(r.pattern));
+    if (earlier !== -1) {
+      throw new Error(
+        `substitutions[${j}] "${later.pattern}" contains substitutions[${earlier}] "${substitutions[earlier].pattern}", ` +
+          "which runs first and consumes it; move it above",
+      );
+    }
+  });
+  return { substitutions: rules, denylist };
+}
+
+// `rules` come from parseSubstitutions.
 export function applySubstitutions(text, rules, rel = "") {
   const counts = new Map();
   let out = text;
   for (const rule of rules) {
-    if (rule.files && !new RegExp(rule.files).test(rel)) continue;
+    if (rule.files && !rule.files.test(rel)) continue;
     let n = 0;
-    out = out.replaceAll(rule.pattern ?? new RegExp(rule.regex, "g"), () => {
+    out = out.replaceAll(rule.match, () => {
       n++;
       return rule.replacement;
     });
-    const key = rule.pattern ?? rule.regex;
-    if (n) counts.set(key, (counts.get(key) ?? 0) + n);
+    if (n) counts.set(rule.key, (counts.get(rule.key) ?? 0) + n);
   }
   return { text: out, counts };
 }
@@ -285,7 +327,9 @@ function main() {
     console.error(`usage: bun tools/sync.mjs <${Object.keys(upstream.components).join("|")}> <new-sha> [--dry-run]`);
     process.exit(2);
   }
-  const { substitutions, denylist } = JSON.parse(readFileSync(join(repo, "tools/substitutions.json"), "utf8"));
+  const { substitutions, denylist } = parseSubstitutions(
+    JSON.parse(readFileSync(join(repo, "tools/substitutions.json"), "utf8")),
+  );
 
   const scratch = mkdtempSync(join(tmpdir(), "pstack-sync-"));
   try {

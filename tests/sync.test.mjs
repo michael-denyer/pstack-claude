@@ -15,9 +15,18 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applySubstitutions, changedLines, classify, denylistHits, mergeFile, syncComponent } from "../tools/sync.mjs";
+import {
+  applySubstitutions,
+  changedLines,
+  classify,
+  denylistHits,
+  mergeFile,
+  parseRule,
+  parseSubstitutions,
+  syncComponent,
+} from "../tools/sync.mjs";
 
-const RULES = JSON.parse(readFileSync(join(import.meta.dir, "../tools/substitutions.json"), "utf8"));
+const RULES = parseSubstitutions(JSON.parse(readFileSync(join(import.meta.dir, "../tools/substitutions.json"), "utf8")));
 
 const fixtures = [];
 afterEach(() => {
@@ -106,6 +115,47 @@ describe("applySubstitutions", () => {
     for (const rule of RULES.substitutions) {
       expect(denylistHits("rule", rule.replacement, RULES.denylist)).toEqual([]);
     }
+  });
+});
+
+describe("parseSubstitutions", () => {
+  const rule = (fields) => ({ replacement: "X", rationale: "fixture", ...fields });
+
+  test("a misspelled field fails naming the rule instead of matching everywhere", () => {
+    expect(() => parseRule(rule({ patern: "a" }), 3)).toThrow('substitutions[3]: unknown field "patern"');
+    expect(() => parseRule(rule({ pattern: "a", file: "^skills/" }), 0)).toThrow('unknown field "file"');
+  });
+
+  test("a rule needs exactly one matcher, a replacement, and a rationale", () => {
+    expect(() => parseRule(rule({}), 0)).toThrow("exactly one of a non-empty pattern or regex");
+    expect(() => parseRule(rule({ pattern: "a", regex: "a" }), 0)).toThrow("exactly one");
+    expect(() => parseRule(rule({ pattern: "" }), 0)).toThrow("exactly one");
+    expect(() => parseRule({ pattern: "a", rationale: "fixture" }, 0)).toThrow("needs a replacement string");
+    expect(() => parseRule({ pattern: "a", replacement: "X" }, 0)).toThrow("needs a rationale");
+  });
+
+  test("a pattern that contains an earlier rule's pattern fails, since it could never match", () => {
+    const generic = rule({ pattern: "`Task`", replacement: "`Agent`" });
+    const specific = rule({ pattern: "Spawn `Task` with", replacement: "Spawn an `Agent` with" });
+    expect(() => parseSubstitutions({ substitutions: [generic, specific], denylist: [] })).toThrow(
+      'substitutions[1] "Spawn `Task` with" contains substitutions[0] "`Task`"',
+    );
+    const { substitutions } = parseSubstitutions({ substitutions: [specific, generic], denylist: [] });
+    expect(applySubstitutions("Spawn `Task` with it. One `Task` call.", substitutions).text).toBe(
+      "Spawn an `Agent` with it. One `Agent` call.",
+    );
+  });
+
+  test("one regex scoped to two path sets counts under two keys", () => {
+    const { substitutions } = parseSubstitutions({
+      substitutions: [
+        rule({ regex: "a+", files: "^one/" }),
+        rule({ regex: "a+", files: "^two/" }),
+      ],
+      denylist: [],
+    });
+    expect([...applySubstitutions("aa", substitutions, "one/x.md").counts.keys()]).toEqual(["a+ in ^one/"]);
+    expect([...applySubstitutions("aa", substitutions, "two/x.md").counts.keys()]).toEqual(["a+ in ^two/"]);
   });
 });
 
@@ -435,13 +485,13 @@ describe("syncComponent", () => {
       oldDir: oldUp,
       newDir: newUp,
       localDir: local,
-      rules: [{ pattern: "run control-cli", replacement: "run cli" }],
+      rules: [parseRule({ pattern: "run control-cli", replacement: "run cli", rationale: "fixture" }, 0)],
     });
     const unchanged = sync({
       oldDir: oldUp,
       newDir: newUp,
       localDir: local,
-      rules: [{ pattern: "run control-cli", replacement: "run cli" }],
+      rules: [parseRule({ pattern: "run control-cli", replacement: "run cli", rationale: "fixture" }, 0)],
     });
 
     expect(failed.hits).toHaveLength(1);

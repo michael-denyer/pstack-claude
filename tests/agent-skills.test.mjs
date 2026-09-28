@@ -27,7 +27,6 @@ const skillsDir = join(repoRoot, "plugins/pstack/skills");
 const agentsDir = join(repoRoot, "plugins/pstack/agents");
 const requiredPortableFiles = [
   "poteto-mode/references/agents/comment-sicko.md",
-  "poteto-mode/references/agents/poteto-agent.md",
   "poteto-mode/references/licenses/LICENSE",
   "poteto-mode/references/licenses/LICENSE-cursor-team-kit",
   "poteto-mode/references/licenses/NOTICE.md",
@@ -216,11 +215,21 @@ describe("shared Agent Skills tree", () => {
 
   test("the subagent definitions dispatched by name install with the skills", () => {
     const vendored = join(skillsDir, "poteto-mode", "references", "agents");
-    for (const name of ["poteto-agent", "comment-sicko"]) {
+    for (const name of ["comment-sicko"]) {
       const copy = readFileSync(join(vendored, `${name}.md`), "utf8");
       expect(copy).toBe(readFileSync(join(agentsDir, `${name}.md`), "utf8"));
       expect(copy).toContain(`name: ${name}`);
     }
+  });
+
+  test("every vendored subagent definition has a skill that tells Codex to read it", () => {
+    const prose = walk(skillsDir)
+      .filter((file) => file.endsWith(".md"))
+      .map((file) => readFileSync(file, "utf8"))
+      .join("\n");
+    const vendored = PORTABLE_ASSETS.map(({ target }) => target).filter((target) => target.includes("/agents/"));
+    expect(vendored.length).toBeGreaterThan(0);
+    expect(vendored.filter((target) => !prose.includes(target))).toEqual([]);
   });
 
   test("every required portable asset lives inside the skills tree", () => {

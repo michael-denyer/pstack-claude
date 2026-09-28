@@ -64,10 +64,6 @@ const VERSIONED_MANIFESTS = [
 
 export const PORTABLE_ASSETS = [
   {
-    source: "plugins/pstack/agents/poteto-agent.md",
-    target: "poteto-mode/references/agents/poteto-agent.md",
-  },
-  {
     source: "plugins/pstack/agents/comment-sicko.md",
     target: "poteto-mode/references/agents/comment-sicko.md",
   },
@@ -530,8 +526,9 @@ export function effortSection(levels, defaultEffort) {
 }
 
 // The effort agents: one general-purpose worker and one poteto-agent per level.
-// The poteto variants carry poteto-agent's body, so the routing contract is
-// written once in plugins/pstack/agents/poteto-agent.md.
+// The poteto variants carry poteto-agent's body. Their descriptions name
+// pstack:poteto-agent instead of copying its routing contract, so only the
+// base agent reads as the routing target for /poteto-mode.
 export function effortAgents(levels, potetoAgent) {
   const { body } = parseFrontmatter(potetoAgent);
   return levels.flatMap((level) => [

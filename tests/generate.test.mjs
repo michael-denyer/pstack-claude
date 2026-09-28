@@ -370,7 +370,7 @@ describe("deriveSkill", () => {
 });
 
 describe("effort agents", () => {
-  const poteto = "---\nname: poteto-agent\ndescription: d\n---\n\n# Poteto subagent\n\nRead the skill.\n";
+  const poteto = "---\nname: poteto-agent\ndescription: Routing contract.\n---\n\n# Poteto subagent\n\nRead the skill.\n";
   const agents = effortAgents(["high", "max"], poteto);
 
   test("one general-purpose and one poteto agent per level, each setting only effort", () => {
@@ -386,6 +386,12 @@ describe("effort agents", () => {
   test("the poteto variant carries poteto-agent's body verbatim", () => {
     expect(agents[1].text.endsWith("---\n\n# Poteto subagent\n\nRead the skill.\n")).toBe(true);
     expect(agents[1].text.match(/^---$/gm)).toHaveLength(2);
+  });
+
+  test("the poteto variant's description defers to pstack:poteto-agent rather than copying its routing contract", () => {
+    const description = agents[1].text.match(/^description: (.*)$/m)[1];
+    expect(description).toContain("in place of `pstack:poteto-agent`");
+    expect(description).not.toContain("Routing contract.");
   });
 
   const pluginRoot = join(fileURLToPath(new URL("..", import.meta.url)), "plugins/pstack");

@@ -189,6 +189,28 @@ describe("validateCodexMarketplace", () => {
   });
 });
 
+describe("manifests", () => {
+  const json = (rel) => JSON.parse(readFileSync(join(repoRoot, rel), "utf8"));
+  const claude = json("plugins/pstack/.claude-plugin/plugin.json");
+  const codex = json("plugins/pstack/.codex-plugin/plugin.json");
+  const claudeMarketplace = json(".claude-plugin/marketplace.json");
+  const codexMarketplace = json(".agents/plugins/marketplace.json");
+
+  test("the plugin and marketplace manifests agree on every fact they repeat", () => {
+    const shared = ({ name, author, homepage, repository, license, keywords }) =>
+      ({ name, author, homepage, repository, license, keywords });
+    expect(Object.values(shared(claude))).not.toContain(undefined);
+    expect(shared(codex)).toEqual(shared(claude));
+    expect(claudeMarketplace.owner).toEqual(claude.author);
+    expect(claudeMarketplace.plugins.map(({ name, source }) => [name, source])).toEqual([[claude.name, "./plugins/pstack"]]);
+    expect(codexMarketplace.name).toBe(claudeMarketplace.name);
+    expect(codexMarketplace.interface.displayName).toBe(codex.interface.displayName);
+    expect(codexMarketplace.plugins.map(({ name, source, category }) => [name, source.path, category])).toEqual([
+      [codex.name, claudeMarketplace.plugins[0].source, codex.interface.category],
+    ]);
+  });
+});
+
 describe("validateHooks", () => {
   const hooks = (command) =>
     JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command }] }] } });

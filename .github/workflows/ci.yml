@@ -77,6 +77,11 @@ jobs:
         run: bun run typecheck
       - name: Test
         run: bun test orch watch-pr
+      # Pinned here, not in package.json, so bun.lock stays identical to
+      # upstream's. 3.6.2 is the newest release that reproduces upstream's
+      # watch-pr files byte for byte; later ones rewrap its types.ts.
+      - name: Check formatting
+        run: bunx prettier@3.6.2 --check .
 
   shellcheck:
     name: Shell scripts

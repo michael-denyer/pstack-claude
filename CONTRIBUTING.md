@@ -62,7 +62,10 @@ cd plugins/pstack/skills/poteto-mode/scripts
 bun install --frozen-lockfile
 bun run typecheck
 bun test orch watch-pr
+bunx prettier@3.6.2 --check .
 ```
+
+The scripts use Prettier 3.6.2 at upstream's settings in `.prettierrc.json`, CI runs the same check, and `.prettierignore` names each file the check skips and why.
 
 If you touched a workflow, audit it before pushing:
 

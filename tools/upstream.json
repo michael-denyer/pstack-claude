@@ -13,7 +13,8 @@
         "assets/",
         "automations/",
         "docs/",
-        "skills/make-bot-ui/"
+        "skills/make-bot-ui/",
+        "skills/poteto-mode/scripts/worktree-audit.sh"
       ]
     },
     "cursor-team-kit": {

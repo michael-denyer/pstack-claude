@@ -1,296 +1,255 @@
-import { afterEach, test } from 'bun:test';
-import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { afterEach, describe, expect, test } from "bun:test";
+import { execFileSync, spawnSync } from "node:child_process";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
-const auditScript = fileURLToPath(
-  new URL('../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.sh', import.meta.url),
-);
+import { audit, classify } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
+
+const script = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs");
+
+const known = (value) => ({ known: true, value });
+const unknown = { known: false };
+const HEAD = "a".repeat(40);
+
+describe("classify", () => {
+  const ancestor = {
+    trunk: known(true),
+    head: known(HEAD),
+    age: known(3),
+    ancestry: known(true),
+    dirty: known({ wip: 0, scratch: 0 }),
+    remote: known("pushed"),
+    pr: known(null),
+    recent: known(false),
+  };
+  const mergedPr = { ...ancestor, ancestry: known(false), pr: known({ number: 8, state: "MERGED", headRefOid: HEAD }) };
+  const allUnknown = Object.fromEntries(Object.keys(ancestor).map((name) => [name, unknown]));
+  const wip = known({ wip: 1, scratch: 0 });
+  const openPr = known({ number: 7, state: "OPEN", headRefOid: HEAD });
+
+  test.each([
+    ["an ancestor of the trunk", ancestor, "safe"],
+    ["an ancestor with only untracked scratch", { ...ancestor, dirty: known({ wip: 0, scratch: 2 }) }, "safe"],
+    ["a merged PR whose head is the worktree HEAD", mergedPr, "safe"],
+    ["commits beyond a merged PR head", { ...mergedPr, head: known("b".repeat(40)) }, "review"],
+    ["a closed PR whose head is the worktree HEAD", { ...mergedPr, pr: known({ number: 9, state: "CLOSED", headRefOid: HEAD }) }, "review"],
+    ["neither an ancestor nor a merged PR", { ...ancestor, ancestry: known(false) }, "review"],
+    ["tracked uncommitted work", { ...ancestor, dirty: wip }, "hold-wip"],
+    ["an open PR", { ...ancestor, pr: openPr }, "hold-open-pr"],
+    ["a chat within four days", { ...ancestor, recent: known(true) }, "verify-recent-chat"],
+    ["tracked work with an open PR and a recent chat", { ...ancestor, dirty: wip, pr: openPr, recent: known(true) }, "hold-wip"],
+    ["an open PR with a recent chat", { ...ancestor, pr: openPr, recent: known(true) }, "hold-open-pr"],
+    ["tracked work while every other fact is unknown", { ...allUnknown, dirty: wip }, "hold-wip"],
+    ["an open PR while every other fact is unknown", { ...allUnknown, pr: openPr }, "hold-open-pr"],
+    ["a recent chat while every other fact is unknown", { ...allUnknown, recent: known(true) }, "verify-recent-chat"],
+  ])("%s -> %s", (_, facts, bucket) => {
+    expect(classify(facts)).toBe(bucket);
+  });
+
+  for (const [label, facts] of [["ancestor", ancestor], ["merged PR", mergedPr]]) {
+    for (const name of Object.keys(facts)) {
+      test(`an unknown ${name} keeps a ${label} out of safe`, () => {
+        expect(classify({ ...facts, [name]: unknown })).toBe("review");
+      });
+    }
+  }
+});
+
 const fixtures = [];
+const locked = [];
 afterEach(() => {
+  for (const path of locked.splice(0)) chmodSync(path, 0o755);
   for (const root of fixtures.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-const git = (...args) => execFileSync('/usr/bin/git', args, {
-  encoding: 'utf8',
-  stdio: ['ignore', 'pipe', 'pipe'],
-}).trim();
+const git = (...args) =>
+  execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
-function createStubs(root) {
-  const bin = join(root, 'bin');
-  const realGit = `#!/bin/sh
-if [ "$1" = -C ] && [ "$3" = status ] && [ -n "$AUDIT_FAIL_STATUS_PATH" ] && [ "$2" = "$AUDIT_FAIL_STATUS_PATH" ]; then
-  exit 1
-fi
-if [ "$1" = fetch ]; then
-  exit "\${AUDIT_FAIL_FETCH:-0}"
-fi
-exec /usr/bin/git "$@"
-`;
-  // Merged and closed PRs drop out of the default open-only listing.
-  const gh = `#!/bin/sh
-if [ "$AUDIT_FAIL_GH" = 1 ]; then exit 1; fi
-case " $* " in
-  *" --state all "*) ;;
-  *) echo "gh stub: expected --state all, got: $*" >&2; exit 3 ;;
-esac
-printf '%s\\n' "$AUDIT_GH_RESPONSE"
-`;
-  // GitHub's ubuntu-latest image ships jq but not rg; grep -r honours the same
-  // fixed-string patterns and exit codes. grep reads no ignore files or config,
-  // so the stub checks for the flags that make rg match that, then drops them.
-  const rg = `#!/bin/sh
-if [ "$AUDIT_FAIL_RG" = 2 ]; then exit 2; fi
-if [ "$1" != --no-config ] || [ "$2" != -uu ]; then
-  echo "rg stub: expected --no-config -uu first, got: $*" >&2
-  exit 3
-fi
-shift 2
-exec grep -r "$@"
-`;
-  execFileSync('/bin/mkdir', ['-p', bin]);
-  writeFileSync(join(bin, 'git'), realGit);
-  writeFileSync(join(bin, 'gh'), gh);
-  writeFileSync(join(bin, 'rg'), rg);
-  for (const name of ['git', 'gh', 'rg']) {
-    chmodSync(join(bin, name), 0o755);
-  }
-  return bin;
+function commit(worktree, message, content = `${message}\n`) {
+  const file = `${message.replaceAll(" ", "-")}.txt`;
+  writeFileSync(join(worktree, file), content);
+  git("-C", worktree, "add", file);
+  git("-C", worktree, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", message);
 }
 
-function createRepo() {
+// A seed repo with a bare remote and a clone, so trunk resolution and the fetch run for real.
+function createFixture({ trunk = "main", cloneArgs = [] } = {}) {
   // git reports resolved worktree paths; macOS tmpdir() sits behind the /var symlink.
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'worktree-audit-test-')));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-test-")));
   fixtures.push(root);
-  const repo = join(root, 'repo');
-  const transcripts = join(root, 'transcripts');
+  const seed = join(root, "seed");
+  git("init", `--initial-branch=${trunk}`, seed);
+  commit(seed, "base");
+  git("-C", seed, "branch", "other");
+  const remote = join(root, "remote.git");
+  git("clone", "--bare", seed, remote);
+  const repo = join(root, "repo");
+  git("clone", ...cloneArgs, remote, repo);
+  const transcripts = join(root, "transcripts");
   mkdirSync(transcripts);
-  git('init', '--initial-branch=main', repo);
-  git('-C', repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
-    'commit', '--allow-empty', '-m', 'base');
-  git('-C', repo, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
-  return { root, repo, transcripts, bin: createStubs(root) };
+  return { root, repo, remote, transcripts };
 }
 
-function createRemoteRepo(branch, cloneArgs = []) {
-  const fixture = createRepo();
-  if (branch !== 'main') git('-C', fixture.repo, 'branch', '-m', branch);
-  git('-C', fixture.repo, 'branch', 'other');
-  const remote = join(fixture.root, 'remote.git');
-  git('clone', '--bare', fixture.repo, remote);
-  const repo = join(fixture.root, 'clone');
-  git('clone', ...cloneArgs, remote, repo);
-  // Exercise real fetches and ref updates against a local remote.
-  rmSync(join(fixture.bin, 'git'));
-  return { ...fixture, repo, remote };
-}
-
-function addWorktree(fixture, name, branch) {
+function addWorktree(fixture, name, ...args) {
   const path = join(fixture.root, name);
-  git('-C', fixture.repo, 'worktree', 'add', '-b', branch, path);
+  git("-C", fixture.repo, "worktree", "add", ...(args.length ? args : ["-b", name]), path);
   return path;
 }
 
-function commit(worktree, message, filename = `${message.replaceAll(' ', '-')}.txt`) {
-  writeFileSync(join(worktree, filename), `${message}\n`);
-  git('-C', worktree, 'add', filename);
-  git('-C', worktree, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
-    'commit', '-m', message);
+function writeTranscript(fixture, rel, worktree, mtimeSeconds) {
+  const path = join(fixture.transcripts, rel);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify({ type: "user", cwd: worktree })}\n`);
+  if (mtimeSeconds) utimesSync(path, mtimeSeconds, mtimeSeconds);
 }
 
-function runAudit(fixture, prs = [], extraEnv = {}) {
-  const result = execFileSync('/bin/bash', [auditScript, fixture.repo, fixture.transcripts], {
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      PATH: `${fixture.bin}:${process.env.PATH}`,
-      AUDIT_GH_RESPONSE: JSON.stringify(prs),
-      AUDIT_FAIL_STATUS_PATH: '',
-      AUDIT_FAIL_FETCH: '0',
-      AUDIT_FAIL_GH: '0',
-      AUDIT_FAIL_RG: '0',
-      ...extraEnv,
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
+function runAudit(fixture, { prs = [], gh, transcripts = fixture.transcripts } = {}) {
+  const warnings = [];
+  const calls = [];
+  const output = audit({
+    repo: fixture.repo,
+    transcripts,
+    warn: (line) => warnings.push(line),
+    gh: gh ?? ((args, cwd) => {
+      calls.push({ args, cwd });
+      return JSON.stringify(prs);
+    }),
   });
-  return result;
+  const [header, ...lines] = output.trimEnd().split("\n");
+  return { header, rows: lines.map((line) => line.split("\t")), warnings, calls };
 }
 
-function rows(output) {
-  return output.trim().split('\n').slice(1).map((line) => line.split('\t'));
-}
+const rowFor = (rows, worktree) => rows.find((row) => row.at(-1) === worktree);
+const ymd = (seconds) => new Date(seconds * 1000).toISOString().slice(0, 10);
+const head = (worktree) => git("-C", worktree, "rev-parse", "HEAD");
 
-function rowFor(output, worktree) {
-  const row = rows(output).find((fields) => fields.at(-1) === worktree);
-  assert.ok(row, `missing row for ${worktree}\n${output}`);
-  return row;
-}
+test("audits every worktree of a fixture repo end to end", () => {
+  const fixture = createFixture();
+  const now = Math.floor(Date.now() / 1000);
 
-function pr(number, state, headRefName, headRefOid) {
-  return { number, state, headRefName, headRefOid };
-}
+  const ancestor = addWorktree(fixture, "ancestor");
+  const spaced = addWorktree(fixture, "with spaces", "-b", "spaced");
+  const detached = addWorktree(fixture, "detached", "--detach");
+  const landed = addWorktree(fixture, "landed");
+  commit(landed, "landed on trunk");
+  git("-C", landed, "push", "origin", "HEAD:main");
+  const merged = addWorktree(fixture, "merged");
+  commit(merged, "squash merged", "x".repeat(512 * 1024));
+  git("-C", merged, "push", "origin", "merged");
+  const open = addWorktree(fixture, "open");
+  const dirty = addWorktree(fixture, "dirty");
+  commit(dirty, "tracked");
+  writeFileSync(join(dirty, "tracked.txt"), "changed\n");
+  const scratch = addWorktree(fixture, "scratch");
+  writeFileSync(join(scratch, "notes.txt"), "scratch\n");
+  const chatted = addWorktree(fixture, "chatted-long");
+  const prefix = addWorktree(fixture, "chatted");
+  writeTranscript(fixture, "-proj/session/subagents/workflows/wf_1/agent-a.jsonl", chatted);
+  const stale = addWorktree(fixture, "stale");
+  const staleAt = now - 10 * 86400;
+  writeTranscript(fixture, "-proj/old.jsonl", stale, staleAt);
+  const broken = addWorktree(fixture, "broken");
+  chmodSync(join(fixture.repo, ".git/worktrees/broken/index"), 0o000);
+  const gone = addWorktree(fixture, "gone");
+  rmSync(gone, { recursive: true });
 
-function assertAncestorSafe(fixture) {
-  const ancestor = addWorktree(fixture, 'ancestor', 'ancestor');
-  const row = rowFor(runAudit(fixture), ancestor);
-  assert.equal(row[2], 'YES');
-  assert.equal(row[7], 'safe');
-}
+  const { header, rows, warnings, calls } = runAudit(fixture, {
+    prs: [
+      { number: 7, state: "OPEN", headRefName: "open", headRefOid: head(open) },
+      { number: 8, state: "MERGED", headRefName: "merged", headRefOid: head(merged) },
+    ],
+  });
 
-test('preserves spaced worktree paths and rejects closed PRs as safe evidence', () => {
-  const fixture = createRepo();
-  const candidate = addWorktree(fixture, 'candidate', 'candidate');
-  commit(candidate, 'candidate work');
-  const spaced = addWorktree(fixture, 'candidate with spaces', 'spaced-candidate');
-  const output = runAudit(fixture, [pr(99, 'CLOSED', 'candidate', git('-C', candidate, 'rev-parse', 'HEAD'))]);
-  const candidateRow = rowFor(output, candidate);
-  const spacedRow = rowFor(output, spaced);
-  assert.equal(candidateRow[5], '#99/CLOSED');
-  assert.equal(candidateRow[7], 'review');
-  assert.equal(spacedRow[8], spaced);
-  assert.notEqual(candidateRow[8], spacedRow[8]);
+  expect(header).toBe("SIZE\tAGE\tMERGED\tDIRTY\tREMOTE\tPR\tLAST_CHAT\tBUCKET\tWORKTREE");
+  expect(warnings).toEqual([]);
+  expect(calls).toHaveLength(1);
+  expect(calls[0].args.join(" ")).toContain("--state all");
+  expect(rows[0].at(-1)).toBe(merged);
+  const today = ymd(now);
+  const columns = (worktree) => rowFor(rows, worktree).slice(1);
+  expect(columns(ancestor)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", ancestor]);
+  expect(columns(spaced)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", spaced]);
+  expect(columns(detached)).toEqual(["0d", "YES", "clean", "detached", "-", "-", "safe", detached]);
+  expect(columns(landed)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", landed]);
+  expect(columns(merged)).toEqual(["0d", "no", "clean", "pushed", "#8/MERGED", "-", "safe", merged]);
+  expect(columns(open)).toEqual(["0d", "YES", "clean", "no-remote", "#7/OPEN", "-", "hold-open-pr", open]);
+  expect(columns(dirty)).toEqual(["0d", "no", "wip:1", "no-remote", "-", "-", "hold-wip", dirty]);
+  expect(columns(scratch)).toEqual(["0d", "YES", "scratch:1", "no-remote", "-", "-", "safe", scratch]);
+  expect(columns(chatted)).toEqual(["0d", "YES", "clean", "no-remote", "-", today, "verify-recent-chat", chatted]);
+  expect(columns(prefix)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", prefix]);
+  expect(columns(stale)).toEqual(["0d", "YES", "clean", "no-remote", "-", ymd(staleAt), "safe", stale]);
+  expect(columns(broken)).toEqual(["0d", "YES", "unknown", "no-remote", "-", "-", "review", broken]);
+  expect(rowFor(rows, gone)).toEqual(["-", "?", "-", "-", "-", "-", "-", "prunable", gone]);
+  expect(rows).toHaveLength(13);
 });
 
-test('marks an actual origin/main ancestor safe', () => {
-  const fixture = createRepo();
-  const ancestor = addWorktree(fixture, 'ancestor', 'ancestor');
-  commit(ancestor, 'merged into main');
-  git('-C', fixture.repo, 'update-ref', 'refs/remotes/origin/main', `${git('-C', ancestor, 'rev-parse', 'HEAD')}`);
-  const output = runAudit(fixture);
-  const row = rowFor(output, ancestor);
-  assert.equal(row[2], 'YES');
-  assert.equal(row[7], 'safe');
+describe("a discovery failure keeps an ancestor out of safe", () => {
+  const failures = [
+    ["the trunk fetch", (fixture) => {
+      git("-C", fixture.repo, "remote", "set-url", "origin", join(fixture.root, "missing.git"));
+      return {};
+    }, /could not fetch origin\/main/],
+    ["gh", () => ({ gh: () => { throw new Error("gh: not logged in"); } }), /gh pr list failed.*not logged in/],
+    ["gh output that is not JSON", () => ({ gh: () => "rate limited" }), /gh pr list failed/],
+    ["gh output that is not a list", () => ({ gh: () => "{}" }), /gh pr list failed/],
+    ["a missing transcripts directory", (fixture) => ({ transcripts: join(fixture.root, "absent") }), /absent not found/],
+    ["an unreadable transcripts directory", (fixture) => {
+      const project = join(fixture.transcripts, "-proj");
+      mkdirSync(project);
+      chmodSync(project, 0o000);
+      locked.push(project);
+      return {};
+    }, /transcript scan failed/],
+  ];
+
+  test.each(failures)("%s", (_, inject, warning) => {
+    const fixture = createFixture();
+    const ancestor = addWorktree(fixture, "ancestor");
+    const { rows, warnings } = runAudit(fixture, inject(fixture));
+    const row = rowFor(rows, ancestor);
+    expect(row[2]).toBe("YES");
+    expect(row[7]).toBe("review");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(warning);
+  });
 });
 
-for (const cachedHead of [true, false]) {
-  test(`audits a non-main trunk with cached HEAD ${cachedHead}`, () => {
-    const fixture = createRemoteRepo('release');
-    if (!cachedHead) git('-C', fixture.repo, 'symbolic-ref', '--delete', 'refs/remotes/origin/HEAD');
+describe("the trunk comes from the remote", () => {
+  const assertAncestorSafe = (fixture) => {
+    const ancestor = addWorktree(fixture, "ancestor");
+    const { rows, warnings } = runAudit(fixture);
+    expect(warnings).toEqual([]);
+    const row = rowFor(rows, ancestor);
+    expect([row[2], row[7]]).toEqual(["YES", "safe"]);
+  };
+
+  for (const cachedHead of [true, false]) {
+    test(`a non-main trunk with cached HEAD ${cachedHead}`, () => {
+      const fixture = createFixture({ trunk: "release" });
+      if (!cachedHead) git("-C", fixture.repo, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+      assertAncestorSafe(fixture);
+    });
+  }
+
+  test("a trunk the single-branch clone does not track", () => {
+    const fixture = createFixture({ trunk: "release", cloneArgs: ["--single-branch", "--branch", "other"] });
+    expect(git("-C", fixture.repo, "for-each-ref", "--format=%(refname)", "refs/remotes/origin/release")).toBe("");
     assertAncestorSafe(fixture);
   });
-}
 
-test('fetches a trunk the single-branch clone does not track', () => {
-  const fixture = createRemoteRepo('release', ['--single-branch', '--branch', 'other']);
-  assert.equal(git('-C', fixture.repo, 'for-each-ref', '--format=%(refname)',
-    'refs/remotes/origin/release'), '');
-  assertAncestorSafe(fixture);
-});
-
-test('falls back to main when the remote advertises an unknown HEAD', () => {
-  const fixture = createRemoteRepo('main');
-  git('--git-dir', fixture.remote, 'symbolic-ref', 'HEAD', 'refs/heads/missing');
-  git('-C', fixture.repo, 'symbolic-ref', '--delete', 'refs/remotes/origin/HEAD');
-  assertAncestorSafe(fixture);
-});
-
-test('holds tracked dirty work', () => {
-  const fixture = createRepo();
-  const dirty = addWorktree(fixture, 'dirty', 'dirty');
-  writeFileSync(join(dirty, 'tracked.txt'), 'tracked\n');
-  git('-C', dirty, 'add', 'tracked.txt');
-  git('-C', dirty, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
-    'commit', '-m', 'tracked base');
-  writeFileSync(join(dirty, 'tracked.txt'), 'tracked change\n');
-  const output = runAudit(fixture);
-  const row = rowFor(output, dirty);
-  assert.match(row[3], /^wip:/);
-  assert.equal(row[7], 'hold-wip');
-});
-
-test('holds an open PR', () => {
-  const fixture = createRepo();
-  const open = addWorktree(fixture, 'open', 'open');
-  const head = git('-C', open, 'rev-parse', 'HEAD');
-  const output = runAudit(fixture, [pr(7, 'OPEN', 'open', head)]);
-  const row = rowFor(output, open);
-  assert.equal(row[5], '#7/OPEN');
-  assert.equal(row[7], 'hold-open-pr');
-});
-
-test('accepts a merged PR whose head matches the worktree HEAD', () => {
-  const fixture = createRepo();
-  const merged = addWorktree(fixture, 'merged', 'merged');
-  commit(merged, 'squash merged');
-  const mergedHead = git('-C', merged, 'rev-parse', 'HEAD');
-  const output = runAudit(fixture, [pr(8, 'MERGED', 'merged', mergedHead)]);
-  const row = rowFor(output, merged);
-  assert.equal(row[5], '#8/MERGED');
-  assert.equal(row[7], 'safe');
-});
-
-test('reviews commits added beyond a merged PR head', () => {
-  const fixture = createRepo();
-  const changed = addWorktree(fixture, 'changed', 'changed');
-  commit(changed, 'merged commit');
-  const mergedHead = git('-C', changed, 'rev-parse', 'HEAD');
-  commit(changed, 'new commit');
-  const output = runAudit(fixture, [pr(9, 'MERGED', 'changed', mergedHead)]);
-  const row = rowFor(output, changed);
-  assert.equal(row[7], 'review');
-});
-
-test('reviews a worktree when its status probe fails', () => {
-  const fixture = createRepo();
-  const failed = addWorktree(fixture, 'failed-status', 'failed-status');
-  const head = git('-C', failed, 'rev-parse', 'HEAD');
-  const output = runAudit(
-    fixture,
-    [pr(10, 'MERGED', 'failed-status', head)],
-    { AUDIT_FAIL_STATUS_PATH: failed },
-  );
-  const row = rowFor(output, failed);
-  assert.equal(row[3], 'unknown');
-  assert.equal(row[7], 'review');
-});
-
-for (const probe of ['AUDIT_FAIL_FETCH', 'AUDIT_FAIL_GH']) {
-  test(`reviews an ancestor when discovery fails: ${probe}`, () => {
-    const fixture = createRepo();
-    const candidate = addWorktree(fixture, 'candidate', 'candidate');
-    const row = rowFor(runAudit(fixture, [], { [probe]: '1' }), candidate);
-    assert.equal(row[2], 'YES');
-    assert.equal(row[7], 'review');
+  test("main when the remote advertises an unknown HEAD", () => {
+    const fixture = createFixture();
+    git("--git-dir", fixture.remote, "symbolic-ref", "HEAD", "refs/heads/missing");
+    git("-C", fixture.repo, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+    assertAncestorSafe(fixture);
   });
-}
-
-test('reviews an ancestor when transcript search fails', () => {
-  const fixture = createRepo();
-  const candidate = addWorktree(fixture, 'candidate', 'candidate');
-  const row = rowFor(runAudit(fixture, [], { AUDIT_FAIL_RG: '2' }), candidate);
-  assert.equal(row[7], 'review');
 });
 
-test('reviews an ancestor when the transcripts directory is missing', () => {
-  const fixture = createRepo();
-  const candidate = addWorktree(fixture, 'candidate', 'candidate');
-  rmSync(fixture.transcripts, { recursive: true });
-  assert.equal(rowFor(runAudit(fixture), candidate)[7], 'review');
-});
-
-// The stub cannot model rg's ignore files, so this leg needs the real binary.
-test.skipIf(spawnSync('rg', ['--version']).status !== 0)(
-  'finds a recent chat in transcripts that a .gitignore hides (skipped without rg)', () => {
-    const fixture = createRepo();
-    rmSync(join(fixture.bin, 'rg'));
-    git('init', fixture.transcripts);
-    writeFileSync(join(fixture.transcripts, '.gitignore'), '*.jsonl\n');
-    const candidate = addWorktree(fixture, 'candidate', 'candidate');
-    writeFileSync(join(fixture.transcripts, 'fixture.jsonl'), `${JSON.stringify({ cwd: candidate })}\n`);
-    assert.equal(rowFor(runAudit(fixture), candidate)[7], 'verify-recent-chat');
-  },
-);
-
-test('keeps the recent-chat hold with an isolated transcript fixture', () => {
-  const fixture = createRepo();
-  const candidate = addWorktree(fixture, 'candidate-long', 'candidate-long');
-  // A path prefix of the chatted worktree must not inherit its chat.
-  const prefix = addWorktree(fixture, 'candidate', 'candidate');
-  writeFileSync(join(fixture.transcripts, 'fixture.jsonl'), `${JSON.stringify({ cwd: candidate })}\n`);
-  const output = runAudit(fixture);
-  assert.equal(rowFor(output, candidate)[7], 'verify-recent-chat');
-  assert.equal(rowFor(output, prefix)[7], 'safe');
+test("the CLI exits 1 outside a git repo", () => {
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-outside-")));
+  fixtures.push(outside);
+  const result = spawnSync("node", [script, outside, outside], { encoding: "utf8" });
+  expect(result.status).toBe(1);
+  expect(result.stderr).toBe("not in a git repo; pass a repo path\n");
 });

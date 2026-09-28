@@ -14,13 +14,13 @@ import process from "node:process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
-export function candidates(projectsDir) {
+export function candidates(projectsDir, maxDepth = 2) {
   const files = [];
   const walk = (dir, depth) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name);
       if (entry.isFile() && entry.name.endsWith(".jsonl")) files.push(full);
-      else if (entry.isDirectory() && depth < 2) walk(full, depth + 1);
+      else if (entry.isDirectory() && depth < maxDepth) walk(full, depth + 1);
     }
   };
   walk(projectsDir, 0);

@@ -144,7 +144,6 @@ Install dependencies for the workflows you use:
 | GitHub CLI, `gh` | PR monitoring and shipping. Authenticate with `gh auth login`. |
 | Bun | The bundled `watch-pr` and `orch` scripts. Their bootstrap installs script dependencies on first run. |
 | Graphite CLI, `gt` | The Orchestrate playbook and `orch` stack frontier. Shipping and autopilot playbooks use `gh` or Origin's CLI when available. |
-| `jq` and `rg` | PR and transcript columns in `worktree-audit.sh`. Missing tools produce warnings and blank columns. |
 | `plugin-dev` | Claude Code skill-authoring guidance used by `automate-me`, `reflect`, and `poteto-mode`. |
 
 Install the Claude Code skill-authoring companion with:

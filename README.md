@@ -54,7 +54,7 @@ pstack is Markdown instructions, a session hook, and local scripts. It runs no s
 - The SessionStart hook reads one file, `pstack-models.md`, from the runtime's configuration directory (`$CLAUDE_CONFIG_DIR` or `~/.claude` on Claude Code, `$CODEX_HOME` or `~/.codex` on Codex) to decide whether to inject the poteto-mode mandate. It reads nothing else and sends nothing.
 - The `watch-pr` and `ship-pr` scripts call the GitHub CLI (`gh`) with your own login to read and act on your own pull requests. They read no token themselves and talk to no service other than GitHub through `gh`.
 - On first use, those scripts install their one npm dependency, `commander`, at the version pinned in `bun.lock`, into the plugin's own `scripts/node_modules`.
-- `worktree-audit.sh` and the `recall` and `eval` playbooks read Claude Code session transcripts on the local machine, under the runtime's transcripts directory, to find which files a session touched. Transcripts stay on disk.
+- `worktree-audit.mjs` and the `recall` and `eval` playbooks read Claude Code session transcripts on the local machine, under the runtime's transcripts directory, to find which files a session touched. Transcripts stay on disk.
 
 ## Contributing
 

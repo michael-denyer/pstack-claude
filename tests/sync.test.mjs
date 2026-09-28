@@ -15,6 +15,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { deriveSkill } from "../tools/generate.mjs";
 import {
   applySubstitutions,
   changedLines,
@@ -898,6 +899,56 @@ describe("syncComponent", () => {
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, exclude: ["docs/"], carriedElsewhere: ["kit/k.md"] });
 
     expect(report.portOnly).toEqual(["tools/extra.ts"]);
+  });
+
+  test("an upstream symlink over a local directory is reported, and the files upstream deleted under it go", () => {
+    for (const dryRun of [true, false]) {
+      const oldDir = tree({ "foo/x.md": "x\n", "keep.md": "k\n" });
+      const newDir = tree({ "keep.md": "k\n" });
+      symlinkSync(tree({ "t.md": "target\n" }), join(newDir, "foo"));
+      const localDir = tree({ "foo/x.md": "x\n", "keep.md": "k\n" });
+
+      const report = sync({ oldDir, newDir, localDir, dryRun });
+
+      expect(report.conflicts).toEqual([{ rel: "foo", reason: "symlink" }]);
+      expect(report.deleted).toEqual(["foo/x.md"]);
+      expect(report.unchanged).toBe(1);
+      expect(existsSync(join(localDir, "foo/x.md"))).toBe(dryRun);
+    }
+  });
+
+  test("an old revision's malformed frontmatter is never derived when the port copy does not need it", () => {
+    const good = "---\nname: a\ndescription: fine\n---\nbody\n";
+    const bad = "---\nname: a\ndescription: [unclosed\n---\nbody\n";
+    const derive = (rel, text) => deriveSkill(join("plugins/pstack/skills", rel), text);
+    const upstreamDeletedIt = { old: { "a/SKILL.md": good, "b/SKILL.md": bad }, new: { "a/SKILL.md": good } };
+    const upstreamFixedIt = { old: { "a/SKILL.md": bad }, new: { "a/SKILL.md": good } };
+    for (const { old, new: next } of [upstreamDeletedIt, upstreamFixedIt]) {
+      const report = sync({ oldDir: tree(old), newDir: tree(next), localDir: tree({ "a/SKILL.md": good }), derive, dryRun: true });
+
+      expect(report.unchanged).toBe(1);
+      expect(report.written).toEqual([]);
+      expect(report.deleted).toEqual([]);
+    }
+  });
+
+  test("a merge git reports as conflicted without printing markers fails the run naming the file", () => {
+    const bin = tree({ git: "#!/bin/sh\nexit 1\n" });
+    chmodSync(join(bin, "git"), 0o755);
+    const [oldDir, newDir, localDir] = [tree({ "s.md": "old\n" }), tree({ "s.md": "new\n" }), tree({ "s.md": "port\n" })];
+    const script = [
+      `import { syncComponent } from ${JSON.stringify(join(import.meta.dir, "../tools/sync.mjs"))};`,
+      `syncComponent(${JSON.stringify({ oldDir, newDir, localDir, rules: [] })});`,
+    ].join("\n");
+
+    const result = spawnSync(process.execPath, ["-e", script], {
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("s.md: git merge-file reported 1 conflict but printed no markers");
+    expect(readFileSync(join(localDir, "s.md"), "utf8")).toBe("port\n");
   });
 });
 

@@ -118,7 +118,9 @@ function renderBlocker(blocker: T.MergeBlocker | StatusQueryBlocker): string {
               ? "get the required approving review"
               : blocker.reason === "merge-blocked"
                 ? "find the branch protection rule holding the merge (mergeStateStatus=BLOCKED with clean CI)"
-                : "resolve the changes-requested review before waiting for the merge queue";
+                : blocker.reason === "changes-requested"
+                  ? "resolve the changes-requested review before waiting for the merge queue"
+                  : (blocker.reason satisfies never);
       return [
         `BLOCKER: ${blocker.reason}`,
         `pr=${blocker.pr.number}`,

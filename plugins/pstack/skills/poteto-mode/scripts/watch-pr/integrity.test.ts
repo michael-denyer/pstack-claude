@@ -3,6 +3,7 @@ import { fakeReader, pendingCheck, failedCheck } from "./fakes.test-helper.ts";
 import type { FakeReaderOptions } from "./fakes.test-helper.ts";
 import { orderStack, WatcherQueryError } from "./github.ts";
 import { classifyPr, readSnapshot, runSimple, runQueued } from "./policy.ts";
+import { renderPretty } from "./render.ts";
 import { parsePrNumber } from "./types.ts";
 
 const context = { owner: "owner", repo: "repo", number: parsePrNumber(1) };
@@ -464,4 +465,124 @@ it("keeps queued pending checks waiting and stops when they fail without advanci
     kind: "BLOCKER",
     blocker: { kind: "failing-checks" },
   });
+});
+
+describe("merge gate", () => {
+  const cases: readonly [
+    string,
+    FakeReaderOptions["facts"],
+    boolean,
+    ReturnType<typeof classifyPr>,
+  ][] = [
+    [
+      "closed",
+      { state: "CLOSED" },
+      false,
+      {
+        kind: "blocker",
+        blocker: {
+          kind: "merge-gate",
+          pr: context,
+          reason: "closed-without-merge",
+        },
+      },
+    ],
+    [
+      "draft",
+      { isDraft: true, reviewDecision: "CHANGES_REQUESTED" },
+      false,
+      {
+        kind: "blocker",
+        blocker: { kind: "merge-gate", pr: context, reason: "draft-pr" },
+      },
+    ],
+    [
+      "changes requested",
+      { reviewDecision: "CHANGES_REQUESTED", mergeStateStatus: "BLOCKED" },
+      true,
+      {
+        kind: "blocker",
+        blocker: {
+          kind: "merge-gate",
+          pr: context,
+          reason: "changes-requested",
+        },
+      },
+    ],
+    [
+      "review required",
+      { reviewDecision: "REVIEW_REQUIRED", mergeStateStatus: "BLOCKED" },
+      false,
+      {
+        kind: "blocker",
+        blocker: { kind: "merge-gate", pr: context, reason: "review-required" },
+      },
+    ],
+    [
+      "branch protection",
+      { mergeStateStatus: "BLOCKED" },
+      false,
+      {
+        kind: "blocker",
+        blocker: { kind: "merge-gate", pr: context, reason: "merge-blocked" },
+      },
+    ],
+  ];
+  for (const [name, facts, allowDraft, expected] of cases)
+    it(`blocks a ${name} PR with its gate reason`, async () => {
+      const row = await readSnapshot({
+        ...snapshotArgs,
+        reader: fakeReader({ facts }),
+      });
+      expect(classifyPr(row, allowDraft)).toEqual(expected);
+    });
+
+  for (const [isDraft, allowDraft, reviewDecision, draft] of [
+    [false, false, "APPROVED", "not-draft"],
+    [true, true, null, "draft-allowed"],
+  ] as const)
+    it(`proves an open gate with review ${reviewDecision} and ${draft}`, async () => {
+      const row = await readSnapshot({
+        ...snapshotArgs,
+        reader: fakeReader({ facts: { isDraft, reviewDecision } }),
+      });
+      expect(classifyPr(row, allowDraft)).toMatchObject({
+        kind: "ready",
+        pr: { proof: { gate: { state: "OPEN", reviewDecision, draft } } },
+      });
+    });
+
+  for (const [reason, action] of [
+    [
+      "closed-without-merge",
+      "restore or remove the closed PR from the queued stack",
+    ],
+    [
+      "draft-pr",
+      "mark the PR ready for review before waiting for the merge queue",
+    ],
+    [
+      "changes-requested",
+      "resolve the changes-requested review before waiting for the merge queue",
+    ],
+    ["review-required", "get the required approving review"],
+    [
+      "merge-blocked",
+      "find the branch protection rule holding the merge (mergeStateStatus=BLOCKED with clean CI)",
+    ],
+  ] as const)
+    it(`renders the ${reason} action`, () => {
+      expect(
+        renderPretty({
+          schemaVersion: 1,
+          sequence: 1,
+          observedAt: "fixture",
+          mode: "single",
+          kind: "BLOCKER",
+          terminal: true,
+          exitCode: 6,
+          blocker: { kind: "merge-gate", pr: context, reason },
+        })
+      ).toBe(`BLOCKER: ${reason}\npr=1\naction=${action}\n`);
+    });
 });

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
+import { DeadlineExceeded, WatchDeadline } from "./deadline.ts";
 import { fakeReader, pendingCheck, failedCheck } from "./fakes.test-helper.ts";
 import type { FakeReaderOptions } from "./fakes.test-helper.ts";
 import { orderStack, parsePullRequest, WatcherQueryError } from "./github.ts";
 import { classifyPr, readSnapshot, runSimple, runQueued } from "./policy.ts";
 import { renderPretty } from "./render.ts";
-import { parsePrNumber } from "./types.ts";
+import { parsePrNumber, type ProgressVerdict } from "./types.ts";
 
 const context = { owner: "owner", repo: "repo", number: parsePrNumber(1) };
 const options = {
@@ -14,6 +15,7 @@ const options = {
   maxQueryErrors: 5,
   allowDraft: false,
 };
+const unbounded = new WatchDeadline(0, () => 0);
 const snapshotArgs = {
   context,
   pendingHistory: "include" as const,
@@ -161,11 +163,12 @@ describe("commit identity", () => {
         reader,
         emit() {},
         clock: { now: () => 0, observedAt: () => "fixture", async sleep() {} },
+        deadline: unbounded,
       },
       contexts: [context],
       mode: "single",
       statusOnly: false,
-      options: { ...options, timeout: 0, maxQueryErrors: 1 },
+      options: { ...options, maxQueryErrors: 1 },
     });
     expect(verdict).toMatchObject({
       kind: "BLOCKER",
@@ -191,11 +194,12 @@ describe("commit identity", () => {
         reader,
         emit() {},
         clock: { now: () => 0, observedAt: () => "fixture", async sleep() {} },
+        deadline: unbounded,
       },
       contexts: [context],
       mode: "single",
       statusOnly: false,
-      options: { ...options, timeout: 0 },
+      options,
     });
     expect(reads).toBe(2);
     expect(verdict).toMatchObject({
@@ -342,6 +346,7 @@ describe("deadline", () => {
             now += seconds;
           },
         },
+        deadline: new WatchDeadline(options.timeout, () => now),
       };
       const result =
         mode === "single"
@@ -388,6 +393,7 @@ describe("deadline", () => {
             now += seconds;
           },
         },
+        deadline: new WatchDeadline(options.timeout, () => now),
       },
       contexts: [context],
       mode: "single",
@@ -400,19 +406,25 @@ describe("deadline", () => {
   });
 
   function dependenciesWithReadOutlivingBudget(
-    readerOptions: FakeReaderOptions = {}
+    readerOptions: FakeReaderOptions = {},
+    failure?: () => Error
   ) {
     let now = 0;
     const base = fakeReader(readerOptions);
+    const emitted: ProgressVerdict[] = [];
     return {
       reader: {
         ...base,
         async pullRequest(requested: typeof context) {
           now += 2;
+          if (failure !== undefined) throw failure();
           return base.pullRequest(requested);
         },
       },
-      emit() {},
+      emitted,
+      emit(verdict: ProgressVerdict) {
+        emitted.push(verdict);
+      },
       clock: {
         now: () => now,
         observedAt: () => "fixture",
@@ -420,8 +432,69 @@ describe("deadline", () => {
           now += seconds;
         },
       },
+      deadline: new WatchDeadline(options.timeout, () => now),
     };
   }
+  const commandExit = () =>
+    new WatcherQueryError({
+      kind: "command-exit",
+      retryable: true,
+      code: 1,
+      detail: "fixture",
+    });
+  const single = {
+    contexts: [context],
+    mode: "single",
+    statusOnly: false,
+  } as const;
+
+  it("times out with the read failure when a retryable read fails past the deadline", async () => {
+    const dependencies = dependenciesWithReadOutlivingBudget({}, commandExit);
+    const result = await runSimple({ ...single, dependencies, options });
+    expect(result).toMatchObject({
+      kind: "TIMEOUT",
+      reason: {
+        kind: "status-unavailable",
+        failure: { kind: "command-exit" },
+      },
+    });
+    expect(dependencies.emitted).toMatchObject([
+      { kind: "RETRY", retryInSeconds: 0 },
+    ]);
+    expect(dependencies.clock.now()).toBe(2);
+  });
+
+  it("reports the status-query blocker when a read past the deadline exhausts the error budget", async () => {
+    const result = await runSimple({
+      ...single,
+      dependencies: dependenciesWithReadOutlivingBudget({}, commandExit),
+      options: { ...options, maxQueryErrors: 1 },
+    });
+    expect(result).toMatchObject({
+      kind: "BLOCKER",
+      exitCode: 7,
+      blocker: { kind: "status-query", failures: 1 },
+    });
+  });
+
+  it("times out without retrying a cancelled command, even while the loop budget has time left", async () => {
+    let cancellations = 0;
+    const dependencies = dependenciesWithReadOutlivingBudget({}, () =>
+      ++cancellations > 1
+        ? new Error("read again after cancellation")
+        : new DeadlineExceeded()
+    );
+    const result = await runSimple({
+      ...single,
+      dependencies: { ...dependencies, deadline: unbounded },
+      options,
+    });
+    expect(result).toMatchObject({
+      kind: "TIMEOUT",
+      reason: { kind: "status-unavailable", failure: { kind: "deadline" } },
+    });
+    expect(cancellations).toBe(1);
+  });
 
   it("reports a READY observation that completes past the deadline", async () => {
     const result = await runSimple({
@@ -489,9 +562,10 @@ it("keeps queued pending checks waiting and stops when they fail without advanci
           failed = true;
         },
       },
+      deadline: unbounded,
     },
     contexts: [context],
-    options: { ...options, timeout: 0 },
+    options,
   });
   expect(events).toContain("WAITING");
   expect(events).not.toContain("ADVANCE");

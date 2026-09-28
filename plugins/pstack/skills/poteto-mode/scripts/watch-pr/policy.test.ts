@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { WatchDeadline } from "./deadline.ts";
 import { WatcherQueryError } from "./github.ts";
 import {
   applyQueueSnapshot,
@@ -280,6 +281,7 @@ describe("queued-stack cadence", () => {
     const running = runQueued({
       dependencies: {
         reader,
+        deadline: new WatchDeadline(options.timeout, () => now),
         clock: {
           now: () => now,
           observedAt: () => "2026-07-26T00:00:00.000Z",
@@ -363,6 +365,7 @@ describe("queued-stack cadence", () => {
     const running = runQueued({
       dependencies: {
         reader,
+        deadline: new WatchDeadline(options.timeout, () => now),
         clock: {
           now: () => now,
           observedAt: () => "2026-07-26T00:00:00.000Z",

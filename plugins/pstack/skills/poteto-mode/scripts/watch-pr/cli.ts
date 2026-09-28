@@ -153,7 +153,7 @@ export function parseArgs(
   };
 }
 export interface CliRuntime {
-  readonly deadline?: WatchDeadline;
+  readonly deadline: WatchDeadline;
   readonly reader: T.GitHubReader;
   readonly clock: WatchClock;
   readonly stdout: (value: string) => void;
@@ -193,9 +193,6 @@ export async function main(
     return error.exitCode === 0 ? 0 : 64;
   }
   const runtime = supplied ?? realRuntime(options.polling.timeout);
-  const deadline =
-    runtime.deadline ??
-    new WatchDeadline(options.polling.timeout, () => runtime.clock.now());
   const render = options.pretty ? renderPretty : renderJson;
   const emit = (verdict: T.ProgressVerdict): void =>
     runtime.stdout(render(verdict));
@@ -233,7 +230,7 @@ export async function main(
     reader: runtime.reader,
     clock: runtime.clock,
     emit,
-    deadline,
+    deadline: runtime.deadline,
   };
   const verdict =
     options.mode === "queued-stack" && !options.statusOnly

@@ -1,4 +1,3 @@
-import { runJson } from "./github.ts";
 import {
   object,
   text,
@@ -137,7 +136,11 @@ function data(value: unknown): Record<string, unknown> {
 }
 
 export class GhShippingService implements ShippingService {
-  constructor(private readonly execute: typeof runJson = runJson) {}
+  constructor(
+    private readonly execute: (
+      argv: readonly [string, ...string[]]
+    ) => Promise<unknown>
+  ) {}
 
   async inspect(context: PrContext): Promise<LandingRecord> {
     const response = data(

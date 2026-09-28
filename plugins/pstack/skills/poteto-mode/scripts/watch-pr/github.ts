@@ -47,10 +47,9 @@ const firstLine = (value: string): string =>
   value.trim().split(/\r?\n/, 1)[0]?.slice(0, 240) ?? "";
 function run(
   argv: readonly [string, ...string[]],
-  deadline?: WatchDeadline
+  deadline: WatchDeadline
 ): Promise<CommandResult> {
-  const remaining = deadline?.remaining() ?? Infinity;
-  if (remaining === 0) return Promise.reject(new DeadlineExceeded());
+  if (deadline.remaining() === 0) return Promise.reject(new DeadlineExceeded());
   return new Promise((resolve, reject) => {
     const child = spawn(argv[0], argv.slice(1), {
       stdio: ["ignore", "pipe", "pipe"],
@@ -60,7 +59,7 @@ function run(
     let expired = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const scheduleDeadline = (): void => {
-      const seconds = deadline?.remaining() ?? Infinity;
+      const seconds = deadline.remaining();
       if (!Number.isFinite(seconds)) return;
       if (seconds === 0) {
         expired = true;
@@ -105,7 +104,7 @@ function parseJson(text: string, label: string): unknown {
 }
 export async function runJson(
   argv: readonly [string, ...string[]],
-  deadline?: WatchDeadline
+  deadline: WatchDeadline
 ): Promise<unknown> {
   const result = await run(argv, deadline);
   if (result.code !== 0)
@@ -528,7 +527,7 @@ function graphqlArgs(
 }
 
 export class GhGitHubReader implements T.GitHubReader {
-  constructor(private readonly deadline?: WatchDeadline) {}
+  constructor(private readonly deadline: WatchDeadline) {}
   private run(argv: readonly [string, ...string[]]): Promise<CommandResult> {
     return run(argv, this.deadline);
   }

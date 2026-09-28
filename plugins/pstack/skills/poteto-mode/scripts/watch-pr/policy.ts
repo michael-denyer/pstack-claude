@@ -1,6 +1,6 @@
 import { landingRevision, sameLandingRevision } from "./landing.ts";
 import { WatcherQueryError, resolveChecks } from "./github.ts";
-import { DeadlineExceeded, WatchDeadline } from "./deadline.ts";
+import { DeadlineExceeded, type WatchDeadline } from "./deadline.ts";
 import type * as T from "./types.ts";
 import { nonEmpty } from "./types.ts";
 export function assessGitHubMerge(args: {
@@ -369,7 +369,7 @@ export interface WatchClock {
   sleep(seconds: number): Promise<void>;
 }
 export interface RunDependencies {
-  readonly deadline?: WatchDeadline;
+  readonly deadline: WatchDeadline;
   readonly reader: T.GitHubReader;
   readonly clock: WatchClock;
   readonly emit: (verdict: T.ProgressVerdict) => void;
@@ -394,7 +394,7 @@ type StepResult<V> =
   | {
       readonly kind: "sleep";
       readonly seconds: number;
-      readonly onDeadline?: () => V;
+      readonly onDeadline: () => V;
     }
   | { readonly kind: "continue" };
 async function pollUntilTerminal<V>(args: {
@@ -404,21 +404,16 @@ async function pollUntilTerminal<V>(args: {
   readonly step: () => Promise<StepResult<V>>;
 }): Promise<V | T.BlockerVerdict | T.TimeoutVerdict> {
   let failures = 0;
-  const deadline =
-    args.dependencies.deadline ??
-    new WatchDeadline(args.options.timeout, () =>
-      args.dependencies.clock.now()
-    );
+  const { deadline } = args.dependencies;
   let onDeadline: () => V | T.TimeoutVerdict = () =>
     deadlineVerdict(args.stamp);
-  while (true) {
-    if (deadline.remaining() === 0) return onDeadline();
+  while (deadline.remaining() > 0) {
     let result: StepResult<V>;
     try {
       result = await args.step();
       failures = 0;
     } catch (error) {
-      if (error instanceof DeadlineExceeded) return onDeadline();
+      if (error instanceof DeadlineExceeded) break;
       if (!(error instanceof WatcherQueryError)) throw error;
       onDeadline = () =>
         args.stamp({
@@ -427,7 +422,6 @@ async function pollUntilTerminal<V>(args: {
           exitCode: 5,
           reason: { kind: "status-unavailable", failure: error.failure },
         });
-      if (deadline.remaining() === 0) return onDeadline();
       failures += 1;
       if (!error.failure.retryable || failures >= args.options.maxQueryErrors)
         return statusQueryVerdict(args.stamp, failures, error.failure);
@@ -449,12 +443,13 @@ async function pollUntilTerminal<V>(args: {
     }
     if (result.kind === "terminal") return result.verdict;
     if (result.kind === "sleep") {
-      onDeadline = result.onDeadline ?? (() => deadlineVerdict(args.stamp));
+      onDeadline = result.onDeadline;
       await args.dependencies.clock.sleep(
         Math.min(result.seconds, deadline.remaining())
       );
     }
   }
+  return onDeadline();
 }
 export async function runSimple(args: {
   readonly dependencies: RunDependencies;

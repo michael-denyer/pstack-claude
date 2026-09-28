@@ -15,7 +15,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applySubstitutions, denylistHits, mergeFile, syncComponent } from "../tools/sync.mjs";
+import { applySubstitutions, changedLines, denylistHits, mergeFile, syncComponent } from "../tools/sync.mjs";
 
 const RULES = JSON.parse(readFileSync(join(import.meta.dir, "../tools/substitutions.json"), "utf8"));
 
@@ -173,6 +173,12 @@ describe("mergeFile", () => {
   test("throws when git fails instead of reporting its exit status as a hunk count", () => {
     const nul = (s) => Buffer.from(`${s}\0\n`);
     expect(() => mergeFile(nul("ours"), nul("base"), nul("theirs"))).toThrow("Command failed");
+  });
+});
+
+describe("changedLines", () => {
+  test("throws git's error instead of counting zero when git cannot read the local file", () => {
+    expect(() => changedLines(Buffer.from("one\n"), join(tree({}), "missing.md"))).toThrow("Could not access");
   });
 });
 
@@ -425,7 +431,7 @@ describe("syncComponent", () => {
     expect(dryRun.hits).toEqual(actual.hits);
     expect(actual.written).toContainEqual({ kind: "merged", rel: "merged.md" });
     expect(actual.conflicts).toContainEqual({ rel: "clash.md", reason: "conflict", hunks: 1 });
-    expect(actual.forked).toEqual(["untouched.md"]);
+    expect(actual.forked).toEqual([{ rel: "untouched.md", changed: 2 }]);
     expect(readFileSync(join(dryRunFixture.localDir, "updated.md")).equals(beforeDryRun)).toBe(true);
     expect(readFileSync(join(dryRunFixture.localDir, "merged.md")).equals(beforeMerged)).toBe(true);
     expect(existsSync(join(dryRunFixture.localDir, "new.md"))).toBe(false);
@@ -550,7 +556,7 @@ describe("syncComponent", () => {
 
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
-    expect(report.forked).toEqual(["s.md"]);
+    expect(report.forked).toEqual([{ rel: "s.md", changed: 2 }]);
     expect(report.conflicts).toEqual([]);
     expect(report.written).toEqual([]);
     expect(readFileSync(join(local, "s.md"), "utf8")).toBe("shared line, plus the port's own paragraph\n");
@@ -564,7 +570,7 @@ describe("syncComponent", () => {
 
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
-    expect(report.forked).toEqual(["s.md"]);
+    expect(report.forked).toEqual([{ rel: "s.md", changed: 1 }]);
     expect(report.hits).toHaveLength(1);
     expect(report.hits[0]).toStartWith("s.md:2:");
   });
@@ -603,7 +609,7 @@ describe("syncComponent", () => {
     // sync, is what keeps it out of a release.
     const rerun = sync({ oldDir: newUp, newDir: newUp, localDir: local });
 
-    expect(rerun.forked).toEqual(["s.md"]);
+    expect(rerun.forked).toEqual([{ rel: "s.md", changed: 4 }]);
     expect(rerun.conflicts).toEqual([]);
     expect(readFileSync(join(local, "s.md"), "utf8")).toBe(marked);
   });
@@ -632,9 +638,42 @@ describe("syncComponent", () => {
 
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
-    expect(report.forked).toEqual(["run.sh"]);
+    expect(report.forked).toEqual([{ rel: "run.sh", changed: 0, modeOnly: true }]);
     expect(report.written).toEqual([]);
     expect(statSync(join(local, "run.sh")).mode & 0o777).toBe(0o755);
+  });
+
+  test("forks are reported largest first by changed lines, and a mode-only fork is marked", () => {
+    const body = { "a.md": "one\n", "b.md": "one\ntwo\nthree\n", "run.sh": "echo\n" };
+    const oldUp = tree(body);
+    const newUp = tree(body);
+    const local = tree({ "a.md": "one\nport\n", "b.md": "ONE\nTWO\nthree\n", "run.sh": "echo\n" });
+    for (const dir of [oldUp, newUp]) chmodSync(join(dir, "run.sh"), 0o755);
+    chmodSync(join(local, "run.sh"), 0o644);
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.forked).toEqual([
+      { rel: "b.md", changed: 4 },
+      { rel: "a.md", changed: 1 },
+      { rel: "run.sh", changed: 0, modeOnly: true },
+    ]);
+  });
+
+  test("a local file no component carries is port-only; excluded, removed-upstream, and other components' files are not", () => {
+    const oldUp = tree({ "a.md": "x\n", "gone.md": "y\n", "docs/guide.md": "z\n" });
+    const newUp = tree({ "a.md": "x\n", "docs/guide.md": "z\n" });
+    const local = tree({
+      "a.md": "x\n",
+      "gone.md": "the port edited this\n",
+      "docs/port.md": "the port's own docs\n",
+      "kit/k.md": "carried by another component\n",
+      "tools/extra.ts": "the port wrote this\n",
+    });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, exclude: ["docs/"], carriedElsewhere: ["kit/k.md"] });
+
+    expect(report.portOnly).toEqual(["tools/extra.ts"]);
   });
 
   test("a binary file differing three ways is reported as unmergeable", () => {
@@ -663,7 +702,7 @@ describe("sync CLI", () => {
     const commit = (text) => {
       writeFileSync(join(upstream, "skills/s.md"), text);
       git("add", ".");
-      git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "update");
+      git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-m", "update");
       return git("rev-parse", "HEAD");
     };
     const oldSha = commit(oldText);
@@ -696,7 +735,7 @@ describe("sync CLI", () => {
       });
     const pin = () => JSON.parse(readFileSync(join(port, "tools/upstream.json"), "utf8")).components.kit.sha;
     const local = () => readFileSync(join(port, "plugins/pstack/skills/s.md"), "utf8");
-    return { oldSha, newSha, scratch, run, pin, local };
+    return { oldSha, newSha, scratch, run, pin, local, port };
   }
 
   test("a denylist failure exits 1 and removes its scratch clone", () => {
@@ -727,5 +766,30 @@ describe("sync CLI", () => {
     expect(result.status).toBe(1);
     expect(pin()).toBe(oldSha);
     expect(local()).toBe("one\n");
+  });
+
+  test("a dry run prints each fork's changed lines with a total, then the port-only files", () => {
+    const { run } = cli({ oldText: "one\n", newText: "one\n", localText: "one\nport\n" });
+    const models = JSON.parse(readFileSync(join(import.meta.dir, "../plugins/pstack/models.json"), "utf8"));
+    const roleSkills = [...new Set(models.roles.map((r) => r.skill))];
+
+    const result = run("--dry-run");
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      "\nforked (upstream untouched): 1\n     1 plugins/pstack/skills/s.md\n     1 total changed lines\n",
+    );
+    expect(result.stdout).toContain(`\nport-only: ${roleSkills.length} files\n`);
+    for (const skill of roleSkills) expect(result.stdout).toContain(`\n  plugins/pstack/skills/${skill}/SKILL.md\n`);
+  });
+
+  test("a dry run prints mode in place of a count for a mode-only fork", () => {
+    const { run, port } = cli({ oldText: "one\n", newText: "one\n", localText: "one\n" });
+    chmodSync(join(port, "plugins/pstack/skills/s.md"), 0o755);
+
+    const result = run("--dry-run");
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("  mode plugins/pstack/skills/s.md\n     0 total changed lines\n");
   });
 });

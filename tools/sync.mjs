@@ -34,10 +34,9 @@
 // can with conflicts: the markers are in the tree, and generate.mjs fails on
 // any marker line under plugins/pstack, so CI rejects an unresolved sync.
 // With --dry-run nothing is written and the pin stays; passing the pinned SHA
-// as <new-sha> under --dry-run prints the ownership map (which files the port
-// has forked).
+// as <new-sha> under --dry-run prints the ownership map.
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
@@ -121,6 +120,16 @@ export function mergeFile(ours, base, theirs) {
   }
 }
 
+// Call only on differing bytes. `--no-index` exits 1 when the two differ, and
+// also on errors such as an unreadable file, which print no numstat line.
+export function changedLines(upstream, localFile) {
+  const args = ["diff", "--no-index", "--numstat", "--text", "-", localFile];
+  const diff = spawnSync("git", args, { input: upstream, encoding: "utf8" });
+  if (diff.status !== 1 || !diff.stdout) throw new Error(`git diff --no-index failed on ${localFile}: ${diff.stderr}`);
+  const [added, removed] = diff.stdout.split("\t").map(Number);
+  return added + removed;
+}
+
 // Paths the port deliberately does not carry (upstream.json `exclude`). An
 // entry matches a path relative to the component root exactly or as its
 // directory prefix; a trailing slash is optional and changes nothing.
@@ -141,6 +150,7 @@ export function syncComponent({
   rules,
   denylist = [],
   exclude = [],
+  carriedElsewhere = [],
   derive = (_, t) => t,
   dryRun = false,
 }) {
@@ -148,6 +158,7 @@ export function syncComponent({
     written: [],
     deleted: [],
     forked: [],
+    portOnly: [],
     conflicts: [],
     binaryConflicts: [],
     unchanged: 0,
@@ -206,7 +217,9 @@ export function syncComponent({
       planWrite(rel, "updated", next.buffer);
       addCounts(next.counts);
     } else if (old && old.equals(next.buffer) && modeOf(join(oldDir, rel)) === modeOf(newFile)) {
-      report.forked.push(rel);
+      report.forked.push(
+        local.equals(old) ? { rel, changed: 0, modeOnly: true } : { rel, changed: changedLines(old, localFile) },
+      );
       scan(rel, local);
     } else if (next.binary) {
       report.binaryConflicts.push(rel);
@@ -234,6 +247,10 @@ export function syncComponent({
     }
   }
 
+  report.forked.sort((a, b) => b.changed - a.changed);
+  const upstreamPaths = new Set([...carriedNew, ...carried(oldDir), ...carriedElsewhere]);
+  report.portOnly = carried(localDir).filter((rel) => !upstreamPaths.has(rel));
+
   if (report.hits.length || report.binaryConflicts.length || dryRun) return report;
   for (const operation of operations) {
     const localFile = join(localDir, operation.rel);
@@ -250,6 +267,22 @@ export function syncComponent({
 
 function git(args) {
   return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+}
+
+// Relative to `component`'s localPath, and read at each other component's own pin.
+function pathsOtherComponentsCarry(clone, components, component) {
+  const { localPath } = components[component];
+  return Object.entries(components)
+    .filter(([name]) => name !== component)
+    .flatMap(([, other]) =>
+      git(["-C", clone, "ls-tree", "-r", "-z", "--name-only", other.sha, "--", other.upstreamPath])
+        .split("\0")
+        .filter(Boolean)
+        .map((path) => relative(other.upstreamPath, path))
+        .filter((rel) => !isExcluded(rel, other.exclude ?? []))
+        .map((rel) => relative(localPath, join(other.localPath, rel)))
+        .filter((rel) => !rel.startsWith("../")),
+    );
 }
 
 function main() {
@@ -283,6 +316,7 @@ function main() {
       rules: substitutions,
       denylist,
       exclude: spec.exclude ?? [],
+      carriedElsewhere: pathsOtherComponentsCarry(join(scratch, "clone"), upstream.components, component),
       derive: (rel, text) => deriveSkill(join(spec.localPath, rel), text),
       dryRun,
     });
@@ -292,8 +326,17 @@ function main() {
     for (const rel of report.deleted) console.log(`deleted: ${rel}`);
     for (const [pattern, n] of report.counts) console.log(`substituted: "${pattern}" x${n}`);
     if (report.forked.length) {
+      const total = report.forked.reduce((sum, fork) => sum + fork.changed, 0);
+      const width = Math.max("mode".length, String(total).length);
       console.log(`\nforked (upstream untouched): ${report.forked.length}`);
-      for (const rel of report.forked) console.log(`  ${spec.localPath}/${rel}`);
+      for (const { rel, changed, modeOnly } of report.forked) {
+        console.log(`  ${String(modeOnly ? "mode" : changed).padStart(width)} ${spec.localPath}/${rel}`);
+      }
+      console.log(`  ${String(total).padStart(width)} total changed lines`);
+    }
+    if (report.portOnly.length) {
+      console.log(`\nport-only: ${report.portOnly.length} files`);
+      for (const rel of report.portOnly) console.log(`  ${spec.localPath}/${rel}`);
     }
     if (report.conflicts.length) {
       console.log(`\nneeds a human: ${report.conflicts.length} (a conflict is written with git's markers):`);

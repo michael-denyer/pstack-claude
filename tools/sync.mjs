@@ -156,6 +156,9 @@ export function mergeFile(ours, base, theirs) {
       return { clean: true, buffer: merged };
     } catch (error) {
       if (!(error.status >= 1 && error.status <= 127)) throw error;
+      if (!error.stdout?.includes("<<<<<<< local")) {
+        throw new Error(`git merge-file reported conflicts (exit ${error.status}) but printed no markers`, { cause: error });
+      }
       return { clean: false, hunks: error.status, buffer: error.stdout };
     }
   } finally {
@@ -183,21 +186,40 @@ export function isExcluded(rel, exclude) {
   });
 }
 
+const lazyFile = (mode, load) => {
+  let loaded;
+  return {
+    mode,
+    get bytes() { return (loaded ??= load()).bytes; },
+    get counts() { return (loaded ??= load()).counts; },
+    get binary() { return (loaded ??= load()).binary; },
+  };
+};
+
 const same = (a, b) => Boolean(a?.bytes && b?.bytes?.equals(a.bytes) && a.mode === b.mode);
+// A file new upstream that the port already wrote has no common ancestor.
+// An empty base makes every shared line a coincidence, which is what it is.
 const NO_COMMON_ANCESTOR = Buffer.alloc(0);
 
-export function classify({ old = null, new: next = null, local = null, excluded = false, elsewhere = false }) {
-  if (excluded) return next ? { kind: "excluded" } : null;
+// Decide one path's fate from its old upstream, new upstream, and local
+// versions, at least one of old and new present. A version is null when
+// absent, `{ symlink: true }` for an upstream link, or a file `{ mode, bytes }`
+// whose upstream form adds substitution `counts` and `binary`. A file reads and
+// derives its bytes on first access, so an early return leaves the rest unread.
+// Returns null when there is nothing to report, else `{ kind }` plus
+// `write: { bytes, mode }` and `counts` for a file to write, `kept` for local
+// bytes left in place, `base` for a fork's upstream text, and `hunks` for a
+// conflict.
+export function classify({ old = null, new: next = null, local = null }) {
   if (next?.symlink) return { kind: "symlink" };
   if (!next) {
-    if (!old) return local && !elsewhere ? { kind: "port-only" } : null;
     if (!local) return null;
     return old.bytes?.equals(local.bytes) ? { kind: "deleted" } : { kind: "removed-upstream", kept: local.bytes };
   }
-  const write = (kind, bytes = next.bytes, mode = next.mode) => ({ kind, write: { bytes, mode }, counts: next.counts });
-  if (!local) return write("added");
+  const writing = (kind, bytes = next.bytes, mode = next.mode) => ({ kind, write: { bytes, mode }, counts: next.counts });
+  if (!local) return writing("added");
   if (same(local, next)) return { kind: "unchanged", kept: local.bytes };
-  if (same(local, old)) return write("updated");
+  if (same(local, old)) return writing("updated");
   if (same(old, next)) {
     if (local.bytes.equals(old.bytes)) return { kind: "mode-only", kept: local.bytes };
     return { kind: "forked", kept: local.bytes, base: old.bytes };
@@ -205,8 +227,8 @@ export function classify({ old = null, new: next = null, local = null, excluded 
   if (next.binary) return { kind: "binary-conflict" };
   const merged = mergeFile(local.bytes, old?.bytes ?? NO_COMMON_ANCESTOR, next.bytes);
   const mode = next.mode === old?.mode ? local.mode : next.mode;
-  if (merged.clean) return write("merged", merged.buffer, mode);
-  return { ...write("conflicted", merged.buffer, mode), hunks: merged.hunks };
+  if (merged.clean) return writing("merged", merged.buffer, mode);
+  return { ...writing("conflicted", merged.buffer, mode), hunks: merged.hunks };
 }
 
 // Compare old-upstream vs new-upstream vs local for one component tree.
@@ -242,24 +264,31 @@ export function syncComponent({
   };
   const listed = (dir) => new Set(walk(dir).map((file) => relative(dir, file)));
   const [oldPaths, newPaths, localPaths] = [listed(oldDir), listed(newDir), listed(localDir)];
-  const upstream = (dir, paths, rel, read) => {
+  const upstream = (dir, paths, rel) => {
     if (!paths.has(rel)) return null;
-    const stat = lstatSync(join(dir, rel));
+    const file = join(dir, rel);
+    const stat = lstatSync(file);
+    // Following a link would copy whatever it points at, even outside the
+    // clone, into the port.
     if (stat.isSymbolicLink()) return { symlink: true };
-    return read ? { ...portForm(rel, readFileSync(join(dir, rel))), mode: stat.mode & 0o777 } : { unread: true };
+    return lazyFile(stat.mode & 0o777, () => portForm(rel, readFileSync(file)));
   };
-  const portCopy = (rel, read) => {
+  const portCopy = (rel) => {
     const file = join(localDir, rel);
-    if (!read) return localPaths.has(rel) ? { unread: true } : null;
-    return existsSync(file) ? { bytes: readFileSync(file), mode: statSync(file).mode & 0o777 } : null;
+    return existsSync(file) ? lazyFile(statSync(file).mode & 0o777, () => ({ bytes: readFileSync(file) })) : null;
   };
   const elsewhere = new Set(carriedElsewhere);
+  const outcomeOf = (rel) => {
+    if (isExcluded(rel, exclude)) return newPaths.has(rel) ? { kind: "excluded" } : null;
+    if (!oldPaths.has(rel) && !newPaths.has(rel)) return elsewhere.has(rel) ? null : { kind: "port-only" };
+    try {
+      return classify({ old: upstream(oldDir, oldPaths, rel), new: upstream(newDir, newPaths, rel), local: portCopy(rel) });
+    } catch (error) {
+      throw new Error(`${rel}: ${error.message}`, { cause: error });
+    }
+  };
   const outcomes = [...new Set([...newPaths, ...oldPaths, ...localPaths])].flatMap((rel) => {
-    const excluded = isExcluded(rel, exclude);
-    const old = upstream(oldDir, oldPaths, rel, !excluded);
-    const next = upstream(newDir, newPaths, rel, !excluded);
-    const local = portCopy(rel, !excluded && Boolean(old || next));
-    const outcome = classify({ old, new: next, local, excluded, elsewhere: elsewhere.has(rel) });
+    const outcome = outcomeOf(rel);
     return outcome ? [{ rel, ...outcome }] : [];
   });
 
@@ -279,6 +308,7 @@ export function syncComponent({
     else if (kind === "binary-conflict") report.binaryConflicts.push(rel);
     else if (kind === "deleted") report.deleted.push(rel);
     else if (kind === "port-only") report.portOnly.push(rel);
+    else if (!["added", "updated", "merged"].includes(kind)) throw new Error(`${rel}: no report entry for ${kind}`);
   }
   report.forked.sort((a, b) => b.changed - a.changed);
 

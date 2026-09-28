@@ -356,11 +356,7 @@ describe("classify", () => {
   const base = ["l1", "l2", "l3", "l4", "l5"].join("\n") + "\n";
 
   test.each([
-    ["an excluded path upstream still has", { excluded: true, new: { unread: true }, local: { unread: true } }, { kind: "excluded" }],
-    ["an excluded path upstream no longer has", { excluded: true, old: { unread: true }, local: { unread: true } }, null],
     ["an upstream symlink", { old: upstream("a\n"), new: { symlink: true }, local: port("a\n") }, { kind: "symlink" }],
-    ["a local file no upstream revision has", { local: { unread: true } }, { kind: "port-only" }],
-    ["a local file another component carries", { local: { unread: true }, elsewhere: true }, null],
     ["a new upstream file", { new: upstream("a\n") }, written("added", "a\n")],
     ["a local copy equal to new", { old: upstream("a\n"), new: upstream("b\n"), local: port("b\n") }, { kind: "unchanged", kept: bytes("b\n") }],
     ["a local copy equal to old", { old: upstream("a\n"), new: upstream("b\n"), local: port("a\n") }, written("updated", "b\n")],
@@ -947,7 +943,7 @@ describe("syncComponent", () => {
     });
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("s.md: git merge-file reported 1 conflict but printed no markers");
+    expect(result.stderr).toContain("s.md: git merge-file reported conflicts (exit 1) but printed no markers");
     expect(readFileSync(join(localDir, "s.md"), "utf8")).toBe("port\n");
   });
 });

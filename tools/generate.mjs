@@ -375,6 +375,51 @@ export function regions(models) {
   ];
 }
 
+const CODEX_TOOLS = `${SKILLS}/poteto-mode/references/codex-tools.md`;
+const CODEX_NOTES_HEADER = "| Skill | On Codex |";
+const CODEX_PREAMBLE =
+  "On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.";
+const DRIVER_LINE = "Resolve the driver skill through [poteto-mode's Non-negotiables](../SKILL.md#non-negotiables).";
+const DRIVER_PLAYBOOKS = ["autopilot-full", "multi-phase-plan", "orchestrate", "refactoring", "shipping"];
+
+// The skills with a row in the Codex mapping's Per-skill notes table, in row order.
+export function codexNoteSkills(markdown) {
+  const lines = markdown.split("\n");
+  const range = tableRows(CODEX_NOTES_HEADER, "| ")(lines);
+  if (!range) throw new Error(`${CODEX_TOOLS}: "${CODEX_NOTES_HEADER}" table header not found`);
+  return lines.slice(...range).map((row) => {
+    const skill = row.match(/^\| `([a-z0-9-]+)` \|/)?.[1];
+    if (!skill) throw new Error(`${CODEX_TOOLS}: Per-skill notes row does not start with a backticked skill: ${row}`);
+    return skill;
+  });
+}
+
+// The line the generator owns under a file's first heading, by repo-relative
+// file: the Codex preamble on each skill the Per-skill notes table has a row
+// for, and the driver-skill line on the playbooks that drive an app.
+export function loadLeadLines(root = repo) {
+  const leads = new Map();
+  for (const skill of codexNoteSkills(readFileSync(join(root, CODEX_TOOLS), "utf8"))) {
+    const file = `${SKILLS}/${skill}/SKILL.md`;
+    if (!existsSync(join(root, file))) throw new Error(`${CODEX_TOOLS}: per-skill note for "${skill}", which has no SKILL.md`);
+    leads.set(file, CODEX_PREAMBLE);
+  }
+  for (const playbook of DRIVER_PLAYBOOKS) leads.set(`${SKILLS}/poteto-mode/playbooks/${playbook}.md`, DRIVER_LINE);
+  return leads;
+}
+
+// Put `line` in its own paragraph right under the first heading after the
+// frontmatter, replacing it if already there. Null when there is no heading.
+export function stampLeadLine(text, line) {
+  const lines = text.split("\n");
+  const bodyStart = lines[0] === "---" ? lines.indexOf("---", 1) + 1 : 0;
+  const heading = lines.findIndex((l, i) => i >= bodyStart && /^#{1,6} /.test(l));
+  if (heading === -1) return null;
+  const present = lines[heading + 1] === "" && lines[heading + 2] === line;
+  lines.splice(heading + 1, present ? 2 : 0, "", line);
+  return lines.join("\n");
+}
+
 // Stamp every region the generator owns in `file` (repo-relative). A missing
 // anchor throws: a stamped region is a structural contract with the file, not
 // an optional nicety. With strict: false a missing anchor is left alone.
@@ -507,12 +552,14 @@ function portFrontmatter(file, text) {
 
 // The port's derivation of an upstream file, as tools/sync.mjs applies it
 // before comparing with the local copy: the port's frontmatter, then the
-// generator's own stamps. A Models section is appended as the last H2 when
+// generator's own stamps, its lead line first. A Models section is appended as the last H2 when
 // upstream has none, which is where every hand-added one already sits. A
 // region whose anchor upstream lacks is left unstamped, so the file surfaces
 // as forked or conflicted instead of aborting the sync.
-export function deriveSkill(file, text, models) {
-  const out = portFrontmatter(file, text);
+export function deriveSkill(file, text, models, leads) {
+  const front = portFrontmatter(file, text);
+  const line = leads.get(file);
+  const out = (line && stampLeadLine(front, line)) || front;
   const lines = out.split("\n");
   for (const region of regions(models).filter((r) => r.file === file && r.appendHeading)) {
     if (region.locate(lines)) continue;
@@ -702,6 +749,11 @@ export function plan(root) {
   const files = {};
   for (const file of VERSIONED_MANIFESTS) files[file] = stampVersion(read(file), version, file);
   for (const file of new Set(regions(models).map((r) => r.file))) files[file] = applyRegions(file, read(file), models);
+  for (const [file, line] of loadLeadLines(root)) {
+    const stamped = stampLeadLine(files[file] ?? read(file), line);
+    if (stamped === null) throw new Error(`${file}: no heading to stamp its lead line under`);
+    files[file] = stamped;
+  }
   for (const skill of slashCommands(read(COMMANDS_DOC), publicSkills(join(root, SKILLS)))) {
     files[`${PROMPTS}/${skill.name}.md`] = promptStub(skill);
   }
@@ -816,6 +868,23 @@ export function problems(root) {
       }
     });
   }
+  attempt(() => {
+    const leads = loadLeadLines(root);
+    const strays = markdownFiles(skillsDir).flatMap((full) => {
+      const file = relative(root, full);
+      return readFileSync(full, "utf8")
+        .split("\n")
+        .flatMap((line, i) =>
+          [CODEX_PREAMBLE, DRIVER_LINE].includes(line) && leads.get(file) !== line ? [`${file}:${i + 1}`] : [],
+        );
+    });
+    if (strays.length) {
+      throw new Error(
+        "generator-owned lead lines outside their files (a Codex preamble needs a row in the Per-skill notes " +
+          `table of ${CODEX_TOOLS}; the driver-skill line belongs to DRIVER_PLAYBOOKS):\n${strays.join("\n")}`,
+      );
+    }
+  });
   attempt(() => validateSkillsTree(skillsDir));
   attempt(() => validateProsePaths(skillsDir));
   if (codexManifest) {

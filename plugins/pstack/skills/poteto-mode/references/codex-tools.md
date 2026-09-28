@@ -81,6 +81,12 @@ Affected skill entry points and the optional Codex slash stubs point here. Most 
 | `maintain-verification-skill` | The parallel per-feature source readers map to `spawn_agent` fan-out; the project-local skill lives under Codex's skills location, not `.claude/skills/`. |
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
 | `automate-me` | `plugin-dev:skill-development` resolves through the skills table above. |
+| `architect` | The runner panel goes through the **arena** skill, so its `spawn_agent` fan-out and model substitution apply here too. |
+| `arena` | The parallel candidates and the cross-judge map to `spawn_agent`; give the runners distinct Codex models (see Model names above). |
+| `how` | The parallel explorers and the explainer map to `spawn_agent` fan-out; substitute your configured Codex models. |
+| `reflect` | The three reviewers and the synthesizer map to `spawn_agent`; substitute your configured Codex models. |
+| `swarm` | Each worker is a `spawn_agent` call, which already runs concurrently; give each writing worker its own worktree (see Subagent policy above). |
+| `why` | The parallel investigators and the synthesizer map to `spawn_agent` fan-out; list MCP servers from the tools Codex exposes to the session. |
 
 ## Vendored scripts
 

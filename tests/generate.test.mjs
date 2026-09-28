@@ -24,7 +24,9 @@ import {
   applyRegions,
   assertChangesHeading,
   changes,
+  codexNoteSkills,
   deriveSkill,
+  loadLeadLines,
   effortAgents,
   effortSection,
   OWNED_DIRS,
@@ -32,6 +34,7 @@ import {
   PORTABLE_ASSETS,
   problems,
   stampAgentPaths,
+  stampLeadLine,
   fenceUnder,
   loadModels,
   parseFrontmatter,
@@ -50,6 +53,7 @@ import { walk } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const models = loadModels();
+const leads = loadLeadLines();
 
 const lines = (text) => text.split("\n");
 const spanned = (locate, doc) => {
@@ -353,7 +357,7 @@ describe("deriveSkill", () => {
   const front = (flags, name = "x") => `---\nname: ${name}\ndescription: d\n${flags}---\n\nbody\n`;
 
   test("drops disable-model-invocation on a public skill and swaps it on a principle leaf", () => {
-    expect(deriveSkill("plugins/pstack/skills/x/SKILL.md", front("disable-model-invocation: true\n"), models)).toBe(
+    expect(deriveSkill("plugins/pstack/skills/x/SKILL.md", front("disable-model-invocation: true\n"), models, leads)).toBe(
       front(""),
     );
     expect(
@@ -361,6 +365,7 @@ describe("deriveSkill", () => {
         "plugins/pstack/skills/principle-x/SKILL.md",
         front("disable-model-invocation: true\n", "principle-x"),
         models,
+        leads,
       ),
     ).toBe(front("user-invocable: false\n", "principle-x"));
   });
@@ -368,54 +373,80 @@ describe("deriveSkill", () => {
   test("names a skill after its directory and an agent after its file, and drops Cursor-only keys", () => {
     const cursorKeys = "mode: true\nicon: crown\ncolor: yellow\nreminder: >-\n  New task?\n  Apply it.\n";
     expect(
-      deriveSkill("plugins/pstack/skills/x/SKILL.md", front(`${cursorKeys}disable-model-invocation: true\n`, "X Mode"), models),
+      deriveSkill("plugins/pstack/skills/x/SKILL.md", front(`${cursorKeys}disable-model-invocation: true\n`, "X Mode"), models, leads),
     ).toBe(front(""));
-    expect(deriveSkill("plugins/pstack/agents/comment-sicko.md", front("is_background: true\n", "Comment Sicko"), models)).toBe(
+    expect(deriveSkill("plugins/pstack/agents/comment-sicko.md", front("is_background: true\n", "Comment Sicko"), models, leads)).toBe(
       front("", "comment-sicko"),
     );
   });
 
   test("leaves a reference file's frontmatter alone", () => {
     const text = front("mode: true\n", "Some Reference");
-    expect(deriveSkill("plugins/pstack/skills/x/references/y.md", text, models)).toBe(text);
+    expect(deriveSkill("plugins/pstack/skills/x/references/y.md", text, models, leads)).toBe(text);
   });
 
   test("leaves a prose mention of the flag alone", () => {
     const text = front("", "automate-me") + "Never write `disable-model-invocation: true` on a skill.\n";
-    expect(deriveSkill("plugins/pstack/skills/automate-me/SKILL.md", text, models)).toBe(text);
+    expect(deriveSkill("plugins/pstack/skills/automate-me/SKILL.md", text, models, leads)).toBe(text);
   });
 
   test("leaves a flag line in the body alone when the frontmatter has none", () => {
     const text = front("", "automate-me") + "disable-model-invocation: true\n";
-    expect(deriveSkill("plugins/pstack/skills/automate-me/SKILL.md", text, models)).toBe(text);
+    expect(deriveSkill("plugins/pstack/skills/automate-me/SKILL.md", text, models, leads)).toBe(text);
   });
 
   test("appends and stamps a Models section when upstream has none", () => {
-    const out = deriveSkill("plugins/pstack/skills/how/SKILL.md", front("disable-model-invocation: true\n"), models);
+    const out = deriveSkill("plugins/pstack/skills/how/SKILL.md", front("disable-model-invocation: true\n"), models, leads);
     expect(out.endsWith("body\n\n## Models\n\nRole defaults, stamped from")).toBe(false);
     expect(out).toContain("body\n\n## Models\n\nRole defaults, stamped from");
     expect(out).toContain("- how explorer:");
     expect(out.endsWith("\n")).toBe(true);
-    expect(deriveSkill("plugins/pstack/skills/how/SKILL.md", out, models)).toBe(out);
+    expect(deriveSkill("plugins/pstack/skills/how/SKILL.md", out, models, leads)).toBe(out);
   });
 
   test("leaves a region whose anchor upstream lacks unstamped instead of throwing", () => {
     const text = front("disable-model-invocation: true\n") + "no reviewer table here\n";
-    const out = deriveSkill("plugins/pstack/skills/interrogate/SKILL.md", text, models);
+    const out = deriveSkill("plugins/pstack/skills/interrogate/SKILL.md", text, models, leads);
     expect(out.startsWith(front("", "interrogate") + "no reviewer table here\n")).toBe(true);
     expect(out).not.toContain("| Reviewer A");
     expect(out).toContain("\n## Reasoning effort\n\nA role value in");
   });
 
   test("appends the Reasoning effort section after the Models section", () => {
-    const out = deriveSkill("plugins/pstack/skills/how/SKILL.md", front("disable-model-invocation: true\n"), models);
+    const out = deriveSkill("plugins/pstack/skills/how/SKILL.md", front("disable-model-invocation: true\n"), models, leads);
     expect(out.indexOf("## Models")).toBeLessThan(out.indexOf("## Reasoning effort"));
     expect(out).toContain("subagent_type: \"pstack:effort-<level>\"");
   });
 
+  test("stamps a file's lead line in its own paragraph under the first heading", () => {
+    for (const file of ["plugins/pstack/skills/teach/SKILL.md", "plugins/pstack/skills/poteto-mode/playbooks/refactoring.md"]) {
+      const text = "---\nname: teach\ndescription: d\n---\n\n# Title\n\nbody\n";
+      const out = deriveSkill(file, text, models, leads);
+      expect(out).toBe(text.replace("# Title\n\n", `# Title\n\n${leads.get(file)}\n\n`));
+      expect(deriveSkill(file, out, models, leads)).toBe(out);
+    }
+  });
+
   test("a file the generator does not own passes through", () => {
     const text = "# plain\n\nreference text\n";
-    expect(deriveSkill("plugins/pstack/skills/how/references/x.md", text, models)).toBe(text);
+    expect(deriveSkill("plugins/pstack/skills/how/references/x.md", text, models, leads)).toBe(text);
+  });
+});
+
+describe("lead lines", () => {
+  test("a lead line goes under the first heading after the frontmatter, once", () => {
+    const text = "---\nname: x\n# a YAML comment\n---\n\n# Title\n\nbody\n";
+    const once = stampLeadLine(text, "Lead.");
+    expect(once).toBe("---\nname: x\n# a YAML comment\n---\n\n# Title\n\nLead.\n\nbody\n");
+    expect(stampLeadLine(once, "Lead.")).toBe(once);
+    expect(stampLeadLine("no heading\n", "Lead.")).toBeNull();
+  });
+
+  test("the Codex notes table lists its skills in row order and rejects a row without one", () => {
+    const table = (...rows) => ["| Skill | On Codex |", "|-------|----------|", ...rows, "", "after"].join("\n");
+    expect(codexNoteSkills(table("| `how` | fan-out |", "| `teach` | images |"))).toEqual(["how", "teach"]);
+    expect(() => codexNoteSkills(table("| how | fan-out |"))).toThrow("does not start with a backticked skill: | how |");
+    expect(() => codexNoteSkills("no table\n")).toThrow('"| Skill | On Codex |" table header not found');
   });
 });
 
@@ -651,6 +682,31 @@ describe("plan, changes, apply", () => {
     spawnSync(process.execPath, [join(root, "tools/generate.mjs"), ...args], { encoding: "utf8" });
   const append = (root, rel, text) => writeFileSync(join(root, rel), readFileSync(join(root, rel), "utf8") + text);
   const STRAY_SLUG = ["plugins/pstack/skills/tdd/SKILL.md", "\nUse claude-opus-99 here.\n"];
+
+  test("plan restores every lead line removed by hand", () => {
+    const root = repoCopy();
+    const leadFiles = [...loadLeadLines(root)];
+    expect(leadFiles.length).toBeGreaterThan(0);
+    for (const [file, line] of leadFiles) {
+      const text = readFileSync(join(root, file), "utf8");
+      writeFileSync(join(root, file), text.replace(`\n\n${line}\n`, "\n"));
+      expect(readFileSync(join(root, file), "utf8")).not.toContain(line);
+    }
+    const { files } = plan(root);
+    for (const [file] of leadFiles) expect(files[file]).toBe(readFileSync(join(repoRoot, file), "utf8"));
+  });
+
+  test("problems reports a lead line in a file that does not own it", () => {
+    const root = repoCopy();
+    const [, preamble] = [...loadLeadLines(root)].find(([, line]) => line.startsWith("On Codex"));
+    append(root, "plugins/pstack/skills/tdd/SKILL.md", `\n${preamble}\n`);
+    const codexTools = "plugins/pstack/skills/poteto-mode/references/codex-tools.md";
+    writeFileSync(join(root, codexTools), readFileSync(join(root, codexTools), "utf8").replace(/^\| `why` \|.*\n/m, ""));
+    const failures = problems(root).filter((f) => f.startsWith("generator-owned lead lines"));
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain("\nplugins/pstack/skills/why/SKILL.md:");
+    expect(failures[0]).toContain("\nplugins/pstack/skills/tdd/SKILL.md:");
+  });
 
   test("problems reports every broken contract, and --check prints each and exits 1", () => {
     const root = repoCopy();

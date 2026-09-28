@@ -15,7 +15,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { deriveSkill, loadModels } from "../tools/generate.mjs";
+import { deriveSkill, loadLeadLines, loadModels } from "../tools/generate.mjs";
 import {
   applySubstitutions,
   changedLines,
@@ -952,8 +952,8 @@ describe("syncComponent", () => {
   test("an old revision's malformed frontmatter is never derived when the port copy does not need it", () => {
     const good = "---\nname: a\ndescription: fine\n---\nbody\n";
     const bad = "---\nname: a\ndescription: [unclosed\n---\nbody\n";
-    const models = loadModels();
-    const derive = (rel, text) => deriveSkill(join("plugins/pstack/skills", rel), text, models);
+    const [models, leads] = [loadModels(), loadLeadLines()];
+    const derive = (rel, text) => deriveSkill(join("plugins/pstack/skills", rel), text, models, leads);
     const upstreamDeletedIt = { old: { "a/SKILL.md": good, "b/SKILL.md": bad }, new: { "a/SKILL.md": good } };
     const upstreamFixedIt = { old: { "a/SKILL.md": bad }, new: { "a/SKILL.md": good } };
     for (const { old, new: next } of [upstreamDeletedIt, upstreamFixedIt]) {
@@ -1008,6 +1008,9 @@ describe("sync CLI", () => {
     cpSync(join(import.meta.dir, "../plugins/pstack/models.json"), join(port, "plugins/pstack/models.json"));
     mkdirSync(join(port, "plugins/pstack/skills"));
     writeFileSync(join(port, "plugins/pstack/skills/s.md"), localText);
+    const codexTools = join(port, "plugins/pstack/skills/poteto-mode/references/codex-tools.md");
+    mkdirSync(join(codexTools, ".."), { recursive: true });
+    writeFileSync(codexTools, "| Skill | On Codex |\n|-------|----------|\n");
     for (const { skill } of JSON.parse(readFileSync(join(port, "plugins/pstack/models.json"), "utf8")).roles) {
       mkdirSync(join(port, "plugins/pstack/skills", skill), { recursive: true });
       writeFileSync(join(port, "plugins/pstack/skills", skill, "SKILL.md"), "");
@@ -1072,8 +1075,9 @@ describe("sync CLI", () => {
     expect(result.stdout).toContain(
       "\nforked (upstream untouched): 1\n     1 plugins/pstack/skills/s.md\n     1 total changed lines\n",
     );
-    expect(result.stdout).toContain(`\nport-only: ${roleSkills.length} files\n`);
-    for (const skill of roleSkills) expect(result.stdout).toContain(`\n  plugins/pstack/skills/${skill}/SKILL.md\n`);
+    const portOnly = [...roleSkills.map((skill) => `${skill}/SKILL.md`), "poteto-mode/references/codex-tools.md"];
+    expect(result.stdout).toContain(`\nport-only: ${portOnly.length} files\n`);
+    for (const rel of portOnly) expect(result.stdout).toContain(`\n  plugins/pstack/skills/${rel}\n`);
   });
 
   test("a dry run prints mode in place of a count for a mode-only fork", () => {

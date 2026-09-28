@@ -352,55 +352,71 @@ describe("classify", () => {
   const bytes = (text) => Buffer.from(text);
   const port = (text, mode = 0o644) => ({ bytes: bytes(text), mode });
   const upstream = (text, mode = 0o644) => ({ ...port(text, mode), binary: false, counts: COUNTS });
+  const older = (text, mode = 0o644) => ({ ...upstream(text, mode), counts: new Map([["Task", 1]]) });
   const written = (kind, text, mode = 0o644) => ({ kind, write: { bytes: bytes(text), mode }, counts: COUNTS });
   const base = ["l1", "l2", "l3", "l4", "l5"].join("\n") + "\n";
 
   test.each([
-    ["an upstream symlink", { old: upstream("a\n"), new: { symlink: true }, local: port("a\n") }, { kind: "symlink" }],
+    ["an upstream symlink", { old: older("a\n"), new: { symlink: true }, local: port("a\n") }, { kind: "symlink" }],
     ["a new upstream file", { new: upstream("a\n") }, written("added", "a\n")],
-    ["a local copy equal to new", { old: upstream("a\n"), new: upstream("b\n"), local: port("b\n") }, { kind: "unchanged", kept: bytes("b\n") }],
-    ["a local copy equal to old", { old: upstream("a\n"), new: upstream("b\n"), local: port("a\n") }, written("updated", "b\n")],
-    ["an upstream mode change", { old: upstream("a\n"), new: upstream("a\n", 0o755), local: port("a\n") }, written("updated", "a\n", 0o755)],
+    ["a local copy equal to new", { old: older("a\n"), new: upstream("b\n"), local: port("b\n") }, { kind: "unchanged", kept: bytes("b\n") }],
+    ["a local copy equal to old", { old: older("a\n"), new: upstream("b\n"), local: port("a\n") }, written("updated", "b\n")],
+    ["an upstream mode change", { old: older("a\n"), new: upstream("a\n", 0o755), local: port("a\n") }, written("updated", "a\n", 0o755)],
     [
       "a port edit upstream left alone",
-      { old: upstream("a\n"), new: upstream("a\n"), local: port("a\nport\n") },
+      { old: older("a\n"), new: upstream("a\n"), local: port("a\nport\n") },
       { kind: "forked", kept: bytes("a\nport\n"), base: bytes("a\n") },
     ],
-    ["a port mode change upstream left alone", { old: upstream("a\n"), new: upstream("a\n"), local: port("a\n", 0o755) }, { kind: "mode-only", kept: bytes("a\n") }],
+    ["a port mode change upstream left alone", { old: older("a\n"), new: upstream("a\n"), local: port("a\n", 0o755) }, { kind: "mode-only", kept: bytes("a\n") }],
     [
       "a binary changed on both sides",
-      { old: upstream("\0old"), new: { ...upstream("\0new"), binary: true }, local: port("\0port") },
+      { old: older("\0old"), new: { ...upstream("\0new"), binary: true }, local: port("\0port") },
       { kind: "binary-conflict" },
     ],
     [
       "edits on both sides that do not overlap",
-      { old: upstream(base), new: upstream(base.replace("l5", "l5 upstream")), local: port(base.replace("l1", "l1 port")) },
+      { old: older(base), new: upstream(base.replace("l5", "l5 upstream")), local: port(base.replace("l1", "l1 port")) },
       written("merged", base.replace("l1", "l1 port").replace("l5", "l5 upstream")),
     ],
-    ["a port mode change under an upstream edit", { old: upstream("a\n"), new: upstream("b\n"), local: port("a\n", 0o755) }, written("merged", "b\n", 0o755)],
+    ["a port mode change under an upstream edit", { old: older("a\n"), new: upstream("b\n"), local: port("a\n", 0o755) }, written("merged", "b\n", 0o755)],
     [
       "a port edit and mode change under an upstream edit",
-      { old: upstream(base), new: upstream(base.replace("l5", "l5 upstream")), local: port(base.replace("l1", "l1 port"), 0o755) },
+      { old: older(base), new: upstream(base.replace("l5", "l5 upstream")), local: port(base.replace("l1", "l1 port"), 0o755) },
       written("merged", base.replace("l1", "l1 port").replace("l5", "l5 upstream"), 0o755),
     ],
     [
       "edits on both sides that overlap",
-      { old: upstream(base), new: upstream(base.replace("l3", "l3 upstream")), local: port(base.replace("l3", "l3 port")) },
+      { old: older(base), new: upstream(base.replace("l3", "l3 upstream")), local: port(base.replace("l3", "l3 port")) },
       { ...written("conflicted", "l1\nl2\n<<<<<<< local\nl3 port\n=======\nl3 upstream\n>>>>>>> upstream\nl4\nl5\n"), hunks: 1 },
     ],
     [
-      "a file new on both sides",
-      { new: upstream("upstream\n"), local: port("port\n") },
+      "a port mode change under an overlapping upstream edit",
+      { old: older(base), new: upstream(base.replace("l3", "l3 upstream")), local: port(base.replace("l3", "l3 port"), 0o755) },
+      { ...written("conflicted", "l1\nl2\n<<<<<<< local\nl3 port\n=======\nl3 upstream\n>>>>>>> upstream\nl4\nl5\n", 0o755), hunks: 1 },
+    ],
+    [
+      "an upstream mode change under a port edit",
+      { old: older(base), new: upstream(base, 0o755), local: port(base.replace("l1", "l1 port")) },
+      written("merged", base.replace("l1", "l1 port"), 0o755),
+    ],
+    [
+      "mode changes on both sides under an overlapping edit",
+      { old: older(base), new: upstream(base.replace("l3", "l3 upstream"), 0o755), local: port(base.replace("l3", "l3 port"), 0o600) },
+      { ...written("conflicted", "l1\nl2\n<<<<<<< local\nl3 port\n=======\nl3 upstream\n>>>>>>> upstream\nl4\nl5\n", 0o755), hunks: 1 },
+    ],
+    [
+      "a file new on both sides, which has no common mode and takes upstream's",
+      { new: upstream("upstream\n"), local: port("port\n", 0o755) },
       { ...written("conflicted", "<<<<<<< local\nport\n=======\nupstream\n>>>>>>> upstream\n"), hunks: 1 },
     ],
     [
-      "a file that replaced an upstream symlink",
-      { old: { symlink: true }, new: upstream("upstream\n"), local: port("port\n") },
+      "a file that replaced an upstream symlink, which has no common mode and takes upstream's",
+      { old: { symlink: true }, new: upstream("upstream\n"), local: port("port\n", 0o755) },
       { ...written("conflicted", "<<<<<<< local\nport\n=======\nupstream\n>>>>>>> upstream\n"), hunks: 1 },
     ],
-    ["an upstream deletion the port never edited", { old: upstream("a\n"), local: port("a\n") }, { kind: "deleted" }],
-    ["an upstream deletion of a port edit", { old: upstream("a\n"), local: port("port\n") }, { kind: "removed-upstream", kept: bytes("port\n") }],
-    ["an upstream deletion the port already made", { old: upstream("a\n") }, null],
+    ["an upstream deletion the port never edited", { old: older("a\n"), local: port("a\n") }, { kind: "deleted" }],
+    ["an upstream deletion of a port edit", { old: older("a\n"), local: port("port\n") }, { kind: "removed-upstream", kept: bytes("port\n") }],
+    ["an upstream deletion the port already made", { old: older("a\n") }, null],
   ])("%s", (_, input, outcome) => {
     expect(classify(input)).toEqual(outcome);
   });
@@ -686,6 +702,7 @@ describe("syncComponent", () => {
     const newUp = tree({});
     writeFileSync(join(newUp, "doc.pdf"), invalidUtf8);
     writeFileSync(join(newUp, "blob.bin"), withNul);
+    writeFileSync(join(newUp, "bun.lock"), "AskQuestion\n");
     const local = tree({});
 
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
@@ -693,6 +710,7 @@ describe("syncComponent", () => {
     expect(report.counts).toEqual(new Map());
     expect(readFileSync(join(local, "doc.pdf")).equals(invalidUtf8)).toBe(true);
     expect(readFileSync(join(local, "blob.bin")).equals(withNul)).toBe(true);
+    expect(readFileSync(join(local, "bun.lock"), "utf8")).toBe("AskQuestion\n");
   });
 
   test("a binary file of any extension differing three ways blocks every write", () => {
@@ -895,6 +913,24 @@ describe("syncComponent", () => {
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, exclude: ["docs/"], carriedElsewhere: ["kit/k.md"] });
 
     expect(report.portOnly).toEqual(["tools/extra.ts"]);
+  });
+
+  test("excluded paths and port-only files are never read", () => {
+    const oldDir = tree({ "docs/a.md": "old\n", "s.md": "s\n" });
+    const newDir = tree({ "docs/a.md": "new\n", "s.md": "s\n" });
+    const localDir = tree({ "docs/a.md": "port\n", "s.md": "s\n" });
+    symlinkSync(tree({ "inner.md": "inner\n" }), join(localDir, "linked-dir"));
+    symlinkSync(join(localDir, "missing.md"), join(localDir, "dangling.md"));
+    const derive = (rel, text) => {
+      if (rel.startsWith("docs/")) throw new Error(`derived excluded ${rel}`);
+      return text;
+    };
+
+    const report = sync({ oldDir, newDir, localDir, exclude: ["docs/"], derive });
+
+    expect(report.excluded).toBe(1);
+    expect(report.unchanged).toBe(1);
+    expect(report.portOnly).toEqual(["dangling.md", "linked-dir"]);
   });
 
   test("an upstream symlink over a local directory is reported, and the files upstream deleted under it go", () => {

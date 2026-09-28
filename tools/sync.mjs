@@ -25,8 +25,8 @@
 //     binary cannot carry markers
 //   - upstream deleted it and local matches the derived OLD text -> deleted
 //
-// A written file takes the new upstream file's mode, except that a merge keeps
-// the port's mode when upstream left the mode alone.
+// A written file takes the new upstream file's mode, except that a merged or
+// conflicted file keeps the port's mode when upstream left the mode alone.
 //
 // Every effective text file, a conflict's marked bytes included, is
 // denylist-scanned; a hit fails the run with file, line, and the hint for that

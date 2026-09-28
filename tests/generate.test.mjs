@@ -648,7 +648,7 @@ describe("plan, changes, apply", () => {
     expect(failures).toEqual([
       expect.stringContaining("plugins/pstack/skills/tdd/SKILL.md:"),
       "invalid local markdown links:\ndeslop/SKILL.md -> missing.md (missing)",
-      expect.stringContaining('skills/unslop/SKILL.md:'),
+      expect.stringContaining("skills/unslop/SKILL.md:"),
     ]);
     const check = generate(root, "--check");
     expect(check.status).toBe(1);
@@ -657,11 +657,11 @@ describe("plan, changes, apply", () => {
 
   test("a write run regenerates before it validates, so a slug left only in a stale copy passes", () => {
     const root = repoCopy();
-    const copy = "plugins/pstack/skills/poteto-mode/references/agents/poteto-agent.md";
+    const copy = "plugins/pstack/skills/poteto-mode/references/agents/comment-sicko.md";
     append(root, copy, "\nUse claude-opus-99 here.\n");
     expect(generate(root).status).toBe(0);
     expect(readFileSync(join(root, copy), "utf8")).toBe(
-      readFileSync(join(root, "plugins/pstack/agents/poteto-agent.md"), "utf8"),
+      readFileSync(join(root, "plugins/pstack/agents/comment-sicko.md"), "utf8"),
     );
   });
 
@@ -681,11 +681,14 @@ describe("plan, changes, apply", () => {
 
   test("problems reports a malformed Codex manifest as one failure and still runs the other checks", () => {
     const root = repoCopy();
-    append(root, "plugins/pstack/.codex-plugin/plugin.json", "}\n");
+    const manifest = "plugins/pstack/.codex-plugin/plugin.json";
     append(root, ...STRAY_SLUG);
-    expect(problems(root)).toEqual([
-      expect.stringContaining("plugins/pstack/.codex-plugin/plugin.json: "),
-      expect.stringContaining("plugins/pstack/skills/tdd/SKILL.md:"),
-    ]);
+    for (const text of [readFileSync(join(root, manifest), "utf8") + "}\n", "null\n"]) {
+      writeFileSync(join(root, manifest), text);
+      expect(problems(root)).toEqual([
+        expect.stringContaining(`${manifest}: `),
+        expect.stringContaining("plugins/pstack/skills/tdd/SKILL.md:"),
+      ]);
+    }
   });
 });

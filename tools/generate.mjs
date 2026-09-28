@@ -75,6 +75,15 @@ export const PORTABLE_ASSETS = [
   { source: "NOTICE-skills.md", target: "poteto-mode/references/licenses/NOTICE.md" },
 ];
 
+// The generator removes every entry of these directories that no planned path
+// runs through, so no hand-written file may live in one.
+export const OWNED_DIRS = [
+  PROMPTS,
+  EFFORT_AGENTS,
+  `${SKILLS}/poteto-mode/references/agents`,
+  `${SKILLS}/poteto-mode/references/licenses`,
+];
+
 // Replace the manifest's single "version" value, preserving all formatting.
 // Exactly one "version" field per manifest is a precondition: a second one
 // (say, from a future nested object) would make the blind replace ambiguous,
@@ -686,15 +695,22 @@ export function plan(root) {
     ...pluginAgentPaths(join(root, PLUGIN)).filter((path) => path.startsWith("./agents/")),
     ...agents.map((agent) => `./effort-agents/${agent.name}.md`).sort(),
   ]);
+  for (const dir of OWNED_DIRS) {
+    const outer = OWNED_DIRS.find((other) => dir.startsWith(`${other}/`));
+    if (outer) throw new Error(`generator-owned directory ${dir} is nested inside ${outer}`);
+  }
   const realRoot = realpathSync(root);
   for (const { source, target } of PORTABLE_ASSETS) {
+    const path = `${SKILLS}/${target}`;
+    if (!OWNED_DIRS.includes(dirname(path))) {
+      throw new Error(`${path} is not directly inside a generator-owned directory (${OWNED_DIRS.join(", ")})`);
+    }
     if (!pathIsInside(realRoot, realpathSync(join(root, source)))) {
       throw new Error(`${source} resolves outside the repository through a symlink`);
     }
-    files[`${SKILLS}/${target}`] = read(source);
+    files[path] = read(source);
   }
-  const portableDirs = new Set(PORTABLE_ASSETS.map(({ target }) => `${SKILLS}/${dirname(target)}`));
-  return { files, ownedDirs: [PROMPTS, EFFORT_AGENTS, ...portableDirs] };
+  return { files, ownedDirs: OWNED_DIRS };
 }
 
 function lstatNoSymlinks(root, path) {
@@ -704,7 +720,7 @@ function lstatNoSymlinks(root, path) {
     at = join(at, part);
     st = lstatSync(at, { throwIfNoEntry: false });
     if (!st) return null;
-    if (st.isSymbolicLink()) throw new Error(`${relative(root, at)} is a symlink; refusing to write through it`);
+    if (st.isSymbolicLink()) throw new Error(`${relative(root, at)} is a symlink; the generator never writes through one`);
   }
   return st;
 }
@@ -713,14 +729,15 @@ export function changes(root, intended) {
   const pending = [];
   for (const [path, text] of Object.entries(intended.files)) {
     const st = lstatNoSymlinks(root, path);
-    if (st && !st.isFile()) throw new Error(`${path} is not a regular file; refusing to overwrite it`);
+    if (st && !st.isFile()) throw new Error(`${path} is not a regular file; the generator never overwrites one`);
     if (!st || readFileSync(join(root, path), "utf8") !== text) pending.push({ kind: "write", path });
   }
+  const planned = Object.keys(intended.files);
   for (const dir of intended.ownedDirs) {
     if (!lstatNoSymlinks(root, dir)) continue;
     for (const entry of readdirSync(join(root, dir)).sort()) {
       const path = `${dir}/${entry}`;
-      if (!Object.hasOwn(intended.files, path)) pending.push({ kind: "remove", path });
+      if (!planned.some((p) => p === path || p.startsWith(`${path}/`))) pending.push({ kind: "remove", path });
     }
   }
   return pending;
@@ -745,13 +762,32 @@ export function apply(root, intended, { log = console.log } = {}) {
 // failing check. The checks read the tree, not the plan, so on a stale tree
 // they see the stale copies.
 export function problems(root) {
-  const models = loadModels(root);
+  const failures = [];
+  const attempt = (check) => {
+    try {
+      return check();
+    } catch (err) {
+      failures.push(err.message);
+    }
+  };
   const pluginRoot = join(root, PLUGIN);
   const skillsDir = join(root, SKILLS);
-  const codexManifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8"));
+  const codexManifestFile = `${PLUGIN}/.codex-plugin/plugin.json`;
+  const codexManifest = attempt(() => {
+    const text = readFileSync(join(root, codexManifestFile), "utf8");
+    let manifest;
+    try {
+      manifest = JSON.parse(text);
+    } catch (err) {
+      throw new Error(`${codexManifestFile}: ${err.message}`);
+    }
+    if (typeof manifest !== "object" || !manifest) throw new Error(`${codexManifestFile}: not a JSON object`);
+    return manifest;
+  });
+  const models = attempt(() => loadModels(root));
   const statOf = (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null);
-  const checks = [
-    () => {
+  if (models) {
+    attempt(() => {
       const strays = markdownFiles(skillsDir).flatMap((full) =>
         strayModelSlugs(relative(root, full), readFileSync(full, "utf8"), models),
       );
@@ -761,27 +797,23 @@ export function problems(root) {
             strays.join("\n"),
         );
       }
-    },
-    () => validateSkillsTree(skillsDir),
-    () => validateProsePaths(skillsDir),
-    () =>
+    });
+  }
+  attempt(() => validateSkillsTree(skillsDir));
+  attempt(() => validateProsePaths(skillsDir));
+  if (codexManifest) {
+    attempt(() =>
       validateCodexMarketplace(readFileSync(join(root, ".agents/plugins/marketplace.json"), "utf8"), {
         expectedName: codexManifest.name,
         pathExists: (p) => existsSync(join(root, p)),
       }),
-    () => validatePluginLayout(pluginRoot),
-    ...["hooks/hooks.json", codexManifest.hooks].map(
-      (file) => () => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file }),
-    ),
-  ];
-  return checks.flatMap((check) => {
-    try {
-      check();
-      return [];
-    } catch (err) {
-      return [err.message];
-    }
-  });
+    );
+  }
+  attempt(() => validatePluginLayout(pluginRoot));
+  for (const file of ["hooks/hooks.json", ...(codexManifest ? [codexManifest.hooks] : [])]) {
+    attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file }));
+  }
+  return failures;
 }
 
 function main() {
@@ -789,15 +821,21 @@ function main() {
   if (args.some((arg) => arg !== "--check")) throw new Error("usage: bun tools/generate.mjs [--check]");
   const check = args.includes("--check");
   const intended = plan(repo);
-  const pending = check ? changes(repo, intended) : apply(repo, intended);
-  const failures = problems(repo);
-  if (check && pending.length) {
+  const failures = [];
+  let pending;
+  try {
+    pending = check ? changes(repo, intended) : apply(repo, intended);
+  } catch (err) {
+    failures.push(err.message);
+  }
+  failures.push(...problems(repo));
+  if (check && pending?.length) {
     failures.push(
       "generated output is stale; run bun tools/generate.mjs:\n" +
         pending.map(({ kind, path }) => `  ${kind}: ${path}`).join("\n"),
     );
   }
-  if (!pending.length) console.log(`ok: ${Object.keys(intended.files).length} generated files current`);
+  if (pending?.length === 0) console.log(`ok: ${Object.keys(intended.files).length} generated files current`);
   for (const failure of failures) console.error(`FAIL: ${failure}`);
   if (failures.length) process.exit(1);
   console.log("ok: skill links, prose paths, model slugs, marketplace, plugin layout, and hooks pass their checks");

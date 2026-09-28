@@ -21,7 +21,7 @@ This plugin is a port of upstream MIT-licensed work. The port's modifications an
 
 ## What changed in the port
 
-The port is editorial, not mechanical. See [CHANGES.md](CHANGES.md) for the full per-skill audit of substitutions applied.
+The port is editorial, not mechanical. [CHANGES.md](CHANGES.md) records each release's changes, and [`tools/substitutions.json`](tools/substitutions.json) lists the token rewrites with the reason for each.
 
 Summary of structural changes:
 
@@ -36,7 +36,7 @@ Summary of structural changes:
 
 ## Modifications
 
-Per the MIT license, modifications are permitted. Skill bodies have been edited to substitute Cursor-specific primitives with their Claude Code equivalents (the full substitution table is in [CHANGES.md](CHANGES.md)). All upstream copyright notices in source files (where present) are preserved.
+Per the MIT license, modifications are permitted. Skill bodies have been edited to substitute Cursor-specific primitives with their Claude Code equivalents (the substitution rules are in [`tools/substitutions.json`](tools/substitutions.json)). All upstream copyright notices in source files (where present) are preserved.
 
 Port-authored files covered by this notice include:
 

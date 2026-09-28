@@ -199,7 +199,7 @@ The skill tree is synced against upstream `12d587d` (v0.15.5).
 
 This repository ports Lauren Tan's pstack from Cursor to Claude Code and shares the skills with other runtimes. It includes seven cursor-team-kit skills and an independently authored `babysit` skill. The port supplies Claude Code plugin registration and routing, Codex manifests and shortcuts, and the Codex tool mapping.
 
-Cursor-specific automations, sticky-mode metadata, the Grok Bot UI workflow, and the Cursor UI tutorial are excluded. [tools/upstream.json](../tools/upstream.json) records the revisions and exclusions; [CHANGES.md](../CHANGES.md) records the per-skill port changes. The bundled `thermo-nuclear-code-quality-review` provides a maintainability review when a workflow calls for one.
+Cursor-specific automations, sticky-mode metadata, the Grok Bot UI workflow, and the Cursor UI tutorial are excluded. [tools/upstream.json](../tools/upstream.json) records the revisions and exclusions, [tools/substitutions.json](../tools/substitutions.json) holds the Cursor-to-Claude rewrite rules, and [CHANGES.md](../CHANGES.md) records each release. The bundled `thermo-nuclear-code-quality-review` provides a maintainability review when a workflow calls for one.
 
 For skill changes, follow the [sync boundary](../CONTRIBUTING.md#the-sync-boundary). Workflow changes usually belong upstream; runtime adaptations belong here.
 

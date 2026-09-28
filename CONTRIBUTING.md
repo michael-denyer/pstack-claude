@@ -15,7 +15,7 @@ Before changing a `SKILL.md`, work out which side your change lives on:
 
 Local-only changes are fine when they're genuinely port-specific. Say so in the PR description, so the next sync knows it is deliberate and not drift.
 
-Every substitution is recorded per-skill in [CHANGES.md](CHANGES.md). If you add one, record it there in the same PR.
+Each substitution rule in [`tools/substitutions.json`](tools/substitutions.json) has a `rationale` field that gives its reason. If you add a rule, fill in its `rationale` in the same PR.
 
 ### Running a sync
 

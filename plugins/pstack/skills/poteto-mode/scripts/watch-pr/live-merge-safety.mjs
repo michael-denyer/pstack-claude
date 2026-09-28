@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 
 if (process.argv.slice(2).join(' ') !== '--live-disposable') {
-  console.error('Usage: node tools/verify-merge-safety.mjs --live-disposable');
+  console.error('Usage: bun watch-pr/live-merge-safety.mjs --live-disposable');
   process.exit(2);
 }
 const gh = (...args) => execFileSync('gh', args, {
@@ -21,7 +21,7 @@ const name = `pstack-merge-safety-fixture-${randomUUID()}`;
 let created = false;
 const repository = `${login}/${name}`;
 const path = `repos/${repository}`;
-const shippingCli = fileURLToPath(new URL('../plugins/pstack/skills/poteto-mode/scripts/watch-pr/ship-pr', import.meta.url));
+const shippingCli = fileURLToPath(new URL('./ship-pr', import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), 'pstack-live-shipping-'));
 const ship = (...args) => JSON.parse(execFileSync('bun', [shippingCli, ...args], { encoding: 'utf8' }));
 function inspect(pr) {

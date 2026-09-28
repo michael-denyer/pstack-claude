@@ -4,7 +4,7 @@
 
 **Non-negotiables for blinding:**
 
-- No `eval`, `test`, `judge`, `experiment`, `rubric`, `score`, `compare`, `benchmark`, `candidate`, or `arena` in any directory, file, or prompt the candidate sees.
+- None of the words eval, test, judge, experiment, rubric, score, compare, benchmark, candidate, or arena in any directory, file, or prompt the candidate sees.
 - The candidate prompt looks like an organic user request. State the goal, not the meta.
 - No chain-eliciting cues. Don't ask the candidate to list which skills, principles, or files they applied. Ask for design notes generally and grade chain-following from code shape, not self-report.
 - Sanitize directory and slug names. Use project-shaped names a user might pick.

@@ -175,16 +175,16 @@ describe("validateHooks", () => {
   const plain = { mode: 0o644 };
 
   test("accepts an executable script under the plugin root", () => {
-    const statOf = (rel) => (rel === "hooks/session-start" ? exec : null);
-    expect(() => validateHooks(hooks('"${CLAUDE_PLUGIN_ROOT}/hooks/session-start"'), { statOf })).not.toThrow();
+    const statOf = (rel) => (rel === "hooks/session-start.sh" ? exec : null);
+    expect(() => validateHooks(hooks('"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"'), { statOf })).not.toThrow();
   });
 
   test("names a missing or non-executable target", () => {
     expect(() => validateHooks(hooks('"${CLAUDE_PLUGIN_ROOT}/hooks/nope"'), { statOf: () => null })).toThrow(
       "SessionStart: hooks/nope does not exist",
     );
-    expect(() => validateHooks(hooks('"${CLAUDE_PLUGIN_ROOT}/hooks/session-start"'), { statOf: () => plain })).toThrow(
-      "hooks/session-start is not executable",
+    expect(() => validateHooks(hooks('"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"'), { statOf: () => plain })).toThrow(
+      "hooks/session-start.sh is not executable",
     );
   });
 

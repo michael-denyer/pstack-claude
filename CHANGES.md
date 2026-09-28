@@ -2,6 +2,14 @@
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.
 
+## 0.9.46 - plugin directory submission holds
+
+The Claude plugin directory validator held the submission on two files it could not read statically. The SessionStart hook resolved its mandate file through `$(dirname "$0")`, which a static reader of `hooks.json` cannot follow; it now names `${CLAUDE_PLUGIN_ROOT}/hooks/session-start-context.md` literally and carries a `.sh` extension so CI's shellcheck job lints it too. `hooks.json` points at the renamed file. Both runtimes export `CLAUDE_PLUGIN_ROOT`, so the behavior is unchanged and `tests/session-hook.test.mjs` still runs the shipped command under each.
+
+The eval playbook listed the blinding keywords in backticks, and the validator read the backticked `eval` as a shell execute pattern and flagged the file as a download-and-run risk. The list is now plain words with the same meaning.
+
+Two holds need a note in the submission rather than a change. The plugin's PR-watching scripts call the user's own `gh` login to act on the user's own pull requests, which is the plugin's purpose, not an unrelated credential. The name `pstack` is upstream's name (`cursor/plugins/pstack`), and the installed `pstack:` namespace depends on it.
+
 ## 0.9.45 - respect CLAUDE_CONFIG_DIR for the override sheet
 
 The Claude Code SessionStart hook read `$HOME/.claude/pstack-models.md` even when `CLAUDE_CONFIG_DIR` pointed Claude Code at another directory, so a `session hook: off` line in the active configuration had no effect. The skills named the same fixed path, so an agent that read the sheet directly fell back to the defaults. Reported in #102.

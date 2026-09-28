@@ -47,6 +47,15 @@ For a bug, it reproduces the failure, uses `how` and `why` to investigate, deleg
 - [Models and dependencies](docs/reference.md#configuration-and-dependencies)
 - [Maintenance and port scope](docs/reference.md#maintenance)
 
+## Data handling
+
+pstack is Markdown instructions, a session hook, and local scripts. It runs no server, collects no telemetry, and sends no data anywhere itself.
+
+- **Session hook.** On session start, the hook prints the routing context from `session-start-context.md` unless your override sheet contains `session hook: off`. It reads only the override sheet and makes no network calls.
+- **Subagents.** Skills that spawn subagents, such as `interrogate`, `arena`, and `swarm`, dispatch them through your harness's own agent tool. Your code and prompts go to the model provider your harness already uses, on the models your override sheet names.
+- **Your tools.** Some skills run tools you have already installed and signed in to. `babysit`, `fix-ci`, `make-pr-easy-to-review`, `why`, and the `poteto-mode` PR and shipping playbooks call the `gh` CLI against your GitHub repository. `why` queries the MCP servers you have connected. Those tools send data under their own terms.
+- **Local files.** `setup-pstack` writes the override sheet `pstack-models.md` to your harness config directory (`$CLAUDE_CONFIG_DIR` or `~/.claude` on Claude Code, `$CODEX_HOME` or `~/.codex` on Codex). `show-me-your-work` writes its decision log to your working tree.
+
 ## Contributing
 
 Thanks for helping make this port better. Bug reports, documentation fixes, and runtime improvements are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the checks and where your change belongs. Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).

@@ -48,7 +48,7 @@ import {
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree } from "./validate-skills.mjs";
+import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -253,6 +253,20 @@ export function validatePluginLayout(pluginRoot) {
   }
   if (problems.length) {
     throw new Error(`plugin agents are dispatched by their namespaced name:\n${problems.join("\n")}`);
+  }
+  // tools/sync.mjs writes an unresolved three-way merge with git's markers and
+  // still advances the pin, so this check is what keeps it out of a release.
+  const markers = [];
+  for (const file of walk(pluginRoot)) {
+    if (!lstatSync(file).isFile()) continue;
+    const raw = readFileSync(file);
+    if (raw.includes(0)) continue;
+    raw.toString("utf8").split("\n").forEach((line, i) => {
+      if (/^(<{7}|={7}|>{7})( |$)/.test(line)) markers.push(`${relative(pluginRoot, file)}:${i + 1}: ${line}`);
+    });
+  }
+  if (markers.length) {
+    throw new Error(`unresolved sync conflict markers; resolve each hunk by hand:\n${markers.join("\n")}`);
   }
 }
 
@@ -838,7 +852,7 @@ function main() {
   console.log("ok: .agents/plugins/marketplace.json names the plugin and points at a real path");
 
   validatePluginLayout(pluginRoot);
-  console.log("ok: no commands/ directory; plugin agents dispatched by namespaced name");
+  console.log("ok: no commands/ directory; plugin agents dispatched by namespaced name; no conflict markers");
   const statOf = (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null);
   const codexHooks = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8")).hooks;
   for (const file of ["hooks/hooks.json", codexHooks]) {

@@ -12,22 +12,30 @@
 //
 //   - local copy is missing -> new file, written
 //   - local copy matches the derived NEW text and mode -> unchanged
-//   - local copy matches the derived OLD text -> clean update, written
+//   - local copy matches the derived OLD text and mode -> clean update, written
 //   - upstream did not touch its text or mode and local differs -> forked,
 //     left alone, counted
 //   - all three differ and git merge-file succeeds -> merged, written
-//   - all three differ and the merge conflicts -> left alone, reported with its
-//     hunk count under conflicts, alongside binaries, upstream symlinks (never
-//     followed), and files upstream deleted that the port had edited
+//   - all three differ and the merge conflicts -> conflicted: written with
+//     git's `<<<<<<< local` / `=======` / `>>>>>>> upstream` markers and
+//     reported with its hunk count under conflicts, alongside upstream symlinks
+//     (never followed, never written) and files upstream deleted that the port
+//     had edited (kept, and printed as now port-only once the pin moves)
+//   - a binary differs all three ways -> the run fails naming it, since a
+//     binary cannot carry markers
 //   - upstream deleted it and local matches the derived OLD text -> deleted
 //
 // A written file takes the new upstream file's mode.
 //
-// Every effective text file is denylist-scanned; a hit fails the run with file,
-// line, and the hint for that token, leaving the tree for inspection. The pin
-// in upstream.json is advanced only when the run succeeds. With --dry-run
-// nothing is written and the pin stays; passing the pinned SHA as <new-sha>
-// under --dry-run prints the ownership map (which files the port has forked).
+// Every effective text file, a conflict's marked bytes included, is
+// denylist-scanned; a hit fails the run with file, line, and the hint for that
+// token. A failed run writes nothing, leaving the tree for inspection.
+// The pin in upstream.json is advanced only when the run succeeds, which it
+// can with conflicts: the markers are in the tree, and generate.mjs fails on
+// any marker line under plugins/pstack, so CI rejects an unresolved sync.
+// With --dry-run nothing is written and the pin stays; passing the pinned SHA
+// as <new-sha> under --dry-run prints the ownership map (which files the port
+// has forked).
 
 import { execFileSync } from "node:child_process";
 import {
@@ -99,13 +107,14 @@ export function mergeFile(ours, base, theirs) {
   try {
     const paths = { ours, base, theirs };
     for (const [name, buffer] of Object.entries(paths)) writeFileSync(join(scratch, name), buffer);
-    const args = ["merge-file", "-p", join(scratch, "ours"), join(scratch, "base"), join(scratch, "theirs")];
+    const labels = ["-L", "local", "-L", "base", "-L", "upstream"];
+    const args = ["merge-file", "-p", ...labels, join(scratch, "ours"), join(scratch, "base"), join(scratch, "theirs")];
     try {
       const merged = execFileSync("git", args, { stdio: ["ignore", "pipe", "inherit"] });
       return { clean: true, buffer: merged };
     } catch (error) {
       if (!(error.status >= 1 && error.status <= 127)) throw error;
-      return { clean: false, hunks: error.status };
+      return { clean: false, hunks: error.status, buffer: error.stdout };
     }
   } finally {
     rmSync(scratch, { recursive: true, force: true });
@@ -140,6 +149,7 @@ export function syncComponent({
     deleted: [],
     forked: [],
     conflicts: [],
+    binaryConflicts: [],
     unchanged: 0,
     excluded: 0,
     counts: new Map(),
@@ -192,25 +202,21 @@ export function syncComponent({
       continue;
     }
     const old = derivedOld(rel);
-    if (old && local.equals(old)) {
+    if (old && local.equals(old) && modeOf(localFile) === modeOf(join(oldDir, rel))) {
       planWrite(rel, "updated", next.buffer);
       addCounts(next.counts);
     } else if (old && old.equals(next.buffer) && modeOf(join(oldDir, rel)) === modeOf(newFile)) {
       report.forked.push(rel);
       scan(rel, local);
     } else if (next.binary) {
-      report.conflicts.push({ rel, reason: "binary" });
+      report.binaryConflicts.push(rel);
     } else {
       // A file new upstream that the port already wrote has no common ancestor.
       // An empty base makes every shared line a coincidence, which is what it is.
       const merged = mergeFile(local, old ?? Buffer.alloc(0), next.buffer);
-      if (merged.clean) {
-        planWrite(rel, "merged", merged.buffer);
-        addCounts(next.counts);
-      } else {
-        report.conflicts.push({ rel, reason: "conflict", hunks: merged.hunks });
-        scan(rel, local);
-      }
+      planWrite(rel, merged.clean ? "merged" : "conflicted", merged.buffer);
+      addCounts(next.counts);
+      if (!merged.clean) report.conflicts.push({ rel, reason: "conflict", hunks: merged.hunks });
     }
   }
 
@@ -228,7 +234,7 @@ export function syncComponent({
     }
   }
 
-  if (report.hits.length || dryRun) return report;
+  if (report.hits.length || report.binaryConflicts.length || dryRun) return report;
   for (const operation of operations) {
     const localFile = join(localDir, operation.rel);
     if (operation.kind === "write") {
@@ -290,15 +296,22 @@ function main() {
       for (const rel of report.forked) console.log(`  ${spec.localPath}/${rel}`);
     }
     if (report.conflicts.length) {
-      console.log(`\nneeds a human (port-specific edits the tool could not merge):`);
+      console.log(`\nneeds a human: ${report.conflicts.length} (a conflict is written with git's markers):`);
       for (const c of report.conflicts) {
         const detail = c.reason === "conflict" ? `conflict, ${c.hunks} hunk${c.hunks === 1 ? "" : "s"}` : c.reason;
         console.log(`  ${spec.localPath}/${c.rel} (${detail})`);
       }
     }
+    if (report.binaryConflicts.length) {
+      console.error(`\nFAIL: binary files changed upstream and in the port cannot carry conflict markers;`);
+      console.error(`replace each with upstream's version or add it to exclude in tools/upstream.json, then rerun:`);
+      for (const rel of report.binaryConflicts) console.error(`  ${spec.localPath}/${rel}`);
+    }
     if (report.hits.length) {
       console.error(`\nFAIL: Cursor-isms in synced files; add a substitution or rewrite by hand, then rerun:`);
       for (const h of report.hits) console.error(`  ${spec.localPath}/${h}`);
+    }
+    if (report.binaryConflicts.length || report.hits.length) {
       process.exitCode = 1;
       return;
     }
@@ -307,7 +320,10 @@ function main() {
     upstream.components[component].sha = newSha;
     writeFileSync(upstreamPath, JSON.stringify(upstream, null, 2) + "\n");
     console.log(`\npinned: ${component} -> ${newSha}`);
-    console.log("next: review the diff, resolve the conflicts list, write the CHANGES.md entry from this report, run bun tools/generate.mjs");
+    for (const c of report.conflicts) {
+      if (c.reason === "removed-upstream") console.log(`  now port-only: ${spec.localPath}/${c.rel}`);
+    }
+    console.log("next: resolve the conflict markers, review the diff, write the CHANGES.md entry from this report (name each now port-only file), run bun tools/generate.mjs (it fails while a marker remains)");
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }

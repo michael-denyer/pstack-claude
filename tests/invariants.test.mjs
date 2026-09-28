@@ -92,15 +92,9 @@ describe("static plugin invariants", () => {
         "echo\n<<<<<<< local\necho port\n=======\necho upstream\n>>>>>>> upstream\n",
       );
     });
-    let message = "";
-    try {
-      check(root);
-    } catch (error) {
-      message = error.message;
-    }
-    for (const site of ["run.sh:2: <<<<<<< local", "run.sh:4: =======", "run.sh:6: >>>>>>> upstream"]) {
-      expect(message).toContain(`skills/good/scripts/${site}`);
-    }
+    expect(() => check(root)).toThrow(
+      /skills\/good\/scripts\/run\.sh:2: <<<<<<< local\n.*run\.sh:4: =======\n.*run\.sh:6: >>>>>>> upstream/,
+    );
   });
 
   test("the body of a skill may mention the flag in prose", () => {

@@ -710,22 +710,22 @@ describe("sync CLI", () => {
   });
 
   test("a run with a text conflict writes the markers and advances the pin", () => {
-    const fixture = cli({ oldText: "one\n", newText: "two\n", localText: "port\n" });
+    const { run, pin, local, newSha } = cli({ oldText: "one\n", newText: "two\n", localText: "port\n" });
 
-    const result = fixture.run();
+    const result = run();
 
     expect(result.status).toBe(0);
-    expect(fixture.pin()).toBe(fixture.newSha);
-    expect(fixture.local()).toBe("<<<<<<< local\nport\n=======\ntwo\n>>>>>>> upstream\n");
+    expect(pin()).toBe(newSha);
+    expect(local()).toBe("<<<<<<< local\nport\n=======\ntwo\n>>>>>>> upstream\n");
   });
 
   test("a denylist hit leaves the pin and the tree alone", () => {
-    const fixture = cli({ oldText: "one\n", newText: "run control-cli\n", localText: "one\n" });
+    const { run, pin, local, oldSha } = cli({ oldText: "one\n", newText: "run control-cli\n", localText: "one\n" });
 
-    const result = fixture.run();
+    const result = run();
 
     expect(result.status).toBe(1);
-    expect(fixture.pin()).toBe(fixture.oldSha);
-    expect(fixture.local()).toBe("one\n");
+    expect(pin()).toBe(oldSha);
+    expect(local()).toBe("one\n");
   });
 });

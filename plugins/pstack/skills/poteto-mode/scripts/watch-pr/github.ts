@@ -479,8 +479,7 @@ export function parsePullRequest(
   const object = record(value, "pull request");
   if (typeof object.isDraft !== "boolean")
     missing("pull request.isDraft", object.isDraft);
-  if (object.state === "OPEN") readLandingRevision(object, context);
-  return {
+  const facts = {
     context,
     mergeable: enumValue(
       object.mergeable,
@@ -505,6 +504,9 @@ export function parsePullRequest(
     mergedAt: optionalString(object.mergedAt, "pull request.mergedAt"),
     isDraft: object.isDraft,
   };
+  return facts.state === "OPEN"
+    ? { ...facts, ...readLandingRevision(object, context), state: facts.state }
+    : { ...facts, state: facts.state };
 }
 function graphqlArgs(
   query: string,

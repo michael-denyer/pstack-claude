@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { fakeReader, pendingCheck, failedCheck } from "./fakes.test-helper.ts";
 import type { FakeReaderOptions } from "./fakes.test-helper.ts";
-import { orderStack, WatcherQueryError } from "./github.ts";
+import { orderStack, parsePullRequest, WatcherQueryError } from "./github.ts";
 import { classifyPr, readSnapshot, runSimple, runQueued } from "./policy.ts";
 import { renderPretty } from "./render.ts";
 import { parsePrNumber } from "./types.ts";
@@ -21,6 +21,41 @@ const snapshotArgs = {
 };
 
 describe("commit identity", () => {
+  const rawPullRequest = {
+    mergeable: "MERGEABLE",
+    mergeStateStatus: "CLEAN",
+    reviewDecision: "APPROVED",
+    headRefOid: "head",
+    baseRefOid: "base",
+    headRefName: "feature",
+    baseRefName: "main",
+    state: "OPEN",
+    mergedAt: null,
+    isDraft: false,
+  };
+
+  it("rejects an open PR without a head or base commit where it is parsed", () => {
+    for (const missing of [{ headRefOid: null }, { baseRefOid: "" }])
+      expect(() =>
+        parsePullRequest({ ...rawPullRequest, ...missing }, context)
+      ).toThrow(WatcherQueryError);
+  });
+
+  it("accepts a merged PR whose head and base commits are gone", () => {
+    expect(
+      parsePullRequest(
+        {
+          ...rawPullRequest,
+          state: "MERGED",
+          mergedAt: "2026-07-26T00:00:00Z",
+          headRefOid: null,
+          baseRefOid: null,
+        },
+        context
+      )
+    ).toMatchObject({ state: "MERGED", headRefOid: null, baseRefOid: null });
+  });
+
   it("rejects a missing expected commit instead of treating it as a null rollup", async () => {
     const reader = fakeReader({
       facts: { headRefOid: "old", mergeStateStatus: "BLOCKED" },

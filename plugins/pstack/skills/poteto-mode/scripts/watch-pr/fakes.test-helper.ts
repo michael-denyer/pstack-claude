@@ -10,6 +10,7 @@ import type {
   ReviewThread,
   RollupPage,
 } from "./types.ts";
+import { parsePullRequest } from "./github.ts";
 import { parsePrNumber } from "./types.ts";
 
 export interface FakeReaderOptions {
@@ -93,7 +94,7 @@ export function fakeReader(
     },
     async pullRequest(requested) {
       calls.push("pullRequest");
-      return { ...defaults, ...options.facts, context: requested };
+      return parsePullRequest({ ...defaults, ...options.facts }, requested);
     },
     async revision(requested) {
       calls.push("revision");

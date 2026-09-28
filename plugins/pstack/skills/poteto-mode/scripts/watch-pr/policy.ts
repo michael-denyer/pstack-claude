@@ -1,4 +1,4 @@
-import { sameLandingRevision } from "./landing.ts";
+import { landingRevision, sameLandingRevision } from "./landing.ts";
 import { WatcherQueryError, resolveChecks } from "./github.ts";
 import { DeadlineExceeded, WatchDeadline } from "./deadline.ts";
 import type * as T from "./types.ts";
@@ -68,13 +68,6 @@ export async function readSnapshot(args: {
     return { kind: "merged", context: args.context, facts };
   if (facts.state === "CLOSED")
     return { kind: "closed", context: args.context, facts };
-  const { headRefOid, baseRefOid } = facts;
-  if (!headRefOid || !baseRefOid)
-    throw new WatcherQueryError({
-      kind: "snapshot-changed",
-      retryable: true,
-      detail: "open PR has no head or base commit",
-    });
   const [threads, checks] = await Promise.all([
     args.reader.reviewThreads(args.context),
     resolveChecks(args.reader, args.context),
@@ -134,16 +127,16 @@ export async function readSnapshot(args: {
       };
   }
   const revision = await args.reader.revision(args.context);
-  if (!sameLandingRevision({ ...facts, headRefOid, baseRefOid }, revision))
+  if (!sameLandingRevision(facts, revision))
     throw new WatcherQueryError({
       kind: "snapshot-changed",
       retryable: true,
-      detail: `PR head or destination changed while collecting ${headRefOid} against ${facts.baseRefName}`,
+      detail: `PR head or destination changed while collecting ${facts.headRefOid} against ${facts.baseRefName}`,
     });
   return {
     kind: "open",
     context: args.context,
-    facts: { ...facts, headRefOid, baseRefOid },
+    facts,
     threads,
     ci,
     reviewAutomationRunning: checks.checks.some(
@@ -234,12 +227,7 @@ function readyContribution(
     kind: "ready-pr",
     context: row.context,
     proof: {
-      revision: {
-        context: row.context,
-        headRefOid: row.facts.headRefOid,
-        baseRefName: row.facts.baseRefName,
-        baseRefOid: row.facts.baseRefOid,
-      },
+      revision: landingRevision(row.facts),
       mergeability: "clear",
       threads: [],
       ci: row.ci,

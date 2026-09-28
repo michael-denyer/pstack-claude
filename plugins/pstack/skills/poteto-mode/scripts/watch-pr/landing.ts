@@ -41,6 +41,11 @@ export function parseLandingRevision(
   };
 }
 
+export function landingRevision(source: LandingRevision): LandingRevision {
+  const { context, headRefOid, baseRefName, baseRefOid } = source;
+  return { context, headRefOid, baseRefName, baseRefOid };
+}
+
 export function sameLandingRevision(
   a: LandingRevision,
   b: LandingRevision

@@ -487,7 +487,7 @@ export function loadModels(root = repo) {
 // hand-added one already sits. A region whose anchor upstream lacks is left
 // unstamped, so the file surfaces as forked or conflicted instead of
 // aborting the sync.
-export function deriveSkill(file, text, models = loadModels()) {
+export function deriveSkill(file, text, models) {
   let out = text;
   const skill = file.match(/^plugins\/pstack\/skills\/([^/]+)\/SKILL\.md$/)?.[1];
   if (skill) {

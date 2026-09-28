@@ -15,7 +15,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { deriveSkill } from "../tools/generate.mjs";
+import { deriveSkill, loadModels } from "../tools/generate.mjs";
 import {
   applySubstitutions,
   changedLines,
@@ -952,7 +952,8 @@ describe("syncComponent", () => {
   test("an old revision's malformed frontmatter is never derived when the port copy does not need it", () => {
     const good = "---\nname: a\ndescription: fine\n---\nbody\n";
     const bad = "---\nname: a\ndescription: [unclosed\n---\nbody\n";
-    const derive = (rel, text) => deriveSkill(join("plugins/pstack/skills", rel), text);
+    const models = loadModels();
+    const derive = (rel, text) => deriveSkill(join("plugins/pstack/skills", rel), text, models);
     const upstreamDeletedIt = { old: { "a/SKILL.md": good, "b/SKILL.md": bad }, new: { "a/SKILL.md": good } };
     const upstreamFixedIt = { old: { "a/SKILL.md": bad }, new: { "a/SKILL.md": good } };
     for (const { old, new: next } of [upstreamDeletedIt, upstreamFixedIt]) {

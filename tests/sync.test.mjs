@@ -142,6 +142,18 @@ describe("denylistHits", () => {
     expect(hits[0]).toContain("skills/x/SKILL.md:2");
     expect(hits[0]).toContain("control-cli");
   });
+
+  test.each([
+    ["create-skill", "hand to Cursor's built-in `create-skill` skill"],
+    ["generalPurpose", "three `Task` calls, `subagent_type: generalPurpose`, with `model` set"],
+    ["agent-transcripts", "The system prompt names the active workspace's `agent-transcripts/` directory."],
+    ['environment: "cloud"', 'Always `environment: "cloud"` unless the task needs this machine'],
+    ["is_background", "is_background: true"],
+  ])("an upstream sentence carrying %s fails the scan", (token, sentence) => {
+    const hits = denylistHits("skills/x/SKILL.md", sentence, RULES.denylist);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toContain(`"${token}"`);
+  });
 });
 
 describe("mergeFile", () => {

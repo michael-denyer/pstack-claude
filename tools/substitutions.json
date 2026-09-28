@@ -111,6 +111,26 @@
     {
       "token": "/goal",
       "hint": "Cursor's /goal has no Claude Code equivalent; the autopilot playbooks keep the objective in standing orders"
+    },
+    {
+      "token": "create-skill",
+      "hint": "Cursor's built-in skill-authoring skill; Claude Code's equivalent is the plugin-dev:skill-development skill"
+    },
+    {
+      "token": "generalPurpose",
+      "hint": "Cursor's built-in agent type; Claude Code's is \"general-purpose\""
+    },
+    {
+      "token": "agent-transcripts",
+      "hint": "Cursor's per-workspace transcript directory; Claude Code keeps transcripts under ~/.claude/projects/"
+    },
+    {
+      "token": "environment: \"cloud\"",
+      "hint": "Cursor cloud-agent dispatch; Claude Code runs subagents locally and isolates writers with worktrees"
+    },
+    {
+      "token": "is_background",
+      "hint": "Cursor-only agent frontmatter key; Claude Code sets run_in_background on each Agent call"
     }
   ]
 }

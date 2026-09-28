@@ -157,13 +157,17 @@ describe("mergeFile", () => {
     expect(merged.buffer.toString("utf8")).toBe(base.replace("l1", "ours").replace("l5", "theirs"));
   });
 
-  test("reports the hunk count instead of throwing when the sides overlap", () => {
+  test("returns the hunk count and git's labelled markers when the sides overlap", () => {
     const merged = mergeFile(
       Buffer.from(base.replace("l3", "ours")),
       Buffer.from(base),
       Buffer.from(base.replace("l3", "theirs")),
     );
-    expect(merged).toEqual({ clean: false, hunks: 1 });
+    expect(merged.clean).toBe(false);
+    expect(merged.hunks).toBe(1);
+    expect(merged.buffer.toString("utf8")).toBe(
+      "l1\nl2\n<<<<<<< local\nours\n=======\ntheirs\n>>>>>>> upstream\nl4\nl5\n",
+    );
   });
 
   test("throws when git fails instead of reporting its exit status as a hunk count", () => {
@@ -199,6 +203,7 @@ describe("syncComponent", () => {
 
     expect(report.written).toEqual([
       { kind: "updated", rel: "skills/a/SKILL.md" },
+      { kind: "conflicted", rel: "skills/b/SKILL.md" },
       { kind: "added", rel: "skills/c/SKILL.md" },
     ]);
     expect(report.conflicts).toEqual([{ rel: "skills/b/SKILL.md", reason: "conflict", hunks: 1 }]);
@@ -209,7 +214,7 @@ describe("syncComponent", () => {
     );
     expect(readFileSync(join(local, "skills/c/SKILL.md"), "utf8")).toBe("Brand new skill. AskUserQuestion early.\n");
     expect(readFileSync(join(local, "skills/b/SKILL.md"), "utf8")).toBe(
-      "Old b body, plus a Platform note the port added.\n",
+      "<<<<<<< local\nOld b body, plus a Platform note the port added.\n=======\nNew b body.\n>>>>>>> upstream\n",
     );
   });
 
@@ -323,7 +328,7 @@ describe("syncComponent", () => {
     expect(existsSync(join(local, "new.md"))).toBe(false);
   });
 
-  test("a conflicted local correction is scanned instead of invalid upstream bytes", () => {
+  test("a conflict's marked bytes are scanned, so a Cursor-ism on upstream's side fails the run", () => {
     const oldUp = tree({ "s.md": "old\n" });
     const newUp = tree({ "s.md": "run control-cli\n" });
     const local = tree({ "s.md": "manual correction\n" });
@@ -331,7 +336,8 @@ describe("syncComponent", () => {
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
     expect(report.conflicts).toEqual([{ rel: "s.md", reason: "conflict", hunks: 1 }]);
-    expect(report.hits).toEqual([]);
+    expect(report.hits).toHaveLength(1);
+    expect(report.hits[0]).toStartWith("s.md:4:");
     expect(readFileSync(join(local, "s.md"), "utf8")).toBe("manual correction\n");
   });
 
@@ -477,18 +483,20 @@ describe("syncComponent", () => {
     expect(readFileSync(join(local, "blob.bin")).equals(withNul)).toBe(true);
   });
 
-  test("a binary file of any extension differing three ways is reported as unmergeable", () => {
-    const oldUp = tree({});
-    const newUp = tree({});
-    const local = tree({});
+  test("a binary file of any extension differing three ways blocks every write", () => {
+    const oldUp = tree({ "sibling.md": "old\n" });
+    const newUp = tree({ "sibling.md": "new\n" });
+    const local = tree({ "sibling.md": "old\n" });
     writeFileSync(join(oldUp, "font.ttf"), Buffer.from([0x00, 0xff, 0x01]));
     writeFileSync(join(newUp, "font.ttf"), Buffer.from([0x00, 0xff, 0x02]));
     writeFileSync(join(local, "font.ttf"), Buffer.from([0x00, 0xff, 0x03]));
 
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
-    expect(report.conflicts).toEqual([{ rel: "font.ttf", reason: "binary" }]);
+    expect(report.binaryConflicts).toEqual(["font.ttf"]);
+    expect(report.conflicts).toEqual([]);
     expect(readFileSync(join(local, "font.ttf")).equals(Buffer.from([0x00, 0xff, 0x03]))).toBe(true);
+    expect(readFileSync(join(local, "sibling.md"), "utf8")).toBe("old\n");
   });
 
   test("an upstream symlink is reported, never followed", () => {
@@ -577,18 +585,27 @@ describe("syncComponent", () => {
     );
   });
 
-  test("overlapping edits are reported with a hunk count and leave local bytes alone", () => {
+  test("overlapping edits are written with conflict markers and reported with a hunk count", () => {
     const base = ["l1", "l2", "l3", "l4", "l5"].join("\n") + "\n";
     const oldUp = tree({ "s.md": base });
     const newUp = tree({ "s.md": base.replace("l3", "l3 upstream") });
-    const localText = base.replace("l3", "l3 the port");
-    const local = tree({ "s.md": localText });
+    const local = tree({ "s.md": base.replace("l3", "l3 the port") });
+    const marked = "l1\nl2\n<<<<<<< local\nl3 the port\n=======\nl3 upstream\n>>>>>>> upstream\nl4\nl5\n";
 
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
     expect(report.conflicts).toEqual([{ rel: "s.md", reason: "conflict", hunks: 1 }]);
-    expect(report.written).toEqual([]);
-    expect(readFileSync(join(local, "s.md"), "utf8")).toBe(localText);
+    expect(report.written).toEqual([{ kind: "conflicted", rel: "s.md" }]);
+    expect(readFileSync(join(local, "s.md"), "utf8")).toBe(marked);
+
+    // Once the pin advances, old and new are both the conflicting upstream, so
+    // the marked file reads as a fork. The generator's marker check, not the
+    // sync, is what keeps it out of a release.
+    const rerun = sync({ oldDir: newUp, newDir: newUp, localDir: local });
+
+    expect(rerun.forked).toEqual(["s.md"]);
+    expect(rerun.conflicts).toEqual([]);
+    expect(readFileSync(join(local, "s.md"), "utf8")).toBe(marked);
   });
 
   test("a file new upstream that already exists locally conflicts against an empty base", () => {
@@ -599,8 +616,25 @@ describe("syncComponent", () => {
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
     expect(report.conflicts).toEqual([{ rel: "s.md", reason: "conflict", hunks: 1 }]);
+    expect(report.written).toEqual([{ kind: "conflicted", rel: "s.md" }]);
+    expect(readFileSync(join(local, "s.md"), "utf8")).toBe(
+      "<<<<<<< local\nthe port wrote this file first\n=======\nupstream's brand new body\n>>>>>>> upstream\n",
+    );
+  });
+
+  test("a mode-only port change upstream left alone is forked and keeps its mode", () => {
+    const oldUp = tree({ "run.sh": "echo\n" });
+    const newUp = tree({ "run.sh": "echo\n" });
+    const local = tree({ "run.sh": "echo\n" });
+    chmodSync(join(oldUp, "run.sh"), 0o644);
+    chmodSync(join(newUp, "run.sh"), 0o644);
+    chmodSync(join(local, "run.sh"), 0o755);
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.forked).toEqual(["run.sh"]);
     expect(report.written).toEqual([]);
-    expect(readFileSync(join(local, "s.md"), "utf8")).toBe("the port wrote this file first\n");
+    expect(statSync(join(local, "run.sh")).mode & 0o777).toBe(0o755);
   });
 
   test("a binary file differing three ways is reported as unmergeable", () => {
@@ -613,14 +647,14 @@ describe("syncComponent", () => {
 
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
-    expect(report.conflicts).toEqual([{ rel: "logo.png", reason: "binary" }]);
+    expect(report.binaryConflicts).toEqual(["logo.png"]);
     expect(report.written).toEqual([]);
     expect(readFileSync(join(local, "logo.png")).equals(Buffer.from([0x89, 0x50, 0x00, 0x03]))).toBe(true);
   });
 });
 
 describe("sync CLI", () => {
-  test("a denylist failure exits 1 and removes its scratch clone", () => {
+  function cli({ oldText, newText, localText }) {
     const root = tree({});
     const upstream = join(root, "upstream");
     mkdirSync(join(upstream, "skills"), { recursive: true });
@@ -632,8 +666,8 @@ describe("sync CLI", () => {
       git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "update");
       return git("rev-parse", "HEAD");
     };
-    const oldSha = commit("one\n");
-    const newSha = commit("run control-cli\n");
+    const oldSha = commit(oldText);
+    const newSha = commit(newText);
 
     const port = join(root, "port");
     for (const file of ["sync.mjs", "generate.mjs", "validate-skills.mjs", "substitutions.json"]) {
@@ -641,7 +675,7 @@ describe("sync CLI", () => {
     }
     cpSync(join(import.meta.dir, "../plugins/pstack/models.json"), join(port, "plugins/pstack/models.json"));
     mkdirSync(join(port, "plugins/pstack/skills"));
-    writeFileSync(join(port, "plugins/pstack/skills/s.md"), "one\n");
+    writeFileSync(join(port, "plugins/pstack/skills/s.md"), localText);
     for (const { skill } of JSON.parse(readFileSync(join(port, "plugins/pstack/models.json"), "utf8")).roles) {
       mkdirSync(join(port, "plugins/pstack/skills", skill), { recursive: true });
       writeFileSync(join(port, "plugins/pstack/skills", skill, "SKILL.md"), "");
@@ -655,14 +689,43 @@ describe("sync CLI", () => {
     );
     const scratch = join(root, "tmp");
     mkdirSync(scratch);
+    const run = (...flags) =>
+      spawnSync(process.execPath, [join(port, "tools/sync.mjs"), "kit", newSha, ...flags], {
+        encoding: "utf8",
+        env: { ...process.env, TMPDIR: scratch },
+      });
+    const pin = () => JSON.parse(readFileSync(join(port, "tools/upstream.json"), "utf8")).components.kit.sha;
+    const local = () => readFileSync(join(port, "plugins/pstack/skills/s.md"), "utf8");
+    return { oldSha, newSha, scratch, run, pin, local };
+  }
 
-    const result = spawnSync(process.execPath, [join(port, "tools/sync.mjs"), "kit", newSha, "--dry-run"], {
-      encoding: "utf8",
-      env: { ...process.env, TMPDIR: scratch },
-    });
+  test("a denylist failure exits 1 and removes its scratch clone", () => {
+    const { run, scratch } = cli({ oldText: "one\n", newText: "run control-cli\n", localText: "one\n" });
+
+    const result = run("--dry-run");
 
     expect(result.stderr).toContain("FAIL: Cursor-isms");
     expect(result.status).toBe(1);
     expect(readdirSync(scratch).filter((name) => name.startsWith("pstack-"))).toEqual([]);
+  });
+
+  test("a run with a text conflict writes the markers and advances the pin", () => {
+    const fixture = cli({ oldText: "one\n", newText: "two\n", localText: "port\n" });
+
+    const result = fixture.run();
+
+    expect(result.status).toBe(0);
+    expect(fixture.pin()).toBe(fixture.newSha);
+    expect(fixture.local()).toBe("<<<<<<< local\nport\n=======\ntwo\n>>>>>>> upstream\n");
+  });
+
+  test("a denylist hit leaves the pin and the tree alone", () => {
+    const fixture = cli({ oldText: "one\n", newText: "run control-cli\n", localText: "one\n" });
+
+    const result = fixture.run();
+
+    expect(result.status).toBe(1);
+    expect(fixture.pin()).toBe(fixture.oldSha);
+    expect(fixture.local()).toBe("one\n");
   });
 });

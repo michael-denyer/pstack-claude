@@ -84,6 +84,25 @@ describe("static plugin invariants", () => {
     expect(() => check(root)).not.toThrow();
   });
 
+  test("an unresolved sync conflict in any plugin file fails and names each marker line", () => {
+    const root = plugin((r) => {
+      mkdirSync(join(r, "skills/good/scripts"), { recursive: true });
+      writeFileSync(
+        join(r, "skills/good/scripts/run.sh"),
+        "echo\n<<<<<<< local\necho port\n=======\necho upstream\n>>>>>>> upstream\n",
+      );
+    });
+    let message = "";
+    try {
+      check(root);
+    } catch (error) {
+      message = error.message;
+    }
+    for (const site of ["run.sh:2: <<<<<<< local", "run.sh:4: =======", "run.sh:6: >>>>>>> upstream"]) {
+      expect(message).toContain(`skills/good/scripts/${site}`);
+    }
+  });
+
   test("the body of a skill may mention the flag in prose", () => {
     const root = plugin();
     writeFileSync(

@@ -459,7 +459,6 @@ async function pollUntilTerminal<V>(args: {
       await args.dependencies.clock.sleep(retryInSeconds);
       continue;
     }
-    if (deadline.remaining() === 0) return onDeadline();
     if (result.kind === "terminal") return result.verdict;
     if (result.kind === "sleep") {
       onDeadline = result.onDeadline ?? (() => deadlineVerdict(args.stamp));

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { fakeReader, pendingCheck, failedCheck } from "./fakes.test-helper.ts";
+import type { FakeReaderOptions } from "./fakes.test-helper.ts";
 import { orderStack, WatcherQueryError } from "./github.ts";
 import { classifyPr, readSnapshot, runSimple, runQueued } from "./policy.ts";
 import { parsePrNumber } from "./types.ts";
@@ -319,6 +320,63 @@ describe("deadline", () => {
     expect(now).toBe(1);
     expect(reads).toBe(1);
   });
+
+  function dependenciesWithReadOutlivingBudget(
+    readerOptions: FakeReaderOptions = {},
+  ) {
+    let now = 0;
+    const base = fakeReader(readerOptions);
+    return {
+      reader: {
+        ...base,
+        async pullRequest(requested: typeof context) {
+          now += 2;
+          return base.pullRequest(requested);
+        },
+      },
+      emit() {},
+      clock: {
+        now: () => now,
+        observedAt: () => "fixture",
+        async sleep(seconds: number) {
+          now += seconds;
+        },
+      },
+    };
+  }
+
+  it("reports a READY observation that completes past the deadline", async () => {
+    const result = await runSimple({
+      dependencies: dependenciesWithReadOutlivingBudget(),
+      contexts: [context],
+      mode: "single",
+      statusOnly: false,
+      options,
+    });
+    expect(result.kind).toBe("READY");
+  });
+
+  for (const [mode, reason] of [
+    ["single", "pending-checks"],
+    ["queued", "queued-stack"],
+  ] as const) {
+    it(`${mode} keeps the ${reason} reason when a waiting observation completes past the deadline`, async () => {
+      const dependencies = dependenciesWithReadOutlivingBudget({
+        fastPath: { kind: "checks", checks: [pendingCheck()] },
+      });
+      const result =
+        mode === "single"
+          ? await runSimple({
+              dependencies,
+              contexts: [context],
+              mode: "single",
+              statusOnly: false,
+              options,
+            })
+          : await runQueued({ dependencies, contexts: [context], options });
+      expect(result).toMatchObject({ kind: "TIMEOUT", reason: { kind: reason } });
+    });
+  }
 });
 
 

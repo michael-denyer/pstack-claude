@@ -25,7 +25,8 @@
 //     binary cannot carry markers
 //   - upstream deleted it and local matches the derived OLD text -> deleted
 //
-// A written file takes the new upstream file's mode.
+// A written file takes the new upstream file's mode, except that a merge keeps
+// the port's mode when upstream left the mode alone.
 //
 // Every effective text file, a conflict's marked bytes included, is
 // denylist-scanned; a hit fails the run with file, line, and the hint for that
@@ -151,7 +152,7 @@ export function classify({ old = null, new: next = null, local = null, excluded 
     if (!local) return null;
     return old.bytes?.equals(local.bytes) ? { kind: "deleted" } : { kind: "removed-upstream", kept: local.bytes };
   }
-  const write = (kind, bytes = next.bytes) => ({ kind, write: { bytes, mode: next.mode }, counts: next.counts });
+  const write = (kind, bytes = next.bytes, mode = next.mode) => ({ kind, write: { bytes, mode }, counts: next.counts });
   if (!local) return write("added");
   if (same(local, next)) return { kind: "unchanged", kept: local.bytes };
   if (same(local, old)) return write("updated");
@@ -161,8 +162,9 @@ export function classify({ old = null, new: next = null, local = null, excluded 
   }
   if (next.binary) return { kind: "binary-conflict" };
   const merged = mergeFile(local.bytes, old?.bytes ?? NO_COMMON_ANCESTOR, next.bytes);
-  if (merged.clean) return write("merged", merged.buffer);
-  return { ...write("conflicted", merged.buffer), hunks: merged.hunks };
+  const mode = next.mode === old?.mode ? local.mode : next.mode;
+  if (merged.clean) return write("merged", merged.buffer, mode);
+  return { ...write("conflicted", merged.buffer, mode), hunks: merged.hunks };
 }
 
 // Compare old-upstream vs new-upstream vs local for one component tree.

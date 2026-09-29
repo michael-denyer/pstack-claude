@@ -19,12 +19,14 @@
 //   - all three differ and git merge-file succeeds -> merged, written
 //   - all three differ and the merge conflicts -> conflicted: written with
 //     git's `<<<<<<< local` / `=======` / `>>>>>>> upstream` markers and
-//     reported with its hunk count under conflicts, alongside upstream symlinks
-//     (never followed, never written) and files upstream deleted that the port
-//     had edited (kept, and printed as now port-only once the pin moves)
-//   - a binary differs all three ways -> the run fails naming it, since a
-//     binary cannot carry markers
-//   - upstream deleted it and local matches the derived OLD text -> deleted
+//     reported with its hunk count under conflicts, alongside symlinks on
+//     either side of an upstream path (never followed, never written) and files
+//     upstream deleted that the port had edited (kept, and printed as now
+//     port-only once the pin moves)
+//   - a binary upstream or port copy differs all three ways -> the run fails
+//     naming it, since a binary cannot carry markers
+//   - upstream deleted it and local matches the derived OLD text and mode ->
+//     deleted
 //
 // A written file takes the new upstream file's mode, except that a merged or
 // conflicted file keeps the port's mode when upstream left the mode alone.
@@ -49,7 +51,6 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
-  statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -207,13 +208,19 @@ export function mergeFile(ours, base, theirs) {
 }
 
 // Call only on differing bytes. `--no-index` exits 1 when the two differ, and
-// also on errors such as an unreadable file, which print no numstat line.
-export function changedLines(upstream, localFile) {
-  const args = ["diff", "--no-index", "--numstat", "--text", "-", localFile];
-  const diff = spawnSync("git", args, { input: upstream, encoding: "utf8" });
-  if (diff.status !== 1 || !diff.stdout) throw new Error(`git diff --no-index failed on ${localFile}: ${diff.stderr}`);
-  const [added, removed] = diff.stdout.split("\t").map(Number);
-  return added + removed;
+// also on errors, which print no numstat line.
+export function changedLines(base, kept) {
+  const scratch = mkdtempSync(join(tmpdir(), "pstack-diff-"));
+  try {
+    writeFileSync(join(scratch, "kept"), kept);
+    const args = ["diff", "--no-index", "--numstat", "--text", "-", join(scratch, "kept")];
+    const diff = spawnSync("git", args, { input: base, encoding: "utf8" });
+    if (diff.status !== 1 || !diff.stdout) throw new Error(`git diff --no-index failed: ${diff.stderr}`);
+    const [added, removed] = diff.stdout.split("\t").map(Number);
+    return added + removed;
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 }
 
 // Paths the port deliberately does not carry (upstream.json `exclude`). An
@@ -243,18 +250,18 @@ const NO_COMMON_ANCESTOR = Buffer.alloc(0);
 
 // Decide one path's fate from its old upstream, new upstream, and local
 // versions, at least one of old and new present. A version is null when
-// absent, `{ symlink: true }` for an upstream link, or a file `{ mode, bytes }`
-// whose upstream form adds substitution `counts` and `binary`. A file reads and
-// derives its bytes on first access, so an early return leaves the rest unread.
+// absent, `{ symlink: true }` for a link, or a file `{ mode, bytes, binary }`
+// whose upstream form adds substitution `counts`. A file reads and derives its
+// bytes on first access, so an early return leaves the rest unread.
 // Returns null when there is nothing to report, else `{ kind }` plus
 // `write: { bytes, mode }` and `counts` for a file to write, `kept` for local
-// bytes left in place, `base` for a fork's upstream text, and `hunks` for a
-// conflict.
+// bytes left in place, `changed` for a fork's changed-line count, and `hunks`
+// for a conflict.
 export function classify({ old = null, new: next = null, local = null }) {
-  if (next?.symlink) return { kind: "symlink" };
+  if (next?.symlink || local?.symlink) return { kind: "symlink" };
   if (!next) {
     if (!local) return null;
-    return old.bytes?.equals(local.bytes) ? { kind: "deleted" } : { kind: "removed-upstream", kept: local.bytes };
+    return same(old, local) ? { kind: "deleted" } : { kind: "removed-upstream", kept: local.bytes };
   }
   const writing = (kind, bytes = next.bytes, mode = next.mode) => ({ kind, write: { bytes, mode }, counts: next.counts });
   if (!local) return writing("added");
@@ -262,9 +269,9 @@ export function classify({ old = null, new: next = null, local = null }) {
   if (same(local, old)) return writing("updated");
   if (same(old, next)) {
     if (local.bytes.equals(old.bytes)) return { kind: "mode-only", kept: local.bytes };
-    return { kind: "forked", kept: local.bytes, base: old.bytes };
+    return { kind: "forked", kept: local.bytes, changed: changedLines(old.bytes, local.bytes) };
   }
-  if (next.binary) return { kind: "binary-conflict" };
+  if (next.binary || local.binary) return { kind: "binary-conflict" };
   const merged = mergeFile(local.bytes, old?.bytes ?? NO_COMMON_ANCESTOR, next.bytes);
   const mode = next.mode === old?.mode ? local.mode : next.mode;
   if (merged.clean) return writing("merged", merged.buffer, mode);
@@ -324,7 +331,15 @@ export function syncComponent({
   };
   const portCopy = (rel) => {
     const file = join(localDir, rel);
-    return existsSync(file) ? lazyFile(statSync(file).mode & 0o777, () => ({ bytes: readFileSync(file) })) : null;
+    // existsSync follows links, so only the walk sees a dangling one.
+    if (!localPaths.has(rel) && !existsSync(file)) return null;
+    const stat = lstatSync(file);
+    // Writing through a link would change, or create, its target.
+    if (stat.isSymbolicLink()) return { symlink: true };
+    return lazyFile(stat.mode & 0o777, () => {
+      const bytes = readFileSync(file);
+      return { bytes, binary: isBinary(rel, bytes) };
+    });
   };
   const elsewhere = new Set(carriedElsewhere);
   const outcomeOf = (rel) => {
@@ -341,7 +356,7 @@ export function syncComponent({
     return outcome ? [{ rel, ...outcome }] : [];
   });
 
-  for (const { rel, kind, write, kept, counts, base, hunks } of outcomes) {
+  for (const { rel, kind, write, kept, counts, changed, hunks } of outcomes) {
     const scanned = write?.bytes ?? kept;
     if (scanned && !isBinary(rel, scanned)) report.hits.push(...denylistHits(rel, scanned.toString("utf8"), denylist));
     if (write) {
@@ -350,7 +365,7 @@ export function syncComponent({
     }
     if (kind === "unchanged") report.unchanged++;
     else if (kind === "excluded") report.excluded++;
-    else if (kind === "forked") report.forked.push({ rel, changed: changedLines(base, join(localDir, rel)) });
+    else if (kind === "forked") report.forked.push({ rel, changed });
     else if (kind === "mode-only") report.forked.push({ rel, changed: 0, modeOnly: true });
     else if (kind === "conflicted") report.conflicts.push({ rel, reason: "conflict", hunks });
     else if (kind === "symlink" || kind === "removed-upstream") report.conflicts.push({ rel, reason: kind });

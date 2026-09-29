@@ -258,12 +258,6 @@
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
-    "plugins/pstack/skills/why/references/sources/databricks.md": {
-      "kind": "policy",
-      "why": "Keeps a sentence upstream deleted that points at a databricks-use-dbt-models skill neither tree carries.",
-      "since": "0.9.39",
-      "upstream": "not-proposed"
-    },
     "plugins/pstack/skills/why/references/synthesizer-prompt.md": {
       "kind": "policy",
       "why": "Adds a step that applies the human-rulings epistemics, and gives the Direct-claim example a URL the link validator resolves.",

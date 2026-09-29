@@ -187,6 +187,11 @@
       "rationale": "same tool, backticked; covers `Task` call, `Task` prompts, and the `Task` response body"
     },
     {
+      "pattern": "Task subagent",
+      "replacement": "`Agent` subagent",
+      "rationale": "same tool, named bare before the word subagent; the port writes the tool name in backticks"
+    },
+    {
       "pattern": "control skill",
       "replacement": "driver skill",
       "rationale": "driver selection lives in poteto-mode/SKILL.md Non-negotiables; preserve the older generator trigger in its local description"
@@ -382,6 +387,10 @@
     {
       "token": "create-skill",
       "hint": "Cursor's built-in skill-authoring skill; Claude Code's equivalent is the plugin-dev:skill-development skill"
+    },
+    {
+      "regex": "\\bTask (?:subagent|tool|schema|`model`)",
+      "hint": "Cursor's subagent tool named bare; Claude Code's is the `Agent` tool. Add a substitution rule for the phrase"
     },
     {
       "token": "generalPurpose",

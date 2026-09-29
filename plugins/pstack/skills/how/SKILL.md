@@ -32,7 +32,7 @@ Each explorer gets the prompt in `references/explorer-prompt.md` with its angle 
 
 ## Step 2b. Direct Explain (simple questions)
 
-Spawn one Task subagent that explores and explains in one pass:
+Spawn one `Agent` subagent that explores and explains in one pass:
 
 - `subagent_type`: `general-purpose`
 - `model`: the `how explainer` line, default in [Models](#models)
@@ -42,7 +42,7 @@ Build its prompt from `references/explainer-prompt.md` without the explorer-find
 
 ## Step 3. Synthesize (complex questions only)
 
-Once all explorers have returned, spawn one Task subagent to synthesize their findings into one explanation:
+Once all explorers have returned, spawn one `Agent` subagent to synthesize their findings into one explanation:
 
 - `subagent_type`: `general-purpose`
 - `model`: the `how explainer` line, default in [Models](#models)

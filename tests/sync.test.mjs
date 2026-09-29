@@ -142,6 +142,11 @@ describe("applySubstitutions", () => {
     ],
     [
       "skills/how/SKILL.md",
+      "Once all explorers have returned, spawn one Task subagent to synthesize their findings into one explanation:",
+      "Once all explorers have returned, spawn one `Agent` subagent to synthesize their findings into one explanation:",
+    ],
+    [
+      "skills/how/SKILL.md",
       "- `model`: the `how explorer` line, default `grok-4.7-xhigh-fast`",
       "- `model`: the `how explorer` line, default in [Models](#models)",
     ],
@@ -312,6 +317,20 @@ describe("denylistHits", () => {
     const supported = "The bundled `/verify` is user-invocable only. " +
       "Use the project `verify` skill or maintain `.claude/skills/verify-*/`.";
     expect(denylistHits("policy.md", supported, RULES.denylist)).toEqual([]);
+  });
+
+  test("the subagent tool named bare fails the scan, and other Task words pass", () => {
+    for (const sentence of [
+      "Spawn one Task subagent that explores and explains in one pass:",
+      "If a Task tool rejects a slug, use the default.",
+      "a nested spawn has the full Task schema including `environment`",
+      "the role runs on the parent chat model (omit Task `model`).",
+    ]) {
+      expect(denylistHits("skills/x/SKILL.md", sentence, RULES.denylist)).toHaveLength(1);
+    }
+    for (const sentence of ["Use TaskCreate and TaskUpdate.", "## <Task as a verb phrase> (<PR id>)"]) {
+      expect(denylistHits("skills/x/SKILL.md", sentence, RULES.denylist)).toEqual([]);
+    }
   });
 
   test("flags residual Cursor-isms with file, line, and hint", () => {

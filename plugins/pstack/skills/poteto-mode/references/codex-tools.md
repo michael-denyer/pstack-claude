@@ -82,11 +82,11 @@ Affected skill entry points and the optional Codex slash stubs point here. Most 
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
 | `automate-me` | `plugin-dev:skill-development` resolves through the skills table above. |
 | `architect` | The runner panel goes through the **arena** skill, so its `spawn_agent` fan-out and model substitution apply here too. |
-| `arena` | The parallel candidates and the cross-judge map to `spawn_agent`; give the runners distinct Codex models (see Model names above). |
+| `arena` | The parallel candidates and the cross-judge map to `spawn_agent`; substitute your configured Codex models for the runners and the cross-judge pool (see Model names above). |
 | `how` | The parallel explorers and the explainer map to `spawn_agent` fan-out; substitute your configured Codex models. |
-| `reflect` | The three reviewers and the synthesizer map to `spawn_agent`; substitute your configured Codex models. |
-| `swarm` | Each worker is a `spawn_agent` call, which already runs concurrently; give each writing worker its own worktree (see Subagent policy above). |
-| `why` | The parallel investigators and the synthesizer map to `spawn_agent` fan-out; list MCP servers from the tools Codex exposes to the session. |
+| `reflect` | The three reviewers and the synthesizer map to `spawn_agent`; substitute your configured Codex models. The transcript finder reads Claude Code's layout under `~/.claude/projects/`, so pass the session digest step 1 allows instead. |
+| `swarm` | Each worker is a `spawn_agent` call on your configured Codex model, and those calls already run concurrently; give each writing worker its own worktree or output directory (see Subagent policy above). |
+| `why` | The parallel investigators and the synthesizer map to `spawn_agent`; substitute your configured Codex models. List MCP servers from the tools Codex exposes to the session, not from `.mcp.json` or `claude mcp list`. |
 
 ## Vendored scripts
 

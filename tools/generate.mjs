@@ -17,17 +17,21 @@
 //   fails by name.
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
 //   available slugs, Codex equivalents)
-//     -> each model-consuming skill's "## Models" section
-//     -> setup-pstack's override-sheet block and interrogate's reviewer table
+//     -> each model-consuming skill's "## Models" and "## Reasoning effort" sections
+//     -> setup-pstack's Models section and override-sheet block, and interrogate's reviewer table
 //     -> the "## Model names" section of poteto-mode/references/codex-tools.md
 //     -> one effort agent pair per level in plugins/pstack/effort-agents/
+//   the Per-skill notes table in poteto-mode/references/codex-tools.md
+//     -> the Codex preamble under the first heading of each listed skill's SKILL.md
+//   DRIVER_PLAYBOOKS -> the driver-skill line under each playbook's first heading
 //   plugins/pstack/{agents,effort-agents}/*.md -> the "agents" list in
 //     plugins/pstack/.claude-plugin/plugin.json (a list replaces the default
 //     agents/ directory, so it names every agent)
-//   plugins/pstack/agents/{poteto-agent,comment-sicko}.md, LICENSE,
-//   LICENSE-cursor-team-kit, and NOTICE-skills.md
+//   plugins/pstack/agents/comment-sicko.md, LICENSE, LICENSE-cursor-team-kit,
+//   and NOTICE-skills.md
 //     -> portable copies under poteto-mode/references/{agents,licenses}/
-//   No other claude-* slug may appear in skill prose; the scan below fails on strays.
+//   No other model name (a claude-* ID or a backticked family name) may appear
+//   in skill prose; the scan below fails on strays.
 //
 // Also validated: .agents/plugins/marketplace.json points at a real plugin
 // directory whose Codex manifest name matches (it carries no version; Codex

@@ -448,6 +448,27 @@ describe("lead lines", () => {
     expect(() => codexNoteSkills(table("| how | fan-out |"))).toThrow("does not start with a backticked skill: | how |");
     expect(() => codexNoteSkills("no table\n")).toThrow('"| Skill | On Codex |" table header not found');
   });
+
+  test("a prompt stub points at codex-tools.md unless its skill carries the Codex preamble", () => {
+    const pointer = "through `poteto-mode/references/codex-tools.md`, including its Per-skill notes.";
+    expect(promptStub({ name: "tdd", menu: "m" }, { preamble: false })).toContain(pointer);
+    expect(promptStub({ name: "how", menu: "m" }, { preamble: true })).toBe(
+      "---\nname: how\ndescription: m\ndisable-model-invocation: true\n---\n\nInvoke the `how` skill and follow it.\n",
+    );
+  });
+
+  test("a prompt stub repeats the codex-tools.md pointer only when its skill lacks the stamped preamble", () => {
+    const { files } = plan(repoRoot);
+    const stubs = Object.keys(files).filter((rel) => rel.startsWith("plugins/pstack/.codex-plugin/prompts/"));
+    const pointsAtMapping = (rel) => files[rel].includes("codex-tools.md");
+    const carriesPreamble = (rel) => {
+      const skill = `plugins/pstack/skills/${basename(rel, ".md")}/SKILL.md`;
+      return readFileSync(join(repoRoot, skill), "utf8").includes("On Codex, read the [platform mapping]");
+    };
+    expect(stubs.filter(carriesPreamble).length).toBeGreaterThan(0);
+    expect(stubs.filter((rel) => !carriesPreamble(rel)).length).toBeGreaterThan(0);
+    for (const rel of stubs) expect({ rel, points: pointsAtMapping(rel) }).toEqual({ rel, points: !carriesPreamble(rel) });
+  });
 });
 
 describe("effort agents", () => {

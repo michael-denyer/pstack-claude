@@ -22,7 +22,8 @@
 //     -> the "## Model names" section of poteto-mode/references/codex-tools.md
 //     -> one effort agent pair per level in plugins/pstack/effort-agents/
 //   the Per-skill notes table in poteto-mode/references/codex-tools.md
-//     -> the Codex preamble under the first heading of each listed skill's SKILL.md
+//     -> the Codex preamble under the first heading of each listed skill's SKILL.md,
+//        and the codex-tools.md pointer in the prompt stub of every other public skill
 //   DRIVER_PLAYBOOKS -> the driver-skill line under each playbook's first heading
 //   plugins/pstack/{agents,effort-agents}/*.md -> the "agents" list in
 //     plugins/pstack/.claude-plugin/plugin.json (a list replaces the default
@@ -267,12 +268,17 @@ export function slashCommands(markdown, skillNames) {
 }
 
 // Optional Codex slash shortcut. Skills also link to the platform mapping so
-// native invocation and skills-only installs do not depend on these stubs.
-export function promptStub({ name, menu }) {
+// native invocation and skills-only installs do not depend on these stubs. A
+// skill with the stamped Codex preamble already sends the reader to the
+// mapping, so its stub does not say it again.
+export function promptStub({ name, menu }, { preamble } = {}) {
+  const pointer = preamble
+    ? ""
+    : " Resolve Claude tool names, Claude model names, and Claude built-in skills through " +
+      "`poteto-mode/references/codex-tools.md`, including its Per-skill notes.";
   return (
     `---\nname: ${name}\ndescription: ${menu}\ndisable-model-invocation: true\n---\n\n` +
-    `Invoke the \`${name}\` skill and follow it. Resolve Claude tool names, Claude model names, and ` +
-    "Claude built-in skills through `poteto-mode/references/codex-tools.md`, including its Per-skill notes.\n"
+    `Invoke the \`${name}\` skill and follow it.${pointer}\n`
   );
 }
 
@@ -765,7 +771,8 @@ export function plan(root, models) {
   };
   for (const file of VERSIONED_MANIFESTS) stamp(file, (text) => stampVersion(text, version, file));
   for (const file of new Set(regions(models).map((r) => r.file))) stamp(file, (text) => applyRegions(file, text, models));
-  for (const [file, line] of loadLeadLines(root)) {
+  const leads = loadLeadLines(root);
+  for (const [file, line] of leads) {
     stamp(file, (text) => {
       const stamped = stampLeadLine(text, line);
       if (stamped === null) throw new Error(`${file}: no heading to stamp its lead line under`);
@@ -773,7 +780,8 @@ export function plan(root, models) {
     });
   }
   for (const skill of slashCommands(read(COMMANDS_DOC), publicSkills(join(root, SKILLS)))) {
-    put(`${PROMPTS}/${skill.name}.md`, promptStub(skill));
+    const preamble = leads.get(`${SKILLS}/${skill.name}/SKILL.md`) === CODEX_PREAMBLE;
+    put(`${PROMPTS}/${skill.name}.md`, promptStub(skill, { preamble }));
   }
   const agents = effortAgents(models.efforts, read(`${PLUGIN}/agents/poteto-agent.md`));
   for (const agent of agents) put(`${EFFORT_AGENTS}/${agent.name}.md`, agent.text);

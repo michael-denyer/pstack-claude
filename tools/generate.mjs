@@ -99,8 +99,8 @@ export function stampVersion(text, version, file) {
 // Every release heading reads "## <version> - <title>"; the current version
 // must have one. A bump without an entry (or an entry without a bump) ships a
 // release nobody can read about.
-export function assertChangesHeading(changes, version) {
-  const lines = changes.split("\n");
+export function assertChangesHeading(changelog, version) {
+  const lines = changelog.split("\n");
   const current = lines.find((line) => line.startsWith(`## ${version} `));
   if (!current) throw new Error(`CHANGES.md has no "## ${version} - <title>" heading`);
   const malformed = lines.filter((line) => /^## \d+\.\d+\.\d+/.test(line) && !/^## \d+\.\d+\.\d+ - \S/.test(line));
@@ -185,18 +185,18 @@ export function validatePluginLayout(pluginRoot) {
   // #58: a plugin's agents register under the plugin namespace, so a dispatch
   // of the bare name errors at runtime with "Agent type 'x' not found".
   const agents = pluginAgentPaths(pluginRoot).map((p) => basename(p, ".md"));
-  const problems = [];
+  const bareDispatches = [];
   for (const file of markdownFiles(join(pluginRoot, "skills"))) {
     readFileSync(file, "utf8").split("\n").forEach((line, i) => {
       for (const name of agents) {
         if (line.includes(`subagent_type: "${name}"`)) {
-          problems.push(`${relative(pluginRoot, file)}:${i + 1}: subagent_type: "${name}" (use "pstack:${name}")`);
+          bareDispatches.push(`${relative(pluginRoot, file)}:${i + 1}: subagent_type: "${name}" (use "pstack:${name}")`);
         }
       }
     });
   }
-  if (problems.length) {
-    throw new Error(`plugin agents are dispatched by their namespaced name:\n${problems.join("\n")}`);
+  if (bareDispatches.length) {
+    throw new Error(`plugin agents are dispatched by their namespaced name:\n${bareDispatches.join("\n")}`);
   }
   // tools/sync.mjs writes an unresolved three-way merge with git's markers and
   // still advances the pin, so this check is what keeps it out of a release.
@@ -715,25 +715,25 @@ export function strayModelSlugs(file, text, models) {
 // plugin, and one the command executes directly must be executable, or the
 // SessionStart hook fails silently for every user.
 export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json" }) {
-  const problems = [];
+  const faults = [];
   for (const [event, groups] of Object.entries(JSON.parse(hooksJson).hooks ?? {})) {
     for (const group of groups) {
       for (const hook of group.hooks ?? []) {
         const refs = [...hook.command.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)/g)].map((m) => m[1]);
         if (!refs.length) {
-          problems.push(`${event}: command does not reference \${CLAUDE_PLUGIN_ROOT}: ${hook.command}`);
+          faults.push(`${event}: command does not reference \${CLAUDE_PLUGIN_ROOT}: ${hook.command}`);
           continue;
         }
         const executed = hook.command.replace(/^"/, "").startsWith("${CLAUDE_PLUGIN_ROOT}/");
         refs.forEach((rel, i) => {
           const st = statOf(rel);
-          if (!st) problems.push(`${event}: ${rel} does not exist`);
-          else if (i === 0 && executed && !(st.mode & 0o111)) problems.push(`${event}: ${rel} is not executable`);
+          if (!st) faults.push(`${event}: ${rel} does not exist`);
+          else if (i === 0 && executed && !(st.mode & 0o111)) faults.push(`${event}: ${rel} is not executable`);
         });
       }
     }
   }
-  if (problems.length) throw new Error(`${file}:\n  ${problems.join("\n  ")}`);
+  if (faults.length) throw new Error(`${file}:\n  ${faults.join("\n  ")}`);
 }
 
 // Every file the generator writes, as exact text by repo-relative path,

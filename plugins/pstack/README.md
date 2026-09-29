@@ -13,7 +13,7 @@ Tell `poteto-mode` your goal and it invokes the workflow that fits: reproduce an
 
 ## Data handling
 
-pstack runs no server, collects no telemetry, and sends no data anywhere itself. The hook reads one configuration file from the runtime's config directory. The PR scripts call the GitHub CLI with your own login on your own pull requests, and install one pinned npm dependency on first use. The audit script and two playbooks read Claude Code transcripts on the local machine. The full description is in the repository README under [Data handling](https://github.com/michael-denyer/pstack-claude/blob/main/README.md#data-handling).
+pstack has no server and no telemetry. Anything a skill tells your agent to read, including session transcripts, goes to your model provider like any other file the agent opens. The PR scripts call `gh` with your login and install one pinned npm dependency on first use. The full description is in the repository README under [Data handling](https://github.com/michael-denyer/pstack-claude/blob/main/README.md#data-handling).
 
 ## Links
 

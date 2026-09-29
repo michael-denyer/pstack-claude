@@ -49,13 +49,16 @@ For a bug, it reproduces the failure, uses `how` and `why` to investigate, deleg
 
 ## Data handling
 
-pstack is Markdown instructions, a session hook, and local scripts. It runs no server, collects no telemetry, and sends no data anywhere itself. What each part touches:
+pstack has no server and no telemetry. Most of it is instructions to your agent, so anything a skill tells the agent to read goes to your model provider, the same as any other file the agent opens. That includes session transcripts. The `recall`, `reflect`, and `automate-me` skills and the `session-pickup` and `eval` playbooks read the current workspace's transcripts under `~/.claude/projects/`.
 
-- The SessionStart hook reads one file, `pstack-models.md`, from the runtime's configuration directory (`$CLAUDE_CONFIG_DIR` or `~/.claude` on Claude Code, `$CODEX_HOME` or `~/.codex` on Codex) to decide whether to inject the poteto-mode mandate. It reads nothing else and sends nothing.
-- The `watch-pr` and `ship-pr` scripts call the GitHub CLI (`gh`) with your own login to read and act on your own pull requests. They read no token themselves and talk to no service other than GitHub through `gh`.
-- On first use, those scripts install their one npm dependency, `commander`, at the version pinned in `bun.lock`, into the plugin's own `scripts/node_modules`.
-- `watch-pr/live-merge-safety.mjs` runs only when you start it by hand with `--live-disposable`; it creates a private repository on your `gh` account, drives `ship-pr` against it, and deletes it.
-- `worktree-audit.mjs` and the `recall` and `eval` playbooks read Claude Code session transcripts on the local machine, under the runtime's transcripts directory, to find which files a session touched. Transcripts stay on disk.
+The hook and scripts run locally:
+
+- The SessionStart hook checks `pstack-models.md` in `$CLAUDE_CONFIG_DIR` (default `~/.claude`) or `$CODEX_HOME` (default `~/.codex`) for `session hook: off`. If that line is absent, it prints the poteto-mode mandate into the session.
+- `watch-pr` and `ship-pr` call `gh` with your login. `watch-pr` reads pull request state. `ship-pr` reads a landing record and can cancel its pending merge.
+- The first time either script runs, it installs `commander`, pinned in `bun.lock`, into the plugin's `scripts/node_modules`.
+- `watch-pr/live-merge-safety.mjs` runs only when you start it with `--live-disposable`. It creates a private repository on your `gh` account, runs `ship-pr` against it, and deletes the repository.
+- `worktree-audit.mjs` searches transcripts under `~/.claude/projects/` for each worktree's path to show when a chat last mentioned it.
+- `resume.mjs` writes checkpoints under the repository's `.git/pstack/resume/`. `orch` writes its state to the directory you pass with `--store` or `ORCH_STORE`.
 
 ## Contributing
 

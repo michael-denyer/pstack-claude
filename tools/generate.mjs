@@ -750,24 +750,38 @@ export function plan(root) {
   assertChangesHeading(read("CHANGES.md"), version);
   const models = loadModels(root);
 
+  // A stamp edits the text planned so far for its path, so producers on one
+  // path compose. A put writes a whole file, so it throws rather than replace
+  // different text another producer planned.
   const files = {};
-  for (const file of VERSIONED_MANIFESTS) files[file] = stampVersion(read(file), version, file);
-  for (const file of new Set(regions(models).map((r) => r.file))) files[file] = applyRegions(file, read(file), models);
+  const current = (rel) => files[rel] ?? read(rel);
+  const stamp = (rel, edit) => {
+    files[rel] = edit(current(rel));
+  };
+  const put = (rel, text) => {
+    if (Object.hasOwn(files, rel) && files[rel] !== text) throw new Error(`${rel} is planned twice with different text`);
+    files[rel] = text;
+  };
+  for (const file of VERSIONED_MANIFESTS) stamp(file, (text) => stampVersion(text, version, file));
+  for (const file of new Set(regions(models).map((r) => r.file))) stamp(file, (text) => applyRegions(file, text, models));
   for (const [file, line] of loadLeadLines(root)) {
-    const stamped = stampLeadLine(files[file] ?? read(file), line);
-    if (stamped === null) throw new Error(`${file}: no heading to stamp its lead line under`);
-    files[file] = stamped;
+    stamp(file, (text) => {
+      const stamped = stampLeadLine(text, line);
+      if (stamped === null) throw new Error(`${file}: no heading to stamp its lead line under`);
+      return stamped;
+    });
   }
   for (const skill of slashCommands(read(COMMANDS_DOC), publicSkills(join(root, SKILLS)))) {
-    files[`${PROMPTS}/${skill.name}.md`] = promptStub(skill);
+    put(`${PROMPTS}/${skill.name}.md`, promptStub(skill));
   }
   const agents = effortAgents(models.efforts, read(`${PLUGIN}/agents/poteto-agent.md`));
-  for (const agent of agents) files[`${EFFORT_AGENTS}/${agent.name}.md`] = agent.text;
-  const manifest = `${PLUGIN}/.claude-plugin/plugin.json`;
-  files[manifest] = stampAgentPaths(files[manifest], [
-    ...pluginAgentPaths(join(root, PLUGIN)).filter((path) => path.startsWith("./agents/")),
-    ...agents.map((agent) => `./effort-agents/${agent.name}.md`).sort(),
-  ]);
+  for (const agent of agents) put(`${EFFORT_AGENTS}/${agent.name}.md`, agent.text);
+  stamp(`${PLUGIN}/.claude-plugin/plugin.json`, (text) =>
+    stampAgentPaths(text, [
+      ...pluginAgentPaths(join(root, PLUGIN)).filter((path) => path.startsWith("./agents/")),
+      ...agents.map((agent) => `./effort-agents/${agent.name}.md`).sort(),
+    ]),
+  );
   for (const dir of OWNED_DIRS) {
     const outer = OWNED_DIRS.find((other) => dir.startsWith(`${other}/`));
     if (outer) throw new Error(`generator-owned directory ${dir} is nested inside ${outer}`);
@@ -781,7 +795,7 @@ export function plan(root) {
     if (!pathIsInside(realRoot, realpathSync(join(root, source)))) {
       throw new Error(`${source} resolves outside the repository through a symlink`);
     }
-    files[path] = read(source);
+    put(path, read(source));
   }
   return { files, ownedDirs: OWNED_DIRS };
 }

@@ -696,6 +696,35 @@ describe("plan, changes, apply", () => {
     for (const [file] of leadFiles) expect(files[file]).toBe(readFileSync(join(repoRoot, file), "utf8"));
   });
 
+  test("two producers on one path compose", () => {
+    const root = repoCopy();
+    const manifest = "plugins/pstack/.claude-plugin/plugin.json";
+    const skill = "plugins/pstack/skills/how/SKILL.md";
+    const text = (rel) => readFileSync(join(root, rel), "utf8");
+    writeFileSync(
+      join(root, manifest),
+      JSON.stringify({ ...JSON.parse(text(manifest)), version: "0.0.1", agents: [] }, null, 2) + "\n",
+    );
+    writeFileSync(
+      join(root, skill),
+      text(skill)
+        .replace(`\n\n${leads.get(skill)}\n`, "\n")
+        .replace(/^- how explorer: .*$/m, "- how explorer: stale"),
+    );
+    const { files } = plan(root);
+    for (const rel of [manifest, skill]) expect(files[rel]).toBe(readFileSync(join(repoRoot, rel), "utf8"));
+  });
+
+  test("plan refuses a path two producers write whole with different text", () => {
+    const target = "poteto-mode/references/licenses/LICENSE";
+    PORTABLE_ASSETS.push({ source: "NOTICE-skills.md", target });
+    try {
+      expect(() => plan(repoRoot)).toThrow(`plugins/pstack/skills/${target} is planned twice with different text`);
+    } finally {
+      PORTABLE_ASSETS.pop();
+    }
+  });
+
   test("problems reports a lead line in a file that does not own it", () => {
     const root = repoCopy();
     const [, preamble] = [...loadLeadLines(root)].find(([, line]) => line.startsWith("On Codex"));

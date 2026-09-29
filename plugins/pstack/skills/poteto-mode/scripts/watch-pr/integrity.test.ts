@@ -3,9 +3,19 @@ import { DeadlineExceeded, WatchDeadline } from "./deadline.ts";
 import { fakeReader, pendingCheck, failedCheck } from "./fakes.test-helper.ts";
 import type { FakeReaderOptions } from "./fakes.test-helper.ts";
 import { orderStack, parsePullRequest, WatcherQueryError } from "./github.ts";
-import { classifyPr, readSnapshot, runSimple, runQueued } from "./policy.ts";
+import {
+  classifyPr,
+  readSnapshot,
+  runSimple,
+  runQueued,
+  selectTierMajorStackDecision,
+} from "./policy.ts";
 import { renderPretty } from "./render.ts";
-import { parsePrNumber, type ProgressVerdict } from "./types.ts";
+import {
+  parsePrNumber,
+  type MergeBlocker,
+  type ProgressVerdict,
+} from "./types.ts";
 
 const context = { owner: "owner", repo: "repo", number: parsePrNumber(1) };
 const options = {
@@ -694,4 +704,60 @@ describe("merge gate", () => {
         })
       ).toBe(`BLOCKER: ${reason}\npr=1\naction=${action}\n`);
     });
+});
+
+describe("blocker producers", () => {
+  const thread = {
+    id: "t1",
+    firstComment: null,
+    isBugbot: false,
+    bugbotReviewPasses: 0,
+  };
+  const rungs: readonly (readonly [MergeBlocker["kind"], FakeReaderOptions])[] =
+    [
+      ["merge-conflicts", { facts: { mergeable: "CONFLICTING" } }],
+      ["review-threads", { threads: [thread] }],
+      [
+        "failing-checks",
+        { fastPath: { kind: "checks", checks: [failedCheck()] } },
+      ],
+      ["merge-gate", { facts: { isDraft: true } }],
+    ];
+  const snapshot = (options: FakeReaderOptions, number: number) => {
+    const pr = { ...context, number: parsePrNumber(number) };
+    return readSnapshot({
+      ...snapshotArgs,
+      context: pr,
+      reader: fakeReader({ ...options, current: pr }),
+    });
+  };
+
+  for (const [index, [kind]] of rungs.entries()) {
+    it(`classifies a PR as ${kind} over every lower-priority blocker`, async () => {
+      let options: FakeReaderOptions = {};
+      for (const [, rung] of rungs.slice(index))
+        options = {
+          ...options,
+          ...rung,
+          facts: { ...options.facts, ...rung.facts },
+        };
+      expect(classifyPr(await snapshot(options, 1))).toMatchObject({
+        kind: "blocker",
+        blocker: { kind },
+      });
+    });
+
+    it(`reports ${kind} in a stack before any lower tier in an earlier PR`, async () => {
+      const rows = await Promise.all(
+        rungs
+          .slice(index)
+          .map(([, options], offset) => snapshot(options, index + offset + 1))
+      );
+      const [first, ...rest] = rows.reverse();
+      expect(selectTierMajorStackDecision([first, ...rest])).toMatchObject({
+        kind: "blocker",
+        blocker: { kind, pr: { number: index + 1 } },
+      });
+    });
+  }
 });

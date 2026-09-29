@@ -880,6 +880,28 @@ describe("syncComponent", () => {
     for (const rel of ["dangling.md", "linked.md", "gone.md"]) expect(lstatSync(join(local, rel)).isSymbolicLink()).toBe(true);
   });
 
+  test("a local symlink at a directory above upstream paths is reported at the link, and nothing is written through it", () => {
+    const outside = tree({ "dir/x.md": "a\n", "file.md": "f\n" });
+    const oldUp = tree({ "d/x.md": "a\n" });
+    const newUp = tree({ "d/x.md": "b\n", "d/new.md": "n\n", "f/z.md": "z\n" });
+    const local = tree({});
+    symlinkSync(join(outside, "dir"), join(local, "d"));
+    symlinkSync(join(outside, "file.md"), join(local, "f"));
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.conflicts).toEqual([
+      { rel: "d", reason: "symlink" },
+      { rel: "f", reason: "symlink" },
+    ]);
+    expect(report.written).toEqual([]);
+    expect(report.portOnly).toEqual([]);
+    expect(readdirSync(join(outside, "dir"))).toEqual(["x.md"]);
+    expect(readFileSync(join(outside, "dir/x.md"), "utf8")).toBe("a\n");
+    expect(readFileSync(join(outside, "file.md"), "utf8")).toBe("f\n");
+    for (const rel of ["d", "f"]) expect(lstatSync(join(local, rel)).isSymbolicLink()).toBe(true);
+  });
+
   test("a binary port copy under an upstream text edit blocks every write", () => {
     const oldUp = tree({ "doc.md": "a\n", "sibling.md": "old\n" });
     const newUp = tree({ "doc.md": "b\n", "sibling.md": "new\n" });

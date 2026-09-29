@@ -20,9 +20,9 @@
 //   - all three differ and the merge conflicts -> conflicted: written with
 //     git's `<<<<<<< local` / `=======` / `>>>>>>> upstream` markers and
 //     reported with its hunk count under conflicts, alongside symlinks on
-//     either side of an upstream path (never followed, never written) and files
-//     upstream deleted that the port had edited (kept, and printed as now
-//     port-only once the pin moves)
+//     either side of an upstream path or in the port at a directory above one
+//     (never followed, never written) and files upstream deleted that the port
+//     had edited (kept, and printed as now port-only once the pin moves)
 //   - a binary upstream or port copy differs all three ways -> the run fails
 //     naming it, since a binary cannot carry markers
 //   - upstream deleted it and local matches the derived OLD text and mode ->
@@ -342,9 +342,18 @@ export function syncComponent({
     });
   };
   const elsewhere = new Set(carriedElsewhere);
+  // A port link where upstream has a directory is reported at the link, and
+  // nothing under it is read or written, since each write would land in its target.
+  const dirsAbove = (rel) => rel.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/"));
+  const upstreamDirs = new Set([...oldPaths, ...newPaths].filter((rel) => !isExcluded(rel, exclude)).flatMap(dirsAbove));
+  const isLink = (rel) => localPaths.has(rel) && lstatSync(join(localDir, rel)).isSymbolicLink();
   const outcomeOf = (rel) => {
     if (isExcluded(rel, exclude)) return newPaths.has(rel) ? { kind: "excluded" } : null;
-    if (!oldPaths.has(rel) && !newPaths.has(rel)) return elsewhere.has(rel) ? null : { kind: "port-only" };
+    if (dirsAbove(rel).some(isLink)) return null;
+    if (!oldPaths.has(rel) && !newPaths.has(rel)) {
+      if (upstreamDirs.has(rel) && isLink(rel)) return { kind: "symlink" };
+      return elsewhere.has(rel) ? null : { kind: "port-only" };
+    }
     try {
       return classify({ old: upstream(oldDir, oldPaths, rel), new: upstream(newDir, newPaths, rel), local: portCopy(rel) });
     } catch (error) {

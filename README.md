@@ -55,7 +55,7 @@ The hook and scripts run locally:
 
 - The SessionStart hook checks `pstack-models.md` in `$CLAUDE_CONFIG_DIR` (default `~/.claude`) or `$CODEX_HOME` (default `~/.codex`) for `session hook: off`. If that line is absent, it prints the poteto-mode mandate into the session.
 - `watch-pr` and `ship-pr` call `gh` with your login. `watch-pr` reads pull request state. `ship-pr` reads a landing record and can cancel its pending merge.
-- The first time either script runs, it installs `commander`, pinned in `bun.lock`, into the plugin's `scripts/node_modules`.
+- The first run of `watch-pr`, `ship-pr`, or `orch` runs `bun install`, which downloads `commander` at the version pinned in `bun.lock` into the plugin's `scripts/node_modules`.
 - `watch-pr/live-merge-safety.mjs` runs only when you start it with `--live-disposable`. It creates a private repository on your `gh` account, runs `ship-pr` against it, and deletes the repository.
 - `worktree-audit.mjs` searches transcripts under `~/.claude/projects/` for each worktree's path to show when a chat last mentioned it.
 - `resume.mjs` writes checkpoints under the repository's `.git/pstack/resume/`. `orch` writes its state to the directory you pass with `--store` or `ORCH_STORE`.

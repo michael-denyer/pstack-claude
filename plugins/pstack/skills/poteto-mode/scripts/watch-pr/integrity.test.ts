@@ -4,6 +4,15 @@ import { fakeReader, pendingCheck, failedCheck } from "./fakes.test-helper.ts";
 import type { FakeReaderOptions } from "./fakes.test-helper.ts";
 import { orderStack, parsePullRequest, WatcherQueryError } from "./github.ts";
 import {
+  flag,
+  nullableText,
+  object,
+  oneOf,
+  parseContext,
+  parseLandingRevision,
+  text,
+} from "./landing.ts";
+import {
   classifyPr,
   readSnapshot,
   runSimple,
@@ -760,4 +769,95 @@ describe("blocker producers", () => {
       });
     });
   }
+});
+
+describe("landing validators", () => {
+  const failure = (parse: () => unknown) => {
+    try {
+      parse();
+    } catch (error) {
+      if (error instanceof WatcherQueryError) return error.failure;
+      throw error;
+    }
+    throw new Error("expected a validation failure");
+  };
+  for (const [name, parse, detail] of [
+    [
+      "object",
+      () => object([], "landing record"),
+      "landing record must be an object",
+    ],
+    [
+      "text",
+      () => text("", "headRefOid"),
+      "headRefOid must be a non-empty string",
+    ],
+    [
+      "nullableText",
+      () => nullableText(0, "queue entry id"),
+      "queue entry id must be a non-empty string",
+    ],
+    [
+      "oneOf",
+      () => oneOf("DRAFT", ["OPEN"], "PR state"),
+      "missing or invalid PR state",
+    ],
+    ["flag", () => flag(null, "autoMerge state"), "missing autoMerge state"],
+    [
+      "parseContext",
+      () => parseContext({ owner: "a/b", repo: "r", number: 1 }),
+      "owner and repo must be individual repository names",
+    ],
+    [
+      "parseLandingRevision",
+      () =>
+        parseLandingRevision(
+          { headRefOid: "head", baseRefName: "main" },
+          context
+        ),
+      "baseRefOid must be a non-empty string",
+    ],
+  ] as const)
+    it(`${name} rejects with a retryable missing-key failure`, () => {
+      expect(failure(parse)).toEqual({
+        kind: "missing-key",
+        retryable: true,
+        detail,
+      });
+    });
+
+  it("returns valid values unchanged", () => {
+    const fields = { key: 1 };
+    expect(object(fields, "fields")).toBe(fields);
+    expect(text("head", "headRefOid")).toBe("head");
+    expect(nullableText(null, "queue entry id")).toBeNull();
+    expect(oneOf("MERGED", ["OPEN", "MERGED"], "PR state")).toBe("MERGED");
+    expect(flag(false, "autoMerge state")).toBe(false);
+  });
+
+  it("reports an open PR's missing head commit as its own failure", () => {
+    expect(
+      failure(() =>
+        parsePullRequest(
+          {
+            mergeable: "MERGEABLE",
+            mergeStateStatus: "CLEAN",
+            reviewDecision: "APPROVED",
+            headRefOid: null,
+            baseRefOid: "base",
+            headRefName: "feature",
+            baseRefName: "main",
+            state: "OPEN",
+            mergedAt: null,
+            isDraft: false,
+          },
+          context
+        )
+      )
+    ).toEqual({
+      kind: "missing-key",
+      retryable: true,
+      detail: "headRefOid must be a non-empty string",
+    });
+  });
 });

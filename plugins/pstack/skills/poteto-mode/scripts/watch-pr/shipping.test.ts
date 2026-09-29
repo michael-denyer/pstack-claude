@@ -261,3 +261,36 @@ describe("shipping GitHub boundary", () => {
     ).toThrow();
   });
 });
+
+describe("shipping validation detail", () => {
+  for (const [name, pullRequest, detail] of [
+    [
+      "an unknown state",
+      { ...raw, state: "DRAFT" },
+      "missing or invalid PR state",
+    ],
+    [
+      "an empty base commit",
+      { ...raw, baseRefOid: "" },
+      "baseRefOid must be a non-empty string",
+    ],
+    [
+      "a malformed queue entry",
+      { ...raw, mergeQueueEntry: { id: 1 } },
+      "queue entry id must be a non-empty string",
+    ],
+  ] as const)
+    it(`names ${name} in the unavailable detail`, async () => {
+      const service = new GhShippingService(async () => response(pullRequest));
+      expect(await inspectLanding(service, context)).toEqual({
+        kind: "unavailable",
+        detail,
+      });
+    });
+
+  it("names a missing autoMerge state in a saved record", () => {
+    expect(() =>
+      parseLandingRecord({ ...empty, pending: { queueEntryId: null } })
+    ).toThrow("missing autoMerge state");
+  });
+});

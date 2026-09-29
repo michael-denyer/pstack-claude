@@ -1,5 +1,8 @@
 import {
+  flag,
+  nullableText,
   object,
+  oneOf,
   text,
   parseLandingRevision,
   sameLandingRevision,
@@ -37,25 +40,18 @@ export type ShippingResult =
     }
   | { readonly kind: "unavailable"; readonly detail: string };
 
-function state(value: unknown): LandingRecord["state"] {
-  if (value !== "OPEN" && value !== "CLOSED" && value !== "MERGED")
-    throw new Error("missing or invalid PR state");
-  return value;
-}
-const nullableText = (value: unknown, label: string): string | null =>
-  value === null ? null : text(value, label);
+const STATES = ["OPEN", "CLOSED", "MERGED"] as const;
 
 export function parseLandingRecord(value: unknown): LandingRecord {
   const record = object(value, "landing record");
   const pending = object(record.pending, "pending merges");
-  if (typeof pending.autoMerge !== "boolean")
-    throw new Error("missing autoMerge state");
+  const autoMerge = flag(pending.autoMerge, "autoMerge state");
   return {
     revision: parseLandingRevision(record.revision),
     pullRequestId: text(record.pullRequestId, "pullRequestId"),
-    state: state(record.state),
+    state: oneOf(record.state, STATES, "PR state"),
     pending: {
-      autoMerge: pending.autoMerge,
+      autoMerge,
       queueEntryId: nullableText(pending.queueEntryId, "queueEntryId"),
     },
     mergeCommitOid: nullableText(record.mergeCommitOid, "mergeCommitOid"),
@@ -181,7 +177,7 @@ export class GhShippingService implements ShippingService {
     return {
       revision: parseLandingRevision(fields, context),
       pullRequestId: text(fields.id, "pull request id"),
-      state: state(fields.state),
+      state: oneOf(fields.state, STATES, "PR state"),
       pending: { autoMerge, queueEntryId },
       mergeCommitOid:
         fields.mergeCommit === null

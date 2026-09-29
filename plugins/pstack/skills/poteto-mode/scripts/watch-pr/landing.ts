@@ -1,3 +1,4 @@
+import { WatcherQueryError } from "./github.ts";
 import { parsePrNumber, type PrContext } from "./types.ts";
 
 export interface LandingRevision {
@@ -7,15 +8,36 @@ export interface LandingRevision {
   readonly baseRefOid: string;
 }
 
+function invalid(detail: string): never {
+  throw new WatcherQueryError({ kind: "missing-key", retryable: true, detail });
+}
+
 export function object(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value))
-    throw new Error(`${label} must be an object`);
+    invalid(`${label} must be an object`);
   return value as Record<string, unknown>;
 }
 
 export function text(value: unknown, label: string): string {
   if (typeof value !== "string" || value.length === 0)
-    throw new Error(`${label} must be a non-empty string`);
+    invalid(`${label} must be a non-empty string`);
+  return value;
+}
+
+export const nullableText = (value: unknown, label: string): string | null =>
+  value === null ? null : text(value, label);
+
+export function oneOf<const V extends readonly string[]>(
+  value: unknown,
+  values: V,
+  label: string
+): V[number] {
+  for (const candidate of values) if (candidate === value) return candidate;
+  return invalid(`missing or invalid ${label}`);
+}
+
+export function flag(value: unknown, label: string): boolean {
+  if (typeof value !== "boolean") invalid(`missing ${label}`);
   return value;
 }
 
@@ -24,7 +46,7 @@ export function parseContext(value: unknown): PrContext {
   const owner = text(fields.owner, "owner");
   const repo = text(fields.repo, "repo");
   if (!/^[\w.-]+$/.test(owner) || !/^[\w.-]+$/.test(repo))
-    throw new Error("owner and repo must be individual repository names");
+    invalid("owner and repo must be individual repository names");
   return { owner, repo, number: parsePrNumber(fields.number) };
 }
 

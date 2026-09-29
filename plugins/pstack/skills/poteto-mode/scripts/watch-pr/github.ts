@@ -458,19 +458,6 @@ export function parseReviewThreads(value: unknown): readonly T.ReviewThread[] {
       bugbotReviewPasses: passes,
     }));
 }
-function readLandingRevision(
-  value: unknown,
-  context: T.PrContext
-): LandingRevision {
-  try {
-    return parseLandingRevision(value, context);
-  } catch (error) {
-    return missing(
-      "landing revision",
-      error instanceof Error ? error.message : String(error)
-    );
-  }
-}
 export function parsePullRequest(
   value: unknown,
   context: T.PrContext
@@ -504,7 +491,7 @@ export function parsePullRequest(
     isDraft: object.isDraft,
   };
   return facts.state === "OPEN"
-    ? { ...facts, ...readLandingRevision(object, context), state: facts.state }
+    ? { ...facts, ...parseLandingRevision(object, context), state: facts.state }
     : { ...facts, state: facts.state };
 }
 function graphqlArgs(
@@ -578,7 +565,7 @@ export class GhGitHubReader implements T.GitHubReader {
       ]),
       "pull request head"
     );
-    return readLandingRevision(value, context);
+    return parseLandingRevision(value, context);
   }
   async openPullRequests(
     repository: T.Repository

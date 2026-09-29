@@ -2,7 +2,7 @@
   "name": "pstack",
   "displayName": "pstack (Claude Code port)",
   "icon": "./assets/pstack-icon.png",
-  "version": "0.9.50",
+  "version": "0.9.51",
   "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Ported from cursor/plugins/pstack to Claude Code. Original pstack by Lauren Tan (poteto).",
   "author": {
     "name": "Michael Denyer",

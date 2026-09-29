@@ -385,6 +385,17 @@ describe("deriveSkill", () => {
     expect(deriveSkill("plugins/pstack/skills/x/references/y.md", text, models, leads)).toBe(text);
   });
 
+  test.each(["|-", ">-"])("drops every paragraph of a %s reminder without changing adjacent fields", (style) => {
+    const text = front(`reminder: ${style}\n  First paragraph.\n\n  Second paragraph.\n  \n  Last paragraph.\nallowed-tools:\n  - Read\n`);
+    const out = deriveSkill("plugins/pstack/skills/x/SKILL.md", text, models, leads);
+
+    expect(parseFrontmatter(out)).toEqual({
+      data: { name: "x", description: "d", "allowed-tools": ["Read"] },
+      body: parseFrontmatter(text).body,
+    });
+    expect(deriveSkill("plugins/pstack/skills/x/SKILL.md", out, models, leads)).toBe(out);
+  });
+
   test("leaves a prose mention of the flag alone", () => {
     const text = front("", "automate-me") + "Never write `disable-model-invocation: true` on a skill.\n";
     expect(deriveSkill("plugins/pstack/skills/automate-me/SKILL.md", text, models, leads)).toBe(text);

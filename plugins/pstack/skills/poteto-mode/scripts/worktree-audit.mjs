@@ -188,12 +188,12 @@ export function audit({
 
   const worktrees = parseWorktrees(git(repo, "worktree", "list", "--porcelain", "-z")).slice(1);
   const live = worktrees.filter((worktree) => !worktree.prunable).map((worktree) => worktree.path);
-  let chats = UNKNOWN;
-  if (statSync(transcripts, { throwIfNoEntry: false })?.isDirectory()) {
-    chats = discover(() => lastChats(transcripts, live), "transcript scan failed; LAST_CHAT column will be empty");
-  } else {
-    warn(`warn: ${transcripts} not found; LAST_CHAT column will be empty`);
-  }
+  const chats = discover(() => {
+    if (!statSync(transcripts, { throwIfNoEntry: false })?.isDirectory()) {
+      throw new Error(`${transcripts} not found`);
+    }
+    return lastChats(transcripts, live);
+  }, "transcript scan failed; LAST_CHAT column will be empty");
 
   const context = { repo, trunk, fetched, prs, chats, now };
   const rows = worktrees.map(({ path, prunable }) =>

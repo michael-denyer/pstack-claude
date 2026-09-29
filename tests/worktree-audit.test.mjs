@@ -201,6 +201,13 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
       locked.push(project);
       return {};
     }, /transcript scan failed/],
+    ["a transcripts directory with an inaccessible parent", (fixture) => {
+      const project = join(fixture.transcripts, "-proj");
+      mkdirSync(project);
+      chmodSync(fixture.transcripts, 0o000);
+      locked.push(fixture.transcripts);
+      return { transcripts: project };
+    }, /transcript scan failed.*EACCES/],
   ];
 
   test.each(failures)("%s", (_, inject, warning) => {

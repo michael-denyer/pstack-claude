@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines which changes belong upstream.
 
+## 0.9.51 - preserve audit results, skill descriptions, and sync ownership
+
+`worktree-audit.mjs` now catches errors when checking the transcript directory itself. An inaccessible parent directory leaves transcript usage unknown, prints a warning, and keeps otherwise safe worktrees at `review` instead of aborting the table.
+
+The upstream frontmatter normalizer removes every paragraph of a Cursor-only field, including paragraphs separated by empty lines. A multiline `reminder` can no longer append its remaining text to the preceding skill description.
+
+The sync reports a clean merge as `updated` when its final bytes and mode match new upstream. A fork declaration then becomes stale in the same run, and removing it no longer blocks the update. A remaining port mode change still requires its declaration.
+
 ## 0.9.50 - the review's open items and the sync's symlink and binary seams
 
 This release closes the items that the code-quality review and its reviewers left open, and it fixes four sync seams that predate the review. The sync no longer writes through a port symlink at or above an upstream path, no longer hands a binary port copy to `git merge-file`, keeps a port file whose only edit is its mode when upstream deletes it, and counts a fork's changed lines from the bytes it compared. Five changes are visible to a user or maintainer. The sync reports the port symlink cases as `symlink` conflicts and a binary port copy under an upstream text edit as a binary conflict (#138). Fourteen Codex prompt stubs drop a sentence that repeated their skill's Codex preamble (#139). `watch-pr` prints shorter status-query detail text when an open PR has no head or base commit (#140). `CHANGES.md` no longer carries the `## Codex port` section (#136). The forked count at upstream pin 12d587d falls from 45 to 44 (#137).

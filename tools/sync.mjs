@@ -16,7 +16,8 @@
 //   - local copy matches the derived OLD text and mode -> clean update, written
 //   - upstream did not touch its text or mode and local differs -> forked,
 //     left alone, counted
-//   - all three differ and git merge-file succeeds -> merged, written
+//   - all three differ and git merge-file succeeds -> updated when the result
+//     matches new upstream's text and mode, else merged; written in either case
 //   - all three differ and the merge conflicts -> conflicted: written with
 //     git's `<<<<<<< local` / `=======` / `>>>>>>> upstream` markers and
 //     reported with its hunk count under conflicts, alongside symlinks on
@@ -274,7 +275,10 @@ export function classify({ old = null, new: next = null, local = null }) {
   if (next.binary || local.binary) return { kind: "binary-conflict" };
   const merged = mergeFile(local.bytes, old?.bytes ?? NO_COMMON_ANCESTOR, next.bytes);
   const mode = next.mode === old?.mode ? local.mode : next.mode;
-  if (merged.clean) return writing("merged", merged.buffer, mode);
+  if (merged.clean) {
+    const kind = same({ bytes: merged.buffer, mode }, next) ? "updated" : "merged";
+    return writing(kind, merged.buffer, mode);
+  }
   return { ...writing("conflicted", merged.buffer, mode), hunks: merged.hunks };
 }
 

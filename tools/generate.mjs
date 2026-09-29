@@ -534,7 +534,7 @@ export function loadModels(root = repo) {
 }
 
 // Frontmatter keys only Cursor reads. The port drops each with any indented
-// continuation lines.
+// continuation lines and blank paragraphs.
 const CURSOR_ONLY_KEYS = /^(?:mode|icon|color|reminder|is_background):/;
 
 // The port's frontmatter for an upstream skill or plugin agent: `name` is the
@@ -551,7 +551,7 @@ function portFrontmatter(file, text) {
   const kept = [];
   let dropping = false;
   for (const line of text.slice(0, text.length - body.length).split("\n")) {
-    dropping = CURSOR_ONLY_KEYS.test(line) || (dropping && /^\s/.test(line));
+    dropping = CURSOR_ONLY_KEYS.test(line) || (dropping && /^(?:\s|$)/.test(line));
     if (!dropping) kept.push(line.startsWith("name:") ? `name: ${name}` : line);
   }
   const head = kept.join("\n");

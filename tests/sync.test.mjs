@@ -634,6 +634,49 @@ describe("syncComponent", () => {
     ]);
   });
 
+  test.each([
+    ["text", "a\nb\nc\nd\ne\n", "A\nb\nc\nd\nE\n", "A\nb\nc\nd\ne\n", 0o644],
+    ["mode", "old\n", "new\n", "old\n", 0o755],
+  ])("upstream absorbing a port %s change retires its fork during the same sync", (_, oldText, newText, localText, mode) => {
+    for (const dryRun of [true, false]) {
+      for (const declared of [true, false]) {
+        const oldDir = tree({ "doc.md": oldText });
+        const newDir = tree({ "doc.md": newText });
+        const localDir = tree({ "doc.md": localText });
+        chmodSync(join(oldDir, "doc.md"), 0o644);
+        for (const dir of [newDir, localDir]) chmodSync(join(dir, "doc.md"), mode);
+        const forks = new Map(declared ? [["doc.md", {}]] : []);
+
+        const report = sync({ oldDir, newDir, localDir, forks, dryRun });
+
+        expect(report.written).toEqual([{ kind: "updated", rel: "doc.md" }]);
+        expect(report.undeclared).toEqual([]);
+        expect(report.stale).toEqual(declared ? [{ rel: "doc.md", reason: "is no longer forked (updated)" }] : []);
+        expect(readFileSync(join(localDir, "doc.md"), "utf8")).toBe(dryRun ? localText : newText);
+        expect(statSync(join(localDir, "doc.md")).mode & 0o777).toBe(mode);
+      }
+    }
+  });
+
+  test("upstream absorbing the port's text leaves a surviving port mode change declared", () => {
+    const oldDir = tree({ "doc.md": "a\nb\nc\nd\ne\n" });
+    const newDir = tree({ "doc.md": "A\nb\nc\nd\nE\n" });
+    const localDir = tree({ "doc.md": "A\nb\nc\nd\ne\n" });
+    for (const dir of [oldDir, newDir]) chmodSync(join(dir, "doc.md"), 0o644);
+    chmodSync(join(localDir, "doc.md"), 0o755);
+
+    const blocked = sync({ oldDir, newDir, localDir, forks: new Map() });
+    expect(blocked.undeclared).toEqual(["doc.md"]);
+    expect(readFileSync(join(localDir, "doc.md"), "utf8")).toBe("A\nb\nc\nd\ne\n");
+
+    const report = sync({ oldDir, newDir, localDir, forks: new Map([["doc.md", {}]]) });
+    expect(report.written).toEqual([{ kind: "merged", rel: "doc.md" }]);
+    expect(report.undeclared).toEqual([]);
+    expect(report.stale).toEqual([]);
+    expect(readFileSync(join(localDir, "doc.md"), "utf8")).toBe("A\nb\nc\nd\nE\n");
+    expect(statSync(join(localDir, "doc.md")).mode & 0o777).toBe(0o755);
+  });
+
   test("a hit prevents valid sibling additions, updates, and deletions", () => {
     const oldUp = tree({
       "bad.md": "old bad\n",

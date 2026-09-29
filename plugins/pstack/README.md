@@ -13,7 +13,7 @@ Tell `poteto-mode` your goal and it invokes the workflow that fits: reproduce an
 
 ## Data handling
 
-pstack has no server and no telemetry. Anything a skill tells your agent to read, including session transcripts, goes to your model provider like any other file the agent opens. The PR scripts call `gh` with your login. The first run of `watch-pr`, `ship-pr`, or `orch` downloads one pinned npm package, `commander`. The full description is in the repository README under [Data handling](https://github.com/michael-denyer/pstack-claude/blob/main/README.md#data-handling).
+pstack has no server or telemetry. Anything its skills ask your agent to read, including session transcripts, goes to your model provider. Scripts run locally, and PR tools use your GitHub CLI login.
 
 ## Links
 

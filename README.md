@@ -49,16 +49,7 @@ For a bug, it reproduces the failure, uses `how` and `why` to investigate, deleg
 
 ## Data handling
 
-pstack has no server and no telemetry. Most of it is instructions to your agent, so anything a skill tells the agent to read goes to your model provider, the same as any other file the agent opens. That includes session transcripts. The `recall`, `reflect`, and `automate-me` skills and the `session-pickup` and `eval` playbooks read the current workspace's transcripts under `~/.claude/projects/`.
-
-The hook and scripts run locally:
-
-- The SessionStart hook checks `pstack-models.md` in `$CLAUDE_CONFIG_DIR` (default `~/.claude`) or `$CODEX_HOME` (default `~/.codex`) for `session hook: off`. If that line is absent, it prints the poteto-mode mandate into the session.
-- `watch-pr` and `ship-pr` call `gh` with your login. `watch-pr` reads pull request state. `ship-pr` reads a landing record and can cancel its pending merge.
-- The first run of `watch-pr`, `ship-pr`, or `orch` runs `bun install`, which downloads `commander` at the version pinned in `bun.lock` into the plugin's `scripts/node_modules`.
-- `watch-pr/live-merge-safety.mjs` runs only when you start it with `--live-disposable`. It creates a private repository on your `gh` account, runs `ship-pr` against it, and deletes the repository.
-- `worktree-audit.mjs` searches transcripts under `~/.claude/projects/` for each worktree's path to show when a chat last mentioned it.
-- `resume.mjs` writes checkpoints under the repository's `.git/pstack/resume/`. `orch` writes its state to the directory you pass with `--store` or `ORCH_STORE`.
+pstack has no server or telemetry. Anything its skills ask your agent to read, including session transcripts, goes to your model provider. Scripts run locally, and PR tools use your GitHub CLI login.
 
 ## Contributing
 

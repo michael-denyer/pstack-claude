@@ -193,7 +193,7 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
     ["gh", () => ({ gh: () => { throw new Error("gh: not logged in"); } }), /gh pr list failed.*not logged in/],
     ["gh output that is not JSON", () => ({ gh: () => "rate limited" }), /gh pr list failed/],
     ["gh output that is not a list", () => ({ gh: () => "{}" }), /gh pr list failed/],
-    ["a missing transcripts directory", (fixture) => ({ transcripts: join(fixture.root, "absent") }), /absent not found/],
+    ["a missing transcripts directory", (fixture) => ({ transcripts: join(fixture.root, "absent") }), /^warn: \S+\/absent not found; LAST_CHAT column will be empty$/],
     ["an unreadable transcripts directory", (fixture) => {
       const project = join(fixture.transcripts, "-proj");
       mkdirSync(project);

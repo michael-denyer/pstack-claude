@@ -634,29 +634,30 @@ describe("syncComponent", () => {
     ]);
   });
 
-  test.each([
-    ["text", "a\nb\nc\nd\ne\n", "A\nb\nc\nd\nE\n", "A\nb\nc\nd\ne\n", 0o644],
-    ["mode", "old\n", "new\n", "old\n", 0o755],
-  ])("upstream absorbing a port %s change retires its fork during the same sync", (_, oldText, newText, localText, mode) => {
-    for (const dryRun of [true, false]) {
-      for (const declared of [true, false]) {
-        const oldDir = tree({ "doc.md": oldText });
-        const newDir = tree({ "doc.md": newText });
-        const localDir = tree({ "doc.md": localText });
-        chmodSync(join(oldDir, "doc.md"), 0o644);
-        for (const dir of [newDir, localDir]) chmodSync(join(dir, "doc.md"), mode);
-        const forks = new Map(declared ? [["doc.md", {}]] : []);
+  test.each(
+    [
+      ["text", "a\nb\nc\nd\ne\n", "A\nb\nc\nd\nE\n", "A\nb\nc\nd\ne\n", 0o644],
+      ["mode", "old\n", "new\n", "old\n", 0o755],
+    ].flatMap((change) => [true, false].flatMap((dryRun) => [true, false].map((declared) => [...change, dryRun, declared]))),
+  )(
+    "upstream absorbing a port %s change retires its fork during the same sync (dry run %s, declared %s)",
+    (_, oldText, newText, localText, mode, dryRun, declared) => {
+      const oldDir = tree({ "doc.md": oldText });
+      const newDir = tree({ "doc.md": newText });
+      const localDir = tree({ "doc.md": localText });
+      chmodSync(join(oldDir, "doc.md"), 0o644);
+      for (const dir of [newDir, localDir]) chmodSync(join(dir, "doc.md"), mode);
+      const forks = new Map(declared ? [["doc.md", {}]] : []);
 
-        const report = sync({ oldDir, newDir, localDir, forks, dryRun });
+      const report = sync({ oldDir, newDir, localDir, forks, dryRun });
 
-        expect(report.written).toEqual([{ kind: "updated", rel: "doc.md" }]);
-        expect(report.undeclared).toEqual([]);
-        expect(report.stale).toEqual(declared ? [{ rel: "doc.md", reason: "is no longer forked (updated)" }] : []);
-        expect(readFileSync(join(localDir, "doc.md"), "utf8")).toBe(dryRun ? localText : newText);
-        expect(statSync(join(localDir, "doc.md")).mode & 0o777).toBe(mode);
-      }
-    }
-  });
+      expect(report.written).toEqual([{ kind: "updated", rel: "doc.md" }]);
+      expect(report.undeclared).toEqual([]);
+      expect(report.stale).toEqual(declared ? [{ rel: "doc.md", reason: "is no longer forked (updated)" }] : []);
+      expect(readFileSync(join(localDir, "doc.md"), "utf8")).toBe(dryRun ? localText : newText);
+      expect(statSync(join(localDir, "doc.md")).mode & 0o777).toBe(mode);
+    },
+  );
 
   test("upstream absorbing the port's text leaves a surviving port mode change declared", () => {
     const oldDir = tree({ "doc.md": "a\nb\nc\nd\ne\n" });

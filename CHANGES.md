@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines which changes belong upstream.
 
+## 0.9.52 - name a missing transcripts directory in the audit warning
+
+`worktree-audit.mjs` warns `<dir> not found; LAST_CHAT column will be empty` when the transcripts directory is missing, and keeps the `transcript scan failed` warning for a directory it cannot read. The sync test for a fork that upstream absorbs now runs each dry-run and declaration combination as its own named case.
+
 ## 0.9.51 - preserve audit results, skill descriptions, and sync ownership
 
 `worktree-audit.mjs` now catches errors when checking the transcript directory itself. An inaccessible parent directory leaves transcript usage unknown, prints a warning, and keeps otherwise safe worktrees at `review` instead of aborting the table.

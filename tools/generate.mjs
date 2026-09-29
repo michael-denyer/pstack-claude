@@ -743,12 +743,13 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json" }) 
 // Every file the generator writes, as exact text by repo-relative path,
 // computed from the sources under `root` without writing. Any other entry in
 // an owned directory is an orphan. Throws when a source cannot be planned.
-export function plan(root) {
+// Without `models`, plan loads the model policy from `root` itself.
+export function plan(root, models) {
   const read = (rel) => readFileSync(join(root, rel), "utf8");
   const version = read("VERSION").trim();
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`VERSION must be MAJOR.MINOR.PATCH, got "${version}"`);
   assertChangesHeading(read("CHANGES.md"), version);
-  const models = loadModels(root);
+  models ??= loadModels(root);
 
   // A stamp edits the text planned so far for its path, so producers on one
   // path compose. A put writes a whole file, so it throws rather than replace
@@ -847,8 +848,8 @@ export function apply(root, intended, { log = console.log } = {}) {
 
 // Every cross-file contract the tree under `root` breaks, one message per
 // failing check. The checks read the tree, not the plan, so on a stale tree
-// they see the stale copies.
-export function problems(root) {
+// they see the stale copies. Without `models`, the policy load is one of the checks.
+export function problems(root, models) {
   const failures = [];
   const attempt = (check) => {
     try {
@@ -871,7 +872,7 @@ export function problems(root) {
     if (typeof manifest !== "object" || !manifest) throw new Error(`${codexManifestFile}: not a JSON object`);
     return manifest;
   });
-  const models = attempt(() => loadModels(root));
+  models ??= attempt(() => loadModels(root));
   const statOf = (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null);
   if (models) {
     attempt(() => {
@@ -924,7 +925,8 @@ function main() {
   const args = process.argv.slice(2);
   if (args.some((arg) => arg !== "--check")) throw new Error("usage: bun tools/generate.mjs [--check]");
   const check = args.includes("--check");
-  const intended = plan(repo);
+  const models = loadModels(repo);
+  const intended = plan(repo, models);
   const failures = [];
   let pending;
   try {
@@ -932,7 +934,7 @@ function main() {
   } catch (err) {
     failures.push(err.message);
   }
-  failures.push(...problems(repo));
+  failures.push(...problems(repo, models));
   if (check && pending?.length) {
     failures.push(
       "generated output is stale; run bun tools/generate.mjs:\n" +

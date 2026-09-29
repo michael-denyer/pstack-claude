@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines which changes belong upstream.
 
+## 0.9.53 - name the port's copyright holder
+
+`LICENSE` adds a `Copyright (c) 2026 Michael Denyer` line beside Lauren Tan's, so the port's modifications and additions have a named holder under the same MIT terms. `NOTICE.md`, `NOTICE-skills.md`, and both READMEs name the holder, and the skills-only copies under `poteto-mode/references/licenses/` carry the new line.
+
 ## 0.9.52 - name a missing transcripts directory in the audit warning
 
 `worktree-audit.mjs` warns `<dir> not found; LAST_CHAT column will be empty` when the transcripts directory is missing, and keeps the `transcript scan failed` warning for a directory it cannot read. The sync test for a fork that upstream absorbs now runs each dry-run and declaration combination as its own named case.

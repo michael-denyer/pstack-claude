@@ -383,6 +383,12 @@ export function regions(models) {
       locate: section("Model names"),
       render: () => blankPadded(codexModelNamesSection(models)),
     },
+    {
+      file: "plugins/pstack/skills/poteto-mode/references/pi-tools.md",
+      name: "Model names section",
+      locate: section("Model names"),
+      render: () => blankPadded(piModelNamesSection(models)),
+    },
   ];
 }
 
@@ -476,8 +482,11 @@ export function parseModels(raw, skillExists) {
     }
   };
   for (const key of ["available", "efforts", "roles"]) if (!Array.isArray(raw[key])) fail(`"${key}" must be a list`);
-  for (const key of ["tiers", "codex"]) {
-    if (!raw[key] || typeof raw[key] !== "object") fail(`"${key}" must be an object`);
+  if (!raw.tiers || typeof raw.tiers !== "object") fail(`"tiers" must be an object`);
+  const structuralKeys = new Set(["tiers", "efforts", "defaultEffort", "available", "roles"]);
+  for (const key of Object.keys(raw)) {
+    if (structuralKeys.has(key)) continue;
+    if (!raw[key] || typeof raw[key] !== "object" || Array.isArray(raw[key])) fail(`"${key}" must be an object`);
   }
   const available = new Set(raw.available);
   unique(raw.available, "available");
@@ -517,12 +526,15 @@ export function parseModels(raw, skillExists) {
   if (!raw.efforts.includes(raw.defaultEffort) && raw.defaultEffort !== "session") {
     fail(`defaultEffort "${raw.defaultEffort}" is not an effort level or "session"`);
   }
-  for (const tier of Object.keys(raw.tiers)) {
-    if (!Object.hasOwn(raw.codex, tier)) fail(`codex has no example for tier "${tier}"`);
-  }
-  for (const [tier, value] of Object.entries(raw.codex)) {
-    if (!Object.hasOwn(raw.tiers, tier)) fail(`codex names "${tier}", which is not a tier`);
-    unique([value].flat(), `codex "${tier}"`);
+  for (const [runtime, block] of Object.entries(raw)) {
+    if (structuralKeys.has(runtime)) continue;
+    for (const tier of Object.keys(raw.tiers)) {
+      if (!Object.hasOwn(block, tier)) fail(`${runtime} has no example for tier "${tier}"`);
+    }
+    for (const [tier, value] of Object.entries(block)) {
+      if (!Object.hasOwn(raw.tiers, tier)) fail(`${runtime} names "${tier}", which is not a tier`);
+      unique([value].flat(), `${runtime} "${tier}"`);
+    }
   }
   return resolveModels(raw);
 }
@@ -699,6 +711,23 @@ export function codexModelNamesSection(models) {
     `on ChatGPT is ${codeList(models.codex.panel)}. If only one model family is reachable, vary reasoning ` +
     "effort and note in the verdict that diversity was reduced.\n\n" +
     "`/setup-pstack` writes the configured model list. On Codex, set it to your Codex model slugs."
+  );
+}
+
+export function piModelNamesSection(models) {
+  const strongest = models.roles.filter((r) => r.tier === "strongest");
+  return (
+    "Skills name Claude defaults (a single-role default for code/prose/judgment and a diverse panel for " +
+    "design comparisons; each model-consuming skill lists its own in a Models section). pi-subagents resolves " +
+    "bare family names via fuzzy substring match, but the shortest matching id wins, so bare `opus` resolves to " +
+    "`claude-opus-5` (the older model), not `claude-opus-5-5`. Write provider-qualified ids in the override sheet:\n\n" +
+    `- Single-model roles: ${code(models.pi.default)}.\n` +
+    `- Roles that default to the strongest Claude model (${strongest.map((r) => code(r.role)).join(", ")}): ` +
+    `${code(models.pi.strongest)}.\n` +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): " +
+    `${codeList(models.pi.panel)}. The adversarial signal comes from model diversity, so use distinct models. ` +
+    "If only one model is reachable, vary reasoning effort and note in the verdict that diversity was reduced.\n\n" +
+    "`/setup-pstack` writes the configured model list. On pi, the extension loads the override sheet automatically, so there is no manual step."
   );
 }
 

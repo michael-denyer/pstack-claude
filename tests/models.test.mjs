@@ -48,7 +48,8 @@ describe("parseModels", () => {
 
   test("a missing top-level key throws naming it", () => {
     expect(parse((p) => delete p.efforts)).toThrow('models.json: "efforts" must be a list');
-    expect(parse((p) => delete p.codex)).toThrow('models.json: "codex" must be an object');
+    expect(parse((p) => (p.codex = "flat"))).toThrow('models.json: "codex" must be an object');
+    expect(parse((p) => (p.pi = [1, 2]))).toThrow('models.json: "pi" must be an object');
   });
 
   test("a role naming an undefined tier throws naming the role and the tier", () => {
@@ -109,9 +110,15 @@ describe("parseModels", () => {
     );
   });
 
-  test("a codex block that misses or adds a tier throws naming the tier", () => {
+  test("a runtime block that misses or adds a tier throws naming the runtime and the tier", () => {
     expect(parse((p) => delete p.codex.strongest)).toThrow('models.json: codex has no example for tier "strongest"');
     expect(parse((p) => (p.codex.fastest = "gpt"))).toThrow('models.json: codex names "fastest", which is not a tier');
+    expect(parse((p) => delete p.pi.panel)).toThrow('models.json: pi has no example for tier "panel"');
+    expect(parse((p) => (p.pi.fastest = "opus"))).toThrow('models.json: pi names "fastest", which is not a tier');
+  });
+
+  test("a duplicate slug in a runtime block throws naming the runtime", () => {
+    expect(parse((p) => (p.pi.panel = ["opus", "opus"]))).toThrow('models.json: pi "panel" lists "opus" twice');
   });
 });
 

@@ -1,0 +1,11 @@
+{
+  "name": "pstack-claude",
+  "version": "0.9.53",
+  "private": true,
+  "description": "pstack skills and routing for Claude Code, Codex, and pi",
+  "keywords": ["pi-package"],
+  "pi": {
+    "skills": ["plugins/pstack/skills"],
+    "extensions": ["plugins/pstack/hooks/pi-session-start.ts"]
+  }
+}

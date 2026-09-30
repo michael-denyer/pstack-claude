@@ -65,6 +65,7 @@ const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
   "plugins/pstack/.claude-plugin/plugin.json",
   "plugins/pstack/.codex-plugin/plugin.json",
+  "package.json",
 ];
 
 export const PORTABLE_ASSETS = [

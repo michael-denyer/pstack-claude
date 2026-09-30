@@ -44,12 +44,13 @@ Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
 ## Runtime support
 
-All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code and Codex plugins also install automatic routing hooks. Codex command shortcuts are separate.
+All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code, Codex, and pi plugins also install automatic routing hooks. Codex command shortcuts are separate.
 
 | Runtime | Setup and recorded verification |
 | --- | --- |
 | Claude Code | Install the marketplace plugin. Skills use Claude tool names and model defaults; the plugin installs automatic routing. |
 | Codex | Install the native plugin through the repository's marketplace and trust its hook through `/hooks`. The [Codex mapping](../plugins/pstack/skills/poteto-mode/references/codex-tools.md) translates Claude tools and model names. Shared skill symlinks were also detected in a live session. |
+| pi | Install via `pi install git:github.com/michael-denyer/pstack-claude`. The [pi mapping](../plugins/pstack/skills/poteto-mode/references/pi-tools.md) documents tool equivalents. Write provider-qualified model ids in the override sheet, because bare names resolve to older models. The extension injects routing on every turn. |
 | Prime Agent | Its documentation describes shared-directory discovery; it has not been tested in a live session. Choose tools and models through Prime's configuration. |
 | opencode | Discovery and reading a linked skill were verified on version 1.18.25. Configure agents, commands, and permissions in `opencode.json`. Its picker also lists principle skills. |
 | Gemini CLI | Its documentation describes shared-directory discovery; it has not been tested in a live session. Use `/skills list` to check discovery and `/skills reload` after changes. |
@@ -58,7 +59,7 @@ These checks cover skill discovery. Delegation and multi-model workflows remain 
 
 ### Automatic routing
 
-The Claude Code and Codex plugins share a [SessionStart hook](../plugins/pstack/hooks/session-start.sh) that loads a short [routing instruction](../plugins/pstack/hooks/session-start-context.md) on startup, resume, clear, and compact. Codex requires the user to trust plugin hooks through `/hooks`. The instruction invokes `poteto-mode` when a task meets any of these conditions:
+The Claude Code and Codex plugins share a [SessionStart hook](../plugins/pstack/hooks/session-start.sh) that loads a short [routing instruction](../plugins/pstack/hooks/session-start-context.md) on startup, resume, clear, and compact. Codex requires the user to trust plugin hooks through `/hooks`. The pi plugin uses a [before_agent_start extension](../plugins/pstack/hooks/pi-session-start.ts) that injects the same routing instruction on every turn, with `pstack:` prefixes stripped from skill names. The instruction invokes `poteto-mode` when a task meets any of these conditions:
 
 - It touches more than one file or changes a signature other files call.
 - It involves a design or architecture choice.
@@ -130,6 +131,29 @@ done
 ```
 
 Each shortcut invokes its skill. The commands skip existing files and links. Remove a shortcut by deleting its link at `~/.codex/prompts/<name>.md`. Both native-plugin and skills-only installations work without these shortcuts.
+
+### pi
+
+Install the package from the repository:
+
+```shell
+pi install git:github.com/michael-denyer/pstack-claude
+```
+
+The root `package.json` declares `pi-package` discovery, points pi at the shared skills tree, and registers the [before_agent_start extension](../plugins/pstack/hooks/pi-session-start.ts). The extension injects the routing mandate on every turn, stripping `pstack:` prefixes so skill names resolve without the plugin namespace. The override sheet at `$PI_CODING_AGENT_DIR/pstack-models.md` (default `~/.pi/agent/pstack-models.md`) loads automatically. No manual paste is needed.
+
+pi-subagents resolves bare family names via fuzzy substring match, but the shortest matching id wins, so bare `opus` hits the older `claude-opus-5`. Write provider-qualified ids (`anthropic/claude-opus-5-5`, `anthropic/claude-fable-5-1`, `anthropic/claude-sonnet-5-5`) in the override sheet. The [pi mapping](../plugins/pstack/skills/poteto-mode/references/pi-tools.md) documents tool equivalents and per-skill notes.
+
+To provision agents for pi-subagents (`npm:@tintinweb/pi-subagents`), run this from the clone's root:
+
+```shell
+for a in plugins/pstack/agents/*.md; do
+  dir="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/agents"
+  mkdir -p "$dir"
+  target="$dir/$(basename "$a")"
+  test -e "$target" || test -L "$target" || ln -s "$PWD/$a" "$target"
+done
+```
 
 ## Configuration and dependencies
 

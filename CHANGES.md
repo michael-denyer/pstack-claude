@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines which changes belong upstream.
 
+## 0.9.54 - pi runtime target
+
+pi joins Claude Code and Codex as a supported runtime. The shell script gains a `pi` arm that reads the sheet from `$PI_CODING_AGENT_DIR` (default `~/.pi/agent`) and strips backticked `pstack:` prefixes from the mandate. A `before_agent_start` extension (`plugins/pstack/hooks/pi-session-start.ts`) injects the routing mandate and loads the override sheet automatically on every turn, so no manual paste into `APPEND_SYSTEM.md` is needed. `session hook: off` disables mandate injection on the next turn. The sheet body always loads, matching Claude Code's `@`-include semantics.
+
+`models.json` adds a `"pi"` block with provider-qualified ids (`anthropic/claude-opus-5-5`, `anthropic/claude-fable-5-1`, `anthropic/claude-sonnet-5-5`) because pi-subagents' fuzzy matcher resolves bare names to the shortest matching id, silently downgrading to older models. `parseModels` generalizes to validate any non-structural top-level key as a runtime block instead of hard-coding `codex`. The generator produces a `pi-tools.md` reference with a stamped "Model names" region. A root `package.json` declares `pi-package` discovery for `pi install` and joins `VERSIONED_MANIFESTS`.
+
+`setup-pstack` gains a pi row in the Other runtimes table. `poteto-mode`'s Platform Adaptation points at `pi-tools.md`. `docs/reference.md` adds pi to the runtime support table, Automatic routing, and a new `### pi` section with install commands and agents provisioning. Both plugin manifests add `"pi"` to keywords. `README.md` names pi in the overview and adds an install section.
+
 ## 0.9.53 - name the port's copyright holder
 
 `LICENSE` adds a `Copyright (c) 2026 Michael Denyer` line beside Lauren Tan's, so the port's modifications and additions have a named holder under the same MIT terms. `NOTICE.md`, `NOTICE-skills.md`, and both READMEs name the holder, and the skills-only copies under `poteto-mode/references/licenses/` carry the new line.

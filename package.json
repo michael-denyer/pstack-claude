@@ -1,6 +1,6 @@
 {
   "name": "pstack-claude",
-  "version": "0.9.53",
+  "version": "0.9.54",
   "private": true,
   "description": "pstack skills and routing for Claude Code, Codex, and pi",
   "keywords": ["pi-package"],

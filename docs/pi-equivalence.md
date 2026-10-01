@@ -11,7 +11,7 @@ Statuses:
 - `difference`: Pi behaves differently, and the reason column says why no skill depends on it for a correct result.
 - `n/a`: the plugin mentions it but no behavior depends on it.
 
-The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`tests/pi/live.test.mjs`). A Live value of `n/a` means the live run did not exercise that row. The machine that ran it had only a ChatGPT sign-in, so the family names resolved through the shipped `openai-codex` table (X01b). The `anthropic/*` IDs (X01a) were never called live; `tests/pi/catalog.test.mjs` checks both tables against the model catalog of the installed Pi. `tests/pi/dogfood.mjs` runs a whole skill, `/skill:interrogate`, on real Pi in print mode and checks its session files. It is not a test, so no row cites it.
+The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`tests/pi/live.test.mjs`). A Live value of `n/a` means the live run did not exercise that row. The machine that ran it had only a ChatGPT sign-in, so the family names resolved through the shipped `openai-codex` table (X01b). The `anthropic/*` IDs (X01a) were never called live; `tests/pi/catalog.test.mjs` checks both tables against the model catalog of the installed Pi. `tests/pi/eval.mjs` runs whole workflows (`interrogate`, `how`, a `poteto-mode` bug fix, and `/loop` in RPC and print mode) on real Pi and checks each against its skill. It is not a test, so no row cites it.
 
 | ID | Claude Code mechanism | On Pi | Status | Evidence | Live |
 | --- | --- | --- | --- | --- | --- |

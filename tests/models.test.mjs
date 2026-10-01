@@ -17,9 +17,9 @@ const raw = JSON.parse(readFileSync(join(repoRoot, "plugins/pstack/models.json")
 const models = loadModels();
 
 describe("committed models.json", () => {
-  test("the pi block gives every available alias a Pi model on anthropic and openai-codex", () => {
+  test("the pi block gives every available alias a Pi model on anthropic, openai, and openai-codex", () => {
     expect(raw.pi.fallback).toBe("anthropic");
-    expect(Object.keys(raw.pi.models).sort()).toEqual(["anthropic", "openai-codex"]);
+    expect(Object.keys(raw.pi.models).sort()).toEqual(["anthropic", "openai", "openai-codex"]);
     for (const table of Object.values(raw.pi.models)) {
       expect(Object.keys(table).sort()).toEqual([...models.available].sort());
     }
@@ -121,7 +121,7 @@ describe("parseModels", () => {
     expect(parse((p) => delete p.pi)).toThrow('models.json: "pi" must be an object');
     expect(parse((p) => delete p.pi.models)).toThrow('models.json: pi needs a "models" object');
     expect(parse((p) => (p.pi.extra = 1))).toThrow('models.json: pi names "extra"; its keys are "fallback" and "models"');
-    expect(parse((p) => (p.pi.fallback = "openai"))).toThrow('models.json: pi.fallback "openai" is not a provider in pi.models');
+    expect(parse((p) => (p.pi.fallback = "google"))).toThrow('models.json: pi.fallback "google" is not a provider in pi.models');
     expect(parse((p) => (p.pi.models.openai = "openai/gpt"))).toThrow("models.json: pi.models.openai must be an object");
     expect(parse((p) => delete p.pi.models["openai-codex"].haiku)).toThrow(
       'models.json: pi.models.openai-codex has no Pi model for "haiku"',

@@ -130,11 +130,11 @@ export function world({ script = {}, sheet = null, killGraceMs = 300 } = {}) {
 }
 
 // The sheet and alias map the real-pi runs use: the shipped table of
-// PSTACK_PI_LIVE_PROVIDER (default openai-codex), with any aliases the
+// PSTACK_PI_LIVE_PROVIDER (default openai), with any aliases the
 // `pi models:` line in PSTACK_PI_LIVE_MODELS names replaced.
 export function liveModels(root, head = "", extra = "") {
   const line = process.env.PSTACK_PI_LIVE_MODELS;
-  const provider = process.env.PSTACK_PI_LIVE_PROVIDER ?? "openai-codex";
+  const provider = process.env.PSTACK_PI_LIVE_PROVIDER ?? "openai";
   const sheet = `${head}${line ? `${line}\n` : ""}${extra}session hook: on\n`;
   const shipped = JSON.parse(readFileSync(join(root, "models.json"), "utf8")).pi.models[provider];
   if (!shipped) throw new Error(`models.json has no pi table for "${provider}"`);

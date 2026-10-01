@@ -48,12 +48,12 @@ poteto-mode's Subagents section applies on Pi through the `agent` tool:
 
 Skills name models by the Claude aliases in their Models sections. On Pi, pass the alias as the `agent` tool's `model`. The pstack extension resolves it in the column of the provider the session's current model comes from, and in the `anthropic` column for any other provider:
 
-| Alias | `anthropic` | `openai-codex` |
-| --- | --- | --- |
-| `opus` | `anthropic/claude-opus-5-5` | `openai-codex/gpt-6.1-sol` |
-| `fable` | `anthropic/claude-fable-5-1` | `openai-codex/gpt-6-astra` |
-| `sonnet` | `anthropic/claude-sonnet-5-5` | `openai-codex/gpt-6-sol` |
-| `haiku` | `anthropic/claude-haiku-4-5` | `openai-codex/gpt-6-luna` |
+| Alias | `anthropic` | `openai` | `openai-codex` |
+| --- | --- | --- | --- |
+| `opus` | `anthropic/claude-opus-5-5` | `openai/gpt-6.1-sol` | `openai-codex/gpt-6.1-sol` |
+| `fable` | `anthropic/claude-fable-5-1` | `openai/gpt-6-astra` | `openai-codex/gpt-6-astra` |
+| `sonnet` | `anthropic/claude-sonnet-5-5` | `openai/gpt-6-sol` | `openai-codex/gpt-6-sol` |
+| `haiku` | `anthropic/claude-haiku-4-5` | `openai/gpt-6-luna` | `openai-codex/gpt-6-luna` |
 
 Pi warns that Anthropic bills Claude used through Pi per token, as extra usage, even on a Claude subscription. Pi shows that warning only in interactive mode, never for the `pi -p` children the `agent` tool runs.
 

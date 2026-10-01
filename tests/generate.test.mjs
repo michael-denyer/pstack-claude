@@ -815,6 +815,18 @@ describe("plan, changes, apply", () => {
     expect(readFileSync(outside, "utf8")).toBe("original");
   });
 
+  test("problems reports an agent whose frontmatter strict YAML cannot read", () => {
+    const root = repoCopy();
+    const agent = "plugins/pstack/agents/comment-sicko.md";
+    writeFileSync(
+      join(root, agent),
+      readFileSync(join(root, agent), "utf8").replace(/^description: .*$/m, "description: `backticked` first"),
+    );
+    expect(problems(root)).toEqual([
+      expect.stringMatching(/^agent frontmatter is not readable YAML:\n\.\/agents\/comment-sicko\.md: /),
+    ]);
+  });
+
   test("problems reports a malformed Codex manifest as one failure and still runs the other checks", () => {
     const root = repoCopy();
     const manifest = "plugins/pstack/.codex-plugin/plugin.json";

@@ -650,6 +650,20 @@ export function pluginAgentPaths(pluginRoot) {
   );
 }
 
+// Claude Code's loader tolerates frontmatter that strict YAML rejects, so an
+// agent file can load locally and still be unreadable to another parser.
+export function validateAgentFrontmatter(pluginRoot) {
+  const failures = pluginAgentPaths(pluginRoot).flatMap((path) => {
+    try {
+      const { data } = parseFrontmatter(readFileSync(join(pluginRoot, path), "utf8"));
+      return data?.name && data?.description ? [] : [`${path}: frontmatter needs a name and a description`];
+    } catch (err) {
+      return [`${path}: ${err.message}`];
+    }
+  });
+  if (failures.length) throw new Error(`agent frontmatter is not readable YAML:\n${failures.join("\n")}`);
+}
+
 export function stampAgentPaths(manifestText, paths) {
   return JSON.stringify({ ...JSON.parse(manifestText), agents: paths }, null, 2) + "\n";
 }
@@ -924,6 +938,7 @@ export function problems(root, models) {
     );
   }
   attempt(() => validatePluginLayout(pluginRoot));
+  attempt(() => validateAgentFrontmatter(pluginRoot));
   for (const file of ["hooks/hooks.json", ...(codexManifest ? [codexManifest.hooks] : [])]) {
     attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file }));
   }
@@ -953,7 +968,7 @@ function main() {
   if (pending?.length === 0) console.log(`ok: ${Object.keys(intended.files).length} generated files current`);
   for (const failure of failures) console.error(`FAIL: ${failure}`);
   if (failures.length) process.exit(1);
-  console.log("ok: skill links, prose paths, model slugs, marketplace, plugin layout, and hooks pass their checks");
+  console.log("ok: skill links, prose paths, model slugs, marketplace, plugin layout, agent frontmatter, and hooks pass their checks");
 }
 
 // Guarded so importing the generator's validation and rendering functions does

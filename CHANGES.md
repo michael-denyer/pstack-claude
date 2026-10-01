@@ -6,6 +6,8 @@ This file is the release changelog, with one `## <version> - <title>` entry per 
 
 The five `poteto-agent-<level>` effort agents wrote their `description` unquoted and opening with a backtick, which a YAML plain scalar cannot start with. Claude Code's loader tolerated it, but `Bun.YAML.parse` and PyYAML reject the block, so a strict reader could not read those agents' frontmatter. The description now opens with `Runs`, and `tests/generate.test.mjs` parses every generated effort agent's frontmatter.
 
+`bun tools/generate.mjs --check` now parses the frontmatter of every file under `agents/` and `effort-agents/` and fails naming each one that is not readable YAML or lacks a `name` or `description`, so CI catches a hand-written agent with the same fault. A new `.pre-commit-config.yaml` runs that check before each commit after `prek install`.
+
 ## 0.9.54 - find the transcript a cleared session opened with
 
 After `/clear`, another local command, or a `!` shell command, a transcript's first user records are the command's wrapper (`<command-name>` or `<bash-input>`), its output (`<local-command-stdout>`) and an `isMeta` caveat, not the prompt the user typed. `reflect/scripts/find-transcript.mjs` compared the opening-prompt fragment against the first of those, so it could miss the session it was asked for and return an older one that matched. `openingPrompt` now skips `isMeta` records and those wrappers and returns the first prompt the user typed. A skill invocation, which leads with `<command-message>`, still counts as the typed prompt. `tests/find-transcript.test.mjs` covers a cleared session and a skill-opened one, and the `reflect` skill describes the new stopping point.

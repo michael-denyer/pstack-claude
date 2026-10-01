@@ -31,6 +31,19 @@ describe("agent tool", () => {
     for (const t of snippets) expect(t.promptSnippet.toLowerCase().startsWith(`${t.name}:`)).toBe(false);
   });
 
+  test("every pstack tool is model-only, so Pi declares it to the model in every codemode mode and never defers it", () => {
+    const { pi } = setup();
+    const exposures = Object.fromEntries([...pi.tools.values()].map((t) => [t.name, t.exposure]));
+    expect(exposures).toEqual({
+      agent: "model-only",
+      send_message: "model-only",
+      list_agents: "model-only",
+      stop_agent: "model-only",
+      ask_user_question: "model-only",
+      schedule_wakeup: "model-only",
+    });
+  });
+
   test("foreground waits, returns the final text and agentId, and runs the exact child command", async () => {
     const { pi, ctx } = setup({ script: { default: [{ reply: "draft" }, { reply: "final answer" }] } });
     const result = await pi.call("agent", { description: "write it", prompt: "-do it" }, ctx);

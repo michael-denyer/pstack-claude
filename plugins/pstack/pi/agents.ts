@@ -514,10 +514,13 @@ const agentSchema = {
   additionalProperties: false,
 };
 
+// model-only exposure keeps every tool declared to the model even under
+// codemode.mode "only", which would otherwise reach them only through scripts.
 export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void {
   pi.registerTool({
     name: "agent",
     label: "Agent",
+    exposure: "model-only",
     description:
       "Launch a subagent: a separate pi process with its own context. Foreground (default) waits and returns its final text; run_in_background returns an agentId at once and a completion notice arrives when it exits. Use send_message to steer a running agent or continue a finished one, stop_agent to stop one, list_agents to see them.",
     promptSnippet: "Launch a subagent (foreground or background, optional worktree isolation)",
@@ -548,6 +551,7 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
   pi.registerTool({
     name: "send_message",
     label: "Send message",
+    exposure: "model-only",
     description:
       "Send a message to an agent this session started, by agentId or description. A running agent reads it after its current tool calls and carries on in the same run, so one completion notice follows. A finished agent resumes in the background with its earlier context and sends a completion notice.",
     parameters: {
@@ -571,6 +575,7 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
   pi.registerTool({
     name: "list_agents",
     label: "List agents",
+    exposure: "model-only",
     description:
       "List every agent this session started with its status. running means the process is alive; completed, failed, and stopped are reported only after the process exited.",
     parameters: { type: "object", properties: {}, additionalProperties: false } as any,
@@ -583,6 +588,7 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
   pi.registerTool({
     name: "stop_agent",
     label: "Stop agent",
+    exposure: "model-only",
     description:
       "Stop a running agent: terminates its whole process tree and returns once the process has exited. Stopping a finished agent reports its final status unchanged.",
     parameters: {

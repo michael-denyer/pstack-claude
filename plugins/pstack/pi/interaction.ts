@@ -170,10 +170,12 @@ export function dynamicPrompt(prompt: string): string {
   );
 }
 
+// model-only exposure keeps these tools declared under codemode.mode "only".
 export function registerInteraction(pi: ExtensionAPI, scheduler: Scheduler): void {
   pi.registerTool({
     name: "ask_user_question",
     label: "Ask user",
+    exposure: "model-only",
     description:
       "Ask the user 1-4 structured questions, each with 2-4 options; the user can also type their own answer. Use it for genuine preference calls the user must make.",
     parameters: questionSchema as any,
@@ -206,6 +208,7 @@ export function registerInteraction(pi: ExtensionAPI, scheduler: Scheduler): voi
   pi.registerTool({
     name: "schedule_wakeup",
     label: "Schedule wakeup",
+    exposure: "model-only",
     description: `Schedule this session to be re-invoked with a prompt after delaySeconds (clamped to ${MIN_DELAY_S}-${MAX_DELAY_S}). One wakeup is pending at a time: a new call replaces it, and stop: true cancels it. Used by /loop's self-paced mode.`,
     parameters: {
       type: "object",

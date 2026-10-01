@@ -4,7 +4,7 @@
 // children load pstack too. Nothing under ~/.pi is written.
 //
 // The aliases resolve through the shipped models.json table of
-// PSTACK_PI_LIVE_PROVIDER (default openai-codex), or through the `pi models:`
+// PSTACK_PI_LIVE_PROVIDER (default openai), or through the `pi models:`
 // line in PSTACK_PI_LIVE_MODELS when it is set. The parent runs on the sonnet
 // alias. PSTACK_PI_LIVE_KEEP=1 keeps the throwaway directory for inspection.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -481,6 +481,35 @@ suite("pstack on live pi", () => {
       }
     },
     6 * MINUTE,
+  );
+
+  test(
+    "tools: the model calls list_agents at its first turn without tool_search, by default and under codemode only",
+    async () => {
+      const PSTACK_TOOLS = ["agent", "send_message", "list_agents", "stop_agent", "ask_user_question", "schedule_wakeup"];
+      const prompt = "Call the list_agents tool directly as your first action. Then reply with exactly one word: done.";
+      const codemodeDir = join(root, "codemode-only");
+      mkdirSync(join(codemodeDir, ".pi"), { recursive: true });
+      writeFileSync(join(codemodeDir, ".pi", "settings.json"), JSON.stringify({ defaultTools: ["+codemode"], codemode: { mode: "only" } }));
+      for (const [cwd, extra] of [[work, []], [codemodeDir, ["--approve"]]]) {
+        const run = spawnSync("pi", ["--mode", "json", "-p", "--model", PARENT_MODEL, "--thinking", "low", ...extra, prompt], {
+          cwd,
+          env,
+          encoding: "utf8",
+        });
+        expect({ cwd, code: run.status, stderr: run.status === 0 ? "" : run.stderr }).toEqual({ cwd, code: 0, stderr: "" });
+        const events = run.stdout.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+        const entries = readEntries(parentSessionFile(events.find((e) => e.type === "session").id));
+        const system = entries.find((e) => e.type === "message" && e.message.role === "system").message;
+        const declared = system.toolsAdded.map((t) => t.name);
+        expect({ cwd, declared: PSTACK_TOOLS.filter((t) => declared.includes(t)) }).toEqual({ cwd, declared: PSTACK_TOOLS });
+        const calls = entries
+          .filter((e) => e.type === "message" && e.message.role === "assistant")
+          .flatMap((e) => e.message.content.filter((c) => c.type === "toolCall").map((c) => c.name));
+        expect({ cwd, first: calls[0], searched: calls.includes("tool_search") }).toEqual({ cwd, first: "list_agents", searched: false });
+      }
+    },
+    5 * MINUTE,
   );
 
   test(

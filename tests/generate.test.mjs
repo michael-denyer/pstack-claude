@@ -507,6 +507,12 @@ describe("effort agents", () => {
     expect(description).not.toContain("Routing contract.");
   });
 
+  test("every agent's frontmatter reads back as YAML", () => {
+    for (const agent of agents) {
+      expect(parseFrontmatter(agent.text).data.name).toBe(agent.name);
+    }
+  });
+
   const pluginRoot = join(fileURLToPath(new URL("..", import.meta.url)), "plugins/pstack");
 
   test("plugin.json lists both hand-written and generated agents", () => {

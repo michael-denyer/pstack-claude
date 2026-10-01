@@ -4,14 +4,18 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+import { defaultSettings } from "../../plugins/pstack/pi/config.ts";
+import { post } from "../../plugins/pstack/pi/inbox.ts";
 import { install } from "../../plugins/pstack/pi/index.ts";
-import { alive, fakeCtx, fakePi, gitRepo, pluginRoot, waitFor, world } from "./harness.mjs";
+import { alive, fakeCtx, fakePi, gitRepo, pluginRoot, sleep, waitFor, world } from "./harness.mjs";
 
 let w;
 afterEach(() => w?.cleanup());
 
+// opts.inbox runs the extension as an agent whose parent writes to that mailbox.
 function setup(opts = {}) {
   w = world(opts);
+  if (opts.inbox) w.settings.inbox = join(w.root, "inbox");
   const pi = fakePi();
   install(pi.api, w.settings);
   return { pi, ctx: fakeCtx({ cwd: w.cwd, ...opts.ctx }) };
@@ -338,18 +342,48 @@ describe("send_message", () => {
     expect(pi.messages[0].message.content).toContain(`agentId: ${first.details.agentId}`);
   });
 
-  test("a message to a running agent queues and resumes it after it exits", async () => {
+  test("a message to a running agent reaches that run before it exits, and the agent reports once", async () => {
     const { pi, ctx } = setup({
-      script: { byPrompt: { slow: [{ sleep: 400 }, { reply: "slow done" }] }, default: [{ reply: "got ${prompt}" }] },
+      script: { byPrompt: { slow: [{ awaitMessage: 3000 }, { reply: "slow done, told: ${steered}" }] } },
+    });
+    const { details } = await pi.call("agent", { description: "worker", prompt: "slow", run_in_background: true }, ctx);
+    await waitFor(() => w.invocations().length === 1);
+    const sent = await pi.call("send_message", { to: "worker", message: "change course" }, ctx);
+    expect(sent.details).toEqual({ agentId: details.agentId, running: true });
+    expect(text(sent)).toContain("after its current tool calls");
+
+    await waitFor(() => pi.messages.length === 1);
+    const [run] = w.invocations();
+    expect(w.log().filter((r) => r.kind === "steered")).toEqual([{ kind: "steered", text: "change course", pid: run.pid }]);
+    expect(pi.messages[0].message.content).toContain("slow done, told: change course");
+    await sleep(300);
+    expect(pi.messages).toHaveLength(1);
+    expect(w.invocations()).toHaveLength(1);
+  });
+
+  test("a message the running agent never reads resumes it after it exits", async () => {
+    const { pi, ctx } = setup({
+      script: { byPrompt: { slow: [{ deaf: true }, { sleep: 400 }, { reply: "slow done" }] }, default: [{ reply: "got ${prompt}" }] },
     });
     const { details } = await pi.call("agent", { description: "worker", prompt: "slow", run_in_background: true }, ctx);
     const sent = await pi.call("send_message", { to: details.agentId, message: "more" }, ctx);
-    expect(sent.details.queued).toBe(true);
+    expect(sent.details.running).toBe(true);
 
     await waitFor(() => pi.messages.length === 2);
     expect(pi.messages[0].message.content).toContain("slow done");
     expect(pi.messages[1].message.content).toContain("got more");
     expect(w.invocations().map((i) => i.prompt)).toEqual(["slow", "more"]);
+  });
+
+  test("stopping an agent discards a message it never read", async () => {
+    const { pi, ctx } = setup({ script: { default: [{ deaf: true }, { sleep: 5000 }] } });
+    const { details } = await pi.call("agent", { description: "worker", prompt: "x", run_in_background: true }, ctx);
+    await waitFor(() => w.invocations().length === 1);
+    await pi.call("send_message", { to: details.agentId, message: "never read" }, ctx);
+    await pi.call("stop_agent", { id: details.agentId }, ctx);
+    await sleep(300);
+    expect(w.invocations()).toHaveLength(1);
+    expect(pi.messages.map((m) => m.message.details.status)).toEqual(["stopped"]);
   });
 
   test("an unknown recipient is an error naming the known agents", async () => {
@@ -385,7 +419,7 @@ describe("worktree isolation", () => {
   });
 
   test("a queued resume whose worktree cannot be re-created fails with a notice", async () => {
-    const { pi, ctx } = setup({ script: { byPrompt: { first: [{ sleep: 400 }, { reply: "ok" }] } } });
+    const { pi, ctx } = setup({ script: { byPrompt: { first: [{ deaf: true }, { sleep: 400 }, { reply: "ok" }] } } });
     gitRepo(w.cwd);
     const id = (await pi.call("agent", { description: "w", prompt: "first", isolation: "worktree", run_in_background: true }, ctx))
       .details.agentId;
@@ -516,4 +550,61 @@ describe("non-interactive settle", () => {
       await pi.emit("session_shutdown", {}, ctx);
     });
   }
+});
+
+describe("an agent's mailbox", () => {
+  test("a streaming run takes its parent's message as a steer; an idle session leaves it for the parent", async () => {
+    let idle = true;
+    const { pi, ctx } = setup({ inbox: true, ctx: { mode: "json", idle: () => idle } });
+    ctx.hasPendingMessages = () => pi.userMessages.length > 0;
+    await pi.emit("session_start", { reason: "startup" }, ctx);
+    post(w.settings.inbox, "while idle");
+    await sleep(500);
+    expect(pi.userMessages).toEqual([]);
+
+    idle = false;
+    post(w.settings.inbox, "while streaming");
+    await waitFor(() => pi.userMessages.length === 2);
+    expect(pi.userMessages).toEqual([
+      { content: "while idle", options: { deliverAs: "steer" } },
+      { content: "while streaming", options: { deliverAs: "steer" } },
+    ]);
+    await pi.emit("session_shutdown", {}, ctx);
+  });
+
+  test("in json mode a message ends the settle hold while a background agent still runs", async () => {
+    const { pi, ctx } = setup({ inbox: true, script: { default: [{ sleep: 5000 }] }, ctx: { mode: "json", idle: false } });
+    ctx.hasPendingMessages = () => pi.userMessages.length > 0;
+    await pi.emit("session_start", { reason: "startup" }, ctx);
+    await pi.call("agent", { description: "long", prompt: "x", run_in_background: true }, ctx);
+
+    let released = false;
+    const hold = pi.emit("agent_before_settle", { entries: [], continue: false, outcome: "completed" }, ctx).then(() => (released = true));
+    await sleep(400);
+    expect(released).toBe(false);
+    post(w.settings.inbox, "new direction");
+    await hold;
+    expect(pi.userMessages).toEqual([{ content: "new direction", options: { deliverAs: "steer" } }]);
+    expect(JSON.parse(text(await pi.call("list_agents", {}, ctx)))[0].status).toBe("running");
+    await pi.emit("session_shutdown", {}, ctx);
+  });
+
+  test("a message waiting when the run reaches its settle is taken there", async () => {
+    const { pi, ctx } = setup({ inbox: true, ctx: { mode: "json", idle: false } });
+    ctx.hasPendingMessages = () => pi.userMessages.length > 0;
+    post(w.settings.inbox, "last word");
+    await pi.emit("agent_before_settle", { entries: [], continue: false, outcome: "completed" }, ctx);
+    expect(pi.userMessages).toEqual([{ content: "last word", options: { deliverAs: "steer" } }]);
+  });
+
+  test("an agent's own children get their own mailbox, never the agent's", async () => {
+    const settings = defaultSettings({ PATH: "/bin", PSTACK_PI_DEPTH: "1", PSTACK_PI_INBOX: "/parent/inbox" });
+    expect(settings.inbox).toBe("/parent/inbox");
+    expect(settings.childEnv).toEqual({ PATH: "/bin", PSTACK_PI_DEPTH: "2" });
+
+    const { pi, ctx } = setup({ inbox: true });
+    const { details } = await pi.call("agent", { description: "grandchild", prompt: "x" }, ctx);
+    const [inv] = w.invocations();
+    expect(inv.inbox).toBe(join(w.agentDir, "pstack", "parent-session", "agents", `${details.agentId}.inbox`));
+  });
 });

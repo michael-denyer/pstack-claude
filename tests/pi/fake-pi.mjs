@@ -9,9 +9,17 @@
 // { stderr }, { sleep: ms }, { exit: code }, { grandchild: true } spawns a
 // sleeping process in this process group, { ignoreSigterm: true },
 // { touch: "<file>" } writes a file in the working directory.
+//
+// Like a child running the pstack extension, it takes messages from the
+// PSTACK_PI_INBOX mailbox at each step boundary and before it ends, emits each
+// as a user message_end, logs it as "steered", and expands "${steered}" to
+// them. { awaitMessage: ms } waits up to ms for one; { deaf: true } stops
+// taking them, as a run past its last boundary does.
 import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { take } from "../../plugins/pstack/pi/inbox.ts";
 
 const argv = process.argv.slice(2);
 const flag = (name) => {
@@ -28,11 +36,11 @@ const log = (record) => {
 };
 
 let history = [];
-if (sessionId && sessionDir) {
+const sessionFile = sessionId && sessionDir ? join(sessionDir, `${sessionId}.fake.jsonl`) : undefined;
+if (sessionFile) {
   mkdirSync(sessionDir, { recursive: true });
-  const file = join(sessionDir, `${sessionId}.fake.jsonl`);
-  if (existsSync(file)) history = readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
-  appendFileSync(file, JSON.stringify(prompt) + "\n");
+  if (existsSync(sessionFile)) history = readFileSync(sessionFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  appendFileSync(sessionFile, JSON.stringify(prompt) + "\n");
 }
 
 log({
@@ -42,6 +50,7 @@ log({
   cwd: process.cwd(),
   pid: process.pid,
   depth: process.env.PSTACK_PI_DEPTH ?? null,
+  inbox: process.env.PSTACK_PI_INBOX ?? null,
   systemPrompt: systemFile && existsSync(systemFile) ? readFileSync(systemFile, "utf8") : null,
   history,
 });
@@ -50,7 +59,20 @@ const script = process.env.PSTACK_FAKE_PI_SCRIPT ? JSON.parse(readFileSync(proce
 const steps = script.byPrompt?.[prompt] ?? script.default ?? [{ reply: "ok" }];
 
 const out = (event) => process.stdout.write(JSON.stringify(event) + "\n");
-const expand = (text) => text.replaceAll("${prompt}", prompt).replaceAll("${history}", history.join(" | "));
+const steered = [];
+const expand = (text) =>
+  text.replaceAll("${prompt}", prompt).replaceAll("${history}", history.join(" | ")).replaceAll("${steered}", steered.join(" | "));
+
+let deaf = false;
+const readInbox = () => {
+  if (deaf || !process.env.PSTACK_PI_INBOX) return;
+  for (const text of take(process.env.PSTACK_PI_INBOX)) {
+    steered.push(text);
+    if (sessionFile) appendFileSync(sessionFile, JSON.stringify(text) + "\n");
+    log({ kind: "steered", text, pid: process.pid });
+    out({ type: "message_end", message: { role: "user", content: [{ type: "text", text }], timestamp: Date.now() } });
+  }
+};
 const assistant = (content, extra = {}) => ({
   role: "assistant",
   content,
@@ -80,6 +102,16 @@ for (const step of steps) {
     const g = spawn("sleep", ["300"], { stdio: "ignore" });
     log({ kind: "grandchild", pid: g.pid });
   }
+  if (step.deaf) deaf = true;
+  if ("awaitMessage" in step) {
+    const deadline = Date.now() + step.awaitMessage;
+    const before = steered.length;
+    while (steered.length === before && Date.now() < deadline) {
+      readInbox();
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  }
+  readInbox();
 }
 out({ type: "agent_end", messages: [] });
 process.exitCode = code;

@@ -71,7 +71,7 @@ export function fakePi({ thinking = "medium" } = {}) {
   };
 }
 
-export function fakeCtx({ cwd, sessionId = "parent-session", entries = [], model, mode = "tui", hasUI = false, ui, idle = true } = {}) {
+export function fakeCtx({ cwd, sessionId = "parent-session", entries = [], model, mode = "tui", hasUI = false, ui, idle = true, pending = () => false } = {}) {
   return {
     cwd,
     mode,
@@ -79,6 +79,7 @@ export function fakeCtx({ cwd, sessionId = "parent-session", entries = [], model
     ui,
     model: model === undefined ? { provider: "anthropic", id: "parent-model" } : model,
     isIdle: () => (typeof idle === "function" ? idle() : idle),
+    hasPendingMessages: pending,
     sessionManager: { getSessionId: () => sessionId, getEntries: () => entries },
   };
 }

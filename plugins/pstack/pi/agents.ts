@@ -14,6 +14,7 @@ import {
   type Settings,
   stateDir,
 } from "./config.ts";
+import { post, take } from "./inbox.ts";
 
 export const ENTRY_TYPE = "pstack-agents";
 export const NOTICE_TYPE = "pstack-agent";
@@ -104,6 +105,8 @@ function runsSession(pid: number, sessionId: string): boolean {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const inboxDir = (record: AgentRecord) => join(record.sessionDir, `${record.id}.inbox`);
+
 function assistantText(message: any): string {
   if (message?.role !== "assistant" || !Array.isArray(message.content)) return "";
   return message.content
@@ -125,7 +128,6 @@ export function truncateUtf8(text: string, cap: number): string {
 export class AgentRunner {
   readonly records = new Map<string, AgentRecord>();
   private readonly runs = new Map<string, Run>();
-  private readonly queues = new Map<string, string[]>();
 
   constructor(
     private readonly pi: ExtensionAPI,
@@ -232,7 +234,7 @@ export class AgentRunner {
 
     const child = spawn(this.settings.pi.command, [...this.settings.pi.args, ...args], {
       cwd: record.cwd,
-      env: this.settings.childEnv,
+      env: { ...this.settings.childEnv, PSTACK_PI_INBOX: inboxDir(record) },
       detached: true,
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -313,11 +315,11 @@ export class AgentRunner {
       // notice joins the context without starting another turn.
       if (background && !run.silent) this.notify(record, record.status !== "stopped");
       resolveDone();
-      const queued = this.queues.get(record.id);
-      if (queued?.length && record.status !== "stopped") {
-        this.queues.delete(record.id);
+      // Messages the run never took resume the agent; a stop discards them.
+      const untaken = take(inboxDir(record));
+      if (untaken.length && record.status !== "stopped") {
         try {
-          this.launch(record, queued.join("\n\n"), true);
+          this.launch(record, untaken.join("\n\n"), true);
         } catch {
           this.notify(record, true);
         }
@@ -407,16 +409,15 @@ export class AgentRunner {
     throw new Error(`No agent "${to}". Known agents: ${known.join(", ") || "none"}.`);
   }
 
-  send(to: string, message: string): { record: AgentRecord; queued: boolean } {
+  // A running agent takes the message mid-run; a finished one resumes with it.
+  send(to: string, message: string): { record: AgentRecord; running: boolean } {
     const record = this.find(to);
     if (this.runs.has(record.id)) {
-      const queue = this.queues.get(record.id) ?? [];
-      queue.push(message);
-      this.queues.set(record.id, queue);
-      return { record, queued: true };
+      post(inboxDir(record), message);
+      return { record, running: true };
     }
     this.launch(record, message, true);
-    return { record, queued: false };
+    return { record, running: false };
   }
 
   async stop(id: string, silent = false): Promise<AgentRecord> {
@@ -425,7 +426,6 @@ export class AgentRunner {
     if (!run) return record;
     run.stopRequested = true;
     run.silent ||= silent;
-    this.queues.delete(record.id);
     const pid = run.child.pid!;
     signalGroup(pid, "SIGTERM");
     const deadline = Date.now() + this.settings.killGraceMs;
@@ -436,7 +436,6 @@ export class AgentRunner {
   }
 
   async stopAll(): Promise<void> {
-    this.queues.clear();
     await Promise.all([...this.runs.keys()].map((id) => this.stop(id, true)));
   }
 
@@ -520,7 +519,7 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
     name: "agent",
     label: "Agent",
     description:
-      "Launch a subagent: a separate pi process with its own context. Foreground (default) waits and returns its final text; run_in_background returns an agentId at once and a completion notice arrives when it exits. Use send_message to continue a finished agent, stop_agent to stop one, list_agents to see them.",
+      "Launch a subagent: a separate pi process with its own context. Foreground (default) waits and returns its final text; run_in_background returns an agentId at once and a completion notice arrives when it exits. Use send_message to steer a running agent or continue a finished one, stop_agent to stop one, list_agents to see them.",
     promptSnippet: "Launch a subagent (foreground or background, optional worktree isolation)",
     parameters: agentSchema as any,
     async execute(_id, params: AgentParams, signal, _onUpdate, ctx) {
@@ -550,7 +549,7 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
     name: "send_message",
     label: "Send message",
     description:
-      "Continue an agent this session started, by agentId or description. A finished agent resumes in the background with its earlier context and sends a completion notice; a running agent receives the message when its current run exits.",
+      "Send a message to an agent this session started, by agentId or description. A running agent reads it after its current tool calls and carries on in the same run, so one completion notice follows. A finished agent resumes in the background with its earlier context and sends a completion notice.",
     parameters: {
       type: "object",
       properties: {
@@ -561,11 +560,11 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
       additionalProperties: false,
     } as any,
     async execute(_id, params: { to: string; message: string }) {
-      const { record, queued } = runner.send(params.to, params.message);
-      const text = queued
-        ? `Agent ${record.id} is running; the message is queued and it resumes when the current run exits.`
+      const { record, running } = runner.send(params.to, params.message);
+      const text = running
+        ? `Agent ${record.id} is running; it reads the message after its current tool calls. If its run ends before then, it resumes with the message and sends a second notice.`
         : JSON.stringify({ agentId: record.id, status: "running" });
-      return { content: [{ type: "text", text }], details: { agentId: record.id, queued } };
+      return { content: [{ type: "text", text }], details: { agentId: record.id, running } };
     },
   });
 

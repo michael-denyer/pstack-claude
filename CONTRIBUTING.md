@@ -59,6 +59,8 @@ Change model defaults in `models.json`, never in a skill body. A role names a ti
 
 `bun test tests/` covers the generator, the sync tool, the link validator, and `tests/invariants.test.mjs`, which builds fixture trees that must trip each layout invariant. One check is behavioral and lives in `tests/skill-collision-repro.sh`: it needs the `claude` CLI and API access and makes one haiku call to prove a user-typed `/plugin:name` reaches a skill with no `commands/` present. CI cannot run it, so run it locally at least once before a release.
 
+If you touched `plugins/pstack/pi/` or `pi-tools.md`, run the Pi checks against a signed-in `pi` 0.99 as well. `PSTACK_PI_LIVE=1 bun test tests/pi/live.test.mjs` drives the extension through real `pi` processes in about five minutes. `bun tests/pi/dogfood.mjs` runs `/skill:interrogate` end to end and prints a PASS or FAIL line per check, and `--keep` keeps its throwaway repo and sessions for inspection. Both make real model calls. Set `PSTACK_PI_LIVE_MODELS` to a `pi models:` line to choose the models they call.
+
 If you touched `skills/poteto-mode/scripts/`:
 
 ```shell

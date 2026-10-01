@@ -51,7 +51,7 @@ Every real slug written must be in the detected set. `inherit-parent` and `auto`
 
 ### 6. Write the override sheet
 
-Write the current runtime's sheet with the shape below. Overwrite the whole file so re-runs stay idempotent.
+Write the current runtime's sheet as the text below, word for word, changing only the values after each colon. The heading and paragraph are fixed text, so do not reword them for style. Overwrite the whole file so re-runs stay idempotent.
 
 ```markdown
 # pstack model configuration

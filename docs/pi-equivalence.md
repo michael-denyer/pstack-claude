@@ -1,6 +1,6 @@
 # Pi equivalence
 
-This table lists every Claude Code mechanism the pstack plugin depends on, found by scanning `plugins/pstack/` for tool names, agent fields, hooks, paths, bundled skills, CLIs, and model names. Each row says how Pi 0.99.2 provides the same behavior and what proves it. `tests/pi-equivalence.test.mjs` fails when a row lacks a valid status, when an `extension` or `script` row names a test that does not exist, or when a `difference` row gives no reason.
+This table lists every Claude Code mechanism the pstack plugin depends on, found by scanning `plugins/pstack/` for tool names, agent fields, hooks, paths, bundled skills, CLIs, and model names. Each row says how Pi 1.0 provides the same behavior and what proves it. `tests/pi-equivalence.test.mjs` fails when a row lacks a valid status, when an `extension` or `script` row names a test that does not exist, or when a `difference` row gives no reason.
 
 Statuses:
 
@@ -11,7 +11,7 @@ Statuses:
 - `difference`: Pi behaves differently, and the reason column says why no skill depends on it for a correct result.
 - `n/a`: the plugin mentions it but no behavior depends on it.
 
-The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`tests/pi/live.test.mjs`). A Live value of `n/a` means the live run did not exercise that row. The machine that ran it had only a ChatGPT sign-in, so the family names resolved through the shipped `openai-codex` table (X01b). The `anthropic/*` IDs (X01a) were never called live; `tests/pi/catalog.test.mjs` checks both tables against the model catalog of the installed Pi. `tests/pi/eval.mjs` runs whole workflows (`interrogate`, `how`, a `poteto-mode` bug fix, and `/loop` in RPC and print mode) on real Pi and checks each against its skill. It is not a test, so no row cites it.
+The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`tests/pi/live.test.mjs`). A Live value of `n/a` means the live run did not exercise that row. The machine that ran it had only a ChatGPT sign-in on the `openai` provider, so the family names resolved through the shipped `openai` table (X01b). The `anthropic/*` IDs (X01a) and the `openai-codex/*` IDs (X01c) were never called live; `tests/pi/catalog.test.mjs` checks both tables against the model catalog of the installed Pi. `tests/pi/eval.mjs` runs whole workflows (`interrogate`, `how`, a `poteto-mode` bug fix, and `/loop` in RPC and print mode) on real Pi and checks each against its skill. It is not a test, so no row cites it.
 
 | ID | Claude Code mechanism | On Pi | Status | Evidence | Live |
 | --- | --- | --- | --- | --- | --- |
@@ -24,7 +24,7 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | T07 | Message an agent (`SendMessage`) | `send_message` reaches a running agent after its current tool calls, in the same run, so it reports once; a message the run never reads, or one to a finished agent, resumes the same Pi session, model, and thinking | extension | `a message to a running agent reaches that run before it exits, and the agent reports once` | VERIFIED |
 | T08 | Stop an agent and confirm it stopped | `stop_agent` kills the process group and reports `stopped` only after exit | extension | `kills the process group and reports stopped only once the process has exited` | VERIFIED |
 | T09 | Agent listing and completion notices | `list_agents`; status follows the process, so `completed` always means exited | extension | `list_agents survives a reload through the persisted entries` | VERIFIED |
-| T10 | Deferred tool loading (`ToolSearch`) | Every extension tool is registered at startup, so nothing is deferred | n/a | pi-tools.md Tool actions | n/a |
+| T10 | Deferred tool loading (`ToolSearch`) | Every pstack tool registers at startup with `model-only` exposure, so Pi declares it to the model from the first turn, in every `codemode.mode`, and `tool_search` never has to load it | extension | `every pstack tool is model-only, so Pi declares it to the model in every codemode mode and never defers it` | VERIFIED |
 | T11 | `Skill` tool and `/command` | Pi lists skills in the system prompt; `/skill:<name>` forces one | native | Pi docs/skills.md | n/a |
 | T12 | `pstack:` skill namespace | Skills load under their bare names and run as `/skill:<name>`; agent types keep `pstack:` | difference | Command spelling only. Skills name each other by bare name in prose, and agent types resolve with the prefix. | n/a |
 | T13 | `AskUserQuestion` | `ask_user_question` with the same shape; without a UI it tells the model to ask in plain text | extension | `a single-select question returns the chosen label` | n/a |
@@ -71,7 +71,8 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | C05 | `bun` scripts | Same through `bash` | native | pi-tools.md Vendored scripts | n/a |
 | C06 | `node` scripts | Same through `bash` | native | pi-tools.md Vendored scripts | n/a |
 | X01a | Family names `opus`, `fable`, `sonnet`, `haiku` on an Anthropic session or any provider without its own table | The `anthropic` table of `models.json` maps them to `anthropic/*` IDs | extension | `a family name resolves in the table of the parent's provider, and in the fallback table on any other` | n/a |
-| X01b | Family names on a ChatGPT sign-in (`openai-codex`) | The `openai-codex` table maps them to GPT-6 models of the same tiers as the Codex defaults | extension | `a family name resolves in the table of the parent's provider, and in the fallback table on any other` | VERIFIED |
+| X01b | Family names on a ChatGPT sign-in (`openai`, Pi's Sign in with ChatGPT) | The `openai` table maps them to GPT-6 models of the same tiers as the Codex defaults | extension | `a family name resolves in the table of the parent's provider, and in the fallback table on any other` | VERIFIED |
+| X01c | Family names on the legacy OpenAI Codex sign-in (`openai-codex`) | The `openai-codex` table maps them to the same GPT-6 models | extension | `a family name resolves in the table of the parent's provider, and in the fallback table on any other` | n/a |
 | X02 | Effort levels and `@level` | Same five levels, passed as `--thinking` | extension | `an effort agent passes its body as a 0600 system prompt file and its effort as --thinking; others run at the parent's level` | VERIFIED |
 | X03 | `inherit-parent` / `auto` | The child runs on the parent's current model | extension | `alias, sheet override, inherit-parent, auto, pass-through, and no parent model` | n/a |
 | X04 | Compaction and `/clear` | Injection on every agent start keeps the routing instruction | extension | `injects the mandate and the full sheet on every agent start` | VERIFIED |

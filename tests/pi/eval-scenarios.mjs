@@ -1,44 +1,12 @@
 // What each eval scenario sets up, runs, and requires. Every check comes from
 // the skill or playbook the scenario runs, and reads only pi's session files and
-// the repo afterwards.
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+// the repo afterwards. New scenarios go in tests/pi/eval/<skill>.mjs; the
+// contract is in eval-lib.mjs.
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { atCommit, firstUserText, isEdit, MINUTE, node, notices, readPiTools, sessionModels, settled, writeFiles } from "./eval-lib.mjs";
 import { sleep } from "./harness.mjs";
-
-const MINUTE = 60_000;
-
-const writeFiles = (dir, files) => {
-  for (const [path, text] of Object.entries(files)) {
-    mkdirSync(join(dir, path, ".."), { recursive: true });
-    writeFileSync(join(dir, path), text);
-  }
-};
-
-const isEdit = (c, file) => (c.name === "edit" || c.name === "write") && String(c.args.path ?? "").endsWith(file);
-const settled = (run) => run.events.at(-1)?.type === "agent_settled";
-const firstUserText = (t) => {
-  const u = t.parent.find((e) => e.type === "message" && e.message.role === "user");
-  return u ? t.textOf(u.message) : "";
-};
-const readPiTools = (t) => t.calls(t.parent).some((c) => c.name === "read" && String(c.args.path).endsWith("pi-tools.md"));
-const notices = (t) => t.parent.flatMap((e, i) => (e.type === "custom_message" && e.customType === "pstack-agent" ? [i] : []));
-const sessionModels = (t, r) =>
-  [...new Set(t.sessionOf(r).filter((e) => e.type === "message" && e.message.role === "assistant").map((e) => `${e.message.provider}/${e.message.model}`))];
-
-// Runs `fn(dir)` in a throwaway detached checkout of `sha`.
-function atCommit(w, sha, fn) {
-  const dir = join(w.root, `at-${sha.slice(0, 12)}`);
-  w.git("worktree", "add", "-q", "--detach", dir, sha);
-  try {
-    return fn(dir);
-  } finally {
-    w.git("worktree", "remove", "--force", dir);
-  }
-}
-
-const node = (dir, ...args) => spawnSync("node", args, { cwd: dir, encoding: "utf8", timeout: 60_000 });
 
 const PAGINATE = `// Returns the items on a page. Pages are numbered from 1.
 export function paginate(items, page, size) {

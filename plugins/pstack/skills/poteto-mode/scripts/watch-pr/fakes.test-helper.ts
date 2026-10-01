@@ -115,7 +115,13 @@ export function fakeReader(
     },
     async checkRollupPage(_requested, after) {
       calls.push(`checkRollupPage:${after ?? "null"}`);
-      return options.rollupPages?.[page++] ?? { checks: [], endCursor: null };
+      return (
+        options.rollupPages?.[page++] ?? {
+          kind: "contexts",
+          checks: [],
+          endCursor: null,
+        }
+      );
     },
     async reviewThreads() {
       calls.push("reviewThreads");

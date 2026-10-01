@@ -180,6 +180,12 @@
       "since": "0.9.43",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/poteto-mode/scripts/watch-pr/transport.test.ts": {
+      "kind": "policy",
+      "why": "Replays a repository with no checks configured through the real reader, which the port's watcher reports as its own state.",
+      "since": "0.9.56",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/types.compile.ts": {
       "kind": "policy",
       "why": "Adds the landing revision to the compile-time type fixture.",

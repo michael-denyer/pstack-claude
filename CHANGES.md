@@ -2,6 +2,16 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines which changes belong upstream.
 
+## 0.9.56 - a watch-pr verdict for a PR with no checks configured
+
+`watch-pr` retried without end on a mergeable PR in a repository with no CI. `resolveChecks` threw `ChecksUnavailable` whenever both check reads were empty, so "no checks exist" and "the checks could not be read" were one failure, and `--status-only` never finished its single pass ([#151](https://github.com/michael-denyer/pstack-claude/issues/151), [#152](https://github.com/michael-denyer/pstack-claude/issues/152)).
+
+Absence of checks is now its own reading. `resolveChecks` returns `no-checks` only when both reads say so: `gh pr checks` exits 1 with `no checks reported on the '<branch>' branch`, and a successful GraphQL query returns `statusCheckRollup: null` for the head commit. `readSnapshot` then accepts it only once GitHub has settled, which means no commit on the PR has a rollup and `mergeable` is not `UNKNOWN`. The snapshot carries the new `ci-none` state, the status table shows `➖ no checks`, and `READY` adds `checks=none reported on the head commit`.
+
+Every other empty result still fails closed as `ChecksUnavailable`: a failed or unauthorized `gh pr checks` beside a null rollup, a rollup that exists but lists no check this reader knows, a head with no rollup on a PR whose earlier commits reported checks, and mergeability GitHub has not computed. A failed GraphQL query still surfaces as its own query error. Conflicts, unresolved review threads, review decisions, drafts, and `mergeStateStatus=BLOCKED` gate a PR with no checks the same way they gate one with clean CI, so a required check that never reported stops at `merge-blocked`.
+
+`transport.test.ts` replays the `gh` output of a no-CI repository through the real reader, and `github.test.ts`, `policy.test.ts`, and `cli.test.ts` cover each one-sided reading, each gate, and the rendering.
+
 ## 0.9.55 - effort agent frontmatter that strict YAML reads
 
 The five `poteto-agent-<level>` effort agents wrote their `description` unquoted and opening with a backtick, which a YAML plain scalar cannot start with. Claude Code's loader tolerated it, but `Bun.YAML.parse` and PyYAML reject the block, so a strict reader could not read those agents' frontmatter. The description now opens with `Runs`, and `tests/generate.test.mjs` parses every generated effort agent's frontmatter.

@@ -486,3 +486,70 @@ describe("review gate", () => {
     });
   });
 });
+
+describe("a PR with no checks configured", () => {
+  const noChecks = {
+    fastPath: { kind: "none-reported" },
+    rollupPages: [{ kind: "no-rollup" }],
+    commitRollups: [{ oid: "head", state: null }],
+  } as const;
+  const read = (overrides: Parameters<typeof fakeReader>[0] = {}) =>
+    readSnapshot({
+      reader: fakeReader({ ...noChecks, ...overrides }),
+      context: context(30),
+      pendingHistory: "omit",
+      allowDraft: false,
+    });
+
+  it("is ready when GitHub reports it mergeable", async () => {
+    const snapshot = await read({ facts: { reviewDecision: null } });
+    expect(classifyPr(snapshot)).toMatchObject({
+      kind: "ready",
+      pr: { proof: { ci: { kind: "ci-none" } } },
+    });
+  });
+
+  it("still stops on conflicts, review threads, and merge gates", async () => {
+    const thread = {
+      id: "thread",
+      firstComment: null,
+      isBugbot: false,
+      bugbotReviewPasses: 0,
+    };
+    const cases = [
+      [{ facts: { mergeable: "CONFLICTING" } }, { kind: "merge-conflicts" }],
+      [{ threads: [thread] }, { kind: "review-threads" }],
+      [
+        { facts: { reviewDecision: "REVIEW_REQUIRED" } },
+        { kind: "merge-gate", reason: "review-required" },
+      ],
+      [
+        { facts: { mergeStateStatus: "BLOCKED" } },
+        { kind: "merge-gate", reason: "merge-blocked" },
+      ],
+      [{ facts: { isDraft: true } }, { kind: "merge-gate", reason: "draft-pr" }],
+    ] as const;
+    for (const [overrides, blocker] of cases)
+      expect(classifyPr(await read(overrides))).toMatchObject({
+        kind: "blocker",
+        blocker,
+      });
+  });
+
+  it("fails closed while the head may not have reported yet", async () => {
+    const unsettled = [
+      {
+        commitRollups: [
+          { oid: "earlier", state: "SUCCESS" },
+          { oid: "head", state: null },
+        ],
+      },
+      { commitRollups: [{ oid: "head", state: "PENDING" }] },
+      { facts: { mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" } },
+    ] as const;
+    for (const overrides of unsettled)
+      await expect(read(overrides)).rejects.toMatchObject({
+        failure: { kind: "checks-unavailable", retryable: true },
+      });
+  });
+});

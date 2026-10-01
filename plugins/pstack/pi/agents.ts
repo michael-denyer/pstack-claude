@@ -505,7 +505,7 @@ const agentSchema = {
     model: {
       type: "string",
       description:
-        "Model alias from pstack's models.json (for example the panel aliases), a full provider/id, or inherit-parent / auto. Omit to use the parent's model.",
+        "Optional model for this agent: a family name (opus, fable, sonnet, haiku) or a full provider/id. If omitted, the agent runs on the parent's model.",
     },
     run_in_background: { type: "boolean", description: "Return at once; a completion notice arrives when the agent exits." },
     isolation: { type: "string", enum: ["worktree"], description: "Run the agent in its own git worktree." },

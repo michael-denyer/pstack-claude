@@ -138,7 +138,7 @@ The repository root is a [Pi package](https://pi.dev/packages): its [`package.js
 
 The extension supplies what Pi lacks natively, under the Claude Code names the skills use:
 
-- `agent` dispatches a child `pi` process with the skill's `subagent_type`, model, and effort, in the foreground or background, optionally in its own git worktree. A background agent's completion arrives as a follow-up turn.
+- `agent` dispatches a child `pi` process with the skill's `subagent_type`, model, and effort, in the foreground or background, optionally in its own git worktree. A background agent's completion joins the running turn after its current tool calls, or starts a turn when the session is idle.
 - `send_message`, `list_agents`, and `stop_agent` resume, list, and stop those agents. An agent's status follows its process.
 - `ask_user_question` and `schedule_wakeup` match `AskUserQuestion` and `ScheduleWakeup`, and `/loop` matches the `loop` skill.
 - At every agent start it adds the routing instruction and the override sheet `<pi-agent>/pstack-models.md` to the system prompt.

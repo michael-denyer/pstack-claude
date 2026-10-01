@@ -13,7 +13,8 @@ export interface Settings {
   agentDir: string;
   pi: { command: string; args: string[] };
   childEnv: NodeJS.ProcessEnv;
-  isChild: boolean;
+  // Layers below the main session: 0 there, 1 in its agents, and so on.
+  depth: number;
   killGraceMs: number;
 }
 
@@ -31,13 +32,14 @@ function piInvocation(env: NodeJS.ProcessEnv): Settings["pi"] {
 
 export function defaultSettings(env: NodeJS.ProcessEnv = process.env): Settings {
   const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const depth = Number(env.PSTACK_PI_DEPTH) || 0;
   return {
     pluginRoot,
     modelsFile: join(pluginRoot, "models.json"),
     agentDir: env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
     pi: piInvocation(env),
-    childEnv: { ...env, PSTACK_PI_CHILD: "1" },
-    isChild: env.PSTACK_PI_CHILD === "1",
+    childEnv: { ...env, PSTACK_PI_DEPTH: String(depth + 1) },
+    depth,
     killGraceMs: 5000,
   };
 }

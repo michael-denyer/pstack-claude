@@ -39,7 +39,7 @@ describe("docs/pi-equivalence.md", () => {
   const titles = testTitles();
 
   test("lists every mechanism once, with six cells", () => {
-    expect(rows.length).toBe(60);
+    expect(rows.length).toBe(61);
     expect(new Set(rows.map((r) => r.id)).size).toBe(rows.length);
     for (const r of rows) expect(r.cells).toBe(6);
   });

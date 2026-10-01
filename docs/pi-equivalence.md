@@ -18,7 +18,7 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | T01 | `Agent` tool dispatch | `agent` tool runs a child `pi --mode json -p` process | extension | `foreground waits, returns the final text and agentId, and runs the exact child command` | VERIFIED |
 | T02 | `subagent_type` | Resolves to the plugin's agent files; unknown types list the valid ones | extension | `unknown subagent_type is an error listing every valid type` | VERIFIED |
 | T03 | Per-call `model` | Family names resolve through `models.json` and the sheet's `pi models:` line | extension | `alias, sheet override, inherit-parent, auto, pass-through, and no parent model` | VERIFIED |
-| T04 | `run_in_background` | Returns the agent id at once; completion arrives as a follow-up turn after the process exits | extension | `background returns at once and the completion notice comes only after the process exits` | VERIFIED |
+| T04 | `run_in_background` | Returns the agent id at once; completion joins the running turn at the next tool boundary, or starts a turn when idle, after the process exits | extension | `background returns at once and the completion notice comes only after the process exits` | VERIFIED |
 | T05 | `readonly` (Cursor-era prose, not a Claude Code parameter) | `readonly: true` runs the child without the `edit` and `write` tools | extension | `readonly runs the child without the edit and write tools` | n/a |
 | T06 | Worktree per writer | `isolation: "worktree"` creates and cleans the worktree; manual `git worktree` works through `bash` | extension | `runs in its own worktree and removes it when the agent changed nothing` | VERIFIED |
 | T07 | Resume an agent (`SendMessage`) | `send_message` resumes the same Pi session, model, and thinking | extension | `resumes a finished agent in the same session, model, and thinking, in the background` | VERIFIED |
@@ -35,6 +35,7 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | T18 | MCP tool discovery | Pi's built-in MCP; list servers from the session's tools or `pi mcp list` | mapping | pi-tools.md `why` note | n/a |
 | T19 | Facts named in the system prompt | Pi's system prompt lists tools and skills; the transcript directory is given in pi-tools.md | mapping | pi-tools.md `reflect` note | n/a |
 | T20 | Image-generation tool | None, as on Claude Code; draw with Mermaid or text | difference | Claude Code has no such tool either, so `teach` already falls back. | n/a |
+| T21 | Nested agents, up to three layers below the main conversation | A child at the third layer runs without the `agent` tool | extension | `agents nest at most three layers below the main session, as on Claude Code` | n/a |
 | A01 | `pstack:poteto-agent` | Resolved from `agents/poteto-agent.md` | extension | `every pstack agent type reaches its child with its own agent file as the system prompt` | VERIFIED |
 | A02 | Effort agents | `effort:` frontmatter becomes the child's `--thinking`; no effort inherits the parent's level | extension | `an effort agent passes its body as a 0600 system prompt file and its effort as --thinking; others run at the parent's level` | VERIFIED |
 | A03 | `pstack:comment-sicko` | Resolved from `agents/comment-sicko.md` | extension | `every pstack agent type reaches its child with its own agent file as the system prompt` | n/a |

@@ -48,18 +48,20 @@ describe("before_agent_start", () => {
 
   test("a child pi gets the sheet but not the mandate", async () => {
     const sheet = "swarm workers: opus\n";
-    const { pi, ctx } = setup({ sheet }, { isChild: true });
+    const { pi, ctx } = setup({ sheet }, { depth: 1 });
     expect(await sectionsAfterStart(pi, ctx)).toEqual({ "pstack-models": sheet });
   });
 
-  test("PSTACK_PI_CHILD=1 marks a child and PI_CODING_AGENT_DIR moves the sheet", () => {
+  test("PSTACK_PI_DEPTH counts the layers below the main session and PI_CODING_AGENT_DIR moves the sheet", () => {
     const env = { PI_CODING_AGENT_DIR: "/tmp/pi-agent-x", PSTACK_PI_BIN: "/bin/fake", HOME: "/nowhere" };
     const parent = defaultSettings(env);
-    expect(parent.isChild).toBe(false);
+    expect(parent.depth).toBe(0);
     expect(parent.agentDir).toBe("/tmp/pi-agent-x");
     expect(parent.pi).toEqual({ command: "/bin/fake", args: [] });
-    expect(parent.childEnv.PSTACK_PI_CHILD).toBe("1");
-    expect(defaultSettings({ ...env, PSTACK_PI_CHILD: "1" }).isChild).toBe(true);
+    expect(parent.childEnv.PSTACK_PI_DEPTH).toBe("1");
+    const child = defaultSettings(parent.childEnv);
+    expect(child.depth).toBe(1);
+    expect(child.childEnv.PSTACK_PI_DEPTH).toBe("2");
     expect(defaultSettings({}).agentDir).toBe(join(homedir(), ".pi", "agent"));
   });
 });

@@ -47,7 +47,7 @@ describe("agent tool", () => {
     expect(inv.prompt).toBe("-do it");
     expect(inv.argv[4]).toMatch(/^[0-9a-f-]{36}$/);
     expect(inv.cwd).toBe(w.cwd);
-    expect(inv.child).toBe("1");
+    expect(inv.depth).toBe("1");
     expect(pi.messages).toEqual([]);
   });
 
@@ -70,7 +70,7 @@ describe("agent tool", () => {
 
     await waitFor(() => pi.messages.length === 1);
     const [{ message, options }] = pi.messages;
-    expect(options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+    expect(options).toEqual({ triggerTurn: true, deliverAs: "steer" });
     expect(message.customType).toBe("pstack-agent");
     expect(message.display).toBe(true);
     expect(message.content).toContain(`agentId: ${id}`);
@@ -140,6 +140,21 @@ describe("agent tool", () => {
     expect(ro.argv.slice(ro.argv.indexOf("--exclude-tools"))).toEqual(["--exclude-tools", "edit,write"]);
     expect(rw.argv).not.toContain("--exclude-tools");
     expect(pi.tools.get("agent").parameters.properties.readonly.type).toBe("boolean");
+  });
+
+  test("agents nest at most three layers below the main session, as on Claude Code", async () => {
+    w = world();
+    const argvAt = async (depth, params = {}) => {
+      const pi = fakePi();
+      install(pi.api, { ...w.settings, depth });
+      await pi.call("agent", { description: "d", prompt: "x", ...params }, fakeCtx({ cwd: w.cwd }));
+      const { argv } = w.invocations().at(-1);
+      return argv.includes("--exclude-tools") ? argv[argv.indexOf("--exclude-tools") + 1] : null;
+    };
+    expect(await argvAt(0)).toBeNull();
+    expect(await argvAt(1)).toBeNull();
+    expect(await argvAt(2)).toBe("agent");
+    expect(await argvAt(2, { readonly: true })).toBe("edit,write,agent");
   });
 
   test("every pstack agent type reaches its child with its own agent file as the system prompt", async () => {
@@ -318,7 +333,7 @@ describe("send_message", () => {
     const [a, b] = w.invocations();
     expect(b.argv).toEqual(a.argv);
     expect(b.prompt).toBe("follow up");
-    expect(pi.messages[0].options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+    expect(pi.messages[0].options).toEqual({ triggerTurn: true, deliverAs: "steer" });
     expect(pi.messages[0].message.content).toContain("seen: first task; now: follow up");
     expect(pi.messages[0].message.content).toContain(`agentId: ${first.details.agentId}`);
   });
@@ -483,7 +498,7 @@ describe("non-interactive settle", () => {
       expect(turns.map((t) => t.map(({ message }) => message.details.agentId))).toEqual([[fast], [slow]]);
       for (const [{ message, options }] of turns) {
         expect(message.customType).toBe("pstack-agent");
-        expect(options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+        expect(options).toEqual({ triggerTurn: true, deliverAs: "steer" });
       }
       expect(turns[1][0].message.content).toContain("slow done");
       const listed = JSON.parse(text(await pi.call("list_agents", {}, ctx)));

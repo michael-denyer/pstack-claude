@@ -20,6 +20,9 @@ export const NOTICE_TYPE = "pstack-agent";
 export const OUTPUT_CAP_BYTES = 50 * 1024;
 const STDERR_CAP = 8 * 1024;
 const CLOSE_AFTER_EXIT_MS = 2000;
+// Claude Code lets agents nest three layers below the main session and withholds
+// the Agent tool at the third.
+export const MAX_SPAWN_DEPTH = 3;
 
 export type AgentStatus = "running" | "completed" | "failed" | "stopped";
 
@@ -224,7 +227,8 @@ export class AgentRunner {
     if (record.model) args.push("--model", record.model);
     if (record.thinking) args.push("--thinking", record.thinking);
     if (record.systemPromptFile) args.push("--append-system-prompt", record.systemPromptFile);
-    if (record.readonly) args.push("--exclude-tools", "edit,write");
+    const excluded = [...(record.readonly ? ["edit", "write"] : []), ...(this.settings.depth + 1 >= MAX_SPAWN_DEPTH ? ["agent"] : [])];
+    if (excluded.length) args.push("--exclude-tools", excluded.join(","));
 
     const child = spawn(this.settings.pi.command, [...this.settings.pi.args, ...args], {
       cwd: record.cwd,
@@ -374,7 +378,7 @@ export class AgentRunner {
         display: true,
         details: { agentId: record.id, status: record.status, exitCode: record.exitCode, outputFile: record.outputFile },
       },
-      triggerTurn ? { triggerTurn: true, deliverAs: "followUp" } : { triggerTurn: false },
+      triggerTurn ? { triggerTurn: true, deliverAs: "steer" } : { triggerTurn: false },
     );
   }
 

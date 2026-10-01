@@ -12,11 +12,10 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 
 import { openingPrompt } from "../../plugins/pstack/skills/reflect/scripts/find-transcript.mjs";
-import { gitRepo, liveModels } from "./harness.mjs";
+import { gitRepo, jsonLines, liveModels, PiRpc, sleep } from "./harness.mjs";
 
 const LIVE = process.env.PSTACK_PI_LIVE === "1";
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -30,8 +29,6 @@ const MINUTE = 60_000;
 // Pi stores an extension's prompt section wrapped in a tag named by its key.
 const tagged = (key, text) => `<${key}>\n${text}\n</${key}>`;
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
 let root;
 let agentDir;
 let work;
@@ -41,107 +38,8 @@ function writeSheet(text) {
   writeFileSync(join(agentDir, "pstack-models.md"), text);
 }
 
-// Splits only on LF: a Unicode line separator is valid inside a JSON string.
-function jsonLines(onRecord) {
-  const decoder = new StringDecoder("utf8");
-  let buf = "";
-  return (chunk) => {
-    buf += decoder.write(chunk);
-    for (let i = buf.indexOf("\n"); i >= 0; i = buf.indexOf("\n")) {
-      const line = buf.slice(0, i).replace(/\r$/, "");
-      buf = buf.slice(i + 1);
-      if (line.trim()) onRecord(JSON.parse(line));
-    }
-  };
-}
-
-class Parent {
-  events = [];
-  pending = new Map();
-  nextId = 0;
-  stderr = "";
-
-  constructor() {
-    this.proc = spawn("pi", ["--mode", "rpc", "--model", PARENT_MODEL, "--thinking", "low"], {
-      cwd: work,
-      env,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    this.proc.stdout.on(
-      "data",
-      jsonLines((record) => {
-        const resolve = record.type === "response" && this.pending.get(record.id);
-        if (resolve) {
-          this.pending.delete(record.id);
-          resolve(record);
-        } else this.events.push({ ...record, at: Date.now() });
-      }),
-    );
-    this.proc.stderr.on("data", (d) => (this.stderr += d));
-    this.exited = new Promise((r) => this.proc.on("close", r));
-  }
-
-  async command(type, fields = {}) {
-    const id = `c${++this.nextId}`;
-    const response = new Promise((r) => this.pending.set(id, r));
-    this.proc.stdin.write(JSON.stringify({ id, type, ...fields }) + "\n");
-    const res = await response;
-    if (!res.success) throw new Error(`${type} failed: ${res.error}`);
-    return res.data;
-  }
-
-  async until(predicate, timeoutMs, what) {
-    const deadline = Date.now() + timeoutMs;
-    for (;;) {
-      const value = predicate();
-      if (value) return value;
-      if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}. stderr: ${this.stderr.slice(-800)}`);
-      await sleep(250);
-    }
-  }
-
-  // Sends a prompt and waits until the session is settled and idle.
-  async run(message, timeoutMs = 3 * MINUTE) {
-    const from = this.events.length;
-    await this.command("prompt", { message });
-    await this.idle(from, timeoutMs);
-    return from;
-  }
-
-  async idle(from, timeoutMs = 3 * MINUTE) {
-    await this.until(() => this.events.slice(from).some((e) => e.type === "agent_settled"), timeoutMs, "agent_settled");
-    for (;;) {
-      const state = await this.command("get_state");
-      if (!state.isStreaming && !state.isCompacting && state.pendingMessageCount === 0) return state;
-      await sleep(250);
-    }
-  }
-
-  messages(from = 0) {
-    return this.events.slice(from).filter((e) => e.type === "message_end").map((e) => ({ ...e.message, at: e.at }));
-  }
-
-  notices(from = 0) {
-    return this.messages(from).filter((m) => m.role === "custom" && m.customType === "pstack-agent");
-  }
-
-  toolResults(name, from = 0) {
-    return this.messages(from).filter((m) => m.role === "toolResult" && m.toolName === name);
-  }
-
-  async sessionFile() {
-    return (await this.command("get_state")).sessionFile;
-  }
-
-  async close() {
-    this.proc.stdin.end();
-    const done = await Promise.race([this.exited.then(() => true), sleep(20_000).then(() => false)]);
-    if (!done) this.proc.kill("SIGKILL");
-  }
-}
-
 async function withParent(fn) {
-  const parent = new Parent();
+  const parent = new PiRpc({ cwd: work, env, model: PARENT_MODEL, thinking: "low" });
   try {
     return await fn(parent);
   } finally {
@@ -253,7 +151,7 @@ suite("pstack on live pi", () => {
     mkdirSync(work);
     symlinkSync(join(homedir(), ".pi", "agent", "auth.json"), join(agentDir, "auth.json"));
     env = { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_TELEMETRY: "0" };
-    delete env.PSTACK_PI_CHILD;
+    delete env.PSTACK_PI_DEPTH;
     delete env.PSTACK_PI_BIN;
     const install = spawnSync("pi", ["install", repoRoot], { cwd: work, env, encoding: "utf8" });
     if (install.status !== 0) throw new Error(`pi install failed: ${install.stderr}`);

@@ -65,7 +65,7 @@ export function registerLifecycle(pi: ExtensionAPI, settings: Settings, cleanup:
   pi.on("before_agent_start", (event) => {
     const sheet = readSheet(settings.agentDir);
     const sections = event.systemPromptOptions.sections;
-    if (!settings.isChild && !sheet?.hookOff) sections[MANDATE_SECTION] = readFileSync(mandateFile, "utf8");
+    if (settings.depth === 0 && !sheet?.hookOff) sections[MANDATE_SECTION] = readFileSync(mandateFile, "utf8");
     if (sheet) sections[SHEET_SECTION] = sheet.text;
   });
 

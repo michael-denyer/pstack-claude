@@ -41,7 +41,7 @@ log({
   prompt,
   cwd: process.cwd(),
   pid: process.pid,
-  child: process.env.PSTACK_PI_CHILD ?? null,
+  depth: process.env.PSTACK_PI_DEPTH ?? null,
   systemPrompt: systemFile && existsSync(systemFile) ? readFileSync(systemFile, "utf8") : null,
   history,
 });

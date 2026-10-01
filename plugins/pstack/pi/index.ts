@@ -25,7 +25,7 @@ export function install(pi: ExtensionAPI, settings: Settings): void {
   });
   // Print and json runs exit once the agent settles, which would drop a
   // background agent's notice. Holding the settle until one exits queues its
-  // notice as a follow-up, so Pi runs another turn and settles again.
+  // notice, so Pi runs another turn and settles again.
   pi.on("agent_before_settle", async (_event, ctx) => {
     if (ctx.mode === "print" || ctx.mode === "json") await runner.nextExit();
   });

@@ -11,7 +11,7 @@ Statuses:
 - `difference`: Pi behaves differently, and the reason column says why no skill depends on it for a correct result.
 - `n/a`: the plugin mentions it but no behavior depends on it.
 
-The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`tests/pi/live.test.mjs`). The machine that ran it had no Anthropic sign-in, so its override sheet pointed the family names at OpenAI subscription models, and a family name's live resolution went through the sheet. `tests/pi/catalog.test.mjs` checks the default `anthropic/*` IDs against the model catalog of the installed Pi.
+The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`tests/pi/live.test.mjs`). A Live value of `n/a` means the live run did not exercise that row. The machine that ran it had no Anthropic sign-in, so its override sheet pointed the family names at OpenAI subscription models. The default `anthropic/*` IDs (X01) were therefore never called live; `tests/pi/catalog.test.mjs` checks them against the model catalog of the installed Pi.
 
 | ID | Claude Code mechanism | On Pi | Status | Evidence | Live |
 | --- | --- | --- | --- | --- | --- |
@@ -19,7 +19,7 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | T02 | `subagent_type` | Resolves to the plugin's agent files; unknown types list the valid ones | extension | `unknown subagent_type is an error listing every valid type` | VERIFIED |
 | T03 | Per-call `model` | Family names resolve through `models.json` and the sheet's `pi models:` line | extension | `alias, sheet override, inherit-parent, auto, pass-through, and no parent model` | VERIFIED |
 | T04 | `run_in_background` | Returns the agent id at once; completion arrives as a follow-up turn after the process exits | extension | `background returns at once and the completion notice comes only after the process exits` | VERIFIED |
-| T05 | `readonly` (Cursor-era prose, not a Claude Code parameter) | Stated in the agent's prompt, as on Claude Code | mapping | pi-tools.md Subagent policy | n/a |
+| T05 | `readonly` (Cursor-era prose, not a Claude Code parameter) | `readonly: true` runs the child without the `edit` and `write` tools | extension | `readonly runs the child without the edit and write tools` | n/a |
 | T06 | Worktree per writer | `isolation: "worktree"` creates and cleans the worktree; manual `git worktree` works through `bash` | extension | `runs in its own worktree and removes it when the agent changed nothing` | VERIFIED |
 | T07 | Resume an agent (`SendMessage`) | `send_message` resumes the same Pi session, model, and thinking | extension | `resumes a finished agent in the same session, model, and thinking, in the background` | VERIFIED |
 | T08 | Stop an agent and confirm it stopped | `stop_agent` kills the process group and reports `stopped` only after exit | extension | `kills the process group and reports stopped only once the process has exited` | VERIFIED |
@@ -31,14 +31,14 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | T14 | `TaskCreate`/`TaskUpdate`/`TodoWrite` | poteto-mode's own `todo.md` fallback | mapping | poteto-mode Platform Adaptation; pi-tools.md Tool actions | n/a |
 | T15 | `Read`/`Edit`/`Write`/`Bash`/`Grep`/`Glob` | `read`, `edit`, `write`, `bash`; `grep`, `find`, `ls` when enabled | native | pi-tools.md Tool actions | n/a |
 | T16 | `WebFetch`/`WebSearch` | `curl` through `bash`; web search through an MCP server | difference | No skill names either tool. Fetching works through `bash`. | n/a |
-| T17 | `ScheduleWakeup` (other named tools are never referenced) | `schedule_wakeup` with the same shape | extension | `clamps to 60 s and fires the prompt as a plain user message when idle` | VERIFIED |
+| T17 | `ScheduleWakeup` (other named tools are never referenced) | `schedule_wakeup` with the same shape | extension | `clamps to 60 s and fires the prompt as a follow-up user message` | VERIFIED |
 | T18 | MCP tool discovery | Pi's built-in MCP; list servers from the session's tools or `pi mcp list` | mapping | pi-tools.md `why` note | n/a |
 | T19 | Facts named in the system prompt | Pi's system prompt lists tools and skills; the transcript directory is given in pi-tools.md | mapping | pi-tools.md `reflect` note | n/a |
 | T20 | Image-generation tool | None, as on Claude Code; draw with Mermaid or text | difference | Claude Code has no such tool either, so `teach` already falls back. | n/a |
-| A01 | `pstack:poteto-agent` | Resolved from `agents/poteto-agent.md` | extension | `unknown subagent_type is an error listing every valid type` | VERIFIED |
+| A01 | `pstack:poteto-agent` | Resolved from `agents/poteto-agent.md` | extension | `every pstack agent type reaches its child with its own agent file as the system prompt` | VERIFIED |
 | A02 | Effort agents | `effort:` frontmatter becomes the child's `--thinking`; no effort inherits the parent's level | extension | `an effort agent passes its body as a 0600 system prompt file and its effort as --thinking; others run at the parent's level` | VERIFIED |
-| A03 | `pstack:comment-sicko` | Resolved from `agents/comment-sicko.md` | extension | `unknown subagent_type is an error listing every valid type` | n/a |
-| A04 | Manifest `agents[]` registration | The extension reads `agents/` and `effort-agents/` at runtime | extension | `unknown subagent_type is an error listing every valid type` | n/a |
+| A03 | `pstack:comment-sicko` | Resolved from `agents/comment-sicko.md` | extension | `every pstack agent type reaches its child with its own agent file as the system prompt` | n/a |
+| A04 | Manifest `agents[]` registration | The extension reads `agents/` and `effort-agents/` at runtime | extension | `every pstack agent type reaches its child with its own agent file as the system prompt` | n/a |
 | A05 | `general-purpose` agent type | A child with no agent file | extension | `foreground waits, returns the final text and agentId, and runs the exact child command` | n/a |
 | A06 | Agent file body as the child's system prompt | Appended with `--append-system-prompt`, keeping Pi's skill list visible to the child | extension | `an effort agent passes its body as a 0600 system prompt file and its effort as --thinking; others run at the parent's level` | VERIFIED |
 | H01 | `SessionStart` hook | The routing instruction is added at every agent start, so it survives resume, clear, and compaction | extension | `injects the mandate and the full sheet on every agent start` | VERIFIED |
@@ -69,7 +69,7 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | C04 | `claude`/`codex` CLI | Prose only (`claude mcp list`), mapped in the `why` note | mapping | pi-tools.md `why` note | n/a |
 | C05 | `bun` scripts | Same through `bash` | native | pi-tools.md Vendored scripts | n/a |
 | C06 | `node` scripts | Same through `bash` | native | pi-tools.md Vendored scripts | n/a |
-| X01 | Family names `opus`, `fable`, `sonnet`, `haiku` | `models.json` `pi` block maps them to `anthropic/*` IDs | extension | `every family name maps to a model in the installed Pi catalog` | VERIFIED |
+| X01 | Family names `opus`, `fable`, `sonnet`, `haiku` | `models.json` `pi` block maps them to `anthropic/*` IDs | extension | `every family name maps to a model in the installed Pi catalog` | n/a |
 | X02 | Effort levels and `@level` | Same five levels, passed as `--thinking` | extension | `an effort agent passes its body as a 0600 system prompt file and its effort as --thinking; others run at the parent's level` | VERIFIED |
 | X03 | `inherit-parent` / `auto` | The child runs on the parent's current model | extension | `alias, sheet override, inherit-parent, auto, pass-through, and no parent model` | n/a |
 | X04 | Compaction and `/clear` | Injection on every agent start keeps the routing instruction | extension | `injects the mandate and the full sheet on every agent start` | VERIFIED |

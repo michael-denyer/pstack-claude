@@ -5,6 +5,8 @@ description: "Keep a reviewable decision trail for long-running or unattended wo
 
 # Show me your work
 
+On Pi, read the [platform mapping](../poteto-mode/references/pi-tools.md), including its per-skill notes, before following this skill.
+
 Keep one canonical log.
 
 ## The format

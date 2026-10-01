@@ -23,7 +23,8 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 | Stop a subagent | `stop_agent` |
 | Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | Pi has no task-tracking tool. Keep the `todo.md` checklist poteto-mode describes for that case. |
 | Ask the human a fixed-choice question (`AskUserQuestion`) | `ask_user_question`, same shape. Without an interactive UI (print or JSON mode) it returns an error, so ask in plain text. |
-| Schedule a self-paced re-invocation (`ScheduleWakeup`) | `schedule_wakeup`, same shape |
+| Schedule a self-paced re-invocation (`ScheduleWakeup`) | `schedule_wakeup`, same shape. In print and JSON mode it returns an error, because Pi exits when the run ends and the wakeup could never fire. |
+| Read this workspace's session transcripts (Claude Code's `~/.claude/projects/<encoded-cwd>/`) | Pi sessions live in `~/.pi/agent/sessions/--<cwd>--/` (under `$PI_CODING_AGENT_DIR` when set), where `<cwd>` is the working directory without its leading `/` and with each `/` as `-`. Subagent sessions the extension started live in `<agent dir>/pstack/<parent session id>/agents/`. Each file opens with a `session` header line; every later line is an entry with an `id` and a `parentId`, and a message entry is `type: "message"` with `message.role` `user`, `assistant`, or `toolResult`. A session keeps abandoned branches in the same file, so follow `parentId` back from the last entry for the conversation that happened. The same privacy rule applies: read only this workspace's directory, never a glob across `sessions/`. |
 
 `agent`, `send_message`, `list_agents`, `stop_agent`, `ask_user_question`, and `schedule_wakeup` come from the pstack Pi extension, which `pi install` of the pstack package loads. A skills-only setup has none of them, and the fan-out skills (`interrogate`, `why`, `how`, `arena`, `reflect`) degrade to a single sequential pass.
 
@@ -32,10 +33,12 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 poteto-mode's Subagents section applies on Pi through the `agent` tool:
 
 - `subagent_type` takes the same values. `pstack:poteto-agent`, `pstack:comment-sicko`, `pstack:poteto-agent-<level>`, and `pstack:effort-<level>` resolve to the plugin's agent files. `general-purpose`, or no `subagent_type`, runs a child with no agent file. Claude Code's built-in types such as `Explore` and `Plan` do not exist on Pi, so use `general-purpose` and put the constraint in the prompt. An unknown type errors and lists the valid ones.
-- The `readonly: true` field the `how` and `interrogate` panels set has no Pi parameter. Tell the agent in its prompt not to edit files.
-- Each child is its own `pi` process in your working directory and loads the same packages, so it sees the pstack skills. `isolation: "worktree"` runs it in its own git worktree under `.claude/worktrees/`, and a worktree with no changes is removed when the agent finishes.
+- `readonly: true`, which the `how` and `interrogate` panels set, runs the child without the `edit` and `write` tools. It keeps `bash`, so a reviewer can still run `git diff`; say in the prompt that it must not change files.
+- Each child is its own `pi` process in your working directory. It loads the packages and settings saved on disk, so it sees the pstack skills when pstack was installed with `pi install`. It does not inherit the parent's command-line flags, such as `-e`, `--api-key`, or a one-off `-a` project trust, so a pstack loaded only through `-e` gives children no extension.
+- `isolation: "worktree"` runs the child in its own git worktree under `.claude/worktrees/`, and a worktree with no changes is removed when the agent finishes.
 - `run_in_background: true` returns the agent id at once, and the completion arrives as a follow-up turn. In print and json mode (`pi -p`), where Pi exits once the run settles, the extension holds the settle while a background agent runs, so each completion still arrives as a turn and the process ends after the last one. Interactive and RPC sessions settle as usual and take the completion when it arrives.
-- An agent's status follows its process. `completed` means the child exited, and `stop_agent` reports `stopped` only once the process tree is gone, so the Claude Code caveat about a `completed` agent that keeps running does not apply.
+- An agent's status follows its process. `completed` means the child exited, and `stop_agent` reports `stopped` only once the process tree is gone, so the Claude Code caveat about a `completed` agent that keeps running does not apply. A stopped agent's notice joins the conversation without starting a turn, since `stop_agent` already returned.
+- Agents belong to the session that started them. Quitting, reloading, and starting, resuming, or forking a session all stop every running agent, and a parent that crashes takes its agents with it.
 - `send_message` to a finished agent resumes its session with the context of its earlier runs. A message to a running agent waits until it exits.
 - A role value's `@<level>` picks the same effort agent as on Claude Code, and the extension passes its level to the child as `--thinking`. `session`, or an agent with no effort, runs the child at the parent's current thinking level.
 - Keep the rest of the policy unchanged. Pass file pointers not inlined context, give each worker its own worktree when they write, review every subagent's diff yourself.
@@ -77,19 +80,21 @@ Affected skill entry points point here. Most skills need only the tables above. 
 
 | Skill | On Pi |
 |-------|-------|
-| `poteto-mode` | The todolist falls back to `todo.md`, and the Subagents defaults map through Subagent policy above. Its Platform Adaptation names `codex-tools.md` for Codex; on Pi this file is the mapping. |
-| `interrogate` | Reviewers dispatch through `agent` with the same `subagent_type` and `model`. Put `readonly` in the prompt (see Subagent policy) and keep the panel on distinct models (see Model names). |
+| `poteto-mode` | The todolist falls back to `todo.md`, and the Subagents defaults map through Subagent policy above. The Eval and Session pickup playbooks read transcripts from the Pi sessions directory (see Tool actions). |
+| `interrogate` | Reviewers dispatch through `agent` with the same `subagent_type`, `model`, and `readonly` (see Subagent policy). Keep the panel on distinct models (see Model names). |
+| `recall` | Search the Pi sessions directory for this workspace (see Tool actions), not `~/.claude/projects/`. Match on `type: "message"` entries and their `message.role`. |
+| `show-me-your-work` | Check the log against this run's Pi session file (see Tool actions), not a Claude Code transcript. |
 | `setup-pstack` | The Pi sheet is `pstack-models.md` in the Pi agent directory (see Session routing), and the extension loads it, so no include line is needed. List models with `pi --list-models`. The role rows are identical, and a `pi models:` line remaps aliases (see Model names). |
 | `no-comments` | `pstack:comment-sicko` resolves through `agent` as written. |
 | `teach` | Running `how` and `why` in parallel maps to two background `agent` calls. Pi has no image generation tool, so draw with Mermaid or plain text. |
 | `create-verification-skill` | The generated skill lands under `.claude/skills/verify/` on Claude Code. Write it where Pi discovers project skills, `.pi/skills/verify/` or `.agents/skills/verify/`, instead. The app-driving harness is platform-neutral. |
 | `maintain-verification-skill` | The parallel per-feature source readers map to background `agent` calls. The project-local skill lives under `.pi/skills/` or `.agents/skills/`, not `.claude/skills/`. |
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
-| `automate-me` | `plugin-dev:skill-development` resolves through the skills table above. |
+| `automate-me` | `plugin-dev:skill-development` resolves through the skills table above. The workspace's transcripts are its Pi sessions directory (see Tool actions). |
 | `architect` | The runner panel goes through the **arena** skill, so its `agent` fan-out and model aliases apply here too. |
 | `arena` | The parallel candidates and the cross-judge are background `agent` calls on the configured aliases (see Model names). |
-| `how` | The parallel explorers and the explainer are `agent` calls. Put `readonly` in the prompt (see Subagent policy). |
-| `reflect` | The three reviewers and the synthesizer are background `agent` calls. The transcript finder reads Pi sessions too. Pass it this session's directory, `~/.pi/agent/sessions/--<cwd>--/` (under `$PI_CODING_AGENT_DIR` when set), where `<cwd>` is the working directory without its leading `/` and with each `/` as `-`, in place of Claude Code's projects directory. It follows the session's active branch to its opening prompt. Skill files load from the Pi package directory that `pi list` shows, not `~/.claude/plugins/`, so treat reads under that directory as plugin skill reads. |
+| `how` | The parallel explorers and the explainer are `agent` calls, and `readonly` applies as written (see Subagent policy). |
+| `reflect` | The three reviewers and the synthesizer are background `agent` calls. The transcript finder reads Pi sessions too. Pass it this workspace's Pi sessions directory (see Tool actions) in place of Claude Code's projects directory. It follows the session's active branch to its opening prompt. Skill files load from the Pi package directory that `pi list` shows, not `~/.claude/plugins/`, so treat reads under that directory as plugin skill reads. |
 | `swarm` | Each worker is a background `agent` call on the configured alias. Give each writing worker `isolation: "worktree"` or its own output directory (see Subagent policy above). |
 | `why` | The parallel investigators and the synthesizer are background `agent` calls. List MCP servers from the tools Pi exposes to the session or `pi mcp list`, not from `.mcp.json` or `claude mcp list`. |
 

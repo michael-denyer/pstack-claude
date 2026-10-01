@@ -79,10 +79,24 @@ export class Scheduler {
   private wakeup?: NodeJS.Timeout;
   private loop?: NodeJS.Timeout;
 
+  private settleWaiters: (() => void)[] = [];
+
   constructor(private readonly pi: ExtensionAPI) {}
 
   fire(prompt: string): void {
     this.pi.sendUserMessage(prompt, { deliverAs: "followUp", expandPromptTemplates: true });
+  }
+
+  // sendUserMessage only starts the run, and print mode disposes the session as
+  // soon as the command that called it returns, so there the command waits it out.
+  async fireFromCommand(prompt: string, ctx: ExtensionContext): Promise<void> {
+    const settled = ctx.mode === "print" || ctx.mode === "json" ? new Promise<void>((r) => this.settleWaiters.push(r)) : undefined;
+    this.fire(prompt);
+    await settled;
+  }
+
+  settled(): void {
+    for (const resolve of this.settleWaiters.splice(0)) resolve();
   }
 
   scheduleWakeup(seconds: number, prompt: string): void {
@@ -252,13 +266,15 @@ export function registerInteraction(pi: ExtensionAPI, scheduler: Scheduler): voi
           scheduler.cancelWakeup();
           scheduler.startLoop(seconds, cmd.prompt, ctx);
           ctx.ui.notify(`Looping every ${seconds}s. /loop stop ends it.`, "info");
-          scheduler.fire(cmd.prompt);
+          await scheduler.fireFromCommand(cmd.prompt, ctx);
           return;
         }
         case "dynamic":
           scheduler.stopLoop();
-          scheduler.fire(dynamicPrompt(cmd.prompt));
+          await scheduler.fireFromCommand(dynamicPrompt(cmd.prompt), ctx);
       }
     },
   });
+
+  pi.on("agent_settled", () => scheduler.settled());
 }

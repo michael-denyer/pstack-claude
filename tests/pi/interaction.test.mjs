@@ -217,6 +217,22 @@ describe("/loop", () => {
     expect(pi.userMessages).toHaveLength(1);
   });
 
+  for (const mode of ["print", "json"]) {
+    test(`in ${mode} mode /loop returns only once the run it started settles, since pi disposes the session when it returns`, async () => {
+      const { pi, run } = loop({ mode });
+      let returned = false;
+      const done = run("tick").then(() => (returned = true));
+      await Promise.resolve();
+      expect(pi.userMessages).toHaveLength(1);
+      jest.advanceTimersByTime(60_000);
+      await Promise.resolve();
+      expect(returned).toBe(false);
+      await pi.emit("agent_settled", {}, fakeCtx({ cwd: w.cwd, mode }));
+      await done;
+      expect(returned).toBe(true);
+    });
+  }
+
   test("/loop stop also cancels a self-paced wakeup", async () => {
     const { pi, run } = loop();
     const ctx = fakeCtx({ cwd: w.cwd });

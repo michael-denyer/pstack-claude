@@ -31,13 +31,19 @@ export default {
     const synth = rs.length > 1 ? rs.at(-1) : undefined;
     const investigators = rs.slice(0, -1);
     const firstSpawn = Math.min(...rs.map((r) => Date.parse(r.startedAt)));
-    // An agent's output reaches the lead as its first completion notice, or as
-    // the result of a foreground agent call; later notices come from resumes the
+    // An agent's findings reach the lead as its first completed notice, or as
+    // the result of a completed foreground agent call. A stopped or failed
+    // notice carries no findings, and later notices come from resumes the
     // lead's own send_message calls start.
     const findingsAt = (r) =>
       Math.min(
-        ...t.parent.filter((e) => e.type === "custom_message" && e.customType === "pstack-agent" && String(e.content).includes(`agentId: ${r.id}`)).map((e) => Date.parse(e.timestamp)),
-        ...t.calls(t.parent).filter((c) => c.name === "agent" && c.output.includes(`agentId: ${r.id}`)).map((c) => c.resultAt),
+        ...t.parent
+          .filter((e) => e.type === "custom_message" && e.customType === "pstack-agent" && e.details?.agentId === r.id && e.details?.status === "completed")
+          .map((e) => Date.parse(e.timestamp)),
+        ...t
+          .calls(t.parent)
+          .filter((c) => c.name === "agent" && c.output.includes(`agentId: ${r.id}\n`) && c.output.includes("\nstatus: completed\n"))
+          .map((c) => c.resultAt),
       );
     const anchored = t.calls(t.parent).some((c) => c.name === "bash" && /\bgit\b[^|;&]*\b(log|blame|show)\b/.test(String(c.args.command)) && c.resultAt <= firstSpawn);
     const spawns = t.calls(t.parent).filter((c) => c.name === "agent");

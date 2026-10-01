@@ -517,7 +517,7 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
     label: "Agent",
     description:
       "Launch a subagent: a separate pi process with its own context. Foreground (default) waits and returns its final text; run_in_background returns an agentId at once and a completion notice arrives when it exits. Use send_message to continue a finished agent, stop_agent to stop one, list_agents to see them.",
-    promptSnippet: "agent: launch a subagent (foreground or background, optional worktree isolation)",
+    promptSnippet: "Launch a subagent (foreground or background, optional worktree isolation)",
     parameters: agentSchema as any,
     async execute(_id, params: AgentParams, signal, _onUpdate, ctx) {
       const record = await runner.start(params, ctx);

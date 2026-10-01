@@ -41,6 +41,11 @@ function text(content) {
   return null;
 }
 
+// `user` records Claude Code writes for a local command (/clear, !cmd) and its
+// output, not a prompt the user typed. A skill invocation leads with
+// <command-message> and is kept: its <command-args> carry what the user typed.
+const LOCAL_COMMAND = /^\s*<(?:command-name|local-command-stdout|bash-input)>/u;
+
 export async function openingPrompt(path) {
   const stream = createReadStream(path, { encoding: "utf8" });
   const lines = createInterface({ input: stream, crlfDelay: Infinity });
@@ -54,9 +59,7 @@ export async function openingPrompt(path) {
       }
       if (record?.type !== "user" || record.isMeta) continue;
       const prompt = text(record.message?.content);
-      // After /clear or another local command, the first user records are the
-      // command's own wrapper and output, not the prompt the user typed.
-      if (prompt && !/^\s*<(?:command-name|local-command-stdout|local-command-stderr|local-command-caveat)>/u.test(prompt)) return prompt;
+      if (prompt && !LOCAL_COMMAND.test(prompt)) return prompt;
     }
   } finally {
     lines.close();

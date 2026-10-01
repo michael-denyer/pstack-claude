@@ -4,7 +4,7 @@ This file is the release changelog, with one `## <version> - <title>` entry per 
 
 ## 0.9.54 - find the transcript a cleared session opened with
 
-After `/clear` or another local command, a transcript's first user records are the command's wrapper (`<command-name>`), its output (`<local-command-stdout>`) and an `isMeta` caveat, not the prompt the user typed. `reflect/scripts/find-transcript.mjs` compared the opening-prompt fragment against the first of those, so it could miss the session it was asked for and return an older one that matched. `openingPrompt` now skips `isMeta` records and those local-command wrappers and returns the first prompt the user typed. `tests/find-transcript.test.mjs` covers a cleared session.
+After `/clear`, another local command, or a `!` shell command, a transcript's first user records are the command's wrapper (`<command-name>` or `<bash-input>`), its output (`<local-command-stdout>`) and an `isMeta` caveat, not the prompt the user typed. `reflect/scripts/find-transcript.mjs` compared the opening-prompt fragment against the first of those, so it could miss the session it was asked for and return an older one that matched. `openingPrompt` now skips `isMeta` records and those wrappers and returns the first prompt the user typed. A skill invocation, which leads with `<command-message>`, still counts as the typed prompt. `tests/find-transcript.test.mjs` covers a cleared session and a skill-opened one, and the `reflect` skill describes the new stopping point.
 
 ## 0.9.53 - name the port's copyright holder
 

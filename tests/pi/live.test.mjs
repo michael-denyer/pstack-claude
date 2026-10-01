@@ -287,6 +287,52 @@ suite("pstack on live pi", () => {
   );
 
   test(
+    "steer: send_message to a running agent reaches that run at its next tool boundary, and it reports once",
+    async () => {
+      const out = join(root, "steer-out.txt");
+      await withParent(async (parent) => {
+        const from = await parent.run(
+          [
+            'Make one agent tool call with run_in_background true, description "steered", and this prompt:',
+            `"Use the bash tool to run exactly this command and wait for it: sleep 40. When it finishes, use the write tool to write one word to ${out}: ALPHA, unless a later message told you another word, in which case write that word. Then reply with the word you wrote."`,
+            "Then reply with exactly one word: started.",
+          ].join("\n"),
+        );
+        const file = await parent.sessionFile();
+        const record = agentByDescription(file, "steered")[0];
+        await parent.until(() => descendants(record.pid).some((p) => /(^|\/|\s)sleep 40\b/.test(p.args)), 3 * MINUTE, "the child's sleep 40");
+
+        const sendFrom = await parent.run(
+          'Call send_message with to "steered" and message "Change of plan: write BRAVO instead of ALPHA." Then reply with exactly one word: sent. Reply to any completion notice with exactly one word: noted.',
+        );
+        expect(pidAlive(record.pid)).toBe(true);
+        const [sent] = parent.toolResults("send_message", sendFrom);
+        expect(sent.details).toEqual({ agentId: record.id, running: true });
+
+        await parent.until(() => parent.notices(from).length >= 1, 4 * MINUTE, "the completion notice");
+        await parent.idle(from);
+        await sleep(5000);
+        const notices = parent.notices(from);
+        expect(notices).toHaveLength(1);
+        expect(notices[0].details).toMatchObject({ agentId: record.id, status: "completed" });
+        expect(textOf(notices[0])).toContain("BRAVO");
+        expect(readFileSync(out, "utf8").trim()).toBe("BRAVO");
+
+        const snaps = agentByDescription(file, "steered");
+        expect(new Set(snaps.map((s) => s.pid))).toEqual(new Set([record.pid]));
+        const child = childEntries(snaps.at(-1));
+        const prompts = child.filter((e) => e.type === "message" && e.message.role === "user").map((e) => textOf(e.message));
+        expect(prompts).toHaveLength(2);
+        expect(prompts[1]).toContain("BRAVO");
+        const steerAt = child.findIndex((e) => e.type === "message" && e.message.role === "user" && textOf(e.message).includes("BRAVO"));
+        const writes = child.filter((e, i) => i > steerAt && e.type === "message" && e.message.role === "assistant" && e.message.content.some((p) => p.type === "toolCall" && p.name === "write"));
+        expect(writes).toHaveLength(1);
+      });
+    },
+    8 * MINUTE,
+  );
+
+  test(
     "effort: pstack:effort-high runs the child at thinking high with the effort agent as its system prompt",
     async () => {
       await withParent(async (parent) => {

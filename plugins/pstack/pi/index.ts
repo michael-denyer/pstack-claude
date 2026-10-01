@@ -5,7 +5,7 @@ import { defaultSettings, type Settings } from "./config.ts";
 import { registerInteraction, Scheduler } from "./interaction.ts";
 import { registerLifecycle } from "./lifecycle.ts";
 
-export function install(pi: ExtensionAPI, settings: Settings): AgentRunner {
+export function install(pi: ExtensionAPI, settings: Settings): void {
   const runner = new AgentRunner(pi, settings);
   const scheduler = new Scheduler(pi);
   registerAgentTools(pi, runner);
@@ -17,7 +17,6 @@ export function install(pi: ExtensionAPI, settings: Settings): AgentRunner {
     scheduler.stopAll();
     await runner.stopAll();
   });
-  return runner;
 }
 
 export default function pstack(pi: ExtensionAPI): void {

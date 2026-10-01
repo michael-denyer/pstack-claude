@@ -6,8 +6,8 @@
 // Prints the newest matching path, or exits 1 with "no transcript". Covers the
 // three layouts under one per-project directory: flat <id>.jsonl, nested
 // <id>/<id>.jsonl, and subagent <id>/subagents/<child>.jsonl. Each candidate is
-// streamed line by line and abandoned at its first `user` record; the first
-// line is session metadata and files run to megabytes.
+// streamed line by line and abandoned at its first typed `user` record; the
+// first line is session metadata and files run to megabytes.
 import { createReadStream, readdirSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
@@ -52,7 +52,11 @@ export async function openingPrompt(path) {
       } catch {
         continue;
       }
-      if (record?.type === "user") return text(record.message?.content);
+      if (record?.type !== "user" || record.isMeta) continue;
+      const prompt = text(record.message?.content);
+      // After /clear or another local command, the first user records are the
+      // command's own wrapper and output, not the prompt the user typed.
+      if (prompt && !/^\s*<(?:command-name|local-command-stdout|local-command-stderr|local-command-caveat)>/u.test(prompt)) return prompt;
     }
   } finally {
     lines.close();

@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines which changes belong upstream.
 
+## 0.9.54 - find the transcript a cleared session opened with
+
+After `/clear` or another local command, a transcript's first user records are the command's wrapper (`<command-name>`), its output (`<local-command-stdout>`) and an `isMeta` caveat, not the prompt the user typed. `reflect/scripts/find-transcript.mjs` compared the opening-prompt fragment against the first of those, so it could miss the session it was asked for and return an older one that matched. `openingPrompt` now skips `isMeta` records and those local-command wrappers and returns the first prompt the user typed. `tests/find-transcript.test.mjs` covers a cleared session.
+
 ## 0.9.53 - name the port's copyright holder
 
 `LICENSE` adds a `Copyright (c) 2026 Michael Denyer` line beside Lauren Tan's, so the port's modifications and additions have a named holder under the same MIT terms. `NOTICE.md`, `NOTICE-skills.md`, and both READMEs name the holder, and the skills-only copies under `poteto-mode/references/licenses/` carry the new line.

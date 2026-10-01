@@ -30,5 +30,13 @@
     "default": "gpt-6-sol",
     "strongest": "gpt-6-astra",
     "panel": ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"]
+  },
+  "pi": {
+    "models": {
+      "opus": "anthropic/claude-opus-5.5",
+      "fable": "anthropic/claude-fable-5.1",
+      "sonnet": "anthropic/claude-sonnet-5.5",
+      "haiku": "anthropic/claude-haiku-4.5"
+    }
   }
 }

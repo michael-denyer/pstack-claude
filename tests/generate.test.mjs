@@ -24,9 +24,12 @@ import {
   applyRegions,
   assertChangesHeading,
   changes,
-  codexNoteSkills,
   deriveSkill,
   loadLeadLines,
+  noteSkills,
+  overrideSheetBlock,
+  piModelNamesSection,
+  RUNTIMES,
   effortAgents,
   effortSection,
   OWNED_DIRS,
@@ -34,7 +37,7 @@ import {
   PORTABLE_ASSETS,
   problems,
   stampAgentPaths,
-  stampLeadLine,
+  stampLeadLines,
   fenceUnder,
   loadModels,
   parseFrontmatter,
@@ -54,6 +57,9 @@ import { walk } from "../tools/validate-skills.mjs";
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const models = loadModels();
 const leads = loadLeadLines();
+const [codex, pi] = RUNTIMES;
+// Remove a stamped lead block (each line is its own paragraph under the heading).
+const unstamp = (text, block) => block.reduce((out, line) => out.replace(`\n\n${line}\n`, "\n"), text);
 
 const lines = (text) => text.split("\n");
 const spanned = (locate, doc) => {
@@ -130,6 +136,27 @@ describe("regions", () => {
   test("applyRegions leaves a file the generator does not own untouched", () => {
     const text = "# other\n\n## Models\n\nprose\n";
     expect(applyRegions("plugins/pstack/skills/other/SKILL.md", text, models)).toBe(text);
+  });
+});
+
+describe("runtime model names", () => {
+  test("each runtime's mapping file owns a stamped Model names section", () => {
+    for (const runtime of RUNTIMES) {
+      expect(regions(models).filter((r) => r.file === runtime.tools).map((r) => r.name)).toEqual(["Model names section"]);
+    }
+  });
+
+  test("the Pi section pairs every alias with its Pi model and names the sheet override", () => {
+    const remapped = { ...models, pi: { models: { ...models.pi.models, haiku: "openai/marker-model" } } };
+    const text = piModelNamesSection(remapped);
+    for (const alias of models.available) {
+      expect(text).toContain(`- \`${alias}\`: \`${remapped.pi.models[alias]}\``);
+    }
+    expect(text).toContain("`pi models: ");
+  });
+
+  test("the override sheet says the Pi extension honors session hook: off", () => {
+    expect(overrideSheetBlock(models)).toContain("or the Pi extension");
   });
 });
 
@@ -433,8 +460,15 @@ describe("deriveSkill", () => {
     for (const file of ["plugins/pstack/skills/teach/SKILL.md", "plugins/pstack/skills/poteto-mode/playbooks/refactoring.md"]) {
       const text = "---\nname: teach\ndescription: d\n---\n\n# Title\n\nbody\n";
       const out = deriveSkill(file, text, models, leads);
-      expect(out).toBe(text.replace("# Title\n\n", `# Title\n\n${leads.get(file)}\n\n`));
+      expect(out).toBe(text.replace("# Title\n\n", `# Title\n\n${leads.get(file).join("\n\n")}\n\n`));
       expect(deriveSkill(file, out, models, leads)).toBe(out);
+    }
+  });
+
+  test("restores the exact lead block the plan stamps on every file that has one", () => {
+    for (const [file, block] of leads) {
+      const text = readFileSync(join(repoRoot, file), "utf8");
+      expect(deriveSkill(file, unstamp(text, block), models, leads)).toBe(text);
     }
   });
 
@@ -447,17 +481,39 @@ describe("deriveSkill", () => {
 describe("lead lines", () => {
   test("a lead line goes under the first heading after the frontmatter, once", () => {
     const text = "---\nname: x\n# a YAML comment\n---\n\n# Title\n\nbody\n";
-    const once = stampLeadLine(text, "Lead.");
+    const once = stampLeadLines(text, ["Lead."]);
     expect(once).toBe("---\nname: x\n# a YAML comment\n---\n\n# Title\n\nLead.\n\nbody\n");
-    expect(stampLeadLine(once, "Lead.")).toBe(once);
-    expect(stampLeadLine("no heading\n", "Lead.")).toBeNull();
+    expect(stampLeadLines(once, ["Lead."])).toBe(once);
+    expect(stampLeadLines("no heading\n", ["Lead."])).toBeNull();
   });
 
-  test("the Codex notes table lists its skills in row order and rejects a row without one", () => {
-    const table = (...rows) => ["| Skill | On Codex |", "|-------|----------|", ...rows, "", "after"].join("\n");
-    expect(codexNoteSkills(table("| `how` | fan-out |", "| `teach` | images |"))).toEqual(["how", "teach"]);
-    expect(() => codexNoteSkills(table("| how | fan-out |"))).toThrow("does not start with a backticked skill: | how |");
-    expect(() => codexNoteSkills("no table\n")).toThrow('"| Skill | On Codex |" table header not found');
+  test("the runtime preambles stack in table order, and a stale or reordered block converges", () => {
+    const doc = (...block) => ["---", "name: x", "---", "", "# Title", "", ...block.flatMap((l) => [l, ""]), "body", ""].join("\n");
+    const both = doc(codex.preamble, pi.preamble);
+    expect(stampLeadLines(doc(), [codex.preamble, pi.preamble])).toBe(both);
+    expect(stampLeadLines(both, [codex.preamble, pi.preamble])).toBe(both);
+    expect(stampLeadLines(doc(pi.preamble, codex.preamble), [codex.preamble, pi.preamble])).toBe(both);
+    expect(stampLeadLines(both, [codex.preamble])).toBe(doc(codex.preamble));
+    expect(stampLeadLines(doc(pi.preamble, "Hand-written lead."), [codex.preamble])).toBe(
+      doc(codex.preamble, "Hand-written lead."),
+    );
+  });
+
+  test("each runtime derives its notes header and preamble from its mapping file", () => {
+    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi"]);
+    expect(codex.preamble).toBe(
+      "On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.",
+    );
+    expect(pi.preamble).toBe(
+      "On Pi, read the [platform mapping](../poteto-mode/references/pi-tools.md), including its per-skill notes, before following this skill.",
+    );
+  });
+
+  test("a notes table lists its skills in row order and rejects a row without one", () => {
+    const table = (...rows) => ["| Skill | On Pi |", "|-------|-------|", ...rows, "", "after"].join("\n");
+    expect(noteSkills(pi, table("| `how` | fan-out |", "| `teach` | images |"))).toEqual(["how", "teach"]);
+    expect(() => noteSkills(pi, table("| how | fan-out |"))).toThrow("does not start with a backticked skill: | how |");
+    expect(() => noteSkills(codex, "no table\n")).toThrow('"| Skill | On Codex |" table header not found');
   });
 
   test("a prompt stub points at codex-tools.md unless its skill carries the Codex preamble", () => {
@@ -528,12 +584,14 @@ describe("effort agents", () => {
     expect(stampAgentPaths(out, ["./agents/a.md"])).toBe(out);
   });
 
-  test("the stamped section names every level, the default, both dispatch targets, and the Codex parameter", () => {
+  test("the stamped section names every level, the default, both dispatch targets, and each runtime's carrier", () => {
     const text = effortSection(["low", "max"], "high");
     for (const level of ["low", "max", "high"]) expect(text).toContain(`\`${level}\``);
     expect(text).toContain('subagent_type: "pstack:effort-<level>"');
     expect(text).toContain('subagent_type: "pstack:poteto-agent-<level>"');
     expect(text).toContain("`reasoning_effort`");
+    expect(text).toContain("On Pi,");
+    expect(text).toContain("`--thinking`");
   });
 });
 
@@ -725,10 +783,9 @@ describe("plan, changes, apply", () => {
     const root = repoCopy();
     const leadFiles = [...loadLeadLines(root)];
     expect(leadFiles.length).toBeGreaterThan(0);
-    for (const [file, line] of leadFiles) {
-      const text = readFileSync(join(root, file), "utf8");
-      writeFileSync(join(root, file), text.replace(`\n\n${line}\n`, "\n"));
-      expect(readFileSync(join(root, file), "utf8")).not.toContain(line);
+    for (const [file, block] of leadFiles) {
+      writeFileSync(join(root, file), unstamp(readFileSync(join(root, file), "utf8"), block));
+      for (const line of block) expect(readFileSync(join(root, file), "utf8")).not.toContain(line);
     }
     const { files } = plan(root);
     for (const [file] of leadFiles) expect(files[file]).toBe(readFileSync(join(repoRoot, file), "utf8"));
@@ -745,9 +802,7 @@ describe("plan, changes, apply", () => {
     );
     writeFileSync(
       join(root, skill),
-      text(skill)
-        .replace(`\n\n${leads.get(skill)}\n`, "\n")
-        .replace(/^- how explorer: .*$/m, "- how explorer: stale"),
+      unstamp(text(skill), leads.get(skill)).replace(/^- how explorer: .*$/m, "- how explorer: stale"),
     );
     const { files } = plan(root);
     for (const rel of [manifest, skill]) expect(files[rel]).toBe(readFileSync(join(repoRoot, rel), "utf8"));
@@ -765,8 +820,7 @@ describe("plan, changes, apply", () => {
 
   test("problems reports a lead line in a file that does not own it", () => {
     const root = repoCopy();
-    const [, preamble] = [...loadLeadLines(root)].find(([, line]) => line.startsWith("On Codex"));
-    append(root, "plugins/pstack/skills/tdd/SKILL.md", `\n${preamble}\n`);
+    append(root, "plugins/pstack/skills/tdd/SKILL.md", `\n${codex.preamble}\n`);
     const codexTools = "plugins/pstack/skills/poteto-mode/references/codex-tools.md";
     writeFileSync(join(root, codexTools), readFileSync(join(root, codexTools), "utf8").replace(/^\| `why` \|.*\n/m, ""));
     const failures = problems(root).filter((f) => f.startsWith("generator-owned lead lines"));

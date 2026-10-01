@@ -17,6 +17,10 @@ const raw = JSON.parse(readFileSync(join(repoRoot, "plugins/pstack/models.json")
 const models = loadModels();
 
 describe("committed models.json", () => {
+  test("the pi block gives every available alias a Pi model", () => {
+    expect(Object.keys(raw.pi.models).sort()).toEqual([...models.available].sort());
+  });
+
   test("available models are the names the Claude Code Agent tool accepts", () => {
     // The Agent tool's `model` parameter is an enum of family names; a full ID
     // such as claude-opus-5-5 is rejected before the subagent starts.
@@ -106,6 +110,19 @@ describe("parseModels", () => {
   test("a defaultEffort that is neither a level nor session throws naming it", () => {
     expect(parse((p) => (p.defaultEffort = "hgih"))).toThrow(
       'models.json: defaultEffort "hgih" is not an effort level or "session"',
+    );
+  });
+
+  test("a pi block must map exactly the available aliases to provider/id models", () => {
+    expect(parse((p) => delete p.pi)).toThrow('models.json: "pi" must be an object');
+    expect(parse((p) => delete p.pi.models)).toThrow('models.json: pi needs a "models" object');
+    expect(parse((p) => (p.pi.extra = 1))).toThrow('models.json: pi names "extra"; its only key is "models"');
+    expect(parse((p) => delete p.pi.models.haiku)).toThrow('models.json: pi.models has no Pi model for "haiku"');
+    expect(parse((p) => (p.pi.models.gpt = "openai/gpt"))).toThrow(
+      'models.json: pi.models names "gpt", which is not in available',
+    );
+    expect(parse((p) => (p.pi.models.opus = "claude-opus"))).toThrow(
+      'models.json: pi.models "opus" is "claude-opus", not a provider/id',
     );
   });
 

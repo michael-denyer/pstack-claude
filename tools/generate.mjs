@@ -16,14 +16,16 @@
 //   user-invocable: false); a skill without a row or a row without a skill
 //   fails by name.
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
-//   available slugs, Codex equivalents)
+//   available slugs, and one block per RUNTIMES row: Codex equivalents, Pi IDs)
 //     -> each model-consuming skill's "## Models" and "## Reasoning effort" sections
 //     -> setup-pstack's Models section and override-sheet block, and interrogate's reviewer table
-//     -> the "## Model names" section of poteto-mode/references/codex-tools.md
+//     -> the "## Model names" section of each runtime's mapping file
+//        (poteto-mode/references/codex-tools.md, pi-tools.md)
 //     -> one effort agent pair per level in plugins/pstack/effort-agents/
-//   the Per-skill notes table in poteto-mode/references/codex-tools.md
-//     -> the Codex preamble under the first heading of each listed skill's SKILL.md,
-//        and the codex-tools.md pointer in the prompt stub of every other public skill
+//   the Per-skill notes table in each runtime's mapping file
+//     -> that runtime's preamble under the first heading of each listed skill's
+//        SKILL.md, in RUNTIMES order, and (Codex only) the codex-tools.md pointer
+//        in the prompt stub of every other public skill
 //   DRIVER_PLAYBOOKS -> the driver-skill line under each playbook's first heading
 //   plugins/pstack/{agents,effort-agents}/*.md -> the "agents" list in
 //     plugins/pstack/.claude-plugin/plugin.json (a list replaces the default
@@ -376,57 +378,80 @@ export function regions(models) {
       locate: fenceUnder("Write the override sheet", "markdown"),
       render: () => [overrideSheetBlock(models)],
     },
-    {
-      file: "plugins/pstack/skills/poteto-mode/references/codex-tools.md",
+    ...RUNTIMES.map((runtime) => ({
+      file: runtime.tools,
       name: "Model names section",
       locate: section("Model names"),
-      render: () => blankPadded(codexModelNamesSection(models)),
-    },
+      render: () => blankPadded(runtime.modelNames(models)),
+    })),
   ];
 }
 
-const CODEX_TOOLS = `${SKILLS}/poteto-mode/references/codex-tools.md`;
-const CODEX_NOTES_HEADER = "| Skill | On Codex |";
-const CODEX_PREAMBLE =
-  "On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.";
+// Every runtime other than Claude Code that reads the skills through a mapping
+// file under poteto-mode/references/. A row gives the runtime its models.json
+// block (`key`, checked by `checkModels`), the generated Model names section in
+// its mapping file, and a preamble on each skill its Per-skill notes table lists.
+// Row order is the order the preambles stack under a skill's first heading.
+export const RUNTIMES = [
+  { name: "Codex", key: "codex", mapping: "codex-tools.md", modelNames: codexModelNamesSection, checkModels: checkCodexModels },
+  { name: "Pi", key: "pi", mapping: "pi-tools.md", modelNames: piModelNamesSection, checkModels: checkPiModels },
+].map((runtime) => ({
+  ...runtime,
+  tools: `${SKILLS}/poteto-mode/references/${runtime.mapping}`,
+  notesHeader: `| Skill | On ${runtime.name} |`,
+  preamble:
+    `On ${runtime.name}, read the [platform mapping](../poteto-mode/references/${runtime.mapping}), ` +
+    "including its per-skill notes, before following this skill.",
+}));
+
+const CODEX = RUNTIMES.find((runtime) => runtime.key === "codex");
 const DRIVER_LINE = "Resolve the driver skill through [poteto-mode's Non-negotiables](../SKILL.md#non-negotiables).";
 const DRIVER_PLAYBOOKS = ["autopilot-full", "multi-phase-plan", "orchestrate", "refactoring", "shipping"];
+// Every line the generator may own under a heading. A lead block is the run
+// of these lines right under the heading, each in its own paragraph.
+const LEAD_LINES = new Set([...RUNTIMES.map((runtime) => runtime.preamble), DRIVER_LINE]);
 
-// The skills with a row in the Codex mapping's Per-skill notes table, in row order.
-export function codexNoteSkills(markdown) {
+// The skills with a row in a runtime mapping's Per-skill notes table, in row order.
+export function noteSkills(runtime, markdown) {
   const lines = markdown.split("\n");
-  const range = tableRows(CODEX_NOTES_HEADER, "| ")(lines);
-  if (!range) throw new Error(`${CODEX_TOOLS}: "${CODEX_NOTES_HEADER}" table header not found`);
+  const range = tableRows(runtime.notesHeader, "| ")(lines);
+  if (!range) throw new Error(`${runtime.tools}: "${runtime.notesHeader}" table header not found`);
   return lines.slice(...range).map((row) => {
     const skill = row.match(/^\| `([a-z0-9-]+)` \|/)?.[1];
-    if (!skill) throw new Error(`${CODEX_TOOLS}: Per-skill notes row does not start with a backticked skill: ${row}`);
+    if (!skill) throw new Error(`${runtime.tools}: Per-skill notes row does not start with a backticked skill: ${row}`);
     return skill;
   });
 }
 
-// The line the generator owns under a file's first heading, by repo-relative
-// file: the Codex preamble on each skill the Per-skill notes table has a row
-// for, and the driver-skill line on the playbooks that drive an app.
+// The lines the generator owns under a file's first heading, by repo-relative
+// file: each runtime's preamble, in RUNTIMES order, on every skill that
+// runtime's Per-skill notes table has a row for, and the driver-skill line on
+// the playbooks that drive an app.
 export function loadLeadLines(root = repo) {
   const leads = new Map();
-  for (const skill of codexNoteSkills(readFileSync(join(root, CODEX_TOOLS), "utf8"))) {
-    const file = `${SKILLS}/${skill}/SKILL.md`;
-    if (!existsSync(join(root, file))) throw new Error(`${CODEX_TOOLS}: per-skill note for "${skill}", which has no SKILL.md`);
-    leads.set(file, CODEX_PREAMBLE);
+  for (const runtime of RUNTIMES) {
+    for (const skill of noteSkills(runtime, readFileSync(join(root, runtime.tools), "utf8"))) {
+      const file = `${SKILLS}/${skill}/SKILL.md`;
+      if (!existsSync(join(root, file))) throw new Error(`${runtime.tools}: per-skill note for "${skill}", which has no SKILL.md`);
+      leads.set(file, [...(leads.get(file) ?? []), runtime.preamble]);
+    }
   }
-  for (const playbook of DRIVER_PLAYBOOKS) leads.set(`${SKILLS}/poteto-mode/playbooks/${playbook}.md`, DRIVER_LINE);
+  for (const playbook of DRIVER_PLAYBOOKS) leads.set(`${SKILLS}/poteto-mode/playbooks/${playbook}.md`, [DRIVER_LINE]);
   return leads;
 }
 
-// Put `line` in its own paragraph right under the first heading after the
-// frontmatter, replacing it if already there. Null when there is no heading.
-export function stampLeadLine(text, line) {
+// Put `block` right under the first heading after the frontmatter, each line
+// in its own paragraph, replacing the lead block already there: the run of
+// generator lead lines (or lines of `block`) directly under the heading. Null
+// when there is no heading.
+export function stampLeadLines(text, block) {
   const lines = text.split("\n");
   const bodyStart = lines[0] === "---" ? lines.indexOf("---", 1) + 1 : 0;
   const heading = lines.findIndex((l, i) => i >= bodyStart && /^#{1,6} /.test(l));
   if (heading === -1) return null;
-  const present = lines[heading + 1] === "" && lines[heading + 2] === line;
-  lines.splice(heading + 1, present ? 2 : 0, "", line);
+  let end = heading + 1;
+  while (lines[end] === "" && (LEAD_LINES.has(lines[end + 1]) || block.includes(lines[end + 1]))) end += 2;
+  lines.splice(heading + 1, end - heading - 1, ...block.flatMap((line) => ["", line]));
   return lines.join("\n");
 }
 
@@ -474,9 +499,10 @@ export function parseModels(raw, skillExists) {
       seen.add(item);
     }
   };
+  const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
   for (const key of ["available", "efforts", "roles"]) if (!Array.isArray(raw[key])) fail(`"${key}" must be a list`);
-  for (const key of ["tiers", "codex"]) {
-    if (!raw[key] || typeof raw[key] !== "object") fail(`"${key}" must be an object`);
+  for (const key of ["tiers", ...RUNTIMES.map((runtime) => runtime.key)]) {
+    if (!isObject(raw[key])) fail(`"${key}" must be an object`);
   }
   const available = new Set(raw.available);
   unique(raw.available, "available");
@@ -516,14 +542,33 @@ export function parseModels(raw, skillExists) {
   if (!raw.efforts.includes(raw.defaultEffort) && raw.defaultEffort !== "session") {
     fail(`defaultEffort "${raw.defaultEffort}" is not an effort level or "session"`);
   }
+  for (const runtime of RUNTIMES) runtime.checkModels(raw[runtime.key], { raw, fail, unique, isObject });
+  return resolveModels(raw);
+}
+
+// Codex has no Claude aliases, so its block gives an example model per tier.
+function checkCodexModels(codex, { raw, fail, unique }) {
   for (const tier of Object.keys(raw.tiers)) {
-    if (!Object.hasOwn(raw.codex, tier)) fail(`codex has no example for tier "${tier}"`);
+    if (!Object.hasOwn(codex, tier)) fail(`codex has no example for tier "${tier}"`);
   }
-  for (const [tier, value] of Object.entries(raw.codex)) {
+  for (const [tier, value] of Object.entries(codex)) {
     if (!Object.hasOwn(raw.tiers, tier)) fail(`codex names "${tier}", which is not a tier`);
     unique([value].flat(), `codex "${tier}"`);
   }
-  return resolveModels(raw);
+}
+
+// The pstack Pi extension resolves each Claude alias a skill names to a Pi
+// provider/id, so the block maps exactly the available aliases.
+function checkPiModels(pi, { raw, fail, isObject }) {
+  for (const key of Object.keys(pi)) if (key !== "models") fail(`pi names "${key}"; its only key is "models"`);
+  if (!isObject(pi.models)) fail('pi needs a "models" object');
+  for (const alias of raw.available) {
+    if (!Object.hasOwn(pi.models, alias)) fail(`pi.models has no Pi model for "${alias}"`);
+  }
+  for (const [alias, id] of Object.entries(pi.models)) {
+    if (!raw.available.includes(alias)) fail(`pi.models names "${alias}", which is not in available`);
+    if (typeof id !== "string" || !/^[^/\s]+\/\S+$/.test(id)) fail(`pi.models "${alias}" is "${id}", not a provider/id`);
+  }
 }
 
 export function loadModels(root = repo) {
@@ -568,8 +613,8 @@ function portFrontmatter(file, text) {
 // as forked or conflicted instead of aborting the sync.
 export function deriveSkill(file, text, models, leads) {
   const front = portFrontmatter(file, text);
-  const line = leads.get(file);
-  const out = (line && stampLeadLine(front, line)) || front;
+  const block = leads.get(file);
+  const out = (block && stampLeadLines(front, block)) || front;
   const lines = out.split("\n");
   for (const region of regions(models).filter((r) => r.file === file && r.appendHeading)) {
     if (region.locate(lines)) continue;
@@ -604,6 +649,8 @@ export function effortSection(levels, defaultEffort) {
     "`pstack:poteto-agent` becomes `subagent_type: \"pstack:poteto-agent-<level>\"`. " +
     "`general-purpose`, or no `subagent_type`, becomes `subagent_type: \"pstack:effort-<level>\"`. " +
     "The effort agents set only `effort`, so the model you pass still decides the model. " +
+    "On Pi, dispatch the same `subagent_type` through the pstack extension's `agent` tool, which passes the " +
+    "agent's level to the child as `--thinking`. " +
     "On Codex, pass the level as `spawn_agent`'s `reasoning_effort` and keep the usual instructions."
   );
 }
@@ -692,8 +739,9 @@ export function overrideSheetBlock(models) {
     "A model may carry a reasoning effort, as in `opus @xhigh` (levels: " + models.efforts.join(", ") + "); " +
     "the role then runs through the pstack effort agent of that level, each entry of a panel list on its own. " +
     "`default effort` sets the level for a value without one; `session` keeps the parent session's effort. " +
-    "`session hook: off` stops the Claude Code or Codex SessionStart hook from injecting the poteto-mode mandate; " +
-    "any other value, or no line, leaves it on.\n\n" +
+    "`session hook: off` stops the Claude Code or Codex SessionStart hook, or the Pi extension, from injecting the " +
+    "poteto-mode mandate; any other value, or no line, leaves it on. " +
+    "On Pi, a `pi models: opus=<provider/id>, sonnet=<provider/id>` line points each alias it names at another Pi model.\n\n" +
     rows +
     `\n\ndefault effort: ${models.defaultEffort}\nsession hook: on`
   );
@@ -713,6 +761,22 @@ export function codexModelNamesSection(models) {
     `on ChatGPT is ${codeList(models.codex.panel)}. If only one model family is reachable, vary reasoning ` +
     "effort and note in the verdict that diversity was reduced.\n\n" +
     "`/setup-pstack` writes the configured model list. On Codex, set it to your Codex model slugs."
+  );
+}
+
+export function piModelNamesSection(models) {
+  const pairs = models.available.map((alias) => `- ${code(alias)}: ${code(models.pi.models[alias])}`).join("\n");
+  return (
+    "Skills name models by the Claude aliases in their Models sections. On Pi, pass the alias as the `agent` " +
+    "tool's `model`; the pstack extension resolves it to a Pi model:\n\n" +
+    pairs +
+    "\n\nA `pi models: opus=<provider/id>, sonnet=<provider/id>` line in the Pi override sheet points each alias " +
+    "it names at another Pi model, for a machine without Anthropic access. The `agent` tool also takes a full " +
+    "`provider/id`, passed through unchanged, and `inherit-parent`, `auto`, or no `model` runs the child on the " +
+    "parent's current model. Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`) " +
+    "stay diverse only while their aliases resolve to distinct models. If one model family is all you can reach, " +
+    "vary the reasoning effort and note in the verdict that diversity was reduced.\n\n" +
+    "`/setup-pstack` writes the configured model list. On Pi, keep the aliases and remap them with `pi models:`."
   );
 }
 
@@ -787,15 +851,15 @@ export function plan(root, models) {
   for (const file of VERSIONED_MANIFESTS) stamp(file, (text) => stampVersion(text, version, file));
   for (const file of new Set(regions(models).map((r) => r.file))) stamp(file, (text) => applyRegions(file, text, models));
   const leads = loadLeadLines(root);
-  for (const [file, line] of leads) {
+  for (const [file, block] of leads) {
     stamp(file, (text) => {
-      const stamped = stampLeadLine(text, line);
+      const stamped = stampLeadLines(text, block);
       if (stamped === null) throw new Error(`${file}: no heading to stamp its lead line under`);
       return stamped;
     });
   }
   for (const skill of slashCommands(read(COMMANDS_DOC), publicSkills(join(root, SKILLS)))) {
-    const preamble = leads.get(`${SKILLS}/${skill.name}/SKILL.md`) === CODEX_PREAMBLE;
+    const preamble = leads.get(`${SKILLS}/${skill.name}/SKILL.md`)?.includes(CODEX.preamble) ?? false;
     put(`${PROMPTS}/${skill.name}.md`, promptStub(skill, { preamble }));
   }
   const agents = effortAgents(models.efforts, read(`${PLUGIN}/agents/poteto-agent.md`));
@@ -917,13 +981,14 @@ export function problems(root, models) {
       return readFileSync(full, "utf8")
         .split("\n")
         .flatMap((line, i) =>
-          [CODEX_PREAMBLE, DRIVER_LINE].includes(line) && leads.get(file) !== line ? [`${file}:${i + 1}`] : [],
+          LEAD_LINES.has(line) && !leads.get(file)?.includes(line) ? [`${file}:${i + 1}`] : [],
         );
     });
     if (strays.length) {
       throw new Error(
-        "generator-owned lead lines outside their files (a Codex preamble needs a row in the Per-skill notes " +
-          `table of ${CODEX_TOOLS}; the driver-skill line belongs to DRIVER_PLAYBOOKS):\n${strays.join("\n")}`,
+        "generator-owned lead lines outside their files (a runtime preamble needs a row in the Per-skill notes " +
+          `table of ${RUNTIMES.map((r) => r.tools).join(" or ")}; the driver-skill line belongs to DRIVER_PLAYBOOKS):\n` +
+          strays.join("\n"),
       );
     }
   });

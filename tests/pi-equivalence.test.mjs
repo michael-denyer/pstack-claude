@@ -24,7 +24,7 @@ function testTitles() {
       const path = join(dir, entry.name);
       if (entry.isDirectory()) walk(path);
       else if (entry.name.endsWith(".test.mjs")) {
-        for (const m of readFileSync(path, "utf8").matchAll(/\btest\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g)) {
+        for (const m of readFileSync(path, "utf8").matchAll(/\btest(?:\.\w+\([^)]*\))?\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g)) {
           titles.add(m[2].replace(/\\(.)/g, "$1"));
         }
       }

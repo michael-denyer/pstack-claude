@@ -33,10 +33,10 @@
   },
   "pi": {
     "models": {
-      "opus": "anthropic/claude-opus-5.5",
-      "fable": "anthropic/claude-fable-5.1",
-      "sonnet": "anthropic/claude-sonnet-5.5",
-      "haiku": "anthropic/claude-haiku-4.5"
+      "opus": "anthropic/claude-opus-5-5",
+      "fable": "anthropic/claude-fable-5-1",
+      "sonnet": "anthropic/claude-sonnet-5-5",
+      "haiku": "anthropic/claude-haiku-4-5"
     }
   }
 }

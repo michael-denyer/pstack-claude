@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { AgentRunner, registerAgentTools } from "./agents.ts";
 import { defaultSettings, type Settings } from "./config.ts";
+import { registerLifecycle } from "./lifecycle.ts";
 
 export function install(pi: ExtensionAPI, settings: Settings): AgentRunner {
   const runner = new AgentRunner(pi, settings);
@@ -9,6 +10,7 @@ export function install(pi: ExtensionAPI, settings: Settings): AgentRunner {
   pi.on("session_start", (_event, ctx) => {
     runner.restore(ctx.sessionManager.getEntries());
   });
+  registerLifecycle(pi, settings, () => runner.stopAll());
   return runner;
 }
 

@@ -509,6 +509,11 @@ describe("lead lines", () => {
     );
   });
 
+  test("the Pi notes table covers every skill the Codex notes table does", () => {
+    const rows = (runtime) => noteSkills(runtime, readFileSync(join(repoRoot, runtime.tools), "utf8"));
+    expect(rows(codex).filter((skill) => !rows(pi).includes(skill))).toEqual([]);
+  });
+
   test("a notes table lists its skills in row order and rejects a row without one", () => {
     const table = (...rows) => ["| Skill | On Pi |", "|-------|-------|", ...rows, "", "after"].join("\n");
     expect(noteSkills(pi, table("| `how` | fan-out |", "| `teach` | images |"))).toEqual(["how", "teach"]);
@@ -823,6 +828,16 @@ describe("plan, changes, apply", () => {
     append(root, "plugins/pstack/skills/tdd/SKILL.md", `\n${codex.preamble}\n`);
     const codexTools = "plugins/pstack/skills/poteto-mode/references/codex-tools.md";
     writeFileSync(join(root, codexTools), readFileSync(join(root, codexTools), "utf8").replace(/^\| `why` \|.*\n/m, ""));
+    const failures = problems(root).filter((f) => f.startsWith("generator-owned lead lines"));
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain("\nplugins/pstack/skills/why/SKILL.md:");
+    expect(failures[0]).toContain("\nplugins/pstack/skills/tdd/SKILL.md:");
+  });
+
+  test("problems reports a Pi preamble in a file whose skill has no Pi row", () => {
+    const root = repoCopy();
+    append(root, "plugins/pstack/skills/tdd/SKILL.md", `\n${pi.preamble}\n`);
+    writeFileSync(join(root, pi.tools), readFileSync(join(root, pi.tools), "utf8").replace(/^\| `why` \|.*\n/m, ""));
     const failures = problems(root).filter((f) => f.startsWith("generator-owned lead lines"));
     expect(failures).toHaveLength(1);
     expect(failures[0]).toContain("\nplugins/pstack/skills/why/SKILL.md:");

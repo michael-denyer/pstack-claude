@@ -7,6 +7,8 @@ description: Configure which models pstack uses per role. Detects available mode
 
 On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.
 
+On Pi, read the [platform mapping](../poteto-mode/references/pi-tools.md), including its per-skill notes, before following this skill.
+
 On another runtime, read [Other runtimes](#other-runtimes) below for where the sheet lives and how it loads; the steps are the same.
 
 Write the current runtime's per-role model override sheet, using the path in [Other runtimes](#other-runtimes). Each pstack skill names a default model inline; the override sheet adapts those defaults to the models you actually have access to.

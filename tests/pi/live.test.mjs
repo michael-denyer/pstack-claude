@@ -416,7 +416,7 @@ suite("pstack on live pi", () => {
   );
 
   test(
-    "worktree: an isolated agent runs in its own worktree, removed when clean and kept with changes",
+    "worktree: an isolated agent runs in its own worktree, removed when clean and kept with changes; pstack:poteto-agent carries its agent file",
     async () => {
       await withParent(async (parent) => {
         const cleanFrom = await parent.run(
@@ -437,9 +437,12 @@ suite("pstack on live pi", () => {
         expect(git("branch", "--list", clean.worktree.branch)).toBe("");
 
         const dirtyFrom = await parent.run(
-          'Make one agent tool call in the foreground with isolation "worktree", description "wt-dirty", prompt "Use the bash tool to run exactly: echo hi > note.txt. Then reply with exactly one word: done". Then reply with exactly one word: ok.',
+          'Make one agent tool call in the foreground with subagent_type "pstack:poteto-agent", isolation "worktree", description "wt-dirty", prompt "Use the bash tool to run exactly: echo hi > note.txt. Then reply with exactly one word: done". Then reply with exactly one word: ok.',
         );
         const dirty = agentByDescription(file, "wt-dirty").at(-1);
+        expect(dirty.subagentType).toBe("pstack:poteto-agent");
+        const agentBody = /^---\n[\s\S]*?\n---\n([\s\S]*)$/.exec(readFileSync(join(pluginRoot, "agents/poteto-agent.md"), "utf8"))[1].trim();
+        expect(sections(childEntries(dirty)).addendum).toContain(agentBody);
         const [dirtyResult] = parent.toolResults("agent", dirtyFrom);
         expect(textOf(dirtyResult)).toContain(`worktree: ${dirty.worktree.path} (branch ${dirty.worktree.branch})`);
         expect(readFileSync(join(dirty.worktree.path, "note.txt"), "utf8")).toBe("hi\n");

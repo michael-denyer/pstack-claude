@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const BUNDLED = resolve(dirname(fileURLToPath(import.meta.url)), "../playbooks");
 const CHANGE = /^\s*[-*]\s+\*\*(?:After|Before|Replace|In)\*\*\s+"([^"]+)"/;
+const CHANGE_VERB = /^\s*[-*]\s+\*\*(?:After|Before|Replace|In)\*\*/;
 const flat = (text) => text.replace(/\s+/g, " ");
 
 export function checkPlaybooks(root, bundled = BUNDLED) {
@@ -30,6 +31,9 @@ export function checkPlaybooks(root, bundled = BUNDLED) {
       if (base.text === null) problems.push(`${path}: extends \`${base.stem}\`, which this pstack has no playbook for`);
     }
     for (const line of text.split("\n")) {
+      if (CHANGE_VERB.test(line) && !CHANGE.test(line)) {
+        problems.push(`${path}: a change has no straight-quoted step text to anchor on: ${line.trim().slice(0, 80)}`);
+      }
       const anchor = line.match(CHANGE)?.[1];
       if (anchor && !bases.some((base) => base.text && flat(base.text).includes(flat(anchor)))) {
         problems.push(`${path}: "${anchor}" is not in any playbook it extends`);

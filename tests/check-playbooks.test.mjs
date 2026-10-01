@@ -28,13 +28,15 @@ describe("project playbooks", () => {
     expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
   });
 
-  test("an unknown base and step text the base does not say both fail", () => {
+  test("an unknown base, step text the base does not say, and an unquoted change all fail", () => {
     const result = run({
       "bug-fix.md": '---\nextends: bug-fix\nwhen: Use it for any bug report.\n---\n- **After** "Ask the user to reproduce it": compare with main.\n',
       "ship.md": "---\nextends: shipping-v2\nwhen: Use it to ship.\n---\n",
+      "fix.md": "---\nextends: bug-fix\nwhen: Use it to fix.\n---\n- **After** \u201cBinary-search the cause\u201d: compare with main.\n",
     });
     expect(result.code).toBe(1);
     expect(result.out).toContain('.agents/playbooks/bug-fix.md: "Ask the user to reproduce it" is not in any playbook it extends');
     expect(result.out).toContain(".agents/playbooks/ship.md: extends `shipping-v2`, which this pstack has no playbook for");
+    expect(result.out).toContain(".agents/playbooks/fix.md: a change has no straight-quoted step text to anchor on");
   });
 });

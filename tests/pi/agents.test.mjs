@@ -1,7 +1,7 @@
 // The agent tools driven through a fake ExtensionAPI, with the fake pi as the child.
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { defaultSettings } from "../../plugins/pstack/pi/config.ts";
@@ -397,6 +397,7 @@ describe("send_message", () => {
     await sleep(300);
     expect(w.invocations()).toHaveLength(1);
     expect(pi.messages.map((m) => m.message.details.status)).toEqual(["stopped"]);
+    expect(readdirSync(w.root, { recursive: true }).filter((p) => String(p).endsWith(".inbox"))).toEqual([]);
   });
 
   test("an unknown recipient is an error naming the known agents", async () => {

@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -317,6 +317,7 @@ export class AgentRunner {
       resolveDone();
       // Messages the run never took resume the agent; a stop discards them.
       const untaken = take(inboxDir(record));
+      rmSync(inboxDir(record), { recursive: true, force: true });
       if (untaken.length && record.status !== "stopped") {
         try {
           this.launch(record, untaken.join("\n\n"), true);

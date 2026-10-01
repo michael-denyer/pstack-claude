@@ -19,4 +19,4 @@ Check the diff against main and remove AI-generated slop introduced in the branc
 
 - Keep behavior unchanged unless fixing a clear bug.
 - Prefer minimal, focused edits over broad rewrites.
-- Keep the final summary concise (1-3 sentences).
+- Keep the final summary concise (1-3 sentences). Name any principle that shaped a removal inside those sentences, not in extra ones.

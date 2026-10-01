@@ -32,6 +32,9 @@
   "pi": {
     "skills": [
       "./plugins/pstack/skills"
+    ],
+    "extensions": [
+      "./plugins/pstack/pi/index.ts"
     ]
   }
 }

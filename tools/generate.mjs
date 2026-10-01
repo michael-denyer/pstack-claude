@@ -5,7 +5,7 @@
 // nothing and fails when a committed copy is stale, so it cannot ship.
 //
 // Sources of truth:
-//   VERSION  -> the "version" field in the three plugin manifests
+//   VERSION  -> the "version" field in the plugin manifests and the Pi package.json
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
 //   each skill's frontmatter (name + description) defines the shared Agent
 //   Skills boundary consumed natively by Codex, Prime, opencode, and Gemini CLI
@@ -38,7 +38,8 @@
 //
 // Also validated: .agents/plugins/marketplace.json points at a real plugin
 // directory whose Codex manifest name matches (it carries no version; Codex
-// reads the version from .codex-plugin/plugin.json).
+// reads the version from .codex-plugin/plugin.json), and the repo-root
+// package.json that makes the repo a Pi package lists paths that exist.
 
 import {
   existsSync,
@@ -67,6 +68,7 @@ const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
   "plugins/pstack/.claude-plugin/plugin.json",
   "plugins/pstack/.codex-plugin/plugin.json",
+  "package.json",
 ];
 
 export const PORTABLE_ASSETS = [
@@ -131,6 +133,31 @@ export function validateCodexMarketplace(text, { expectedName, pathExists }) {
   const path = plugin.source?.path;
   if (!path || !pathExists(path)) {
     throw new Error(`.agents/plugins/marketplace.json: source.path "${path}" does not resolve to a directory`);
+  }
+}
+
+const PI_SKILLS = `./${SKILLS}`;
+const PI_EXTENSION = `./${PLUGIN}/pi/index.ts`;
+
+// `pi install` reads the repo-root package.json's `pi` key. A path there that
+// does not exist loads nothing without failing the install, and an extension
+// entry the key omits never loads, so both directions are checked here.
+export function validatePiPackage(text, { pathExists }) {
+  const manifest = JSON.parse(text);
+  const fail = (message) => {
+    throw new Error(`package.json: ${message}`);
+  };
+  if (!manifest.keywords?.includes("pi-package")) fail('keywords must include "pi-package"');
+  if (Object.keys(manifest.dependencies ?? {}).length) fail("the Pi package has no runtime dependencies");
+  const pi = manifest.pi ?? {};
+  for (const key of ["skills", "extensions"]) {
+    for (const path of pi[key] ?? []) {
+      if (!pathExists(path.replace(/^\.\//, ""))) fail(`pi.${key} names ${path}, which does not exist`);
+    }
+  }
+  if (!pi.skills?.includes(PI_SKILLS)) fail(`pi.skills must list ${PI_SKILLS}`);
+  if (pathExists(PI_EXTENSION.slice(2)) && !pi.extensions?.includes(PI_EXTENSION)) {
+    fail(`pi.extensions must list ${PI_EXTENSION}`);
   }
 }
 
@@ -1002,6 +1029,11 @@ export function problems(root, models) {
       }),
     );
   }
+  attempt(() =>
+    validatePiPackage(readFileSync(join(root, "package.json"), "utf8"), {
+      pathExists: (p) => existsSync(join(root, p)),
+    }),
+  );
   attempt(() => validatePluginLayout(pluginRoot));
   attempt(() => validateAgentFrontmatter(pluginRoot));
   for (const file of ["hooks/hooks.json", ...(codexManifest ? [codexManifest.hooks] : [])]) {
@@ -1033,7 +1065,7 @@ function main() {
   if (pending?.length === 0) console.log(`ok: ${Object.keys(intended.files).length} generated files current`);
   for (const failure of failures) console.error(`FAIL: ${failure}`);
   if (failures.length) process.exit(1);
-  console.log("ok: skill links, prose paths, model slugs, marketplace, plugin layout, agent frontmatter, and hooks pass their checks");
+  console.log("ok: skill links, prose paths, model slugs, marketplace, Pi package, plugin layout, agent frontmatter, and hooks pass their checks");
 }
 
 // Guarded so importing the generator's validation and rendering functions does

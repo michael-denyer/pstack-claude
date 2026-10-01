@@ -51,6 +51,7 @@ import {
   tableRows,
   validateCodexMarketplace,
   validateHooks,
+  validatePiPackage,
 } from "../tools/generate.mjs";
 import { walk } from "../tools/validate-skills.mjs";
 
@@ -239,6 +240,7 @@ describe("manifests", () => {
   const codex = json("plugins/pstack/.codex-plugin/plugin.json");
   const claudeMarketplace = json(".claude-plugin/marketplace.json");
   const codexMarketplace = json(".agents/plugins/marketplace.json");
+  const piPackage = json("package.json");
 
   test("the plugin and marketplace manifests agree on every fact they repeat", () => {
     const shared = ({ name, author, homepage, repository, license, keywords }) =>
@@ -247,11 +249,51 @@ describe("manifests", () => {
     expect(shared(codex)).toEqual(shared(claude));
     expect(claudeMarketplace.owner).toEqual(claude.author);
     expect(claudeMarketplace.plugins.map(({ name, source }) => [name, source])).toEqual([[claude.name, "./plugins/pstack"]]);
+    expect(shared(piPackage)).toEqual({ ...shared(claude), keywords: ["pi-package", ...claude.keywords] });
+    expect(piPackage.version).toBe(claude.version);
     expect(codexMarketplace.name).toBe(claudeMarketplace.name);
     expect(codexMarketplace.interface.displayName).toBe(codex.interface.displayName);
     expect(codexMarketplace.plugins.map(({ name, source, category }) => [name, source.path, category])).toEqual([
       [codex.name, claudeMarketplace.plugins[0].source, codex.interface.category],
     ]);
+  });
+});
+
+describe("validatePiPackage", () => {
+  const ENTRY = "plugins/pstack/pi/index.ts";
+  const manifest = (pi, extra = {}) => JSON.stringify({ name: "pstack", keywords: ["pi-package"], ...extra, pi });
+  const good = { skills: ["./plugins/pstack/skills"], extensions: [`./${ENTRY}`] };
+  const everything = () => true;
+
+  test("accepts the skills tree and the extension entry when both exist", () => {
+    expect(() => validatePiPackage(manifest(good), { pathExists: everything })).not.toThrow();
+  });
+
+  test("names each listed path that does not exist", () => {
+    const pathExists = (rel) => rel !== "plugins/pstack/skill";
+    expect(() =>
+      validatePiPackage(manifest({ ...good, skills: ["./plugins/pstack/skill"] }), { pathExists }),
+    ).toThrow("package.json: pi.skills names ./plugins/pstack/skill, which does not exist");
+  });
+
+  test("requires the skills tree, and the extension entry whenever it exists", () => {
+    expect(() => validatePiPackage(manifest({ ...good, skills: [] }), { pathExists: everything })).toThrow(
+      "package.json: pi.skills must list ./plugins/pstack/skills",
+    );
+    const { extensions, ...skillsOnly } = good;
+    expect(() => validatePiPackage(manifest(skillsOnly), { pathExists: everything })).toThrow(
+      `package.json: pi.extensions must list ./${ENTRY}`,
+    );
+    expect(() => validatePiPackage(manifest(skillsOnly), { pathExists: (rel) => rel !== ENTRY })).not.toThrow();
+  });
+
+  test("requires the pi-package keyword and no runtime dependencies", () => {
+    expect(() => validatePiPackage(manifest(good, { keywords: [] }), { pathExists: everything })).toThrow(
+      'package.json: keywords must include "pi-package"',
+    );
+    expect(() => validatePiPackage(manifest(good, { dependencies: { x: "1" } }), { pathExists: everything })).toThrow(
+      "package.json: the Pi package has no runtime dependencies",
+    );
   });
 });
 

@@ -34,11 +34,20 @@ if (scenario === 'slow') {
   writeFileSync(process.env.WATCH_PID, String(process.pid));
   await new Promise(resolve => setTimeout(resolve, 2000));
 }
+const noCi = scenario.startsWith('no-ci');
+const fail = (stderr) => { console.error(stderr); process.exit(1); };
 let value;
 if (args[0] === 'pr' && args[1] === 'view') {
-  value = { headRefOid: 'head', baseRefOid: 'base', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', reviewDecision: 'APPROVED', headRefName: 'feature', baseRefName: 'main', state: 'OPEN', mergedAt: null, isDraft: false };
+  value = { headRefOid: 'head', baseRefOid: 'base', mergeable: 'MERGEABLE', mergeStateStatus: scenario === 'no-ci-blocked' ? 'BLOCKED' : 'CLEAN', reviewDecision: noCi ? '' : 'APPROVED', headRefName: 'feature', baseRefName: 'main', state: 'OPEN', mergedAt: null, isDraft: false };
 } else if (args[0] === 'pr' && args[1] === 'checks') {
+  if (scenario === 'no-ci-unauthorized') fail('HTTP 401: Bad credentials (https://api.github.com/graphql)');
+  if (noCi) fail("no checks reported on the 'feature' branch");
   value = [{ name: 'ci', state: 'SUCCESS', bucket: 'pass', description: '', link: '', workflow: '' }];
+} else if (args.some(a => a.includes('query PrCheckRollup'))) {
+  if (scenario === 'no-ci-rollup-fails') fail('HTTP 502: Bad Gateway (https://api.github.com/graphql)');
+  value = { data: { repository: { pullRequest: { commits: { nodes: [{ commit: { statusCheckRollup: null } }] } } } } };
+} else if (noCi && args.some(a => a.includes('query PrCommitStatuses'))) {
+  value = { data: { repository: { pullRequest: { commits: { nodes: [{ commit: { oid: 'head', statusCheckRollup: null } }] } } } } };
 } else if (args[0] === 'pr' && args[1] === 'list') {
   value = [{ number: 1, headRefName: 'main', baseRefName: 'main', headRepository: { name: 'repo', nameWithOwner: 'fork/repo' }, headRepositoryOwner: { login: 'fork' } }];
 } else if (args.some(a => a.includes('query ReviewThreads'))) {
@@ -121,6 +130,48 @@ it("keeps a fork main branch distinct from destination main during stack discove
     kind: "STATUS",
     rows: [{ context: { number: 1 } }],
   });
+});
+
+// The no-ci fixtures replay what gh returned for a mergeable PR in a repository
+// with no checks configured: `gh pr checks` exits 1 with "no checks reported"
+// and the head commit's statusCheckRollup is null.
+it("finishes a status-only pass for a clean PR with no checks configured", () => {
+  const result = run("no-ci", ["--status-only", "--max-query-errors", "1"]);
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({
+    kind: "STATUS",
+    terminal: true,
+    rows: [{ kind: "open", ci: { kind: "ci-none" } }],
+  });
+});
+
+it("reports a clean PR with no checks configured as READY", () => {
+  const result = run("no-ci", ["--max-query-errors", "1"]);
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({
+    kind: "READY",
+    scope: { pr: { kind: "ready-pr", proof: { ci: { kind: "ci-none" } } } },
+  });
+});
+
+it("stops at the merge gate when GitHub blocks a PR that has no checks", () => {
+  const result = run("no-ci-blocked", ["--max-query-errors", "1"]);
+  expect(result.status).toBe(6);
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({
+    kind: "BLOCKER",
+    blocker: { kind: "merge-gate", reason: "merge-blocked" },
+  });
+});
+
+it("fails closed when the check queries fail instead of reporting no checks", () => {
+  for (const scenario of ["no-ci-unauthorized", "no-ci-rollup-fails"]) {
+    const result = run(scenario, ["--status-only", "--max-query-errors", "1"]);
+    expect(result.status).toBe(7);
+    expect(JSON.parse(result.stdout.trim())).toMatchObject({
+      kind: "BLOCKER",
+      blocker: { kind: "status-query" },
+    });
+  }
 });
 
 it("cancels an in-flight command at the CLI deadline", () => {

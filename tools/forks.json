@@ -32,7 +32,7 @@
     },
     "plugins/pstack/skills/poteto-mode/SKILL.md": {
       "kind": "policy",
-      "why": "Adds the deploy-platform and defect-severity triggers and the port's principle summaries beside the Claude Code Platform Adaptation section and run-or-verify driver line.",
+      "why": "Adds the deploy-platform and defect-severity triggers, the port's principle summaries and the project playbooks paragraph beside the Claude Code Platform Adaptation section and run-or-verify driver line.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },

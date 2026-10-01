@@ -1,0 +1,50 @@
+#!/usr/bin/env node
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+
+const BUNDLED = resolve(dirname(fileURLToPath(import.meta.url)), "../playbooks");
+const CHANGE = /^\s*[-*]\s+\*\*(?:After|Before|Replace|In)\*\*\s+"([^"]+)"/;
+const flat = (text) => text.replace(/\s+/g, " ");
+
+export function checkPlaybooks(root, bundled = BUNDLED) {
+  const dir = join(root, ".agents/playbooks");
+  if (!existsSync(dir)) return [];
+  const problems = [];
+  for (const name of readdirSync(dir).filter((file) => file.endsWith(".md")).sort()) {
+    const path = `.agents/playbooks/${name}`;
+    const text = readFileSync(join(dir, name), "utf8");
+    const front = text.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? "";
+    const field = (key) => front.match(new RegExp(`^${key}:[ \\t]*(.*)$`, "m"))?.[1].trim() ?? "";
+    if (!field("when")) problems.push(`${path}: its frontmatter needs a "when:" line`);
+    const bases = field("extends")
+      .split(",")
+      .map((stem) => stem.trim())
+      .filter(Boolean)
+      .map((stem) => {
+        const file = join(bundled, `${stem}.md`);
+        return { stem, text: existsSync(file) ? readFileSync(file, "utf8") : null };
+      });
+    for (const base of bases) {
+      if (base.text === null) problems.push(`${path}: extends \`${base.stem}\`, which this pstack has no playbook for`);
+    }
+    for (const line of text.split("\n")) {
+      const anchor = line.match(CHANGE)?.[1];
+      if (anchor && !bases.some((base) => base.text && flat(base.text).includes(flat(anchor)))) {
+        problems.push(`${path}: "${anchor}" is not in any playbook it extends`);
+      }
+    }
+  }
+  return problems;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const problems = checkPlaybooks(resolve(process.argv[2] ?? "."));
+  if (problems.length > 0) {
+    console.error(problems.join("\n"));
+    process.exitCode = 1;
+  } else {
+    console.log("Every project playbook matches this pstack's playbooks.");
+  }
+}

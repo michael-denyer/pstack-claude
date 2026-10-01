@@ -5,22 +5,17 @@
 //
 //   bun tests/pi/dogfood.mjs [--keep]
 //
-// Reads PSTACK_PI_LIVE_MODELS like the live suite (a `pi models:` line).
+// Picks models like the live suite: PSTACK_PI_LIVE_PROVIDER and PSTACK_PI_LIVE_MODELS.
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseSheet } from "../../plugins/pstack/pi/config.ts";
-import { gitRepo } from "./harness.mjs";
+import { gitRepo, liveModels } from "./harness.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
-const PI_MODELS =
-  process.env.PSTACK_PI_LIVE_MODELS ??
-  "pi models: opus=openai-codex/gpt-6-astra, fable=openai-codex/gpt-6-sol, sonnet=openai-codex/gpt-6-luna, haiku=openai-codex/gpt-6-luna";
-const SHEET = `${PI_MODELS}\ninterrogate reviewers: opus, fable, sonnet\nsession hook: on\n`;
-const MODELS = parseSheet(SHEET).piModels;
+const { sheet: SHEET, models: MODELS } = liveModels(join(repoRoot, "plugins/pstack"), "", "interrogate reviewers: opus, fable, sonnet\n");
 
 const root = mkdtempSync(join(tmpdir(), "pstack-pi-dogfood-"));
 const agentDir = join(root, "agent");
@@ -88,11 +83,14 @@ const walk = (p) => {
 };
 walk(join(agentDir, "pstack"));
 
-const finalText = parent
-  .filter((e) => e.type === "message" && e.message.role === "assistant")
-  .map((e) => e.message.content.filter((c) => c.type === "text").map((c) => c.text).join("\n"))
-  .filter(Boolean)
-  .at(-1);
+// A notice that lands after the verdict starts one more short turn, so the
+// verdict is the last text with an Act On heading, not the last text.
+const texts = parent
+  .map((e, i) => [i, e.type === "message" && e.message.role === "assistant" ? e.message.content.filter((c) => c.type === "text").map((c) => c.text).join("\n") : ""])
+  .filter(([, t]) => t);
+const [verdictAt, finalText] = texts.findLast(([, t]) => /^#+\s*act on\b/im.test(t)) ?? [-1, texts.at(-1)?.[1]];
+const lastNoticeAt = parent.findLastIndex((e) => e.type === "custom_message" && e.customType === "pstack-agent");
+const notices = parent.filter((e) => e.type === "custom_message" && e.customType === "pstack-agent").length;
 
 const checks = {
   "pi exited 0": run.status === 0,
@@ -104,13 +102,15 @@ const checks = {
   "the reviewers ran on three distinct models": new Set([...records.values()].map((r) => r.model)).size === 3,
   "each reviewer's session used its own model": childModels.length === 3 && new Set(childModels).size === 3,
   "every reviewer completed": [...records.values()].every((r) => r.status === "completed"),
-  "the verdict has an Act On section": /act on/i.test(finalText ?? ""),
+  "the verdict has an Act On section": verdictAt >= 0,
+  "each reviewer's result reached the lead once": notices === 3,
+  "the verdict came after every reviewer's result": verdictAt > lastNoticeAt,
   "the verdict names the page offset bug": /(page\s*-\s*1|\(page - 1\)|off[- ]by[- ]one|first page|skips?)/i.test(finalText ?? ""),
 };
 
 console.log(`root: ${root}`);
 console.log(`elapsed: ${Math.round((Date.now() - started) / 1000)} s, exit ${run.status}, signal ${run.signal}`);
-console.log(`agent calls: ${JSON.stringify(agentCalls.map((a) => ({ model: a.model, readonly: a.readonly, type: a.subagent_type })))}`);
+console.log(`agent calls: ${JSON.stringify(agentCalls.map((a) => ({ model: a.model, readonly: a.readonly, background: a.run_in_background, type: a.subagent_type })))}`);
 console.log(`child models: ${childModels.join(" | ")}`);
 console.log(`reads: ${reads.join(", ")}`);
 for (const [name, ok] of Object.entries(checks)) console.log(`${ok ? "PASS" : "FAIL"}  ${name}`);

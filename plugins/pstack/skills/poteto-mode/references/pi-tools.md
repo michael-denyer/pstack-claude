@@ -18,7 +18,7 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 | Dispatch a subagent (the `Agent`/`Task` tool) | `agent` |
 | Dispatch N parallel subagents in one turn | N `agent` calls with `run_in_background: true` in one response |
 | Wait for a subagent result | A foreground `agent` call returns the final text. A background agent's completion arrives as a message naming its id, status, and final text, after your current tool calls or as a new turn when you are idle, so do not poll. |
-| Continue a finished subagent (`SendMessage`) | `send_message`, addressed by agent id or description |
+| Continue or steer a subagent (`SendMessage`) | `send_message`, addressed by agent id or description |
 | List subagents | `list_agents` |
 | Stop a subagent | `stop_agent` |
 | Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | Pi has no task-tracking tool. Keep the `todo.md` checklist poteto-mode describes for that case. |
@@ -40,7 +40,7 @@ poteto-mode's Subagents section applies on Pi through the `agent` tool:
 - `run_in_background: true` returns the agent id at once. The completion joins the conversation after your current tool calls finish, as on Claude Code, or starts a turn when you are idle. In print and json mode (`pi -p`), where Pi exits once the run settles, the extension holds the settle while a background agent runs, so each completion still arrives as a turn and the process ends after the last one. Interactive and RPC sessions settle as usual and take the completion when it arrives.
 - An agent's status follows its process. `completed` means the child exited, and `stop_agent` reports `stopped` only once the process tree is gone, so the Claude Code caveat about a `completed` agent that keeps running does not apply. A stopped agent's notice joins the conversation without starting a turn, since `stop_agent` already returned.
 - Agents belong to the session that started them. Quitting, reloading, and starting, resuming, or forking a session all stop every running agent, and a parent that crashes takes its agents with it.
-- `send_message` to a finished agent resumes its session with the context of its earlier runs. A message to a running agent waits until it exits.
+- `send_message` to a running agent reaches it after its current tool calls, as on Claude Code, and the agent carries on in the same run and sends one completion notice. A message to a finished agent resumes its session with the context of its earlier runs, and so does a message that arrives as the run ends.
 - A role value's `@<level>` picks the same effort agent as on Claude Code, and the extension passes its level to the child as `--thinking`. `session`, or an agent with no effort, runs the child at the parent's current thinking level.
 - Keep the rest of the policy unchanged. Pass file pointers not inlined context, give each worker its own worktree when they write, review every subagent's diff yourself.
 
@@ -101,7 +101,7 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | `how` | The parallel explorers and the explainer are `agent` calls, and `readonly` applies as written (see Subagent policy). |
 | `reflect` | The three reviewers and the synthesizer are background `agent` calls. The transcript finder reads Pi sessions too. Pass it this workspace's Pi sessions directory (see Tool actions) in place of Claude Code's projects directory. It follows the session's active branch to its opening prompt. Skill files load from the Pi package directory that `pi list` shows, not `~/.claude/plugins/`, so treat reads under that directory as plugin skill reads. |
 | `swarm` | Each worker is a background `agent` call on the configured alias. Give each writing worker `isolation: "worktree"` or its own output directory (see Subagent policy above). |
-| `why` | The parallel investigators and the synthesizer are background `agent` calls. List MCP servers from the tools Pi exposes to the session or `pi mcp list`, not from `.mcp.json` or `claude mcp list`. |
+| `why` | The parallel investigators and the synthesizer are background `agent` calls. List MCP servers from the tools Pi exposes to the session or `pi mcp list`, not from `.mcp.json` or `claude mcp list`. Spawn the synthesizer only after every investigator's completion notice has arrived, because those notices carry the findings the synthesizer gets. A `send_message` to an investigator returns no findings, so wait for its notice. |
 
 ## Vendored scripts
 

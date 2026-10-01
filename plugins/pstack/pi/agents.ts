@@ -276,11 +276,12 @@ export class AgentRunner {
       record.exitCode = spawnError ? null : exitCode;
       record.endedAt = new Date().toISOString();
       record.status = run.stopRequested ? "stopped" : exitCode === 0 && finalText && !spawnError ? "completed" : "failed";
-      record.finalText =
-        finalText || errorMessage || spawnError?.message || stderr.trim() || "(no output)";
-      if (record.status === "failed" && finalText && (errorMessage || stderr.trim())) {
-        record.finalText = `${finalText}\n\n${errorMessage || stderr.trim()}`;
-      }
+      // Stderr diagnoses a failure. A stopped child's stderr is not its output:
+      // pi warns there on every first run of a --session-id.
+      const diagnostics = errorMessage || spawnError?.message || stderr.trim();
+      if (record.status === "stopped") record.finalText = finalText || "(stopped before it replied)";
+      else if (record.status === "failed" && finalText && diagnostics) record.finalText = `${finalText}\n\n${diagnostics}`;
+      else record.finalText = finalText || diagnostics || "(no output)";
       if (record.worktree) {
         try {
           this.settleWorktree(record.worktree);

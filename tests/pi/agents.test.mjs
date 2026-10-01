@@ -198,6 +198,30 @@ describe("stop_agent", () => {
     expect(Date.now() - started).toBeLessThan(3000);
   });
 
+  test("a stopped agent reports its last reply, never pi's stderr diagnostics as its output", async () => {
+    const warning = "Warning: No project session found with id 'x'; creating a new session with that id.\n";
+    const { pi, ctx } = setup({
+      script: {
+        byPrompt: {
+          quiet: [{ stderr: warning }, { sleep: 30000 }],
+          chatty: [{ stderr: warning }, { reply: "halfway" }, { sleep: 30000 }],
+        },
+      },
+    });
+    const quiet = (await pi.call("agent", { description: "quiet", prompt: "quiet", run_in_background: true }, ctx)).details.agentId;
+    const chatty = (await pi.call("agent", { description: "chatty", prompt: "chatty", run_in_background: true }, ctx)).details.agentId;
+    await waitFor(() => w.invocations().length === 2);
+    await new Promise((r) => setTimeout(r, 300));
+    await pi.call("stop_agent", { id: quiet }, ctx);
+    await pi.call("stop_agent", { id: chatty }, ctx);
+
+    const notice = (id) => pi.messages.find((m) => m.message.details.agentId === id).message.content;
+    expect(notice(quiet)).toContain("status: stopped");
+    expect(notice(quiet)).toContain("stopped before it replied");
+    expect(notice(chatty)).toContain("halfway");
+    for (const id of [quiet, chatty]) expect(notice(id)).not.toContain("No project session");
+  });
+
   test("stopping an exited agent reports its final status unchanged", async () => {
     const { pi, ctx } = setup();
     const { details } = await pi.call("agent", { description: "quick", prompt: "x" }, ctx);

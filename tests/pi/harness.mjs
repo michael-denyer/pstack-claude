@@ -21,7 +21,7 @@ export const fixtureModels = {
   },
 };
 
-export function fakePi() {
+export function fakePi({ thinking = "medium" } = {}) {
   const tools = new Map();
   const commands = new Map();
   const handlers = new Map();
@@ -37,6 +37,7 @@ export function fakePi() {
     },
     sendMessage: (message, options) => messages.push({ message, options }),
     sendUserMessage: (content, options) => userMessages.push({ content, options }),
+    getThinkingLevel: () => thinking,
     appendEntry: (customType, data) =>
       entries.push({ type: "custom", customType, data: JSON.parse(JSON.stringify(data)) }),
   };

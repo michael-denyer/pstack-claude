@@ -46,9 +46,10 @@ describe("before_agent_start", () => {
     expect(await sectionsAfterStart(pi, ctx)).toEqual({ "pstack-models": sheet });
   });
 
-  test("a child pi gets neither", async () => {
-    const { pi, ctx } = setup({ sheet: "swarm workers: opus\n" }, { isChild: true });
-    expect(await sectionsAfterStart(pi, ctx)).toEqual({});
+  test("a child pi gets the sheet but not the mandate", async () => {
+    const sheet = "swarm workers: opus\n";
+    const { pi, ctx } = setup({ sheet }, { isChild: true });
+    expect(await sectionsAfterStart(pi, ctx)).toEqual({ "pstack-models": sheet });
   });
 
   test("PSTACK_PI_CHILD=1 marks a child and PI_CODING_AGENT_DIR moves the sheet", () => {

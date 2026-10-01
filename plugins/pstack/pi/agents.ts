@@ -159,7 +159,8 @@ export class AgentRunner {
       description: params.description,
       subagentType: type,
       model,
-      thinking: def?.effort,
+      // Claude Code subagents without an effort run at the session's effort.
+      thinking: def?.effort ?? this.pi.getThinkingLevel(),
       sessionId: randomUUID(),
       sessionDir,
       systemPromptFile,
@@ -211,14 +212,16 @@ export class AgentRunner {
     if (record.model) args.push("--model", record.model);
     if (record.thinking) args.push("--thinking", record.thinking);
     if (record.systemPromptFile) args.push("--append-system-prompt", record.systemPromptFile);
-    args.push("--", prompt);
 
     const child = spawn(this.settings.pi.command, [...this.settings.pi.args, ...args], {
       cwd: record.cwd,
       env: this.settings.childEnv,
       detached: true,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
     });
+    // The prompt goes in on stdin: argv would cap it at 128 KiB and expand a leading @ as a file.
+    child.stdin!.on("error", () => {});
+    child.stdin!.end(prompt);
     Object.assign(record, {
       status: "running",
       pid: child.pid,

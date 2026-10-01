@@ -34,8 +34,9 @@ describe("agent tool", () => {
       "--session-id", inv.argv[4],
       "--session-dir", join(w.agentDir, "pstack", "parent-session", "agents"),
       "--model", "anthropic/parent-model",
-      "--", "-do it",
+      "--thinking", "medium",
     ]);
+    expect(inv.prompt).toBe("-do it");
     expect(inv.argv[4]).toMatch(/^[0-9a-f-]{36}$/);
     expect(inv.cwd).toBe(w.cwd);
     expect(inv.child).toBe("1");
@@ -122,7 +123,7 @@ describe("agent tool", () => {
     expect(w.invocations()).toEqual([]);
   });
 
-  test("an effort agent passes its body as a 0600 system prompt file and its effort as --thinking", async () => {
+  test("an effort agent passes its body as a 0600 system prompt file and its effort as --thinking; others run at the parent's level", async () => {
     const { pi, ctx } = setup();
     await pi.call("agent", { description: "e", prompt: "x", subagent_type: "pstack:effort-xhigh" }, ctx);
     await pi.call("agent", { description: "g", prompt: "x", subagent_type: "general-purpose" }, ctx);
@@ -133,7 +134,7 @@ describe("agent tool", () => {
     const file = effort.argv[effort.argv.indexOf("--append-system-prompt") + 1];
     expect(effort.systemPrompt).toBe(body);
     expect(statSync(file).mode & 0o777).toBe(0o600);
-    expect(general.argv).not.toContain("--thinking");
+    expect(general.argv[general.argv.indexOf("--thinking") + 1]).toBe("medium");
     expect(general.argv).not.toContain("--append-system-prompt");
   });
 });
@@ -230,9 +231,8 @@ describe("send_message", () => {
     await waitFor(() => pi.messages.length === 1);
 
     const [a, b] = w.invocations();
-    const flags = (inv) => inv.argv.slice(0, inv.argv.indexOf("--"));
-    expect(flags(b)).toEqual(flags(a));
-    expect(b.argv.at(-1)).toBe("follow up");
+    expect(b.argv).toEqual(a.argv);
+    expect(b.prompt).toBe("follow up");
     expect(pi.messages[0].options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
     expect(pi.messages[0].message.content).toContain("seen: first task; now: follow up");
     expect(pi.messages[0].message.content).toContain(`agentId: ${first.details.agentId}`);
@@ -249,7 +249,7 @@ describe("send_message", () => {
     await waitFor(() => pi.messages.length === 2);
     expect(pi.messages[0].message.content).toContain("slow done");
     expect(pi.messages[1].message.content).toContain("got more");
-    expect(w.invocations().map((i) => i.argv.at(-1))).toEqual(["slow", "more"]);
+    expect(w.invocations().map((i) => i.prompt)).toEqual(["slow", "more"]);
   });
 
   test("an unknown recipient is an error naming the known agents", async () => {

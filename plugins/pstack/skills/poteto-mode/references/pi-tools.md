@@ -37,7 +37,7 @@ poteto-mode's Subagents section applies on Pi through the `agent` tool:
 - `run_in_background: true` returns the agent id at once, and the completion arrives as a follow-up turn.
 - An agent's status follows its process. `completed` means the child exited, and `stop_agent` reports `stopped` only once the process tree is gone, so the Claude Code caveat about a `completed` agent that keeps running does not apply.
 - `send_message` to a finished agent resumes its session with the context of its earlier runs. A message to a running agent waits until it exits.
-- A role value's `@<level>` picks the same effort agent as on Claude Code, and the extension passes its level to the child as `--thinking`. `session` passes no level.
+- A role value's `@<level>` picks the same effort agent as on Claude Code, and the extension passes its level to the child as `--thinking`. `session`, or an agent with no effort, runs the child at the parent's current thinking level.
 - Keep the rest of the policy unchanged. Pass file pointers not inlined context, give each worker its own worktree when they write, review every subagent's diff yourself.
 
 ## Model names
@@ -55,7 +55,7 @@ A `pi models: opus=<provider/id>, sonnet=<provider/id>` line in the Pi override 
 
 ## Session routing
 
-The pstack Pi extension adds the poteto-mode mandate, the text the Claude Code and Codex `SessionStart` hook injects, to the system prompt at every agent start, so the mandate survives compaction. It also adds the Pi override sheet, because Pi has no include syntax for context files. The sheet is `pstack-models.md` in the Pi agent directory, which is `$PI_CODING_AGENT_DIR` when set and `~/.pi/agent` otherwise. `session hook: off` in the sheet stops the mandate. Child agents that the `agent` tool starts get neither.
+The pstack Pi extension adds the poteto-mode mandate, the text the Claude Code and Codex `SessionStart` hook injects, to the system prompt at every agent start, so the mandate survives compaction. It also adds the Pi override sheet, because Pi has no include syntax for context files. The sheet is `pstack-models.md` in the Pi agent directory, which is `$PI_CODING_AGENT_DIR` when set and `~/.pi/agent` otherwise. `session hook: off` in the sheet stops the mandate. Child agents that the `agent` tool starts get the sheet but not the mandate, as Claude Code subagents see CLAUDE.md but run no `SessionStart` hook.
 
 Without the extension nothing is injected. Request `poteto-mode` explicitly with `/skill:poteto-mode`, or add a standing instruction to `AGENTS.md`.
 

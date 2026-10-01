@@ -60,11 +60,12 @@ export function registerLifecycle(pi: ExtensionAPI, settings: Settings, cleanup:
   // Claude Code runs the session hook and loads the sheet through a CLAUDE.md
   // include; Pi has neither, so both ride as system prompt sections, set again
   // on every agent start so compaction cannot drop them.
+  // A child gets the sheet, as a Claude Code subagent sees CLAUDE.md, but not
+  // the mandate: SessionStart does not run for subagents.
   pi.on("before_agent_start", (event) => {
-    if (settings.isChild) return;
     const sheet = readSheet(settings.agentDir);
     const sections = event.systemPromptOptions.sections;
-    if (!sheet?.hookOff) sections[MANDATE_SECTION] = readFileSync(mandateFile, "utf8");
+    if (!settings.isChild && !sheet?.hookOff) sections[MANDATE_SECTION] = readFileSync(mandateFile, "utf8");
     if (sheet) sections[SHEET_SECTION] = sheet.text;
   });
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Stands in for `pi --mode json -p` (selected with PSTACK_PI_BIN). It logs its
 // invocation to PSTACK_FAKE_PI_LOG and plays the steps PSTACK_FAKE_PI_SCRIPT
-// names for its prompt: { "default": [steps], "byPrompt": { "<prompt>": [steps] } }.
+// names for its prompt, read from stdin as real pi does: { "default": [steps], "byPrompt": { "<prompt>": [steps] } }.
 //
 // Steps: { reply } emits an assistant message_end ("${prompt}" and "${history}"
 // expand, history being the earlier prompts of the same --session-id);
@@ -18,8 +18,7 @@ const flag = (name) => {
   const i = argv.indexOf(name);
   return i === -1 ? undefined : argv[i + 1];
 };
-const dash = argv.indexOf("--");
-const prompt = dash === -1 ? argv.at(-1) : argv.slice(dash + 1).join(" ");
+const prompt = readFileSync(0, "utf8");
 const sessionId = flag("--session-id");
 const sessionDir = flag("--session-dir");
 const systemFile = flag("--append-system-prompt");
@@ -39,6 +38,7 @@ if (sessionId && sessionDir) {
 log({
   kind: "invocation",
   argv,
+  prompt,
   cwd: process.cwd(),
   pid: process.pid,
   child: process.env.PSTACK_PI_CHILD ?? null,

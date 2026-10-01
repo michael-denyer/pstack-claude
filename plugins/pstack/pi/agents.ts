@@ -37,7 +37,8 @@ export interface AgentRecord {
   description: string;
   subagentType: string;
   model?: string;
-  thinking?: Effort;
+  thinking?: Effort | ReturnType<ExtensionAPI["getThinkingLevel"]>;
+  readonly?: boolean;
   sessionId: string;
   sessionDir: string;
   systemPromptFile?: string;
@@ -55,6 +56,8 @@ export interface AgentRecord {
 interface Run {
   child: ChildProcess;
   stopRequested: boolean;
+  // Set by a session-shutdown stop: the session is being torn down, so no notice.
+  silent: boolean;
   done: Promise<void>;
 }
 
@@ -65,6 +68,7 @@ export interface AgentParams {
   model?: string;
   run_in_background?: boolean;
   isolation?: "worktree";
+  readonly?: boolean;
 }
 
 function git(cwd: string, args: string[]): string {
@@ -86,6 +90,13 @@ function signalGroup(pid: number, signal: NodeJS.Signals): void {
   try {
     process.kill(-pid, signal);
   } catch {}
+}
+
+// A persisted pid may have been reused; only a process still running this
+// agent's session is ours to kill.
+function runsSession(pid: number, sessionId: string): boolean {
+  const r = spawnSync("ps", ["-o", "args=", "-p", String(pid)], { encoding: "utf8" });
+  return r.status === 0 && r.stdout.includes(sessionId);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -161,6 +172,7 @@ export class AgentRunner {
       model,
       // Claude Code subagents without an effort run at the session's effort.
       thinking: def?.effort ?? this.pi.getThinkingLevel(),
+      readonly: params.readonly || undefined,
       sessionId: randomUUID(),
       sessionDir,
       systemPromptFile,
@@ -212,6 +224,7 @@ export class AgentRunner {
     if (record.model) args.push("--model", record.model);
     if (record.thinking) args.push("--thinking", record.thinking);
     if (record.systemPromptFile) args.push("--append-system-prompt", record.systemPromptFile);
+    if (record.readonly) args.push("--exclude-tools", "edit,write");
 
     const child = spawn(this.settings.pi.command, [...this.settings.pi.args, ...args], {
       cwd: record.cwd,
@@ -261,7 +274,7 @@ export class AgentRunner {
     });
 
     let resolveDone!: () => void;
-    const run: Run = { child, stopRequested: false, done: new Promise((r) => (resolveDone = r)) };
+    const run: Run = { child, stopRequested: false, silent: false, done: new Promise((r) => (resolveDone = r)) };
     this.runs.set(record.id, run);
     this.persist(record);
 
@@ -290,13 +303,20 @@ export class AgentRunner {
           record.finalText += `\n\n(worktree cleanup failed: ${(e as Error).message})`;
         }
       }
+      this.spill(record);
       this.persist(record);
-      if (background) this.notify(record);
+      // The model that called stop_agent already has the result, so a stop's
+      // notice joins the context without starting another turn.
+      if (background && !run.silent) this.notify(record, record.status !== "stopped");
       resolveDone();
       const queued = this.queues.get(record.id);
       if (queued?.length && record.status !== "stopped") {
         this.queues.delete(record.id);
-        this.launch(record, queued.join("\n\n"), true);
+        try {
+          this.launch(record, queued.join("\n\n"), true);
+        } catch {
+          this.notify(record, true);
+        }
       }
     };
     child.on("error", (e) => finish(e));
@@ -316,12 +336,18 @@ export class AgentRunner {
     return run;
   }
 
+  // Writes a final text over the cap to disk, so the record can carry its path.
+  private spill(record: AgentRecord): void {
+    const text = record.finalText ?? "";
+    if (Buffer.byteLength(text, "utf8") <= OUTPUT_CAP_BYTES) return;
+    record.outputFile = join(record.sessionDir, `${record.id}.out.md`);
+    writeFileSync(record.outputFile, text);
+  }
+
   // Text for the model: the final text, cut to the cap with the full copy on disk.
   report(record: AgentRecord): string {
     const text = record.finalText ?? "";
-    if (Buffer.byteLength(text, "utf8") <= OUTPUT_CAP_BYTES) return text;
-    record.outputFile = join(record.sessionDir, `${record.id}.out.md`);
-    writeFileSync(record.outputFile, text);
+    if (!record.outputFile) return text;
     return `${truncateUtf8(text, OUTPUT_CAP_BYTES)}\n\n[Output truncated at 50 KB. Full output: ${record.outputFile}]`;
   }
 
@@ -339,7 +365,7 @@ export class AgentRunner {
     return lines.join("\n");
   }
 
-  private notify(record: AgentRecord): void {
+  private notify(record: AgentRecord, triggerTurn: boolean): void {
     const body = this.report(record);
     this.pi.sendMessage(
       {
@@ -348,7 +374,7 @@ export class AgentRunner {
         display: true,
         details: { agentId: record.id, status: record.status, exitCode: record.exitCode, outputFile: record.outputFile },
       },
-      { triggerTurn: true, deliverAs: "followUp" },
+      triggerTurn ? { triggerTurn: true, deliverAs: "followUp" } : { triggerTurn: false },
     );
   }
 
@@ -389,11 +415,12 @@ export class AgentRunner {
     return { record, queued: false };
   }
 
-  async stop(id: string): Promise<AgentRecord> {
+  async stop(id: string, silent = false): Promise<AgentRecord> {
     const record = this.find(id);
     const run = this.runs.get(record.id);
     if (!run) return record;
     run.stopRequested = true;
+    run.silent ||= silent;
     this.queues.delete(record.id);
     const pid = run.child.pid!;
     signalGroup(pid, "SIGTERM");
@@ -406,7 +433,15 @@ export class AgentRunner {
 
   async stopAll(): Promise<void> {
     this.queues.clear();
-    await Promise.all([...this.runs.keys()].map((id) => this.stop(id)));
+    await Promise.all([...this.runs.keys()].map((id) => this.stop(id, true)));
+  }
+
+  // For an exit that cannot wait: SIGTERM lets each child pi stop its own agents.
+  signalAll(): void {
+    for (const run of this.runs.values()) {
+      run.silent = true;
+      if (run.child.pid) signalGroup(run.child.pid, "SIGTERM");
+    }
   }
 
   list(): object[] {
@@ -424,18 +459,31 @@ export class AgentRunner {
   }
 
   private persist(record: AgentRecord): void {
-    this.pi.appendEntry(ENTRY_TYPE, { ...record, worktree: record.worktree && { ...record.worktree } });
+    this.pi.appendEntry(ENTRY_TYPE, {
+      ...record,
+      finalText: record.finalText && truncateUtf8(record.finalText, OUTPUT_CAP_BYTES),
+      worktree: record.worktree && { ...record.worktree },
+    });
   }
 
-  // Folds persisted snapshots, last write per id wins. A run cannot outlive the
-  // runtime that spawned it, so a snapshot still marked running was stopped.
+  // Folds persisted snapshots, last write per id wins. A snapshot still marked
+  // running belongs to an earlier runtime; a crash can leave its process alive,
+  // so that process is stopped too.
   restore(entries: readonly any[]): void {
     for (const entry of entries) {
       if (entry?.type !== "custom" || entry.customType !== ENTRY_TYPE || !entry.data?.id) continue;
       if (this.runs.has(entry.data.id)) continue;
-      const record: AgentRecord = { ...entry.data };
-      if (record.status === "running") record.status = "stopped";
-      this.records.set(record.id, record);
+      this.records.set(entry.data.id, { ...entry.data });
+    }
+    for (const record of this.records.values()) {
+      if (record.status !== "running" || this.runs.has(record.id)) continue;
+      record.status = "stopped";
+      const pid = record.pid;
+      if (!pid || !groupAlive(pid) || !runsSession(pid, record.sessionId)) continue;
+      signalGroup(pid, "SIGTERM");
+      setTimeout(() => {
+        if (groupAlive(pid) && runsSession(pid, record.sessionId)) signalGroup(pid, "SIGKILL");
+      }, this.settings.killGraceMs).unref();
     }
   }
 }
@@ -457,6 +505,7 @@ const agentSchema = {
     },
     run_in_background: { type: "boolean", description: "Return at once; a completion notice arrives when the agent exits." },
     isolation: { type: "string", enum: ["worktree"], description: "Run the agent in its own git worktree." },
+    readonly: { type: "boolean", description: "Run the agent without the edit and write tools." },
   },
   required: ["description", "prompt"],
   additionalProperties: false,

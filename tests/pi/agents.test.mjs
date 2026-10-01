@@ -1,6 +1,7 @@
 // The agent tools driven through a fake ExtensionAPI, with the fake pi as the child.
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
@@ -113,6 +114,41 @@ describe("agent tool", () => {
     expect(readFileSync(details.outputFile, "utf8")).toBe(big);
   });
 
+  test("a persisted record keeps capped text and the full output's path", async () => {
+    const big = "x".repeat(80 * 1024);
+    const { pi, ctx } = setup({ script: { default: [{ reply: big }] } });
+    await pi.call("agent", { description: "big", prompt: "x", run_in_background: true }, ctx);
+    await waitFor(() => pi.messages.length === 1);
+    const last = pi.entries.at(-1).data;
+    expect(last.status).toBe("completed");
+    expect(Buffer.byteLength(last.finalText)).toBeLessThanOrEqual(50 * 1024);
+    expect(readFileSync(last.outputFile, "utf8")).toBe(big);
+  });
+
+  test("readonly runs the child without the edit and write tools", async () => {
+    const { pi, ctx } = setup();
+    await pi.call("agent", { description: "r", prompt: "x", readonly: true }, ctx);
+    await pi.call("agent", { description: "w", prompt: "x" }, ctx);
+    const [ro, rw] = w.invocations();
+    expect(ro.argv.slice(ro.argv.indexOf("--exclude-tools"))).toEqual(["--exclude-tools", "edit,write"]);
+    expect(rw.argv).not.toContain("--exclude-tools");
+    expect(pi.tools.get("agent").parameters.properties.readonly.type).toBe("boolean");
+  });
+
+  test("every pstack agent type reaches its child with its own agent file as the system prompt", async () => {
+    const { pi, ctx } = setup();
+    const files = {
+      "pstack:poteto-agent": "agents/poteto-agent.md",
+      "pstack:comment-sicko": "agents/comment-sicko.md",
+      "pstack:poteto-agent-high": "effort-agents/poteto-agent-high.md",
+      "pstack:effort-low": "effort-agents/effort-low.md",
+    };
+    for (const type of Object.keys(files)) await pi.call("agent", { description: type, prompt: "x", subagent_type: type }, ctx);
+    const prompts = w.invocations().map((inv) => inv.systemPrompt);
+    const bodies = Object.values(files).map((f) => readFileSync(join(pluginRoot, f), "utf8").split("---\n").slice(2).join("---\n").trim());
+    expect(prompts).toEqual(bodies);
+  });
+
   test("unknown subagent_type is an error listing every valid type", async () => {
     const { pi, ctx } = setup();
     const err = await pi.call("agent", { description: "x", prompt: "x", subagent_type: "poteto-agent" }, ctx).catch((e) => e);
@@ -220,6 +256,7 @@ describe("stop_agent", () => {
     expect(notice(quiet)).toContain("stopped before it replied");
     expect(notice(chatty)).toContain("halfway");
     for (const id of [quiet, chatty]) expect(notice(id)).not.toContain("No project session");
+    for (const { options } of pi.messages) expect(options).toEqual({ triggerTurn: false });
   });
 
   test("stopping an exited agent reports its final status unchanged", async () => {
@@ -308,6 +345,21 @@ describe("worktree isolation", () => {
     expect(git("branch", "--list", `worktree-agent-${id}`)).toContain(`worktree-agent-${id}`);
   });
 
+  test("a queued resume whose worktree cannot be re-created fails with a notice", async () => {
+    const { pi, ctx } = setup({ script: { byPrompt: { first: [{ sleep: 400 }, { reply: "ok" }] } } });
+    gitRepo(w.cwd);
+    const id = (await pi.call("agent", { description: "w", prompt: "first", isolation: "worktree", run_in_background: true }, ctx))
+      .details.agentId;
+    await waitFor(() => w.invocations().length === 1);
+    await pi.call("send_message", { to: id, message: "again" }, ctx);
+    rmSync(w.invocations()[0].cwd, { recursive: true, force: true });
+
+    await waitFor(() => pi.messages.length === 2);
+    expect(pi.messages[1].message.details.status).toBe("failed");
+    expect(pi.messages[1].message.content).toContain("git worktree add");
+    expect(w.invocations()).toHaveLength(1);
+  });
+
   test("outside a git repo it is an error and nothing runs", async () => {
     const { pi, ctx } = setup();
     mkdirSync(join(w.cwd, "sub"));
@@ -338,6 +390,44 @@ describe("registry", () => {
     await waitFor(() => reloaded.messages.length === 1);
     expect(w.invocations()[1].argv[4]).toBe(w.invocations()[0].argv[4]);
   });
+
+  test("a restored agent whose process outlived its parent is killed, and an unrelated pid is left alone", async () => {
+    const { pi, ctx } = setup({ script: { default: [{ grandchild: true }, { sleep: 30000 }] } });
+    await pi.call("agent", { description: "orphan", prompt: "x", run_in_background: true }, ctx);
+    await waitFor(() => w.log().some((r) => r.kind === "grandchild"));
+    const stranger = spawn("sleep", ["30"], { detached: true, stdio: "ignore" });
+    const entries = [
+      ...pi.entries,
+      { type: "custom", customType: "pstack-agents", data: { ...pi.entries.at(-1).data, id: "astranger", pid: stranger.pid } },
+    ];
+
+    const resumed = fakePi();
+    install(resumed.api, w.settings);
+    await resumed.emit("session_start", { reason: "resume" }, fakeCtx({ cwd: w.cwd, entries }));
+    try {
+      await waitFor(() => w.log().every((r) => !alive(r.pid)));
+      expect(alive(stranger.pid)).toBe(true);
+      const listed = JSON.parse(text(await resumed.call("list_agents", {}, ctx)));
+      expect(listed.map((a) => a.status)).toEqual(["stopped", "stopped"]);
+    } finally {
+      stranger.kill("SIGKILL");
+    }
+  });
+
+  for (const how of ["exit", "SIGINT"]) {
+    test(`a print-mode parent that ends by ${how} takes its running agents with it`, async () => {
+      w = world({ script: { default: [{ grandchild: true }, { sleep: 30000 }] } });
+      const host = spawn(process.execPath, [join(import.meta.dir, "host.mjs"), JSON.stringify(w.settings), how], {
+        stdio: ["ignore", "pipe", "inherit"],
+      });
+      const exited = new Promise((r) => host.on("exit", r));
+      await waitFor(() => w.log().some((r) => r.kind === "grandchild"));
+      if (how === "SIGINT") host.kill("SIGINT");
+      await exited;
+      await waitFor(() => w.log().every((r) => !alive(r.pid)));
+      expect(w.log().length).toBeGreaterThan(1);
+    });
+  }
 });
 
 // Plays Pi's settle loop: a follow-up queued during agent_before_settle starts

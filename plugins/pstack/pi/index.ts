@@ -10,8 +10,18 @@ export function install(pi: ExtensionAPI, settings: Settings): void {
   const scheduler = new Scheduler(pi);
   registerAgentTools(pi, runner);
   registerInteraction(pi, scheduler);
+  // Children run detached so a stop can kill their whole tree, which also means
+  // they outlive a parent that exits without session_shutdown: a crash, or Ctrl-C
+  // in print mode, where pi leaves SIGINT at its default.
+  const onExit = () => runner.signalAll();
+  const onSigint = () => {
+    runner.signalAll();
+    process.exit(130);
+  };
+  process.on("exit", onExit);
   pi.on("session_start", (_event, ctx) => {
     runner.restore(ctx.sessionManager.getEntries());
+    if ((ctx.mode === "print" || ctx.mode === "json") && process.listenerCount("SIGINT") === 0) process.on("SIGINT", onSigint);
   });
   // Print and json runs exit once the agent settles, which would drop a
   // background agent's notice. Holding the settle until one exits queues its
@@ -20,6 +30,8 @@ export function install(pi: ExtensionAPI, settings: Settings): void {
     if (ctx.mode === "print" || ctx.mode === "json") await runner.nextExit();
   });
   registerLifecycle(pi, settings, async () => {
+    process.off("exit", onExit);
+    process.off("SIGINT", onSigint);
     scheduler.stopAll();
     await runner.stopAll();
   });

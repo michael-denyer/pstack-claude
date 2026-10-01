@@ -65,7 +65,7 @@ describe("before_agent_start", () => {
 });
 
 describe("session_shutdown", () => {
-  test("stops every running agent, and a second shutdown is a no-op", async () => {
+  test("stops every running agent without a notice, and a second shutdown is a no-op", async () => {
     const { pi, ctx } = setup({ script: { default: [{ grandchild: true }, { sleep: 30000 }] } });
     await pi.call("agent", { description: "one", prompt: "x", run_in_background: true }, ctx);
     await pi.call("agent", { description: "two", prompt: "x", run_in_background: true }, ctx);
@@ -75,10 +75,10 @@ describe("session_shutdown", () => {
     for (const r of w.log()) expect(alive(r.pid)).toBe(false);
     const listed = JSON.parse((await pi.call("list_agents", {}, ctx)).content[0].text);
     expect(listed.map((a) => a.status)).toEqual(["stopped", "stopped"]);
-    const notices = pi.messages.length;
+    expect(pi.messages).toEqual([]);
 
     await pi.emit("session_shutdown", { reason: "quit" }, ctx);
-    expect(pi.messages.length).toBe(notices);
+    expect(pi.messages).toEqual([]);
   });
 });
 

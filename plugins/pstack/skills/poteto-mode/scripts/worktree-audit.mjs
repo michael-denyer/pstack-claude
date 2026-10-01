@@ -4,12 +4,16 @@
 // operated in it, then prints a table sorted by size with a suggested bucket.
 // Never deletes anything; deletion stays a human-gated step in the playbook.
 //
-//   node worktree-audit.mjs [repo-path] [transcripts-path]
+//   node worktree-audit.mjs [repo-path] [transcripts-path ...]
+//
+// Without a transcripts path it scans every runtime's transcripts directory
+// that exists: Claude Code's ~/.claude/projects, and Pi's sessions and pstack
+// subagent sessions under $PI_CODING_AGENT_DIR (default ~/.pi/agent).
 //
 // Every probe yields a Fact, { known: true, value } or { known: false }. A hold
 // bucket needs only its own fact; `safe` needs every fact known.
 import { execFileSync } from "node:child_process";
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
@@ -65,12 +69,20 @@ export function parseWorktrees(output) {
   return worktrees;
 }
 
+export function defaultTranscriptRoots({ env = process.env, home = homedir(), exists = existsSync } = {}) {
+  const claude = join(home, ".claude", "projects");
+  const piAgent = env.PI_CODING_AGENT_DIR || join(home, ".pi", "agent");
+  const found = [claude, join(piAgent, "sessions"), join(piAgent, "pstack")].filter((root) => exists(root));
+  return found.length ? found : [claude];
+}
+
 // A transcript names a worktree as `<path>/` or `<path>"`, never a bare prefix,
 // so `/x/candidate` does not inherit a chat that ran in `/x/candidate-long`.
-export function lastChats(transcripts, paths) {
+// Claude Code and Pi transcripts are both JSONL that quote the paths they touch.
+export function lastChats(roots, paths) {
   const needles = paths.map((path) => [path, [Buffer.from(`${path}/`), Buffer.from(`${path}"`)]]);
   const latest = new Map();
-  for (const file of candidates(transcripts, Infinity)) {
+  for (const file of roots.flatMap((root) => candidates(root, Infinity))) {
     const text = readFileSync(file);
     const mtime = Math.floor(statSync(file).mtimeMs / 1000);
     for (const [path, forms] of needles) {
@@ -189,10 +201,13 @@ export function audit({
   const worktrees = parseWorktrees(git(repo, "worktree", "list", "--porcelain", "-z")).slice(1);
   const live = worktrees.filter((worktree) => !worktree.prunable).map((worktree) => worktree.path);
   const scanFailed = "transcript scan failed; LAST_CHAT column will be empty";
-  const isDirectory = discover(() => statSync(transcripts, { throwIfNoEntry: false })?.isDirectory(), scanFailed);
-  let chats = UNKNOWN;
-  if (isDirectory.value) chats = discover(() => lastChats(transcripts, live), scanFailed);
-  else if (isDirectory.known) warn(`warn: ${transcripts} not found; LAST_CHAT column will be empty`);
+  // Every root must be readable: a chat the scan could not see might be recent.
+  const readable = transcripts.every((root) => {
+    const isDirectory = discover(() => statSync(root, { throwIfNoEntry: false })?.isDirectory(), scanFailed);
+    if (isDirectory.known && !isDirectory.value) warn(`warn: ${root} not found; LAST_CHAT column will be empty`);
+    return isDirectory.value;
+  });
+  const chats = readable ? discover(() => lastChats(transcripts, live), scanFailed) : UNKNOWN;
 
   const context = { repo, trunk, fetched, prs, chats, now };
   const rows = worktrees.map(({ path, prunable }) =>
@@ -203,13 +218,13 @@ export function audit({
 }
 
 function main(argv) {
-  const [repoArg, transcriptsArg] = argv;
+  const [repoArg, ...transcriptsArgs] = argv;
   const repo = probe(() => git(repoArg || process.cwd(), "rev-parse", "--show-toplevel"));
   if (!repo.known) {
     console.error("not in a git repo; pass a repo path");
     return 1;
   }
-  const transcripts = transcriptsArg || join(homedir(), ".claude", "projects");
+  const transcripts = transcriptsArgs.length ? transcriptsArgs : defaultTranscriptRoots();
   process.stdout.write(audit({ repo: repo.value, transcripts }));
   return 0;
 }

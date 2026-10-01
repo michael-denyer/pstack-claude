@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // Locate the transcript whose opening user prompt carries a fragment.
 //
-//   node find-transcript.mjs <projects-dir> <opening-prompt-fragment>
+//   node find-transcript.mjs <transcripts-dir> <opening-prompt-fragment>
 //
-// Prints the newest matching path, or exits 1 with "no transcript". Covers the
-// three layouts under one per-project directory: flat <id>.jsonl, nested
-// <id>/<id>.jsonl, and subagent <id>/subagents/<child>.jsonl. Each candidate is
-// streamed line by line and abandoned at its first typed `user` record; the
-// first line is session metadata and files run to megabytes.
+// Prints the newest matching path, or exits 1 with "no transcript". Covers
+// Claude Code's three layouts under one per-project directory (flat
+// <id>.jsonl, nested <id>/<id>.jsonl, subagent <id>/subagents/<child>.jsonl)
+// and Pi's <iso>_<id>.jsonl under its per-cwd sessions directory, told apart
+// by Pi's session header line. Each candidate is streamed line by line; a
+// Claude Code transcript is abandoned at its first typed `user` record, while a
+// Pi session is read to its last entry to find the active branch.
 import { createReadStream, readdirSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
@@ -46,15 +48,50 @@ function text(content) {
 // <command-message> and is kept: its <command-args> carry what the user typed.
 const LOCAL_COMMAND = /^\s*<(?:command-name|local-command-stdout|bash-input)>/u;
 
+// A Pi session opens with this header line; Claude Code transcripts never do.
+const isPiHeader = (record) =>
+  record?.type === "session" && Number.isInteger(record.version) && typeof record.cwd === "string";
+
+// Pi branches in place: every entry is appended to one file and linked to its
+// parent by id, and the last entry is the current leaf. The opening prompt is
+// the first user message on the path from that leaf to its root, which may not
+// be the first one in file order.
+function activeOpening(entries, leaf) {
+  let prompt = null;
+  const seen = new Set();
+  for (let id = leaf; entries.has(id) && !seen.has(id); id = entries.get(id).parentId) {
+    seen.add(id);
+    prompt = entries.get(id).prompt ?? prompt;
+  }
+  return prompt;
+}
+
 export async function openingPrompt(path) {
   const stream = createReadStream(path, { encoding: "utf8" });
   const lines = createInterface({ input: stream, crlfDelay: Infinity });
+  let pi = null;
+  let leaf = null;
+  let first = true;
   try {
     for await (const line of lines) {
       let record;
       try {
         record = JSON.parse(line);
       } catch {
+        continue;
+      }
+      if (first) {
+        first = false;
+        if (isPiHeader(record)) {
+          pi = new Map();
+          continue;
+        }
+      }
+      if (pi) {
+        if (typeof record?.id !== "string") continue;
+        const isUser = record.type === "message" && record.message?.role === "user";
+        pi.set(record.id, { parentId: record.parentId ?? null, prompt: isUser ? text(record.message.content) || null : null });
+        leaf = record.id;
         continue;
       }
       if (record?.type !== "user" || record.isMeta) continue;
@@ -65,7 +102,7 @@ export async function openingPrompt(path) {
     lines.close();
     stream.destroy();
   }
-  return null;
+  return pi ? activeOpening(pi, leaf) : null;
 }
 
 export async function findTranscript(projectsDir, fragment) {
@@ -79,7 +116,7 @@ export async function findTranscript(projectsDir, fragment) {
 async function main(argv) {
   const [projectsDir, fragment] = argv;
   if (!projectsDir || !fragment) {
-    console.error("usage: find-transcript.mjs <projects-dir> <opening-prompt-fragment>");
+    console.error("usage: find-transcript.mjs <transcripts-dir> <opening-prompt-fragment>");
     return 2;
   }
   const path = await findTranscript(projectsDir, fragment);

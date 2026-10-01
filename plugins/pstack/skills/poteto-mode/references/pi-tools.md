@@ -89,13 +89,13 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | `architect` | The runner panel goes through the **arena** skill, so its `agent` fan-out and model aliases apply here too. |
 | `arena` | The parallel candidates and the cross-judge are background `agent` calls on the configured aliases (see Model names). |
 | `how` | The parallel explorers and the explainer are `agent` calls. Put `readonly` in the prompt (see Subagent policy). |
-| `reflect` | The three reviewers and the synthesizer are background `agent` calls. The transcript finder reads Claude Code's layout under `~/.claude/projects/`, so pass the session digest step 1 allows instead. |
+| `reflect` | The three reviewers and the synthesizer are background `agent` calls. The transcript finder reads Pi sessions too. Pass it this session's directory, `~/.pi/agent/sessions/--<cwd>--/` (under `$PI_CODING_AGENT_DIR` when set), where `<cwd>` is the working directory without its leading `/` and with each `/` as `-`, in place of Claude Code's projects directory. It follows the session's active branch to its opening prompt. |
 | `swarm` | Each worker is a background `agent` call on the configured alias. Give each writing worker `isolation: "worktree"` or its own output directory (see Subagent policy above). |
 | `why` | The parallel investigators and the synthesizer are background `agent` calls. List MCP servers from the tools Pi exposes to the session or `pi mcp list`, not from `.mcp.json` or `claude mcp list`. |
 
 ## Vendored scripts
 
-`skills/poteto-mode/scripts/` ships the `watch-pr` PR watcher, the `orch` store CLI, and `worktree-audit.mjs`. These scripts use bun and Node.js and run the same on Pi; invoke them through `bash`. They need `bun`, `gh`, and (for stack work) `gt`. `worktree-audit.mjs` reads Claude Code transcripts under `~/.claude/projects/`; point it at your runtime's transcript directory instead when you run it elsewhere. It imports the transcript walker from `skills/reflect/scripts/find-transcript.mjs`, so keep the `reflect` skill installed beside `poteto-mode`.
+`skills/poteto-mode/scripts/` ships the `watch-pr` PR watcher, the `orch` store CLI, and `worktree-audit.mjs`. These scripts use bun and Node.js and run the same on Pi; invoke them through `bash`. They need `bun`, `gh`, and (for stack work) `gt`. `worktree-audit.mjs` finds each worktree's last chat in Claude Code transcripts under `~/.claude/projects/` and in Pi sessions under the Pi agent directory, both its `sessions/` and the pstack extension's subagent sessions. Pass transcript directories after the repo path to scan others instead. It imports the transcript walker from `skills/reflect/scripts/find-transcript.mjs`, so keep the `reflect` skill installed beside `poteto-mode`.
 
 ## Instructions file
 

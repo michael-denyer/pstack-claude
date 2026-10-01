@@ -4,6 +4,8 @@ export const OTHER = "Other (type an answer)";
 export const DONE = "Done";
 export const MIN_DELAY_S = 60;
 export const MAX_DELAY_S = 3600;
+// setInterval treats a delay above 2^31-1 ms as 1 ms.
+export const MAX_LOOP_S = 24 * 86400;
 
 interface Question {
   question: string;
@@ -72,23 +74,22 @@ const questionSchema = {
 };
 
 // One pending wakeup and one fixed-interval loop per session. A fire delivers
-// the prompt as a user message, queued as a follow-up when the agent is busy.
+// the prompt as a follow-up user message, which runs at once when the agent is idle.
 export class Scheduler {
   private wakeup?: NodeJS.Timeout;
   private loop?: NodeJS.Timeout;
 
   constructor(private readonly pi: ExtensionAPI) {}
 
-  fire(prompt: string, ctx: ExtensionContext): void {
-    if (ctx.isIdle()) this.pi.sendUserMessage(prompt, { expandPromptTemplates: true });
-    else this.pi.sendUserMessage(prompt, { deliverAs: "followUp", expandPromptTemplates: true });
+  fire(prompt: string): void {
+    this.pi.sendUserMessage(prompt, { deliverAs: "followUp", expandPromptTemplates: true });
   }
 
-  scheduleWakeup(seconds: number, prompt: string, ctx: ExtensionContext): void {
+  scheduleWakeup(seconds: number, prompt: string): void {
     this.cancelWakeup();
     this.wakeup = setTimeout(() => {
       this.wakeup = undefined;
-      this.fire(prompt, ctx);
+      this.fire(prompt);
     }, seconds * 1000);
     this.wakeup.unref?.();
   }
@@ -102,7 +103,8 @@ export class Scheduler {
 
   startLoop(seconds: number, prompt: string, ctx: ExtensionContext): void {
     this.stopLoop();
-    this.loop = setInterval(() => this.fire(prompt, ctx), seconds * 1000);
+    // A tick that lands mid-run is dropped, so a slow iteration cannot pile up a backlog.
+    this.loop = setInterval(() => ctx.isIdle() && this.fire(prompt), seconds * 1000);
     this.loop.unref?.();
   }
 
@@ -127,7 +129,7 @@ const UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
 
 export type LoopCommand =
   | { kind: "stop" }
-  | { kind: "usage" }
+  | { kind: "usage"; reason?: string }
   | { kind: "fixed"; seconds: number; prompt: string }
   | { kind: "dynamic"; prompt: string };
 
@@ -135,8 +137,13 @@ export function parseLoop(args: string): LoopCommand {
   const text = args.trim();
   if (!text) return { kind: "usage" };
   if (text === "stop") return { kind: "stop" };
-  const m = /^(\d+)([smhd])\s+([\s\S]+)$/.exec(text);
-  if (m) return { kind: "fixed", seconds: Number(m[1]) * UNIT_SECONDS[m[2]], prompt: m[3].trim() };
+  const m = /^(\d+)([smhd])(?:\s+([\s\S]+))?$/.exec(text);
+  if (m) {
+    const seconds = Number(m[1]) * UNIT_SECONDS[m[2]];
+    if (!m[3]) return { kind: "usage" };
+    if (seconds > MAX_LOOP_S) return { kind: "usage", reason: "Intervals over 24 days are not supported." };
+    return { kind: "fixed", seconds, prompt: m[3].trim() };
+  }
   return { kind: "dynamic", prompt: text };
 }
 
@@ -209,11 +216,16 @@ export function registerInteraction(pi: ExtensionAPI, scheduler: Scheduler): voi
         const text = had ? "Pending wakeup cancelled." : "No wakeup was pending.";
         return { content: [{ type: "text", text }], details: { cancelled: had } };
       }
+      if (ctx.mode === "print" || ctx.mode === "json") {
+        throw new Error(
+          `schedule_wakeup cannot fire in ${ctx.mode} mode: pi exits when this run ends. Finish the work in this run instead.`,
+        );
+      }
       if (params.noop) {
         return { content: [{ type: "text", text: "No change to the pending wakeup." }], details: { noop: true } };
       }
       const seconds = clampDelay(params.delaySeconds);
-      scheduler.scheduleWakeup(seconds, params.prompt, ctx);
+      scheduler.scheduleWakeup(seconds, params.prompt);
       const fireAt = new Date(Date.now() + seconds * 1000).toISOString();
       const clamped = seconds !== params.delaySeconds ? ` (clamped from ${params.delaySeconds})` : "";
       return {
@@ -229,7 +241,7 @@ export function registerInteraction(pi: ExtensionAPI, scheduler: Scheduler): voi
       const cmd = parseLoop(args);
       switch (cmd.kind) {
         case "usage":
-          ctx.ui.notify("Usage: /loop [interval like 5m or 1h] <prompt>, or /loop stop", "info");
+          ctx.ui.notify(`${cmd.reason ? `${cmd.reason} ` : ""}Usage: /loop [interval like 5m or 1h] <prompt>, or /loop stop`, "info");
           return;
         case "stop": {
           ctx.ui.notify(scheduler.stopAll() ? "Loop stopped." : "No loop was running.", "info");
@@ -240,12 +252,12 @@ export function registerInteraction(pi: ExtensionAPI, scheduler: Scheduler): voi
           scheduler.cancelWakeup();
           scheduler.startLoop(seconds, cmd.prompt, ctx);
           ctx.ui.notify(`Looping every ${seconds}s. /loop stop ends it.`, "info");
-          scheduler.fire(cmd.prompt, ctx);
+          scheduler.fire(cmd.prompt);
           return;
         }
         case "dynamic":
           scheduler.stopLoop();
-          scheduler.fire(dynamicPrompt(cmd.prompt), ctx);
+          scheduler.fire(dynamicPrompt(cmd.prompt));
       }
     },
   });

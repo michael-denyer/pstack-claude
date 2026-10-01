@@ -92,15 +92,25 @@ describe("schedule_wakeup", () => {
 
   const wake = (pi, ctx, params) => pi.call("schedule_wakeup", { reason: "waiting on CI", ...params }, ctx);
 
-  test("clamps to 60 s and fires the prompt as a plain user message when idle", async () => {
+  test("clamps to 60 s and fires the prompt as a follow-up user message", async () => {
     const { pi, ctx } = setup({ idle: true });
     const result = await wake(pi, ctx, { delaySeconds: 5, prompt: "check CI" });
     expect(result.details.delaySeconds).toBe(60);
     jest.advanceTimersByTime(59_000);
     expect(pi.userMessages).toEqual([]);
     jest.advanceTimersByTime(1_000);
-    expect(pi.userMessages).toEqual([{ content: "check CI", options: { expandPromptTemplates: true } }]);
+    expect(pi.userMessages).toEqual([{ content: "check CI", options: { deliverAs: "followUp", expandPromptTemplates: true } }]);
   });
+
+  for (const mode of ["print", "json"]) {
+    test(`in ${mode} mode it is an error, since pi exits before a wakeup could fire`, async () => {
+      const { pi, ctx } = setup({ mode });
+      const err = await wake(pi, ctx, { delaySeconds: 60, prompt: "later" }).catch((e) => e);
+      expect(err.message).toContain("exits when this run ends");
+      jest.advanceTimersByTime(3_600_000);
+      expect(pi.userMessages).toEqual([]);
+    });
+  }
 
   test("clamps to 3600 s and queues as a follow-up when the agent is busy", async () => {
     const { pi, ctx } = setup({ idle: false });
@@ -148,9 +158,9 @@ describe("/loop", () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  function loop() {
+  function loop(ctxOpts = {}) {
     const ui = scriptedUi([]);
-    const { pi, ctx } = setup();
+    const { pi, ctx } = setup(ctxOpts);
     return { pi, ui, run: (args) => pi.commands.get("loop").handler(args, { ...ctx, ui }) };
   }
 
@@ -173,6 +183,27 @@ describe("/loop", () => {
     jest.advanceTimersByTime(1_000);
     expect(pi.userMessages).toHaveLength(2);
     expect(ui.calls.at(-1).message).toContain("60s");
+  });
+
+  test("an interval tick while the agent is busy is skipped, not queued", async () => {
+    let idle = true;
+    const { pi, run } = loop({ idle: () => idle });
+    await run("1m tick");
+    idle = false;
+    jest.advanceTimersByTime(10 * 60_000);
+    expect(pi.userMessages).toHaveLength(1);
+    idle = true;
+    jest.advanceTimersByTime(60_000);
+    expect(pi.userMessages).toHaveLength(2);
+  });
+
+  test("an interval with no prompt or over 24 days is rejected and starts nothing", async () => {
+    const { pi, run, ui } = loop();
+    await run("5m");
+    await run("25d x");
+    jest.advanceTimersByTime(60 * 60_000);
+    expect(pi.userMessages).toEqual([]);
+    expect(ui.calls.map((c) => c.message)).toEqual([expect.stringContaining("Usage"), expect.stringContaining("24 days")]);
   });
 
   test("without an interval the prompt runs once and asks the model to pace itself", async () => {

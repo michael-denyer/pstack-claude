@@ -69,12 +69,12 @@ export function readSheet(agentDir: string): Sheet | undefined {
 
 interface ModelsConfig {
   available: string[];
-  piModels: Record<string, string>;
+  pi: { fallback: string; models: Record<string, Record<string, string>> };
 }
 
 function readModels(modelsFile: string): ModelsConfig {
   const raw = JSON.parse(readFileSync(modelsFile, "utf8"));
-  return { available: raw.available ?? [], piModels: raw.pi?.models ?? {} };
+  return { available: raw.available ?? [], pi: raw.pi };
 }
 
 // Returns the provider/id for --model, or undefined when the child should run
@@ -92,12 +92,13 @@ export function resolveModel(
     const valid = [...models.available, ...PARENT_MODEL_ALIASES, "<provider>/<model-id>"];
     throw new Error(`Unknown model "${requested}". Valid values: ${valid.join(", ")}.`);
   }
-  const id = sheet?.piModels.get(requested) ?? models.piModels[requested];
+  // Family names follow the provider the session is signed in to, so a ChatGPT
+  // subscription gets OpenAI models without any configuration.
+  const provider = parentModel?.split("/")[0] ?? "";
+  const table = models.pi.models[Object.hasOwn(models.pi.models, provider) ? provider : models.pi.fallback];
+  const id = sheet?.piModels.get(requested) ?? table[requested];
   if (!id) {
-    throw new Error(
-      `No Pi model mapped for "${requested}": add it to the pi.models block of models.json ` +
-        `or a "pi models: ${requested}=<provider>/<id>" line to the override sheet.`,
-    );
+    throw new Error(`No Pi model mapped for "${requested}": add a "pi models: ${requested}=<provider>/<id>" line to the override sheet.`);
   }
   return id;
 }

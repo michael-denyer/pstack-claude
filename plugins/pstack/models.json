@@ -32,11 +32,20 @@
     "panel": ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"]
   },
   "pi": {
+    "fallback": "anthropic",
     "models": {
-      "opus": "anthropic/claude-opus-5-5",
-      "fable": "anthropic/claude-fable-5-1",
-      "sonnet": "anthropic/claude-sonnet-5-5",
-      "haiku": "anthropic/claude-haiku-4-5"
+      "anthropic": {
+        "opus": "anthropic/claude-opus-5-5",
+        "fable": "anthropic/claude-fable-5-1",
+        "sonnet": "anthropic/claude-sonnet-5-5",
+        "haiku": "anthropic/claude-haiku-4-5"
+      },
+      "openai-codex": {
+        "opus": "openai-codex/gpt-6.1-sol",
+        "fable": "openai-codex/gpt-6-astra",
+        "sonnet": "openai-codex/gpt-6-sol",
+        "haiku": "openai-codex/gpt-6-luna"
+      }
     }
   }
 }

@@ -143,7 +143,7 @@ The extension supplies what Pi lacks natively, under the Claude Code names the s
 - `ask_user_question` and `schedule_wakeup` match `AskUserQuestion` and `ScheduleWakeup`, and `/loop` matches the `loop` skill.
 - At every agent start it adds the routing instruction and the override sheet `<pi-agent>/pstack-models.md` to the system prompt.
 
-Family names such as `opus` resolve through the `pi` block of [`models.json`](../plugins/pstack/models.json) to Pi's Anthropic model IDs. A `pi models:` line in the sheet remaps them. The [Pi mapping](../plugins/pstack/skills/poteto-mode/references/pi-tools.md) lists every translation, and the [equivalence table](pi-equivalence.md) records what was verified and how.
+Family names such as `opus` resolve through the `pi` block of [`models.json`](../plugins/pstack/models.json) to model IDs for the provider the Pi session runs on. A ChatGPT sign-in (`openai-codex`) gets OpenAI models, and Anthropic or any other provider gets Claude models. Pi warns that Anthropic bills Claude used through Pi per token, as extra usage, even on a Claude subscription, and every subagent pstack starts adds to that bill. Run pstack in Claude Code to stay within a Claude plan's limits. A `pi models:` line in the sheet remaps any family name. The [Pi mapping](../plugins/pstack/skills/poteto-mode/references/pi-tools.md) lists every translation, and the [equivalence table](pi-equivalence.md) records what was verified and how.
 
 ## Configuration and dependencies
 

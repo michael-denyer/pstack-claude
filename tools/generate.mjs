@@ -584,17 +584,27 @@ function checkCodexModels(codex, { raw, fail, unique }) {
   }
 }
 
-// The pstack Pi extension resolves each Claude alias a skill names to a Pi
-// provider/id, so the block maps exactly the available aliases.
+// The pstack Pi extension resolves each Claude alias a skill names through the
+// table of the session's provider, or the fallback table on any other provider,
+// so every table maps exactly the available aliases to that provider's models.
 function checkPiModels(pi, { raw, fail, isObject }) {
-  for (const key of Object.keys(pi)) if (key !== "models") fail(`pi names "${key}"; its only key is "models"`);
-  if (!isObject(pi.models)) fail('pi needs a "models" object');
-  for (const alias of raw.available) {
-    if (!Object.hasOwn(pi.models, alias)) fail(`pi.models has no Pi model for "${alias}"`);
+  for (const key of Object.keys(pi)) {
+    if (key !== "fallback" && key !== "models") fail(`pi names "${key}"; its keys are "fallback" and "models"`);
   }
-  for (const [alias, id] of Object.entries(pi.models)) {
-    if (!raw.available.includes(alias)) fail(`pi.models names "${alias}", which is not in available`);
-    if (typeof id !== "string" || !/^[^/\s]+\/\S+$/.test(id)) fail(`pi.models "${alias}" is "${id}", not a provider/id`);
+  if (!isObject(pi.models)) fail('pi needs a "models" object');
+  if (!Object.hasOwn(pi.models, pi.fallback)) fail(`pi.fallback "${pi.fallback}" is not a provider in pi.models`);
+  for (const [provider, table] of Object.entries(pi.models)) {
+    const at = `pi.models.${provider}`;
+    if (!isObject(table)) fail(`${at} must be an object`);
+    for (const alias of raw.available) {
+      if (!Object.hasOwn(table, alias)) fail(`${at} has no Pi model for "${alias}"`);
+    }
+    for (const [alias, id] of Object.entries(table)) {
+      if (!raw.available.includes(alias)) fail(`${at} names "${alias}", which is not in available`);
+      if (typeof id !== "string" || !id.startsWith(`${provider}/`) || /\s/.test(id) || id === `${provider}/`) {
+        fail(`${at} "${alias}" is "${id}", not a ${provider}/<id>`);
+      }
+    }
   }
 }
 
@@ -792,13 +802,20 @@ export function codexModelNamesSection(models) {
 }
 
 export function piModelNamesSection(models) {
-  const pairs = models.available.map((alias) => `- ${code(alias)}: ${code(models.pi.models[alias])}`).join("\n");
+  const { fallback, models: tables } = models.pi;
+  const columns = Object.keys(tables);
+  const table =
+    `| Alias | ${columns.map(code).join(" | ")} |\n| --- |${" --- |".repeat(columns.length)}\n` +
+    models.available.map((alias) => `| ${code(alias)} | ${columns.map((p) => code(tables[p][alias])).join(" | ")} |`).join("\n");
   return (
     "Skills name models by the Claude aliases in their Models sections. On Pi, pass the alias as the `agent` " +
-    "tool's `model`; the pstack extension resolves it to a Pi model:\n\n" +
-    pairs +
-    "\n\nA `pi models: opus=<provider/id>, sonnet=<provider/id>` line in the Pi override sheet points each alias " +
-    "it names at another Pi model, for a machine without Anthropic access. The `agent` tool also takes a full " +
+    "tool's `model`. The pstack extension resolves it in the column of the provider the session's current model " +
+    `comes from, and in the ${code(fallback)} column for any other provider:\n\n` +
+    table +
+    "\n\nPi warns that Anthropic bills Claude used through Pi per token, as extra usage, even on a Claude subscription. " +
+    "Pi shows that warning only in interactive mode, never for the `pi -p` children the `agent` tool runs.\n\n" +
+    "A `pi models: opus=<provider/id>, sonnet=<provider/id>` line in the Pi override sheet points each alias " +
+    "it names at another Pi model, whatever the session's provider. The `agent` tool also takes a full " +
     "`provider/id`, passed through unchanged, and `inherit-parent`, `auto`, or no `model` runs the child on the " +
     "parent's current model. Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`) " +
     "stay diverse only while their aliases resolve to distinct models. If one model family is all you can reach, " +

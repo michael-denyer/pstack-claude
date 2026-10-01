@@ -184,6 +184,7 @@ describe("model resolution", () => {
       await pi.call("agent", { description: "m", prompt: "x", model }, ctx);
     }
     await pi.call("agent", { description: "m", prompt: "x" }, fakeCtx({ cwd: w.cwd, model: null }));
+    await pi.call("agent", { description: "m", prompt: "x", model: "opus" }, fakeCtx({ cwd: w.cwd, model: null }));
     expect(w.invocations().map(modelOf)).toEqual([
       "anthropic/fixture-opus",
       "openai/sheet-sonnet",
@@ -192,6 +193,22 @@ describe("model resolution", () => {
       "openai/gpt-x",
       "anthropic/parent-model",
       null,
+      "anthropic/fixture-opus",
+    ]);
+  });
+
+  test("a family name resolves in the table of the parent's provider, and in the fallback table on any other", async () => {
+    const { pi } = setup({ sheet: "pi models: haiku=anthropic/sheet-haiku\n" });
+    const on = (provider) => fakeCtx({ cwd: w.cwd, model: { provider, id: "parent" } });
+    for (const model of ["opus", "fable", "haiku"]) await pi.call("agent", { description: "m", prompt: "x", model }, on("openai-codex"));
+    await pi.call("agent", { description: "m", prompt: "x", model: "opus" }, on("openrouter"));
+    await pi.call("agent", { description: "m", prompt: "x", model: "opus" }, on("constructor"));
+    expect(w.invocations().map(modelOf)).toEqual([
+      "openai-codex/fixture-opus",
+      "openai-codex/fixture-fable",
+      "anthropic/sheet-haiku",
+      "anthropic/fixture-opus",
+      "anthropic/fixture-opus",
     ]);
   });
 

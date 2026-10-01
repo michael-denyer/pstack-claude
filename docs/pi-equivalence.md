@@ -11,7 +11,7 @@ Statuses:
 - `difference`: Pi behaves differently, and the reason column says why no skill depends on it for a correct result.
 - `n/a`: the plugin mentions it but no behavior depends on it.
 
-The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`tests/pi/live.test.mjs`). A Live value of `n/a` means the live run did not exercise that row. The machine that ran it had no Anthropic sign-in, so its override sheet pointed the family names at OpenAI subscription models. The default `anthropic/*` IDs (X01) were therefore never called live; `tests/pi/catalog.test.mjs` checks them against the model catalog of the installed Pi. `tests/pi/dogfood.mjs` runs a whole skill, `/skill:interrogate`, on real Pi in print mode and checks its session files. It is not a test, so no row cites it.
+The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`tests/pi/live.test.mjs`). A Live value of `n/a` means the live run did not exercise that row. The machine that ran it had only a ChatGPT sign-in, so the family names resolved through the shipped `openai-codex` table (X01b). The `anthropic/*` IDs (X01a) were never called live; `tests/pi/catalog.test.mjs` checks both tables against the model catalog of the installed Pi. `tests/pi/dogfood.mjs` runs a whole skill, `/skill:interrogate`, on real Pi in print mode and checks its session files. It is not a test, so no row cites it.
 
 | ID | Claude Code mechanism | On Pi | Status | Evidence | Live |
 | --- | --- | --- | --- | --- | --- |
@@ -69,7 +69,8 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | C04 | `claude`/`codex` CLI | Prose only (`claude mcp list`), mapped in the `why` note | mapping | pi-tools.md `why` note | n/a |
 | C05 | `bun` scripts | Same through `bash` | native | pi-tools.md Vendored scripts | n/a |
 | C06 | `node` scripts | Same through `bash` | native | pi-tools.md Vendored scripts | n/a |
-| X01 | Family names `opus`, `fable`, `sonnet`, `haiku` | `models.json` `pi` block maps them to `anthropic/*` IDs | extension | `every family name maps to a model in the installed Pi catalog` | n/a |
+| X01a | Family names `opus`, `fable`, `sonnet`, `haiku` on an Anthropic session or any provider without its own table | The `anthropic` table of `models.json` maps them to `anthropic/*` IDs | extension | `a family name resolves in the table of the parent's provider, and in the fallback table on any other` | n/a |
+| X01b | Family names on a ChatGPT sign-in (`openai-codex`) | The `openai-codex` table maps them to GPT-6 models of the same tiers as the Codex defaults | extension | `a family name resolves in the table of the parent's provider, and in the fallback table on any other` | VERIFIED |
 | X02 | Effort levels and `@level` | Same five levels, passed as `--thinking` | extension | `an effort agent passes its body as a 0600 system prompt file and its effort as --thinking; others run at the parent's level` | VERIFIED |
 | X03 | `inherit-parent` / `auto` | The child runs on the parent's current model | extension | `alias, sheet override, inherit-parent, auto, pass-through, and no parent model` | n/a |
 | X04 | Compaction and `/clear` | Injection on every agent start keeps the routing instruction | extension | `injects the mandate and the full sheet on every agent start` | VERIFIED |

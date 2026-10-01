@@ -3,10 +3,10 @@
 // user's credentials symlinked in and this repo installed as a package, so
 // children load pstack too. Nothing under ~/.pi is written.
 //
-// The aliases resolve through the sheet's `pi models:` line, which defaults to
-// the OpenAI fallback approved for machines without an Anthropic sign-in;
-// PSTACK_PI_LIVE_MODELS replaces that line. The parent runs on the sonnet alias.
-// PSTACK_PI_LIVE_KEEP=1 keeps the throwaway directory for inspection.
+// The aliases resolve through the shipped models.json table of
+// PSTACK_PI_LIVE_PROVIDER (default openai-codex), or through the `pi models:`
+// line in PSTACK_PI_LIVE_MODELS when it is set. The parent runs on the sonnet
+// alias. PSTACK_PI_LIVE_KEEP=1 keeps the throwaway directory for inspection.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
@@ -15,18 +15,13 @@ import { dirname, join } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 
-import { parseSheet } from "../../plugins/pstack/pi/config.ts";
 import { openingPrompt } from "../../plugins/pstack/skills/reflect/scripts/find-transcript.mjs";
-import { gitRepo } from "./harness.mjs";
+import { gitRepo, liveModels } from "./harness.mjs";
 
 const LIVE = process.env.PSTACK_PI_LIVE === "1";
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const pluginRoot = join(repoRoot, "plugins/pstack");
-const PI_MODELS =
-  process.env.PSTACK_PI_LIVE_MODELS ??
-  "pi models: opus=openai-codex/gpt-6-astra, fable=openai-codex/gpt-6-sol, sonnet=openai-codex/gpt-6-luna, haiku=openai-codex/gpt-6-luna";
-const SHEET = `# pstack live test sheet\n\n${PI_MODELS}\nsession hook: on\n`;
-const MODELS = parseSheet(SHEET).piModels;
+const { sheet: SHEET, models: MODELS } = liveModels(pluginRoot, "# pstack live test sheet\n\n");
 const PARENT_MODEL = MODELS.get("sonnet");
 const MANDATE = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
 const MANDATE_KEY = "pstack-session-start";

@@ -42,13 +42,12 @@ function catalogIds(dir, provider) {
 const dir = catalogDir();
 
 describe("models.json pi block", () => {
-  test.skipIf(!dir)("every family name maps to a model in the installed Pi catalog", () => {
-    const missing = Object.entries(piModels)
-      .filter(([, ref]) => {
-        const [provider, id] = ref.split("/");
-        return !catalogIds(dir, provider).has(id);
-      })
-      .map(([alias, ref]) => `${alias}: ${ref}`);
+  test.skipIf(!dir)("every provider table maps each family name to a model in the installed Pi catalog", () => {
+    const missing = Object.entries(piModels).flatMap(([provider, table]) =>
+      Object.entries(table)
+        .filter(([, ref]) => !catalogIds(dir, provider).has(ref.slice(provider.length + 1)))
+        .map(([alias, ref]) => `${alias}: ${ref}`),
+    );
     expect(missing).toEqual([]);
   });
 });

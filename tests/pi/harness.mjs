@@ -6,17 +6,28 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { parseSheet } from "../../plugins/pstack/pi/config.ts";
+
 export const pluginRoot = fileURLToPath(new URL("../../plugins/pstack/", import.meta.url));
 export const fakePiBin = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
 
 export const fixtureModels = {
   available: ["opus", "fable", "sonnet", "haiku"],
   pi: {
+    fallback: "anthropic",
     models: {
-      opus: "anthropic/fixture-opus",
-      fable: "anthropic/fixture-fable",
-      sonnet: "anthropic/fixture-sonnet",
-      haiku: "anthropic/fixture-haiku",
+      anthropic: {
+        opus: "anthropic/fixture-opus",
+        fable: "anthropic/fixture-fable",
+        sonnet: "anthropic/fixture-sonnet",
+        haiku: "anthropic/fixture-haiku",
+      },
+      "openai-codex": {
+        opus: "openai-codex/fixture-opus",
+        fable: "openai-codex/fixture-fable",
+        sonnet: "openai-codex/fixture-sonnet",
+        haiku: "openai-codex/fixture-haiku",
+      },
     },
   },
 };
@@ -114,6 +125,18 @@ export function world({ script = {}, sheet = null, killGraceMs = 300 } = {}) {
     },
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
+}
+
+// The sheet and alias map the real-pi runs use: the shipped table of
+// PSTACK_PI_LIVE_PROVIDER (default openai-codex), with any aliases the
+// `pi models:` line in PSTACK_PI_LIVE_MODELS names replaced.
+export function liveModels(root, head = "", extra = "") {
+  const line = process.env.PSTACK_PI_LIVE_MODELS;
+  const provider = process.env.PSTACK_PI_LIVE_PROVIDER ?? "openai-codex";
+  const sheet = `${head}${line ? `${line}\n` : ""}${extra}session hook: on\n`;
+  const shipped = JSON.parse(readFileSync(join(root, "models.json"), "utf8")).pi.models[provider];
+  if (!shipped) throw new Error(`models.json has no pi table for "${provider}"`);
+  return { sheet, models: new Map([...Object.entries(shipped), ...parseSheet(sheet).piModels]) };
 }
 
 export function gitRepo(dir) {

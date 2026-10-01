@@ -147,12 +147,14 @@ describe("runtime model names", () => {
     }
   });
 
-  test("the Pi section pairs every alias with its Pi model and names the sheet override", () => {
-    const remapped = { ...models, pi: { models: { ...models.pi.models, haiku: "openai/marker-model" } } };
-    const text = piModelNamesSection(remapped);
+  test("the Pi section tables every alias per provider, names the fallback, and names the sheet override", () => {
+    const tables = { ...models.pi.models, marker: { opus: "marker/o", fable: "marker/f", sonnet: "marker/s", haiku: "marker/h" } };
+    const text = piModelNamesSection({ ...models, pi: { fallback: "marker", models: tables } });
+    expect(text).toContain(`| Alias | ${Object.keys(tables).map((p) => `\`${p}\``).join(" | ")} |`);
     for (const alias of models.available) {
-      expect(text).toContain(`- \`${alias}\`: \`${remapped.pi.models[alias]}\``);
+      expect(text).toContain(`| \`${alias}\` | ${Object.values(tables).map((t) => `\`${t[alias]}\``).join(" | ")} |`);
     }
+    expect(text).toContain("in the `marker` column for any other provider");
     expect(text).toContain("`pi models: ");
   });
 

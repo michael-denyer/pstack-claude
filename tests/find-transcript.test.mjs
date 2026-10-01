@@ -151,6 +151,19 @@ describe("find-transcript", () => {
     expect(await openingPrompt(path)).toBe("first branch opening");
   });
 
+  test("a raw U+2028 or U+2029 inside a record does not split it", async () => {
+    const dir = tempDir();
+    const claude = transcript(dir, "c.jsonl", [meta, user("fix the parser\u2028please"), user("a later prompt")], 100);
+    const pi = transcript(
+      dir,
+      "--work-repo--/s.jsonl",
+      [piHeader, piMessage("u1", null, "user", "ship the release"), piMessage("a1", "u1", "assistant", "line\u2029break"), piMessage("u2", "a1", "user", "a later prompt")],
+      100,
+    );
+    expect(await openingPrompt(claude)).toBe("fix the parser\u2028please");
+    expect(await openingPrompt(pi)).toBe("ship the release");
+  });
+
   test("a Pi session with no user message on its active branch has no opening prompt", async () => {
     const dir = tempDir();
     const path = transcript(

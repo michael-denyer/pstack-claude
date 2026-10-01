@@ -13,8 +13,18 @@
 import { createReadStream, readdirSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
-import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+
+// readline also breaks on U+2028 and U+2029, which JSON leaves unescaped.
+async function* jsonlLines(stream) {
+  let rest = "";
+  for await (const chunk of stream) {
+    const parts = (rest + chunk).split("\n");
+    rest = parts.pop();
+    yield* parts;
+  }
+  if (rest) yield rest;
+}
 
 export function candidates(projectsDir, maxDepth = 2) {
   const files = [];
@@ -68,12 +78,11 @@ function activeOpening(entries, leaf) {
 
 export async function openingPrompt(path) {
   const stream = createReadStream(path, { encoding: "utf8" });
-  const lines = createInterface({ input: stream, crlfDelay: Infinity });
   let pi = null;
   let leaf = null;
   let first = true;
   try {
-    for await (const line of lines) {
+    for await (const line of jsonlLines(stream)) {
       let record;
       try {
         record = JSON.parse(line);
@@ -99,7 +108,6 @@ export async function openingPrompt(path) {
       if (prompt && !LOCAL_COMMAND.test(prompt)) return prompt;
     }
   } finally {
-    lines.close();
     stream.destroy();
   }
   return pi ? activeOpening(pi, leaf) : null;

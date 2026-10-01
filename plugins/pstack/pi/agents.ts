@@ -359,6 +359,11 @@ export class AgentRunner {
     await this.runs.get(id)?.done;
   }
 
+  // Resolves once the first running agent exits, at once when none is running.
+  async nextExit(): Promise<void> {
+    if (this.runs.size) await Promise.race([...this.runs.values()].map((run) => run.done));
+  }
+
   find(to: string): AgentRecord {
     const byId = this.records.get(to);
     if (byId) return byId;

@@ -59,9 +59,10 @@ export function fakePi({ thinking = "medium" } = {}) {
   };
 }
 
-export function fakeCtx({ cwd, sessionId = "parent-session", entries = [], model, hasUI = false, ui, idle = true } = {}) {
+export function fakeCtx({ cwd, sessionId = "parent-session", entries = [], model, mode = "tui", hasUI = false, ui, idle = true } = {}) {
   return {
     cwd,
+    mode,
     hasUI,
     ui,
     model: model === undefined ? { provider: "anthropic", id: "parent-model" } : model,

@@ -315,3 +315,52 @@ describe("registry", () => {
     expect(w.invocations()[1].argv[4]).toBe(w.invocations()[0].argv[4]);
   });
 });
+
+// Plays Pi's settle loop: a follow-up queued during agent_before_settle starts
+// another turn, and a settle that queues nothing ends the run.
+async function settleLoop(pi, ctx) {
+  const turns = [];
+  for (let i = 0; i < 5; i++) {
+    const before = pi.messages.length;
+    await pi.emit("agent_before_settle", { entries: [], continue: false, outcome: "completed" }, ctx);
+    const queued = pi.messages.slice(before);
+    if (!queued.length) return turns;
+    turns.push(queued);
+  }
+  throw new Error("settle never ended");
+}
+
+describe("non-interactive settle", () => {
+  for (const mode of ["json", "print"]) {
+    test(`in ${mode} mode the run settles only after every background agent's notice has run as a turn`, async () => {
+      const { pi, ctx } = setup({
+        script: { byPrompt: { fast: [{ sleep: 150 }, { reply: "fast done" }], slow: [{ sleep: 700 }, { reply: "slow done" }] } },
+        ctx: { mode },
+      });
+      const fast = (await pi.call("agent", { description: "fast", prompt: "fast", run_in_background: true }, ctx)).details.agentId;
+      const slow = (await pi.call("agent", { description: "slow", prompt: "slow", run_in_background: true }, ctx)).details.agentId;
+
+      const turns = await settleLoop(pi, ctx);
+
+      expect(turns.map((t) => t.map(({ message }) => message.details.agentId))).toEqual([[fast], [slow]]);
+      for (const [{ message, options }] of turns) {
+        expect(message.customType).toBe("pstack-agent");
+        expect(options).toEqual({ triggerTurn: true, deliverAs: "followUp" });
+      }
+      expect(turns[1][0].message.content).toContain("slow done");
+      const listed = JSON.parse(text(await pi.call("list_agents", {}, ctx)));
+      expect(listed.map((a) => a.status)).toEqual(["completed", "completed"]);
+    });
+  }
+
+  for (const mode of ["tui", "rpc"]) {
+    test(`in ${mode} mode the settle does not wait for a running agent`, async () => {
+      const { pi, ctx } = setup({ script: { default: [{ sleep: 5000 }] }, ctx: { mode } });
+      await pi.call("agent", { description: "long", prompt: "x", run_in_background: true }, ctx);
+
+      expect(await settleLoop(pi, ctx)).toEqual([]);
+      expect(JSON.parse(text(await pi.call("list_agents", {}, ctx)))[0].status).toBe("running");
+      await pi.emit("session_shutdown", {}, ctx);
+    });
+  }
+});

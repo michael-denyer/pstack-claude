@@ -1,0 +1,13 @@
+# Run with prek or pre-commit: `prek install` once per clone.
+# The hook is the first step of CI's "Generated files current" job. It reads the
+# working tree, not the index, so an unstaged regenerated file passes here and
+# still fails CI.
+repos:
+  - repo: local
+    hooks:
+      - id: generate-check
+        name: generated files and plugin invariants
+        entry: bun tools/generate.mjs --check
+        language: system
+        pass_filenames: false
+        always_run: true

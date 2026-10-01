@@ -611,7 +611,8 @@ export function effortSection(levels, defaultEffort) {
 // The effort agents: one general-purpose worker and one poteto-agent per level.
 // The poteto variants carry poteto-agent's body. Their descriptions name
 // pstack:poteto-agent instead of copying its routing contract, so only the
-// base agent reads as the routing target for /poteto-mode.
+// base agent reads as the routing target for /poteto-mode. A description is
+// written unquoted, so it must not open with a backtick: strict YAML rejects it.
 export function effortAgents(levels, potetoAgent) {
   const { body } = parseFrontmatter(potetoAgent);
   return levels.flatMap((level) => [
@@ -628,7 +629,7 @@ export function effortAgents(levels, potetoAgent) {
     {
       name: `poteto-agent-${level}`,
       text:
-        `---\nname: poteto-agent-${level}\ndescription: \`pstack:poteto-agent\` at ${level} reasoning effort. ` +
+        `---\nname: poteto-agent-${level}\ndescription: Runs \`pstack:poteto-agent\` at ${level} reasoning effort. ` +
         `Dispatched in place of \`pstack:poteto-agent\` when a pstack role's override names \`@${level}\`. The caller passes the model.\n` +
         `effort: ${level}\n---\n` + body,
     },
@@ -647,6 +648,20 @@ export function pluginAgentPaths(pluginRoot) {
           .map((f) => `./${dir}/${f}`)
       : [],
   );
+}
+
+// Claude Code's loader tolerates frontmatter that strict YAML rejects, so an
+// agent file can load locally and still be unreadable to another parser.
+export function validateAgentFrontmatter(pluginRoot) {
+  const failures = pluginAgentPaths(pluginRoot).flatMap((path) => {
+    try {
+      const { data } = parseFrontmatter(readFileSync(join(pluginRoot, path), "utf8"));
+      return data?.name && data?.description ? [] : [`${path}: frontmatter needs a name and a description`];
+    } catch (err) {
+      return [`${path}: ${err.message}`];
+    }
+  });
+  if (failures.length) throw new Error(`agent frontmatter is not readable YAML:\n${failures.join("\n")}`);
 }
 
 export function stampAgentPaths(manifestText, paths) {
@@ -923,6 +938,7 @@ export function problems(root, models) {
     );
   }
   attempt(() => validatePluginLayout(pluginRoot));
+  attempt(() => validateAgentFrontmatter(pluginRoot));
   for (const file of ["hooks/hooks.json", ...(codexManifest ? [codexManifest.hooks] : [])]) {
     attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file }));
   }
@@ -952,7 +968,7 @@ function main() {
   if (pending?.length === 0) console.log(`ok: ${Object.keys(intended.files).length} generated files current`);
   for (const failure of failures) console.error(`FAIL: ${failure}`);
   if (failures.length) process.exit(1);
-  console.log("ok: skill links, prose paths, model slugs, marketplace, plugin layout, and hooks pass their checks");
+  console.log("ok: skill links, prose paths, model slugs, marketplace, plugin layout, agent frontmatter, and hooks pass their checks");
 }
 
 // Guarded so importing the generator's validation and rendering functions does

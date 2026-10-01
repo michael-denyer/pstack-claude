@@ -95,10 +95,13 @@ export type Check =
     });
 export type FailedCheck = Extract<Check, { readonly kind: "failed" }>;
 export type PendingCheck = Extract<Check, { readonly kind: "pending" }>;
-export interface CheckRead {
+export interface ReportedChecks {
+  readonly kind: "reported";
   readonly source: "gh-pr-checks" | "graphql-rollup";
   readonly checks: NonEmpty<Check>;
 }
+/** `resolveChecks` owns what counts as `no-checks`. */
+export type CheckRead = ReportedChecks | { readonly kind: "no-checks" };
 export interface CommitRollup {
   readonly oid: string;
   readonly state: RollupState;
@@ -123,7 +126,7 @@ export type GitHubMergeAllowed =
     };
 export type GitHubMergeAssessment = GitHubMergeAllowed | GitHubMergeRefusal;
 interface CiBase {
-  readonly source: CheckRead["source"];
+  readonly source: ReportedChecks["source"];
   readonly all: NonEmpty<Check>;
   readonly hadPreviousPassingCi: boolean;
 }
@@ -150,7 +153,19 @@ export type CiClean = CiBase & {
   readonly pending: readonly [];
   readonly github: GitHubMergeAllowed;
 };
-export type CiState = CiFailing | CiGithubRejected | CiPending | CiClean;
+export interface CiNone {
+  readonly kind: "ci-none";
+  readonly failed: readonly [];
+  readonly pending: readonly [];
+  readonly hadPreviousPassingCi: false;
+  readonly github: GitHubMergeAllowed;
+}
+export type CiState =
+  | CiFailing
+  | CiGithubRejected
+  | CiPending
+  | CiClean
+  | CiNone;
 export type PrSnapshot =
   | {
       readonly kind: "merged" | "closed";
@@ -172,7 +187,7 @@ export interface ReadyPr {
     readonly revision: LandingRevision;
     readonly mergeability: "clear";
     readonly threads: readonly [];
-    readonly ci: CiClean;
+    readonly ci: CiClean | CiNone;
     readonly gate: {
       readonly state: "OPEN";
       readonly reviewDecision: Exclude<
@@ -395,15 +410,19 @@ export type QueueTerminalVerdict =
   | TimeoutVerdict;
 export type ChecksFastPath =
   | { readonly kind: "checks"; readonly checks: readonly Check[] }
+  | { readonly kind: "none-reported" }
   | {
       readonly kind: "unusable";
       readonly exitCode: number;
       readonly stderr: string;
     };
-export interface RollupPage {
-  readonly checks: readonly Check[];
-  readonly endCursor: string | null;
-}
+export type RollupPage =
+  | {
+      readonly kind: "contexts";
+      readonly checks: readonly Check[];
+      readonly endCursor: string | null;
+    }
+  | { readonly kind: "no-rollup" };
 export interface GitHubReader {
   originRepo(): Promise<Repository | null>;
   currentPr(pr: PrNumber | null): Promise<PrContext>;

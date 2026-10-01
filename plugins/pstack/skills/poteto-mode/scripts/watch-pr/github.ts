@@ -633,6 +633,13 @@ export class GhGitHubReader implements T.GitHubReader {
         if (!(error instanceof WatcherQueryError)) throw error;
       }
     }
+    // Only this stderr line means gh read the head commit and found no checks.
+    // Any other exit 1 is a failed query.
+    if (
+      result.code === 1 &&
+      firstLine(result.stderr).startsWith("no checks reported on the ")
+    )
+      return { kind: "none-reported" };
     return { kind: "unusable", exitCode: result.code, stderr: result.stderr };
   }
   async checkRollupPage(
@@ -646,13 +653,13 @@ export class GhGitHubReader implements T.GitHubReader {
       at(value, ["data", "repository", "pullRequest", "commits", "nodes"]),
       "commits.nodes"
     );
-    if (commits.length === 0) return { checks: [], endCursor: null };
+    if (commits.length === 0)
+      return { kind: "contexts", checks: [], endCursor: null };
     const commit = record(
       at(commits[commits.length - 1], ["commit"]),
       "commit"
     );
-    if (commit.statusCheckRollup === null)
-      return { checks: [], endCursor: null };
+    if (commit.statusCheckRollup === null) return { kind: "no-rollup" };
     const contexts = record(
       at(commit, ["statusCheckRollup", "contexts"]),
       "contexts"
@@ -667,7 +674,11 @@ export class GhGitHubReader implements T.GitHubReader {
       page.endCursor,
       "contexts.pageInfo.endCursor"
     );
-    return { checks, endCursor: page.hasNextPage && cursor ? cursor : null };
+    return {
+      kind: "contexts",
+      checks,
+      endCursor: page.hasNextPage && cursor ? cursor : null,
+    };
   }
   async reviewThreads(
     context: T.PrContext
@@ -734,20 +745,34 @@ export async function resolveChecks(
 ): Promise<T.CheckRead> {
   const fast = await reader.checksFastPath(context);
   const direct = fast.kind === "checks" ? nonEmpty(fast.checks) : null;
-  if (direct !== null) return { source: "gh-pr-checks", checks: direct };
+  if (direct !== null)
+    return { kind: "reported", source: "gh-pr-checks", checks: direct };
   const checks: T.Check[] = [];
   let after: string | null = null;
+  let headHasRollup = true;
   do {
     const page = await reader.checkRollupPage(context, after);
+    if (page.kind === "no-rollup") {
+      headHasRollup = false;
+      break;
+    }
     checks.push(...page.checks);
     after = page.endCursor;
   } while (after !== null);
   const fallback = nonEmpty(checks);
-  if (fallback !== null) return { source: "graphql-rollup", checks: fallback };
+  if (fallback !== null)
+    return { kind: "reported", source: "graphql-rollup", checks: fallback };
+  // Both reads have to say it. A null rollup beside a failed fast path can be a
+  // credential that cannot see checks, and a rollup that exists but maps to no
+  // check can hold a context type this reader does not know.
+  if (fast.kind === "none-reported" && !headHasRollup)
+    return { kind: "no-checks" };
   const suffix =
     fast.kind === "unusable"
       ? `fast path exit=${fast.exitCode}; GraphQL rollup was empty${firstLine(fast.stderr) ? `; ${firstLine(fast.stderr)}` : ""}`
-      : "fast path and GraphQL rollup were empty";
+      : fast.kind === "none-reported"
+        ? "fast path reported no checks; GraphQL rollup exists but listed no readable check"
+        : "fast path and GraphQL rollup were empty";
   throw new ChecksUnavailable(`could not read PR checks: ${suffix}`);
 }
 export async function resolveContext(args: {

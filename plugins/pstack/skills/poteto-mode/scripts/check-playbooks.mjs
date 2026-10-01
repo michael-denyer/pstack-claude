@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const BUNDLED = resolve(dirname(fileURLToPath(import.meta.url)), "../playbooks");
-const CHANGE = /^\s*[-*]\s+\*\*(?:After|Before|Replace|In)\*\*\s+"([^"]+)"/;
-const CHANGE_VERB = /^\s*[-*]\s+\*\*(?:After|Before|Replace|In)\*\*/;
+const CHANGE = /^\s*(?:[-*]|\d+\.)\s+\*\*(?:After|Before|Replace|In)\*\*\s+"([^"]+)"/;
+const CHANGE_VERB = /^\s*(?:[-*]|\d+\.)\s+\*\*(?:After|Before|Replace|In)\*\*/;
 const flat = (text) => text.replace(/\s+/g, " ");
 
 export function checkPlaybooks(root, bundled = BUNDLED) {
@@ -15,7 +15,7 @@ export function checkPlaybooks(root, bundled = BUNDLED) {
   const problems = [];
   for (const name of readdirSync(dir).filter((file) => file.endsWith(".md")).sort()) {
     const path = `.agents/playbooks/${name}`;
-    const text = readFileSync(join(dir, name), "utf8");
+    const text = readFileSync(join(dir, name), "utf8").replaceAll("\r\n", "\n");
     const front = text.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? "";
     const field = (key) => front.match(new RegExp(`^${key}:[ \\t]*(.*)$`, "m"))?.[1].trim() ?? "";
     if (!field("when")) problems.push(`${path}: its frontmatter needs a "when:" line`);
@@ -43,7 +43,17 @@ export function checkPlaybooks(root, bundled = BUNDLED) {
   return problems;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// node leaves argv[1] unresolved and may set it to a non-file (`node -e ... arg`).
+function invokedDirectly() {
+  if (!process.argv[1]) return false;
+  try {
+    return fileURLToPath(import.meta.url) === realpathSync(process.argv[1]);
+  } catch {
+    return false;
+  }
+}
+
+if (invokedDirectly()) {
   const problems = checkPlaybooks(resolve(process.argv[2] ?? "."));
   if (problems.length > 0) {
     console.error(problems.join("\n"));

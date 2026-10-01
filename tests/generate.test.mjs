@@ -507,6 +507,12 @@ describe("effort agents", () => {
     expect(description).not.toContain("Routing contract.");
   });
 
+  test("every agent's frontmatter reads back as YAML", () => {
+    for (const agent of agents) {
+      expect(parseFrontmatter(agent.text).data.name).toBe(agent.name);
+    }
+  });
+
   const pluginRoot = join(fileURLToPath(new URL("..", import.meta.url)), "plugins/pstack");
 
   test("plugin.json lists both hand-written and generated agents", () => {
@@ -807,6 +813,18 @@ describe("plan, changes, apply", () => {
     expect(check.stderr).toContain(`FAIL: ${STUB} is a symlink; the generator never writes through one\n`);
     expect(check.stderr).toContain("FAIL: model names outside generator-owned regions");
     expect(readFileSync(outside, "utf8")).toBe("original");
+  });
+
+  test("problems reports an agent whose frontmatter strict YAML cannot read", () => {
+    const root = repoCopy();
+    const agent = "plugins/pstack/agents/comment-sicko.md";
+    writeFileSync(
+      join(root, agent),
+      readFileSync(join(root, agent), "utf8").replace(/^description: .*$/m, "description: `backticked` first"),
+    );
+    expect(problems(root)).toEqual([
+      expect.stringMatching(/^agent frontmatter is not readable YAML:\n\.\/agents\/comment-sicko\.md: /),
+    ]);
   });
 
   test("problems reports a malformed Codex manifest as one failure and still runs the other checks", () => {

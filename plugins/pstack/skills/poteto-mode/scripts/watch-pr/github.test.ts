@@ -17,6 +17,7 @@ import {
   passingCheck,
   pendingCheck,
 } from "./fakes.test-helper.ts";
+import type { CheckRead, ReportedChecks } from "./types.ts";
 import { parsePrNumber } from "./types.ts";
 
 const context = {
@@ -25,12 +26,18 @@ const context = {
   number: parsePrNumber(42),
 };
 
+function reported(read: CheckRead): ReportedChecks {
+  if (read.kind !== "reported")
+    throw new Error(`expected checks: ${read.kind}`);
+  return read;
+}
+
 describe("checks fallback chain", () => {
   it("uses a non-empty fast-path result without a rollup query", async () => {
     const reader = fakeReader({
       fastPath: { kind: "checks", checks: [passingCheck("fast")] },
     });
-    const read = await resolveChecks(reader, context);
+    const read = reported(await resolveChecks(reader, context));
     expect(read.source).toBe("gh-pr-checks");
     expect(read.checks.map((check) => check.name)).toEqual(["fast"]);
     expect(reader.calls).toEqual(["checksFastPath"]);
@@ -40,11 +47,15 @@ describe("checks fallback chain", () => {
     const reader = fakeReader({
       fastPath: { kind: "unusable", exitCode: 8, stderr: "" },
       rollupPages: [
-        { checks: [passingCheck("first")], endCursor: "next" },
-        { checks: [failedCheck("second")], endCursor: null },
+        {
+          kind: "contexts",
+          checks: [passingCheck("first")],
+          endCursor: "next",
+        },
+        { kind: "contexts", checks: [failedCheck("second")], endCursor: null },
       ],
     });
-    const read = await resolveChecks(reader, context);
+    const read = reported(await resolveChecks(reader, context));
     expect(read.source).toBe("graphql-rollup");
     expect(read.checks.map((check) => check.name)).toEqual(["first", "second"]);
     expect(reader.calls).toEqual([
@@ -57,9 +68,15 @@ describe("checks fallback chain", () => {
   it("falls back when valid fast-path JSON represented an empty list", async () => {
     const reader = fakeReader({
       fastPath: { kind: "checks", checks: [] },
-      rollupPages: [{ checks: [pendingCheck("fallback")], endCursor: null }],
+      rollupPages: [
+        {
+          kind: "contexts",
+          checks: [pendingCheck("fallback")],
+          endCursor: null,
+        },
+      ],
     });
-    expect((await resolveChecks(reader, context)).checks[0].name).toBe(
+    expect(reported(await resolveChecks(reader, context)).checks[0].name).toBe(
       "fallback"
     );
     expect(reader.calls).toEqual(["checksFastPath", "checkRollupPage:null"]);
@@ -77,6 +94,50 @@ describe("checks fallback chain", () => {
       ChecksUnavailable
     );
     expect(reader.calls).toEqual(["checksFastPath", "checkRollupPage:null"]);
+  });
+
+  it("reads no checks when gh reports none and the head commit has no rollup", async () => {
+    const reader = fakeReader({
+      fastPath: { kind: "none-reported" },
+      rollupPages: [{ kind: "no-rollup" }],
+    });
+    expect(await resolveChecks(reader, context)).toEqual({ kind: "no-checks" });
+    expect(reader.calls).toEqual(["checksFastPath", "checkRollupPage:null"]);
+  });
+
+  it("fails closed when only one read says there are no checks", async () => {
+    const oneSided = [
+      {
+        fastPath: { kind: "unusable", exitCode: 1, stderr: "HTTP 401" },
+        rollupPages: [{ kind: "no-rollup" }],
+      },
+      {
+        fastPath: { kind: "checks", checks: [] },
+        rollupPages: [{ kind: "no-rollup" }],
+      },
+      {
+        fastPath: { kind: "none-reported" },
+        rollupPages: [{ kind: "contexts", checks: [], endCursor: null }],
+      },
+    ] as const;
+    for (const options of oneSided)
+      await expect(
+        resolveChecks(fakeReader(options), context)
+      ).rejects.toBeInstanceOf(ChecksUnavailable);
+  });
+
+  it("propagates a failed rollup query instead of reading it as no checks", async () => {
+    const reader = fakeReader({ fastPath: { kind: "none-reported" } });
+    const failure = new WatcherQueryError({
+      kind: "command-exit",
+      retryable: true,
+      code: 1,
+      detail: "HTTP 502",
+    });
+    reader.checkRollupPage = async () => {
+      throw failure;
+    };
+    await expect(resolveChecks(reader, context)).rejects.toBe(failure);
   });
 });
 

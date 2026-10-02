@@ -9,7 +9,7 @@ import { Value } from "typebox/value";
 import { noticeOf, OUTPUT_CAP_BYTES, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
 import { alive, type ChildExit, PiChild, signalGroup } from "./child.ts";
-import { GENERAL_PURPOSE, loadAgentTypes, readSheet, resolveModel, type Settings } from "./config.ts";
+import { DEPTH_FLAG, GENERAL_PURPOSE, loadAgentTypes, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
 
 const ENTRY_TYPE = "pstack-agents";
@@ -110,6 +110,7 @@ function childArgs(identity: AgentIdentity, depth: number): string[] {
   if (identity.model) args.push("--model", identity.model);
   if (identity.thinking) args.push("--thinking", identity.thinking);
   if (identity.systemPromptFile) args.push("--append-system-prompt", identity.systemPromptFile);
+  args.push(`--${DEPTH_FLAG}`, String(depth + 1));
   const excluded = [...(identity.readonly ? ["edit", "write"] : []), ...(depth + 1 >= MAX_SPAWN_DEPTH ? ["agent"] : [])];
   if (excluded.length) args.push("--exclude-tools", excluded.join(","));
   return args;

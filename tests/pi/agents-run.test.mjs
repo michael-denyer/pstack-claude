@@ -25,6 +25,7 @@ describe("agent tool", () => {
       "--session-dir", join(w.agentDir, "pstack", "parent-session", "agents"),
       "--model", "anthropic/parent-model",
       "--thinking", "medium",
+      "--pstack-depth", "1",
     ]);
     expect(inv.prompt).toBe("-do it");
     expect(flag(inv, "--session-id")).toMatch(/^[0-9a-f-]{36}$/);

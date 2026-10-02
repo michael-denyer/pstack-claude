@@ -107,7 +107,6 @@ export function world({ script = {}, sheet = null } = {}) {
     childEnv: {
       PATH: process.env.PATH,
       HOME: root,
-      PSTACK_PI_DEPTH: "1",
       PSTACK_FAKE_PI_SCRIPT: scriptFile,
       PSTACK_FAKE_PI_LOG: logFile,
     },

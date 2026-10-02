@@ -67,7 +67,7 @@ export class PiChild {
   private errorMessage = "";
   private stderr = "";
 
-  constructor(command: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; exitGraceMs: number }, prompt: string) {
+  constructor(command: string, args: string[], opts: { cwd: string; env?: NodeJS.ProcessEnv; exitGraceMs: number }, prompt: string) {
     this.exitGraceMs = opts.exitGraceMs;
     this.proc = spawn(command, args, { cwd: opts.cwd, env: opts.env, detached: true, stdio: ["pipe", "pipe", "pipe"] });
     this.pid = this.proc.pid;

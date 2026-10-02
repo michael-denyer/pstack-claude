@@ -9,14 +9,19 @@ const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
 type Effort = (typeof EFFORT_LEVELS)[number];
 const PARENT_MODEL_ALIASES = ["inherit-parent", "auto"];
 
+// A parent passes it to each agent it starts, so the agent knows its depth.
+export const DEPTH_FLAG = "pstack-depth";
+
 export interface Settings {
   pluginRoot: string;
   modelsFile: string;
   agentDir: string;
   pi: { command: string; args: string[] };
-  childEnv: NodeJS.ProcessEnv;
+  // Unset, so an agent inherits the session's environment. Tests set it to
+  // configure their fake pi.
+  childEnv?: NodeJS.ProcessEnv;
   // Layers below the main session: 0 there, 1 in its agents, and so on.
-  depth: number;
+  readonly depth: number;
   killGraceMs: number;
   // How long a settled child gets to exit after its stdin closes. It covers a
   // nested child's own shutdown, which stops its agents with killGraceMs each.
@@ -34,16 +39,18 @@ function piInvocation(): Settings["pi"] {
   return /^(node|bun)(\.exe)?$/.test(exe) ? { command: "pi", args: [] } : { command: process.execPath, args: [] };
 }
 
-export function defaultSettings(env: NodeJS.ProcessEnv = process.env): Settings {
+// readDepth is called on each use: pi parses extension flags after it loads
+// the extension.
+export function defaultSettings(readDepth: () => number, env: NodeJS.ProcessEnv = process.env): Settings {
   const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-  const depth = Number(env.PSTACK_PI_DEPTH) || 0;
   return {
     pluginRoot,
     modelsFile: join(pluginRoot, "models.json"),
     agentDir: env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
     pi: piInvocation(),
-    childEnv: { ...env, PSTACK_PI_DEPTH: String(depth + 1) },
-    depth,
+    get depth() {
+      return readDepth();
+    },
     killGraceMs: 5000,
     exitGraceMs: 30_000,
   };

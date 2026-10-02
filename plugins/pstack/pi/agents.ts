@@ -518,7 +518,7 @@ const agentSchema = {
 // Claude Code's background launch result says the same, and without it models
 // wait for a notice with sleep loops that cost a model call per check.
 const BACKGROUND_NOTE =
-  "The agent runs in the background. Its completion notice arrives on its own, after your current tool calls or as a new turn when you are idle. Do not sleep, poll, or call list_agents to wait for it: do other work, or end your turn.";
+  "The agent runs in the background. Its completion notice arrives on its own, after your current tool calls or as a new turn when you are idle. Do not sleep, poll, or call list_agents to wait for it, and do not start other agents on its part of the task. Once nothing else the task needs is left, end your turn; the notice starts a new one.";
 
 // model-only exposure keeps every tool declared to the model even under
 // codemode.mode "only", which would otherwise reach them only through scripts.

@@ -6,6 +6,11 @@ import { readSheet, type Settings } from "./config.ts";
 
 export const MANDATE_SECTION = "pstack-session-start";
 export const SHEET_SECTION = "pstack-models";
+export const PARALLEL_SECTION = "pstack-parallel-calls";
+// Claude Code's system prompt, word for word but for its function_calls block.
+// pstack skills that say "one message, N Agent calls" rely on it.
+export const PARALLEL_CALLS =
+  "If you intend to call multiple tools and there are no dependencies between the calls, make all of the independent calls in the same response, otherwise you MUST wait for previous calls to finish first to determine the dependent values.";
 const FILE_TOOLS = new Set(["read", "edit", "write"]);
 
 interface PathSkill {
@@ -65,6 +70,7 @@ export function registerLifecycle(pi: ExtensionAPI, settings: Settings, cleanup:
   pi.on("before_agent_start", (event) => {
     const sheet = readSheet(settings.agentDir);
     const sections = event.systemPromptOptions.sections;
+    sections[PARALLEL_SECTION] = PARALLEL_CALLS;
     if (settings.depth === 0 && !sheet?.hookOff) sections[MANDATE_SECTION] = readFileSync(mandateFile, "utf8");
     if (sheet) sections[SHEET_SECTION] = sheet.text;
   });

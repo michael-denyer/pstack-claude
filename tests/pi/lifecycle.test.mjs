@@ -6,6 +6,7 @@ import { join } from "node:path";
 
 import { defaultSettings } from "../../plugins/pstack/pi/config.ts";
 import { install } from "../../plugins/pstack/pi/index.ts";
+import { PARALLEL_CALLS } from "../../plugins/pstack/pi/lifecycle.ts";
 import { alive, fakeCtx, fakePi, pluginRoot, waitFor, world } from "./harness.mjs";
 
 const mandate = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
@@ -29,27 +30,27 @@ async function sectionsAfterStart(pi, ctx) {
 describe("before_agent_start", () => {
   test("injects the mandate when there is no sheet", async () => {
     const { pi, ctx } = setup();
-    expect(await sectionsAfterStart(pi, ctx)).toEqual({ "pstack-session-start": mandate });
+    expect(await sectionsAfterStart(pi, ctx)).toEqual({ "pstack-parallel-calls": PARALLEL_CALLS, "pstack-session-start": mandate });
   });
 
   test("injects the mandate and the full sheet on every agent start", async () => {
     const sheet = "arena runners: opus, fable, sonnet\nsession hook: on\n";
     const { pi, ctx } = setup({ sheet });
     for (let i = 0; i < 2; i++) {
-      expect(await sectionsAfterStart(pi, ctx)).toEqual({ "pstack-session-start": mandate, "pstack-models": sheet });
+      expect(await sectionsAfterStart(pi, ctx)).toEqual({ "pstack-parallel-calls": PARALLEL_CALLS, "pstack-session-start": mandate, "pstack-models": sheet });
     }
   });
 
   test("session hook: off drops the mandate but keeps the sheet", async () => {
     const sheet = "swarm workers: opus\nsession hook: off\n";
     const { pi, ctx } = setup({ sheet });
-    expect(await sectionsAfterStart(pi, ctx)).toEqual({ "pstack-models": sheet });
+    expect(await sectionsAfterStart(pi, ctx)).toEqual({ "pstack-parallel-calls": PARALLEL_CALLS, "pstack-models": sheet });
   });
 
   test("a child pi gets the sheet but not the mandate", async () => {
     const sheet = "swarm workers: opus\n";
     const { pi, ctx } = setup({ sheet }, { depth: 1 });
-    expect(await sectionsAfterStart(pi, ctx)).toEqual({ "pstack-models": sheet });
+    expect(await sectionsAfterStart(pi, ctx)).toEqual({ "pstack-parallel-calls": PARALLEL_CALLS, "pstack-models": sheet });
   });
 
   test("PSTACK_PI_DEPTH counts the layers below the main session and PI_CODING_AGENT_DIR moves the sheet", () => {

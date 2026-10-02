@@ -452,7 +452,7 @@ suite("pstack on live pi", () => {
       expect(events.at(-1).type).toBe("agent_settled");
       const sessionId = events.find((e) => e.type === "session").id;
       const record = agentByDescription(parentSessionFile(sessionId), "printbg").at(-1);
-      expect(record).toMatchObject({ id: notice.details.agentId, status: "completed" });
+      expect(record).toMatchObject({ agent: { id: notice.details.agentId }, status: "completed" });
       expect(pidAlive(record.pid)).toBe(false);
     },
     5 * MINUTE,

@@ -115,7 +115,7 @@ suite("pstack on live pi", () => {
         for (const [description, [alias, word]] of Object.entries(expected)) {
           const snaps = agentByDescription(file, description);
           const last = snaps.at(-1);
-          expect(last).toMatchObject({ status: "completed", model: MODELS.get(alias) });
+          expect(last).toMatchObject({ status: "completed", agent: { model: MODELS.get(alias) } });
           expect(pidAlive(last.pid)).toBe(false);
           const notice = notices.find((n) => n.details.agentId === last.agent.id);
           expect(notice.details.status).toBe("completed");
@@ -254,7 +254,7 @@ suite("pstack on live pi", () => {
           'Make one agent tool call in the foreground with subagent_type "pstack:effort-high", description "effort", prompt "Reply with exactly one word: done". Then reply with exactly one word: ok.',
         );
         const record = agentByDescription(await parent.sessionFile(), "effort").at(-1);
-        expect(record).toMatchObject({ status: "completed", subagentType: "pstack:effort-high", thinking: "high" });
+        expect(record).toMatchObject({ status: "completed", agent: { subagentType: "pstack:effort-high", thinking: "high" } });
         const child = childEntries(record);
         const levels = child.filter((e) => e.type === "thinking_level_change").map((e) => e.thinkingLevel);
         expect(levels.at(-1)).toBe("high");

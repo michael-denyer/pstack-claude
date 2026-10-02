@@ -2,6 +2,12 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.60 - orch and the watch-pr tests stop handing the whole environment to child processes
+
+The Claude plugin directory holds pstack with "Uses a credential from the user's machine". The orch store passed a copy of `process.env` to `gt` and `git`, and three test files passed one to the processes they start. The orch store now lets `gt` and `git` inherit the environment and strips colour codes from `gt` output, where it set `NO_COLOR` before. `openStore` takes a `gt` option, the path of the `gt` executable, which defaults to `gt`. The orch tests use it to run a fake `gt`, because Bun resolves a command that has no `env` option against the `PATH` it started with. The tests' child processes get only `PATH` and the variables each test sets. The Pi extension still passes `PSTACK_PI_DEPTH` to its child agents in a copy of the environment.
+
+The plugin folder has `.claude-plugin/icon.png`, the path the directory reads for the listing icon.
+
 ## 0.9.59 - no `$PWD` in the repository and no listing fields in `plugin.json`
 
 The Claude plugin directory validator reads `$PWD` as a credential-named variable and holds a plugin when a file that names it also names a remote URL. The shared-skills and Codex prompt install loops in `docs/reference.md` link with `$(pwd)`, the CI and Security workflows mount `$GITHUB_WORKSPACE`, and the skills-only CI job installs `./plugins/pstack/skills`. Each resolves to the same path as before.

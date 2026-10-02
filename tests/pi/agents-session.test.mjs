@@ -140,7 +140,9 @@ describe("registry", () => {
     await w.until("grandchild", 2);
 
     await pi.emit("session_shutdown", { reason: "quit" }, ctx);
-    for (const r of w.log()) expect(alive(r.pid)).toBe(false);
+    for (const inv of w.invocations()) expect(alive(inv.pid)).toBe(false);
+    // A child kills its running command as it exits and does not wait for it.
+    await waitFor(() => w.logged("grandchild").every((r) => !alive(r.pid)));
     expect((await listAgents(pi, ctx)).map((a) => a.status)).toEqual(["stopped", "stopped"]);
     expect(pi.messages).toEqual([]);
 

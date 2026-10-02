@@ -237,7 +237,8 @@ describe("stop_agent", () => {
     const result = await pi.call("stop_agent", { id: details.agentId }, ctx);
     expect(JSON.parse(resultText(result)).status).toBe("stopped");
     expect(alive(pid)).toBe(false);
-    expect(alive(spawned("running"))).toBe(false);
+    // The child kills its running command as it exits and does not wait for it.
+    await waitFor(() => !alive(spawned("running")));
     expect(alive(spawned("background"))).toBe(true);
     expect((await listAgents(pi, ctx))[0].status).toBe("stopped");
     await waitFor(() => pi.messages.length === 1);

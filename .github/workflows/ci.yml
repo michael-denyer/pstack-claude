@@ -75,7 +75,7 @@ jobs:
       # generated job already validated the source tree's links and prose.
       - name: Install the skills tree with the skills CLI
         run: |
-          npx --yes skills@1.5.23 add "$PWD/plugins/pstack/skills" \
+          npx --yes skills@1.5.23 add ./plugins/pstack/skills \
             --skill '*' --agent codex --yes --copy
       - name: Compare the installed skills tree with the source
         run: diff -qr plugins/pstack/skills .agents/skills
@@ -159,7 +159,7 @@ jobs:
       # Resolved with: docker buildx imagetools inspect rhysd/actionlint:1.7.12
       - name: Run actionlint
         run: |
-          docker run --rm -v "$PWD:/repo" -w /repo \
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo" -w /repo \
             rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
             -no-color
 
@@ -190,7 +190,7 @@ jobs:
       # Resolved with: docker buildx imagetools inspect lycheeverse/lychee:0.24.2
       - name: Check relative links and fragments
         run: |
-          docker run --rm -v "$PWD:/repo" -w /repo \
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo" -w /repo \
             lycheeverse/lychee:0.24.2@sha256:e2d19e57cf6ab037026f20b8e449a1f30d9d7f81eef4194763aab2eab20bd28d \
             --offline --no-progress --include-fragments \
             --exclude-path node_modules --exclude-path .git '**/*.md'

@@ -81,7 +81,7 @@ cd pstack-claude
 mkdir -p ~/.agents/skills
 for s in plugins/pstack/skills/*/; do
   target=~/.agents/skills/"$(basename "$s")"
-  test -e "$target" || test -L "$target" || ln -s "$PWD/$s" "$target"
+  test -e "$target" || test -L "$target" || ln -s "$(pwd)/$s" "$target"
 done
 ```
 
@@ -126,7 +126,7 @@ For optional slash-command shortcuts, run this from the clone's root:
 mkdir -p ~/.codex/prompts
 for c in plugins/pstack/.codex-plugin/prompts/*.md; do
   target=~/.codex/prompts/"$(basename "$c")"
-  test -e "$target" || test -L "$target" || ln -s "$PWD/$c" "$target"
+  test -e "$target" || test -L "$target" || ln -s "$(pwd)/$c" "$target"
 done
 ```
 

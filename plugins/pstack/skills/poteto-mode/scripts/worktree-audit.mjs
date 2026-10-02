@@ -201,13 +201,15 @@ export function audit({
   const worktrees = parseWorktrees(git(repo, "worktree", "list", "--porcelain", "-z")).slice(1);
   const live = worktrees.filter((worktree) => !worktree.prunable).map((worktree) => worktree.path);
   const scanFailed = "transcript scan failed; LAST_CHAT column will be empty";
+  const missing = discover(
+    () => transcripts.filter((root) => !statSync(root, { throwIfNoEntry: false })?.isDirectory()),
+    scanFailed,
+  );
   // Every root must be readable: a chat the scan could not see might be recent.
-  const readable = transcripts.every((root) => {
-    const isDirectory = discover(() => statSync(root, { throwIfNoEntry: false })?.isDirectory(), scanFailed);
-    if (isDirectory.known && !isDirectory.value) warn(`warn: ${root} not found; LAST_CHAT column will be empty`);
-    return isDirectory.value;
+  const chats = bind(missing, (roots) => {
+    for (const root of roots) warn(`warn: ${root} not found; LAST_CHAT column will be empty`);
+    return roots.length ? UNKNOWN : discover(() => lastChats(transcripts, live), scanFailed);
   });
-  const chats = readable ? discover(() => lastChats(transcripts, live), scanFailed) : UNKNOWN;
 
   const context = { repo, trunk, fetched, prs, chats, now };
   const rows = worktrees.map(({ path, prunable }) =>

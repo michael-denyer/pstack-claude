@@ -54,7 +54,7 @@ import { walk } from "../tools/validate-skills.mjs";
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const models = loadModels();
 const leads = loadLeadLines();
-const [codex, pi] = RUNTIMES;
+const [codex, pi, copilot] = RUNTIMES;
 
 const lines = (text) => text.split("\n");
 const spanned = (locate, doc) => {
@@ -493,7 +493,7 @@ describe("deriveSkill", () => {
     for (const file of ["plugins/pstack/skills/teach/SKILL.md", "plugins/pstack/skills/poteto-mode/playbooks/refactoring.md"]) {
       const text = "---\nname: teach\ndescription: d\n---\n\n# Title\n\nbody\n";
       const out = deriveSkill(file, text, models, leads);
-      expect(out).toBe(text.replace("# Title\n\n", `# Title\n\n${leads.get(file)}\n\n`));
+      expect(out).toBe(text.replace("# Title\n\n", `# Title\n\n${leads.get(file).join("\n\n")}\n\n`));
       expect(deriveSkill(file, out, models, leads)).toBe(out);
     }
   });
@@ -513,13 +513,16 @@ describe("lead lines", () => {
     expect(stampLeadLine("no heading\n", "Lead.")).toBeNull();
   });
 
-  test("Codex stamps a preamble on its noted skills and Pi stamps none", () => {
-    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi"]);
+  test("Codex and Copilot stamp a preamble on their noted skills and Pi stamps none", () => {
+    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi", "GitHub Copilot"]);
     expect(codex.preamble).toBe(
       "On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.",
     );
+    expect(copilot.preamble).toBe(
+      "On GitHub Copilot, read the [platform mapping](../poteto-mode/references/copilot-tools.md), including its per-skill notes, before following this skill.",
+    );
     expect(pi.preamble).toBeNull();
-    expect([...leads.values()].filter((line) => line.includes("pi-tools.md"))).toEqual([]);
+    expect([...leads.values()].flat().filter((line) => line.includes("pi-tools.md"))).toEqual([]);
   });
 
   test("a notes table lists its skills in row order and rejects a row without one", () => {
@@ -794,10 +797,12 @@ describe("plan, changes, apply", () => {
     const root = repoCopy();
     const leadFiles = [...loadLeadLines(root)];
     expect(leadFiles.length).toBeGreaterThan(0);
-    for (const [file, line] of leadFiles) {
-      const text = readFileSync(join(root, file), "utf8");
-      writeFileSync(join(root, file), text.replace(`\n\n${line}\n`, "\n"));
-      expect(readFileSync(join(root, file), "utf8")).not.toContain(line);
+    for (const [file, lines] of leadFiles) {
+      for (const line of lines) {
+        const text = readFileSync(join(root, file), "utf8");
+        writeFileSync(join(root, file), text.replace(`\n\n${line}\n`, "\n"));
+        expect(readFileSync(join(root, file), "utf8")).not.toContain(line);
+      }
     }
     const { files } = plan(root);
     for (const [file] of leadFiles) expect(files[file]).toBe(readFileSync(join(repoRoot, file), "utf8"));
@@ -815,7 +820,7 @@ describe("plan, changes, apply", () => {
     writeFileSync(
       join(root, skill),
       text(skill)
-        .replace(`\n\n${leads.get(skill)}\n`, "\n")
+        .replace(`\n\n${leads.get(skill)[0]}\n`, "\n")
         .replace(/^- how explorer: .*$/m, "- how explorer: stale"),
     );
     const { files } = plan(root);

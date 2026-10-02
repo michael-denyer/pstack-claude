@@ -6,10 +6,12 @@
 // Prints the newest matching path, or exits 1 with "no transcript". Covers
 // Claude Code's three layouts under one per-project directory (flat
 // <id>.jsonl, nested <id>/<id>.jsonl, subagent <id>/subagents/<child>.jsonl)
-// and Pi's <iso>_<id>.jsonl under its per-cwd sessions directory, told apart
-// by Pi's session header line. Each candidate is streamed line by line; a
-// Claude Code transcript is abandoned at its first typed `user` record, while a
-// Pi session is read to its last entry to find the active branch.
+// Pi's <iso>_<id>.jsonl under its per-cwd sessions directory, and GitHub
+// Copilot's <id>/events.jsonl under its session-state directory, told apart by
+// Pi's session header line and Copilot's session.start event. Each candidate is
+// streamed line by line; a Claude Code or Copilot transcript is abandoned at its
+// first typed user record, while a Pi session is read to its last entry to find
+// the active branch.
 import { createReadStream, readdirSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
@@ -62,6 +64,19 @@ const LOCAL_COMMAND = /^\s*<(?:command-name|local-command-stdout|bash-input)>/u;
 const isPiHeader = (record) =>
   record?.type === "session" && Number.isInteger(record.version) && typeof record.cwd === "string";
 
+// A Copilot events.jsonl opens with this event and records each prompt the
+// user typed as a `user.message` event.
+const isCopilotHeader = (record) => record?.type === "session.start" && typeof record.data === "object";
+
+async function copilotOpening(records) {
+  for await (const record of records) {
+    if (record?.type !== "user.message") continue;
+    const prompt = text(record.data?.content);
+    if (prompt) return prompt;
+  }
+  return null;
+}
+
 async function* parsed(lines) {
   for await (const line of lines) {
     try {
@@ -113,7 +128,9 @@ export async function openingPrompt(path) {
     const records = parsed(jsonlLines(stream));
     const { value: head, done } = await records.next();
     if (done) return null;
-    return await (isPiHeader(head) ? piOpening(records) : claudeOpening(prepend(head, records)));
+    if (isPiHeader(head)) return await piOpening(records);
+    if (isCopilotHeader(head)) return await copilotOpening(records);
+    return await claudeOpening(prepend(head, records));
   } finally {
     stream.destroy();
   }

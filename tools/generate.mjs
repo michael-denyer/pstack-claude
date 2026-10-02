@@ -20,12 +20,20 @@
 //     -> each model-consuming skill's "## Models" and "## Reasoning effort" sections
 //     -> setup-pstack's Models section and override-sheet block, and interrogate's reviewer table
 //     -> the "## Model names" section of each runtime's mapping file
-//        (poteto-mode/references/codex-tools.md, pi-tools.md)
+//        (poteto-mode/references/codex-tools.md, pi-tools.md, copilot-tools.md)
 //     -> one effort agent pair per level in plugins/pstack/effort-agents/
 //   the Per-skill notes table in poteto-mode/references/codex-tools.md
 //     -> the Codex preamble under the first heading of each listed skill's SKILL.md,
 //        and the codex-tools.md pointer in the prompt stub of every other public skill
+//   the Per-skill notes table in poteto-mode/references/copilot-tools.md
+//     -> the GitHub Copilot preamble under the same heading, after any Codex one
 //   DRIVER_PLAYBOOKS -> the driver-skill line under each playbook's first heading
+//   hooks/session-start-context.md + hooks/session-start-copilot.md
+//     + hooks/session-start-copilot-sheet.md
+//     -> hooks/session-start-context.json, the Copilot hook's JSON output, whose
+//        marker the hook replaces with the sheet's role lines
+//   ... + hooks/session-start-copilot-nosheet.md
+//     -> hooks/session-start-context-nosheet.json, its output with no Copilot sheet
 //   plugins/pstack/{agents,effort-agents}/*.md -> the "agents" list in
 //     plugins/pstack/.claude-plugin/plugin.json (a list replaces the default
 //     agents/ directory, so it names every agent)
@@ -383,32 +391,37 @@ export function noteSkills(runtime, markdown) {
   });
 }
 
-// The line the generator owns under a file's first heading, by repo-relative
-// file: a runtime's preamble on each skill its Per-skill notes table has a row
-// for, and the driver-skill line on the playbooks that drive an app. Every
-// runtime's table must name real skills, whether or not it stamps a preamble.
+// The lines the generator owns under a file's first heading, in order, by
+// repo-relative file: a runtime's preamble on each skill its Per-skill notes
+// table has a row for, in RUNTIMES order, and the driver-skill line on the
+// playbooks that drive an app. Every runtime's table must name real skills,
+// whether or not it stamps a preamble.
 export function loadLeadLines(root = repo) {
   const leads = new Map();
   for (const runtime of RUNTIMES) {
     for (const skill of noteSkills(runtime, readFileSync(join(root, runtime.tools), "utf8"))) {
       const file = `${SKILLS}/${skill}/SKILL.md`;
       if (!existsSync(join(root, file))) throw new Error(`${runtime.tools}: per-skill note for "${skill}", which has no SKILL.md`);
-      if (runtime.preamble) leads.set(file, runtime.preamble);
+      if (runtime.preamble) leads.set(file, [...(leads.get(file) ?? []), runtime.preamble]);
     }
   }
-  for (const playbook of DRIVER_PLAYBOOKS) leads.set(`${SKILLS}/poteto-mode/playbooks/${playbook}.md`, DRIVER_LINE);
+  for (const playbook of DRIVER_PLAYBOOKS) leads.set(`${SKILLS}/poteto-mode/playbooks/${playbook}.md`, [DRIVER_LINE]);
   return leads;
 }
 
-// Put `line` in its own paragraph right under the first heading after the
-// frontmatter, replacing it if already there. Null when there is no heading.
-export function stampLeadLine(text, line) {
+// Put each lead line in its own paragraph under the first heading after the
+// frontmatter, in order, keeping one already there. Null when there is no
+// heading.
+export function stampLeadLine(text, lead) {
   const lines = text.split("\n");
   const bodyStart = lines[0] === "---" ? lines.indexOf("---", 1) + 1 : 0;
   const heading = lines.findIndex((l, i) => i >= bodyStart && /^#{1,6} /.test(l));
   if (heading === -1) return null;
-  const present = lines[heading + 1] === "" && lines[heading + 2] === line;
-  lines.splice(heading + 1, present ? 2 : 0, "", line);
+  let at = heading + 1;
+  for (const line of [lead].flat()) {
+    if (!(lines[at] === "" && lines[at + 1] === line)) lines.splice(at, 0, "", line);
+    at += 2;
+  }
   return lines.join("\n");
 }
 
@@ -539,7 +552,7 @@ function portFrontmatter(file, text) {
 
 // The port's derivation of an upstream file, as tools/sync.mjs applies it
 // before comparing with the local copy: the port's frontmatter, then the
-// generator's own stamps, its lead line first. A Models section is appended as the last H2 when
+// generator's own stamps, its lead lines first. A Models section is appended as the last H2 when
 // upstream has none, which is where every hand-added one already sits. A
 // region whose anchor upstream lacks is left unstamped, so the file surfaces
 // as forked or conflicted instead of aborting the sync.
@@ -756,7 +769,7 @@ export function plan(root, models) {
   }
   for (const runtime of PROMPT_RUNTIMES) {
     for (const skill of slashCommands(read(COMMANDS_DOC), publicSkills(join(root, SKILLS)))) {
-      const preamble = leads.get(`${SKILLS}/${skill.name}/SKILL.md`) === runtime.preamble;
+      const preamble = (leads.get(`${SKILLS}/${skill.name}/SKILL.md`) ?? []).includes(runtime.preamble);
       put(`${runtime.prompts}/${skill.name}.md`, promptStub(skill, { preamble }));
     }
   }
@@ -783,7 +796,36 @@ export function plan(root, models) {
     }
     put(path, read(source));
   }
+  const hook = (name) => read(`${PLUGIN}/hooks/${name}`);
+  for (const [out, extra, markers] of [
+    ["session-start-context.json", "session-start-copilot-sheet.md", 1],
+    ["session-start-context-nosheet.json", "session-start-copilot-nosheet.md", 0],
+  ]) {
+    const context = copilotSessionContext(
+      hook("session-start-context.md"),
+      `${hook("session-start-copilot.md").trim()}\n\n${hook(extra)}`,
+    );
+    if (context.split(SAVED_CHOICES_MARKER).length - 1 !== markers) {
+      throw new Error(`hooks/${out} must contain ${SAVED_CHOICES_MARKER} exactly ${markers} time(s)`);
+    }
+    put(`${PLUGIN}/hooks/${out}`, context);
+  }
   return { files, ownedDirs: OWNED_DIRS };
+}
+
+// Copilot parses a sessionStart hook's stdout as one JSON object, so the
+// hook prints a stamped JSON copy of the mandate: the Claude/Codex text with
+// the Copilot addendum inside the closing tag. The hook swaps this marker for
+// the sheet's role lines at session start; nothing else is escaped at runtime.
+export const SAVED_CHOICES_MARKER = "@PSTACK_SAVED_MODEL_CHOICES@";
+
+export function copilotSessionContext(mandate, addendum) {
+  const close = "</EXTREMELY_IMPORTANT>";
+  if (mandate.split(close).length !== 2) {
+    throw new Error(`hooks/session-start-context.md must contain exactly one ${close}`);
+  }
+  const body = mandate.replace(close, `\n${addendum.trim()}\n${close}`);
+  return JSON.stringify({ additionalContext: body }, null, 2) + "\n";
 }
 
 function lstatNoSymlinks(root, path) {
@@ -879,7 +921,7 @@ export function problems(root, models) {
       return readFileSync(full, "utf8")
         .split("\n")
         .flatMap((line, i) =>
-          LEAD_LINES.includes(line) && leads.get(file) !== line ? [`${file}:${i + 1}`] : [],
+          LEAD_LINES.includes(line) && !(leads.get(file) ?? []).includes(line) ? [`${file}:${i + 1}`] : [],
         );
     });
     if (strays.length) {

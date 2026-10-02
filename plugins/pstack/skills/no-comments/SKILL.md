@@ -7,6 +7,8 @@ description: "Spawn the comment-sicko subagent, fix accepted findings, and offer
 
 On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.
 
+On GitHub Copilot, read the [platform mapping](../poteto-mode/references/copilot-tools.md), including its per-skill notes, before following this skill.
+
 Spawn comment-sicko. Act on accepted findings.
 
 Defer to comment-sicko's fresh perspective.

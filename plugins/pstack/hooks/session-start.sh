@@ -1,6 +1,26 @@
 #!/bin/sh
 set -eu
 
+# GitHub Copilot reads hooks.json too, so it passes `claude`, but it also
+# exports COPILOT_PLUGIN_ROOT and parses stdout as one JSON object. It gets the
+# generator-stamped JSON copy of the mandate, and while no Copilot sheet exists
+# the copy that says to run setup-pstack first.
+if [ -n "${COPILOT_PLUGIN_ROOT:-}" ]; then
+  hooks=$(dirname "$0")
+  sheet="${COPILOT_HOME:-$HOME/.copilot}/pstack-models.md"
+  if [ ! -e "$sheet" ]; then
+    cat "$hooks/session-start-context-nosheet.json"
+    exit 0
+  fi
+  if grep -qs '^session hook: off$' "$sheet"; then
+    exit 0
+  fi
+  # The sheet sits outside Copilot's path sandbox, so the hook puts its role
+  # lines in place of the stamped marker and the agent never reads the file.
+  exec env LC_ALL=C PSTACK_SHEET="$sheet" awk -f "$hooks/json.awk" -f "$hooks/sheet.awk" \
+    -f "$hooks/saved-model-choices.awk" "$hooks/session-start-context.json"
+fi
+
 # Each runtime's hooks file passes its own name.
 case "${1:-}" in
   claude) sheet="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md" ;;

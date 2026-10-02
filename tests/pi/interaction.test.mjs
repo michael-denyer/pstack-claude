@@ -1,7 +1,7 @@
 // ask_user_question, schedule_wakeup, and /loop through the fake ExtensionAPI.
 import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 
-import { DONE, OTHER } from "../../plugins/pstack/pi/interaction.ts";
+import { DONE, OTHER } from "../../plugins/pstack/pi/ask.ts";
 import { useWorld } from "./harness.mjs";
 
 const setup = useWorld();

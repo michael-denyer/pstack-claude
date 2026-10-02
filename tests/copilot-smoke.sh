@@ -65,7 +65,7 @@ trap cleanup EXIT
 # prompt; mark the offer as answered.
 no_app_offer() { printf '{"appTipShown": true, "appInstallNudgeResponded": true}\n' >"$1/config.json"; }
 no_app_offer "$home"
-export COPILOT_HOME="$home" HOME="$user"
+export COPILOT_HOME="$home" HOME="$user" XDG_CACHE_HOME="$user/.cache"
 failures=0
 pass() { printf 'ok: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1"; failures=$((failures + 1)); }
@@ -76,6 +76,9 @@ echo "copilot: $cli_version"
 # print its events.jsonl path.
 probe() {
   local before after
+  # Copilot CLI 1.0.92 drops plugin skills from -p sessions once its cached
+  # computer-use experiment assignment turns on; interactive sessions keep them.
+  rm -f "$user/Library/Caches/copilot/exp-cache.json" "$user/.cache/copilot/exp-cache.json"
   before="$(ls "$home/session-state" 2>/dev/null | sort || true)"
   (cd "$work" && copilot -s --model "${PROBE_MODEL:-$model}" --no-ask-user "$@" >"$root/last-reply.txt" 2>"$root/last-stderr.txt") || true
   after="$(ls "$home/session-state" 2>/dev/null | sort || true)"
@@ -171,7 +174,10 @@ setup_probes() {
   # The task tool is withheld so the probe cannot spend a panel.
   events="$(PROBE_MODEL=$setup_model probe --allow-all-tools --excluded-tools task -p 'Use the arena skill to decide whether a function that adds two integers should be named add or sum. Keep it brief.')"
   order="$(jq -r 'select(.type == "tool.execution_start" and .data.toolName == "skill") | .data.arguments.skill' "$events" | tr '\n' ' ')"
-  if [[ "$order" == *"setup-pstack"* ]]; then
+  local loaded
+  loaded="$(jq -r 'select(.type == "tool.execution_start" and .data.toolName == "skill" and (.data.arguments.skill | test("setup-pstack$"))) | .data.toolCallId' "$events" \
+    | while read -r id; do jq -r --arg id "$id" 'select(.type == "tool.execution_complete" and .data.toolCallId == $id and .data.success == true) | "yes"' "$events"; done | head -1)"
+  if [ "$loaded" = yes ]; then
     pass "$setup_model: missing sheet: setup-pstack ran (skill calls: $order)"
   else
     fail "$setup_model: missing sheet did not trigger setup-pstack (skill calls: ${order:-none}) ($events)"

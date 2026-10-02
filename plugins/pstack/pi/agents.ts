@@ -515,6 +515,11 @@ const agentSchema = {
   additionalProperties: false,
 };
 
+// Claude Code's background launch result says the same, and without it models
+// wait for a notice with sleep loops that cost a model call per check.
+const BACKGROUND_NOTE =
+  "The agent runs in the background. Its completion notice arrives on its own, after your current tool calls or as a new turn when you are idle. Do not sleep, poll, or call list_agents to wait for it: do other work, or end your turn.";
+
 // model-only exposure keeps every tool declared to the model even under
 // codemode.mode "only", which would otherwise reach them only through scripts.
 export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void {
@@ -523,14 +528,14 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
     label: "Agent",
     exposure: "model-only",
     description:
-      "Launch a subagent: a separate pi process with its own context. Foreground (default) waits and returns its final text; run_in_background returns an agentId at once and a completion notice arrives when it exits. Use send_message to steer a running agent or continue a finished one, stop_agent to stop one, list_agents to see them.",
+      "Launch a subagent: a separate pi process with its own context. Foreground (default) waits and returns its final text; run_in_background returns an agentId at once and a completion notice arrives on its own when it exits, so never sleep or poll to wait for one. Use send_message to steer a running agent or continue a finished one, stop_agent to stop one, list_agents to see them.",
     promptSnippet: "Launch a subagent (foreground or background, optional worktree isolation)",
     parameters: agentSchema as any,
     async execute(_id, params: AgentParams, signal, _onUpdate, ctx) {
       const record = await runner.start(params, ctx);
       if (params.run_in_background) {
         return {
-          content: [{ type: "text", text: JSON.stringify({ agentId: record.id, status: "running" }) }],
+          content: [{ type: "text", text: `${JSON.stringify({ agentId: record.id, status: "running" })}\n\n${BACKGROUND_NOTE}` }],
           details: { agentId: record.id, status: "running" },
         };
       }

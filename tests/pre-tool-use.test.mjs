@@ -259,6 +259,7 @@ describe("PreToolUse sheet check", () => {
     const other = join(workspace, "notes.md");
     expect(runWith(sheet(), input("Bash", { command: `cat > '${other}' <<'EOF'\nsee ${sheetPath}\nEOF` }))).toEqual(quiet);
     expect(runWith(sheet(), input("Bash", { command: `cat > '${sheetPath}' <<EOF\nx\nEOF` }))).toEqual(quiet);
+    expect(runWith(sheet(), input("Bash", { command: `cat > '${sheetPath}' <<'EOF'\n${sheet({ drop: "hillclimb" })}EOF\nchmod 600 '${sheetPath}'` }))).toEqual(quiet);
   });
 
   test("other paths are not the sheet", () => {

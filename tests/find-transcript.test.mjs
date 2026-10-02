@@ -105,6 +105,84 @@ describe("find-transcript", () => {
     expect(await findTranscript(dir, "resume the audit")).toBe(older);
   });
 
+  // Pi's layout: <sessions>/--<cwd>--/<iso>_<uuid>.jsonl, a header line, then
+  // entries linked by id/parentId; branching appends to the same file.
+  const piHeader = JSON.stringify({ type: "session", version: 3, id: "s-1", timestamp: "2026-10-01T00:00:00.000Z", cwd: "/work/repo" });
+  const piEntry = (id, parentId, type, fields = {}) =>
+    JSON.stringify({ type, id, parentId, timestamp: "2026-10-01T00:00:01.000Z", ...fields });
+  const piMessage = (id, parentId, role, text) =>
+    piEntry(id, parentId, "message", { message: { role, content: [{ type: "text", text }], timestamp: 1 } });
+
+  test("a Pi session's opening prompt is the first user message on the branch that ends at the last entry", async () => {
+    const dir = tempDir();
+    const path = transcript(
+      dir,
+      "--work-repo--/2026-10-01T00-00-00-000Z_s-1.jsonl",
+      [
+        piHeader,
+        piMessage("sys", null, "system", "You are Pi."),
+        piMessage("u1", "sys", "user", "abandoned opening"),
+        piMessage("a1", "u1", "assistant", "ok"),
+        piEntry("sum", "sys", "branch_summary", { fromId: "a1", summary: "tried A" }),
+        piMessage("u2", "sum", "user", "ship the release lanes"),
+        piMessage("a2", "u2", "assistant", "on it"),
+        piMessage("t2", "a2", "toolResult", "done"),
+        piMessage("u3", "t2", "user", "a later prompt"),
+      ],
+      100,
+    );
+    expect(await openingPrompt(path)).toBe("ship the release lanes");
+  });
+
+  test("a Pi session whose leaf is on the first branch keeps that branch's opening", async () => {
+    const dir = tempDir();
+    const path = transcript(
+      dir,
+      "--work-repo--/s.jsonl",
+      [
+        piHeader,
+        piMessage("u1", null, "user", "first branch opening"),
+        piMessage("a1", "u1", "assistant", "ok"),
+        piMessage("u2", null, "user", "second root opening"),
+        piEntry("c1", "a1", "custom", { customType: "pstack-agents", data: {} }),
+      ],
+      100,
+    );
+    expect(await openingPrompt(path)).toBe("first branch opening");
+  });
+
+  test("a raw U+2028 or U+2029 inside a record does not split it", async () => {
+    const dir = tempDir();
+    const claude = transcript(dir, "c.jsonl", [meta, user("fix the parser\u2028please"), user("a later prompt")], 100);
+    const pi = transcript(
+      dir,
+      "--work-repo--/s.jsonl",
+      [piHeader, piMessage("u1", null, "user", "ship the release"), piMessage("a1", "u1", "assistant", "line\u2029break"), piMessage("u2", "a1", "user", "a later prompt")],
+      100,
+    );
+    expect(await openingPrompt(claude)).toBe("fix the parser\u2028please");
+    expect(await openingPrompt(pi)).toBe("ship the release");
+  });
+
+  test("a Pi session with no user message on its active branch has no opening prompt", async () => {
+    const dir = tempDir();
+    const path = transcript(
+      dir,
+      "--work-repo--/s.jsonl",
+      [piHeader, piMessage("u1", null, "user", "dead"), piEntry("m", null, "model_change", { provider: "p", modelId: "m" })],
+      100,
+    );
+    expect(await openingPrompt(path)).toBeNull();
+  });
+
+  test("findTranscript finds a Pi session among Claude transcripts in the same tree", async () => {
+    const dir = tempDir();
+    transcript(dir, "claude.jsonl", [meta, user("review issue 59")], 100);
+    const pi = transcript(dir, "--work-repo--/s.jsonl", [piHeader, piMessage("u1", null, "user", "review issue 59 on Pi")], 200);
+    expect(await findTranscript(dir, "on Pi")).toBe(pi);
+    expect(await findTranscript(dir, "issue 59")).toBe(pi);
+  });
+
   test("the CLI prints the path and exits 1 when nothing matches", () => {
     const dir = tempDir();
     const path = transcript(dir, "s/s.jsonl", [meta, user("ship the release")], 100);

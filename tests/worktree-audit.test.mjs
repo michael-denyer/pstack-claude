@@ -4,7 +4,7 @@ import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, wr
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { audit, classify } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
+import { audit, classify, defaultTranscriptRoots } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
 
 const script = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs");
 
@@ -104,7 +104,7 @@ function writeTranscript(fixture, rel, worktree, mtimeSeconds) {
   if (mtimeSeconds) utimesSync(path, mtimeSeconds, mtimeSeconds);
 }
 
-function runAudit(fixture, { prs = [], gh, transcripts = fixture.transcripts } = {}) {
+function runAudit(fixture, { prs = [], gh, transcripts = [fixture.transcripts] } = {}) {
   const warnings = [];
   const calls = [];
   const output = audit({
@@ -184,6 +184,46 @@ test("audits every worktree of a fixture repo end to end", () => {
   expect(rows).toHaveLength(13);
 });
 
+test("a Pi session in a second transcripts root marks the worktree it ran in as a recent chat", () => {
+  const fixture = createFixture();
+  const piChatted = addWorktree(fixture, "pi-chatted");
+  const quiet = addWorktree(fixture, "quiet");
+  const sessions = join(fixture.root, "pi-agent/sessions");
+  const session = join(sessions, `--${piChatted.slice(1).replaceAll("/", "-")}--`, "2026-10-01T00-00-00-000Z_s.jsonl");
+  mkdirSync(dirname(session), { recursive: true });
+  writeFileSync(
+    session,
+    [
+      { type: "session", version: 3, id: "s", timestamp: "2026-10-01T00:00:00.000Z", cwd: piChatted },
+      { type: "message", id: "u1", parentId: null, timestamp: "2026-10-01T00:00:01.000Z", message: { role: "user", content: [{ type: "text", text: "go" }] } },
+    ].map((entry) => JSON.stringify(entry)).join("\n") + "\n",
+  );
+  const { rows, warnings } = runAudit(fixture, { transcripts: [fixture.transcripts, sessions] });
+  expect(warnings).toEqual([]);
+  expect(rowFor(rows, piChatted).slice(6, 8)).toEqual([ymd(Math.floor(Date.now() / 1000)), "verify-recent-chat"]);
+  expect(rowFor(rows, quiet).slice(6, 8)).toEqual(["-", "safe"]);
+});
+
+describe("default transcripts roots", () => {
+  const home = "/home/u";
+  const claude = "/home/u/.claude/projects";
+
+  test("every runtime directory that exists, Pi's under PI_CODING_AGENT_DIR when set", () => {
+    const present = new Set([claude, "/pi/sessions", "/pi/pstack", "/home/u/.pi/agent/sessions"]);
+    const exists = (path) => present.has(path);
+    expect(defaultTranscriptRoots({ env: { PI_CODING_AGENT_DIR: "/pi" }, home, exists })).toEqual([
+      claude,
+      "/pi/sessions",
+      "/pi/pstack",
+    ]);
+    expect(defaultTranscriptRoots({ env: {}, home, exists })).toEqual([claude, "/home/u/.pi/agent/sessions"]);
+  });
+
+  test("Claude Code's directory when no runtime directory exists, so the audit warns about it", () => {
+    expect(defaultTranscriptRoots({ env: {}, home, exists: () => false })).toEqual([claude]);
+  });
+});
+
 describe("a discovery failure keeps an ancestor out of safe", () => {
   const failures = [
     ["the trunk fetch", (fixture) => {
@@ -193,7 +233,7 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
     ["gh", () => ({ gh: () => { throw new Error("gh: not logged in"); } }), /gh pr list failed.*not logged in/],
     ["gh output that is not JSON", () => ({ gh: () => "rate limited" }), /gh pr list failed/],
     ["gh output that is not a list", () => ({ gh: () => "{}" }), /gh pr list failed/],
-    ["a missing transcripts directory", (fixture) => ({ transcripts: join(fixture.root, "absent") }), /^warn: \S+\/absent not found; LAST_CHAT column will be empty$/],
+    ["a missing transcripts directory", (fixture) => ({ transcripts: [fixture.transcripts, join(fixture.root, "absent")] }), /^warn: \S+\/absent not found; LAST_CHAT column will be empty$/],
     ["an unreadable transcripts directory", (fixture) => {
       const project = join(fixture.transcripts, "-proj");
       mkdirSync(project);
@@ -206,7 +246,7 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
       mkdirSync(project);
       chmodSync(fixture.transcripts, 0o000);
       locked.push(fixture.transcripts);
-      return { transcripts: project };
+      return { transcripts: [project] };
     }, /transcript scan failed.*EACCES/],
   ];
 

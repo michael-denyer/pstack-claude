@@ -68,6 +68,19 @@ describe("agent tool", () => {
     expect(pi.messages).toEqual([]);
   });
 
+  test("a bare sleep is blocked only while a background agent runs", async () => {
+    const { pi, ctx } = setup({ script: { default: [{ sleep: 400 }, { reply: "done" }] } });
+    const bash = async (command) => (await pi.emit("tool_call", { toolName: "bash", toolCallId: "t", input: { command } }, ctx)).find(Boolean);
+    expect(await bash("sleep 20")).toBeUndefined();
+    await pi.call("agent", { description: "bg", prompt: "go", run_in_background: true }, ctx);
+    expect(await bash("sleep 20")).toMatchObject({ block: true });
+    expect(await bash("  sleep 2.5 && ls")).toMatchObject({ block: true });
+    expect(await bash("sleep 1")).toBeUndefined();
+    expect(await bash("npm test; sleep 30")).toBeUndefined();
+    await waitFor(() => pi.messages.length === 1);
+    expect(await bash("sleep 20")).toBeUndefined();
+  });
+
   test("background returns at once and the completion notice comes only after the process exits", async () => {
     const { pi, ctx } = setup({ script: { default: [{ sleep: 300 }, { reply: "done in bg" }] } });
     let aliveAtNotice;

@@ -393,6 +393,10 @@ export class AgentRunner {
     await this.runs.get(id)?.done;
   }
 
+  get busy(): boolean {
+    return this.runs.size > 0;
+  }
+
   // Resolves once the first running agent exits, at once when none is running.
   async nextExit(): Promise<void> {
     if (this.runs.size) await Promise.race([...this.runs.values()].map((run) => run.done));
@@ -519,9 +523,21 @@ const agentSchema = {
 const BACKGROUND_NOTE =
   "The agent is working in the background. You will be notified automatically when it completes. You know nothing about its results until that notification arrives — do not report, assume, or predict them; continue other work or respond to the user in the meantime.\nDo not duplicate this agent's work — avoid working with the same files or topics it is using.";
 
+const SLEEP_BLOCKED =
+  "Blocked: a background agent is still running, and its completion notice arrives on its own. Do not sleep or poll for it. Continue other work, or end your turn. The notice starts your next one.";
+
+const leadingSleep = (command: unknown) => Number(/^\s*sleep\s+(\d*\.?\d+)\b/.exec(String(command))?.[1] ?? 0) >= 2;
+
 // model-only exposure keeps every tool declared to the model even under
 // codemode.mode "only", which would otherwise reach them only through scripts.
 export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void {
+  // Wording alone did not stop models from polling a background agent with
+  // sleep, which spends turns and leads them to cut the agent short.
+  pi.on("tool_call", (event) => {
+    if (runner.busy && event.toolName === "bash" && leadingSleep((event.input as { command?: unknown }).command)) {
+      return { block: true, reason: SLEEP_BLOCKED };
+    }
+  });
   pi.registerTool({
     name: "agent",
     label: "Agent",

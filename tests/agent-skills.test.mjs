@@ -14,13 +14,13 @@ import { fileURLToPath } from "node:url";
 
 import {
   agentSkills,
-  codexModelNamesSection,
   PORTABLE_ASSETS,
   plan,
   problems,
   publicSkills,
   resolveModels,
 } from "../tools/generate.mjs";
+import { codexModelNamesSection } from "../tools/runtimes.mjs";
 import { validateProsePaths, validateSkillsTree, walk } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));

@@ -24,9 +24,9 @@ import {
   applyRegions,
   assertChangesHeading,
   changes,
-  codexNoteSkills,
   deriveSkill,
   loadLeadLines,
+  noteSkills,
   effortAgents,
   effortSection,
   OWNED_DIRS,
@@ -46,14 +46,15 @@ import {
   stampVersion,
   strayModelSlugs,
   tableRows,
-  validateCodexMarketplace,
   validateHooks,
 } from "../tools/generate.mjs";
+import { RUNTIMES, validateCodexMarketplace } from "../tools/runtimes.mjs";
 import { walk } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const models = loadModels();
 const leads = loadLeadLines();
+const [codex] = RUNTIMES;
 
 const lines = (text) => text.split("\n");
 const spanned = (locate, doc) => {
@@ -455,9 +456,9 @@ describe("lead lines", () => {
 
   test("the Codex notes table lists its skills in row order and rejects a row without one", () => {
     const table = (...rows) => ["| Skill | On Codex |", "|-------|----------|", ...rows, "", "after"].join("\n");
-    expect(codexNoteSkills(table("| `how` | fan-out |", "| `teach` | images |"))).toEqual(["how", "teach"]);
-    expect(() => codexNoteSkills(table("| how | fan-out |"))).toThrow("does not start with a backticked skill: | how |");
-    expect(() => codexNoteSkills("no table\n")).toThrow('"| Skill | On Codex |" table header not found');
+    expect(noteSkills(codex, table("| `how` | fan-out |", "| `teach` | images |"))).toEqual(["how", "teach"]);
+    expect(() => noteSkills(codex, table("| how | fan-out |"))).toThrow("does not start with a backticked skill: | how |");
+    expect(() => noteSkills(codex, "no table\n")).toThrow('"| Skill | On Codex |" table header not found');
   });
 
   test("a prompt stub points at codex-tools.md unless its skill carries the Codex preamble", () => {

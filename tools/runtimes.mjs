@@ -13,9 +13,9 @@ export const codeList = (models) => models.map(code).join(", ");
 // block (`key`, checked by `checkModels`) and the generated Model names section
 // in its mapping file. A `skillPreambles` runtime also gets a preamble under
 // the first heading of each skill its Per-skill notes table lists, and a
-// runtime with a `prompts` directory (under the plugin) a slash stub per public
-// skill there. Pi has neither: its one pointer is hand-written in poteto-mode's
-// Platform Adaptation section.
+// runtime with a `prompts` directory a slash stub per public skill there. Pi
+// has neither: its one pointer is hand-written in poteto-mode's Platform
+// Adaptation section.
 export const RUNTIMES = [
   {
     name: "Codex",
@@ -24,7 +24,7 @@ export const RUNTIMES = [
     modelNames: codexModelNamesSection,
     checkModels: checkCodexModels,
     skillPreambles: true,
-    prompts: ".codex-plugin/prompts",
+    prompts: `${PLUGIN}/.codex-plugin/prompts`,
   },
   { name: "Pi", key: "pi", mapping: "pi-tools.md", modelNames: piModelNamesSection, checkModels: checkPiModels },
 ].map((runtime) => ({

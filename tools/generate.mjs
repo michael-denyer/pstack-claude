@@ -60,7 +60,7 @@ import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, wa
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const EFFORT_AGENTS = `${PLUGIN}/effort-agents`;
-const promptsDir = (runtime) => `${PLUGIN}/${runtime.prompts}`;
+const PROMPT_RUNTIMES = RUNTIMES.filter((runtime) => runtime.prompts);
 
 const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
@@ -85,7 +85,7 @@ export const PORTABLE_ASSETS = [
 // The generator removes every entry of these directories that no planned path
 // runs through, so no hand-written file may live in one.
 export const OWNED_DIRS = [
-  ...RUNTIMES.filter((r) => r.prompts).map(promptsDir),
+  ...PROMPT_RUNTIMES.map((runtime) => runtime.prompts),
   EFFORT_AGENTS,
   `${SKILLS}/poteto-mode/references/agents`,
   `${SKILLS}/poteto-mode/references/licenses`,
@@ -753,10 +753,10 @@ export function plan(root, models) {
       return stamped;
     });
   }
-  for (const runtime of RUNTIMES.filter((r) => r.prompts)) {
+  for (const runtime of PROMPT_RUNTIMES) {
     for (const skill of slashCommands(read(COMMANDS_DOC), publicSkills(join(root, SKILLS)))) {
       const preamble = leads.get(`${SKILLS}/${skill.name}/SKILL.md`) === runtime.preamble;
-      put(`${promptsDir(runtime)}/${skill.name}.md`, promptStub(skill, { preamble }));
+      put(`${runtime.prompts}/${skill.name}.md`, promptStub(skill, { preamble }));
     }
   }
   const agents = effortAgents(models.efforts, read(`${PLUGIN}/agents/poteto-agent.md`));

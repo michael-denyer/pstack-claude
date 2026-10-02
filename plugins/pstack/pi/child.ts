@@ -1,12 +1,34 @@
 import { type ChildProcessByStdio, spawn } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
-import type { RpcCommand, RpcResponse } from "@earendil-works/pi-coding-agent";
+import type { RpcCommand } from "@earendil-works/pi-coding-agent";
+import { type Static, Type } from "typebox";
+import { Value } from "typebox/value";
 
 const STDERR_CAP = 8 * 1024;
 const CLOSE_AFTER_EXIT_MS = 2000;
+
+// What this reader takes from pi's stdout. The stream is pi's, but a line, or
+// the part of one a field comes from, is checked against these before the
+// field is read, and a line that fits none is skipped: one that lacks a field
+// must not end the agent.
+const answerLine = Type.Object({ type: Type.Literal("response"), id: Type.String() });
+const responseSchema = Type.Object({ success: Type.Boolean(), error: Type.Optional(Type.String()) });
+type Answer = Static<typeof responseSchema>;
+const handledPrompt = Type.Object({ command: Type.Literal("prompt"), data: Type.Object({ disposition: Type.Literal("handled") }) });
+const assistantEndLine = Type.Object({
+  type: Type.Literal("message_end"),
+  message: Type.Object({ role: Type.Literal("assistant"), content: Type.Array(Type.Unknown()), stopReason: Type.Optional(Type.Unknown()) }),
+});
+const textPart = Type.Object({ type: Type.Literal("text"), text: Type.String() });
+const failedMessage = Type.Object({ errorMessage: Type.String() });
+const settledLine = Type.Object({ type: Type.Literal("agent_settled") });
 // Dialogs block the child until the client answers; a notify or status needs none.
-const DIALOGS = new Set(["select", "confirm", "input", "editor"]);
+const dialogLine = Type.Object({
+  type: Type.Literal("extension_ui_request"),
+  id: Type.String(),
+  method: Type.Union([Type.Literal("select"), Type.Literal("confirm"), Type.Literal("input"), Type.Literal("editor")]),
+});
 
 export interface ChildExit {
   exitCode: number | null;
@@ -18,15 +40,10 @@ export interface ChildExit {
   stderr: string;
 }
 
-type Shape = Record<string, unknown>;
-const isShape = (value: unknown): value is Shape => typeof value === "object" && value !== null;
-
-// The text parts of an assistant message's content, read defensively: the
-// stream is pi's, but a line that lacks a field must not end the agent.
 function assistantText(content: unknown[]): string {
   return content
-    .filter((p): p is Shape => isShape(p) && p.type === "text" && typeof p.text === "string")
-    .map((p) => p.text as string)
+    .filter((part) => Value.Check(textPart, part))
+    .map((part) => part.text)
     .join("\n")
     .trim();
 }
@@ -42,7 +59,7 @@ export class PiChild {
   readonly exited: Promise<ChildExit>;
   private readonly proc: ChildProcessByStdio<Writable, Readable, Readable>;
   private readonly exitGraceMs: number;
-  private readonly pending = new Map<string, (response: RpcResponse | undefined) => void>();
+  private readonly pending = new Map<string, (response: Answer | undefined) => void>();
   private nextId = 0;
   private open = true;
   private settled = false;
@@ -103,7 +120,7 @@ export class PiChild {
     void this.command({ type: "prompt", message: prompt }).then((response) => {
       if (!response) return;
       if (!response.success) this.errorMessage = response.error ?? "pi rejected the prompt";
-      else if (response.command === "prompt" && response.data?.disposition === "handled") {
+      else if (Value.Check(handledPrompt, response)) {
         this.errorMessage = "pi consumed the prompt as an extension command, so no agent run started. Send the task as plain text.";
       } else return;
       this.close();
@@ -112,7 +129,7 @@ export class PiChild {
 
   // Resolves with pi's response, or undefined when stdin is closed or the
   // process exits first.
-  command(command: RpcCommand): Promise<RpcResponse | undefined> {
+  command(command: RpcCommand): Promise<Answer | undefined> {
     return new Promise((resolve) => this.send(command, resolve));
   }
 
@@ -120,13 +137,13 @@ export class PiChild {
   // it, since it exits on EOF. So a steer was taken into the run only when the
   // run had not settled as its response was read, which is when `taken` is
   // decided: the settle can follow in the same chunk of output.
-  steer(message: string): Promise<{ response: RpcResponse | undefined; taken: boolean }> {
+  steer(message: string): Promise<{ response: Answer | undefined; taken: boolean }> {
     return new Promise((resolve) =>
       this.send({ type: "steer", message }, (response) => resolve({ response, taken: response?.success === true && !this.settled })),
     );
   }
 
-  private send(command: RpcCommand, onResponse: (response: RpcResponse | undefined) => void): void {
+  private send(command: RpcCommand, onResponse: (response: Answer | undefined) => void): void {
     if (!this.open) return onResponse(undefined);
     const id = `c${++this.nextId}`;
     this.pending.set(id, onResponse);
@@ -155,43 +172,30 @@ export class PiChild {
   }
 
   private onLine(line: string): void {
-    if (!line.trim()) return;
     let parsed: unknown;
     try {
       parsed = JSON.parse(line);
     } catch {
       return;
     }
-    if (!isShape(parsed)) return;
-    switch (parsed.type) {
-      case "response": {
-        if (typeof parsed.id !== "string") return;
-        // A response that is not pi's shape still answers its command, as a failure.
-        const response = typeof parsed.success === "boolean" ? parsed : { ...parsed, success: false, error: `malformed response: ${JSON.stringify(parsed).slice(0, 200)}` };
-        this.pending.get(parsed.id)?.(response as RpcResponse);
-        this.pending.delete(parsed.id);
-        return;
-      }
-      case "message_end": {
-        const message = parsed.message;
-        if (!isShape(message) || message.role !== "assistant" || !Array.isArray(message.content)) return;
-        // A tool-call-only message is normal mid-run and the next text clears
-        // the note; a run that ends on one has no answer, only earlier text.
-        const text = assistantText(message.content);
-        if (text) this.finalText = text;
-        const error = typeof message.errorMessage === "string" ? message.errorMessage : undefined;
-        this.errorMessage = error ?? (text ? "" : `(the last assistant message had no text; stop reason: ${String(message.stopReason)})`);
-        return;
-      }
-      case "agent_settled":
-        this.settled = true;
-        this.close();
-        return;
-      case "extension_ui_request":
-        if (typeof parsed.id === "string" && typeof parsed.method === "string" && DIALOGS.has(parsed.method)) {
-          this.proc.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: parsed.id, cancelled: true })}\n`);
-        }
-        return;
+    if (Value.Check(answerLine, parsed)) {
+      // A response that is not pi's shape still answers its command, as a failure.
+      const malformed = { success: false, error: `malformed response: ${JSON.stringify(parsed).slice(0, 200)}` };
+      this.pending.get(parsed.id)?.(Value.Check(responseSchema, parsed) ? parsed : malformed);
+      this.pending.delete(parsed.id);
+    } else if (Value.Check(assistantEndLine, parsed)) {
+      // A tool-call-only message is normal mid-run and the next text clears
+      // the note; a run that ends on one has no answer, only earlier text.
+      const { message } = parsed;
+      const text = assistantText(message.content);
+      if (text) this.finalText = text;
+      if (Value.Check(failedMessage, message)) this.errorMessage = message.errorMessage;
+      else this.errorMessage = text ? "" : `(the last assistant message had no text; stop reason: ${String(message.stopReason)})`;
+    } else if (Value.Check(settledLine, parsed)) {
+      this.settled = true;
+      this.close();
+    } else if (Value.Check(dialogLine, parsed)) {
+      this.proc.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: parsed.id, cancelled: true })}\n`);
     }
   }
 }

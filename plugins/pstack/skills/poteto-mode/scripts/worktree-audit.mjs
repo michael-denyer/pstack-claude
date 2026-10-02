@@ -72,13 +72,14 @@ export function parseWorktrees(output) {
 export function defaultTranscriptRoots({ env = process.env, home = homedir(), exists = existsSync } = {}) {
   const claude = join(home, ".claude", "projects");
   const piAgent = env.PI_CODING_AGENT_DIR || join(home, ".pi", "agent");
-  const found = [claude, join(piAgent, "sessions"), join(piAgent, "pstack")].filter((root) => exists(root));
+  const copilot = join(env.COPILOT_HOME || join(home, ".copilot"), "session-state");
+  const found = [claude, join(piAgent, "sessions"), join(piAgent, "pstack"), copilot].filter((root) => exists(root));
   return found.length ? found : [claude];
 }
 
 // A transcript names a worktree as `<path>/` or `<path>"`, never a bare prefix,
 // so `/x/candidate` does not inherit a chat that ran in `/x/candidate-long`.
-// Claude Code and Pi transcripts are both JSONL that quote the paths they touch.
+// Claude Code, Pi, and Copilot transcripts are all JSONL that quote the paths they touch.
 export function lastChats(roots, paths) {
   const needles = paths.map((path) => [path, [Buffer.from(`${path}/`), Buffer.from(`${path}"`)]]);
   const latest = new Map();

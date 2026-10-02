@@ -183,6 +183,30 @@ describe("find-transcript", () => {
     expect(await findTranscript(dir, "issue 59")).toBe(pi);
   });
 
+  // Copilot's layout: <session-state>/<id>/events.jsonl, a session.start event,
+  // then one event per line with each typed prompt as a user.message.
+  const copilotStart = JSON.stringify({ type: "session.start", data: { sessionId: "c1", context: { cwd: "/work/repo" } } });
+  const copilotEvent = (type, content) => JSON.stringify({ type, data: { content } });
+
+  test("a Copilot session's opening prompt is its first user.message, not the injected context", async () => {
+    const dir = tempDir();
+    const path = transcript(dir, "c1/events.jsonl", [
+      copilotStart,
+      copilotEvent("hook.end", "routing context"),
+      copilotEvent("user.message", ""),
+      copilotEvent("user.message", "review issue 59 on Copilot"),
+      copilotEvent("user.message", "a later prompt"),
+    ], 100);
+    expect(await openingPrompt(path)).toBe("review issue 59 on Copilot");
+  });
+
+  test("findTranscript finds a Copilot session among Claude transcripts in the same tree", async () => {
+    const dir = tempDir();
+    transcript(dir, "claude.jsonl", [meta, user("review issue 59")], 100);
+    const copilot = transcript(dir, "c1/events.jsonl", [copilotStart, copilotEvent("user.message", "review issue 59 on Copilot")], 200);
+    expect(await findTranscript(dir, "on Copilot")).toBe(copilot);
+  });
+
   test("the CLI prints the path and exits 1 when nothing matches", () => {
     const dir = tempDir();
     const path = transcript(dir, "s/s.jsonl", [meta, user("ship the release")], 100);

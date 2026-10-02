@@ -7,6 +7,10 @@ description: Configure which models pstack uses per role. Detects available mode
 
 On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.
 
+On GitHub Copilot, read the [platform mapping](../poteto-mode/references/copilot-tools.md), including its per-skill notes, before following this skill.
+
+On GitHub Copilot, detect models and ask the user as [the Copilot setup questions](copilot.md) describe, in place of the questions in steps 1, 3, and 4: one `ask_user` question per tier and panel slot, each with a `choices` list. pstack ships no Copilot model defaults, so never pick a model the user has not chosen, and never write the Claude Code names in [Models](#models) or step 6's shape into a Copilot sheet. When `ask_user` is not available and the request leaves a model question open, write no sheet and tell the user to rerun `setup-pstack` interactively.
+
 On another runtime, read [Other runtimes](#other-runtimes) below for where the sheet lives and how it loads; the steps are the same.
 
 Write the current runtime's per-role model override sheet, using the path in [Other runtimes](#other-runtimes). Each pstack skill names a default model inline; the override sheet adapts those defaults to the models you actually have access to.
@@ -29,7 +33,7 @@ Enumerate the model names the `Agent` tool's `model` parameter accepts in this s
 
 ### 2. Load current state
 
-The default role-to-model mapping is the rule shape shown in the Write the override sheet step below. If the current runtime's sheet already exists, read it and treat its values as the current choices. Otherwise start from those defaults. A line whose role is not in that shape, such as `how critics`, is from a retired role. Drop it. An older sheet may name full model IDs that start with `claude-`, which the `Agent` tool rejects. Replace each with its family name, the word after `claude-`.
+The default role-to-model mapping is the rule shape shown in the Write the override sheet step below. If the current runtime's sheet already exists, read it and treat its values as the current choices. Otherwise start from those defaults. A line whose role is not in that shape, such as `how critics`, is from a retired role. Drop it. An older sheet may name full model IDs that start with `claude-`, which the `Agent` tool rejects. On Claude Code, replace each with its family name, the word after `claude-`; a Copilot sheet keeps full IDs.
 
 ### 3. Map and confirm
 
@@ -39,7 +43,7 @@ Then ask for the default reasoning effort, the `default effort` line. It is `ses
 
 ### 4. Choose whether the session hook routes tasks
 
-On Claude Code and Codex, the plugin's `SessionStart` hook injects the poteto-mode mandate on startup, resume, clear, and compact. Codex asks the user to trust plugin hooks through `/hooks` before running them. Ask whether to keep the hook. The default is on. The answer is the `session hook` line in the current runtime's sheet: `on` or `off`. With no sheet or no line, the hook injects. The line is inert on other runtimes.
+On Claude Code and Codex, the plugin's `SessionStart` hook injects the poteto-mode mandate on startup, resume, clear, and compact. Codex asks the user to trust plugin hooks through `/hooks` before running them. Ask whether to keep the hook. The default is on. The answer is the `session hook` line in the current runtime's sheet: `on` or `off`. With no sheet or no line, the hook injects. On GitHub Copilot the same hook runs on the CLI and in the Copilot app and reads the line from the Copilot sheet. The line is inert on other runtimes.
 
 ### 5. Validate
 
@@ -82,19 +86,28 @@ On Claude Code, if `<config>/CLAUDE.md` does not already include `<config>/pstac
 
 On Codex, paste the model rows and the `default effort` line into `<codex-home>/AGENTS.md`; Codex has no `@` include. Do not paste the `session hook` line there: the plugin hook reads it directly from `<codex-home>/pstack-models.md`.
 
+On GitHub Copilot, add no include: Copilot does not expand `@~/` paths in user instructions, and the plugin hook reads `${COPILOT_HOME:-~/.copilot}/pstack-models.md` at session start and injects its role lines as the user's saved pstack model choices. If the hook is on but this session's context lacks the routing mandate (the block that opens `You have pstack.`), another hook or a skills-only install has displaced it. Offer to append this standing instruction to `~/.copilot/copilot-instructions.md` instead:
+
+```text
+pstack: for a task that touches more than one file, changes a signature other files call, involves a design choice, or is a bug with an unknown cause or a performance issue, load the poteto-mode skill and follow it. Resolve Claude tool and model names through poteto-mode's references/copilot-tools.md; role models are in ~/.copilot/pstack-models.md.
+```
+
 ### 8. Confirm
 
 Tell the user where the override was written, how its model rows load, and whether the plugin hook is on. Re-running this skill updates the override sheet.
 
 ## Other runtimes
 
-The role lines are the same everywhere. What differs is the sheet path, how the runtime loads it, and how you list models. Detect models with the runtime's own tool and never write a slug you have not seen listed. A runtime whose subagent call has no model parameter still gets the sheet, as the record of the user's choice, and applies it where it can. The `session hook` line applies to the Claude Code and Codex plugins.
+The role lines are the same everywhere. What differs is the sheet path, how the runtime loads it, and how you list models. Detect models with the runtime's own tool and never write a slug you have not seen listed. A runtime whose subagent call has no model parameter still gets the sheet, as the record of the user's choice, and applies it where it can. The `session hook` line applies to the Claude Code, Codex, and GitHub Copilot plugins.
+
+On GitHub Copilot the build ships no default model IDs, so the Claude defaults in [Models](#models) never apply there. A skill that needs a role model and finds no Copilot sheet runs this skill first. Copilot's file tools expand neither `~` nor variables, so print the sheet's absolute path with `echo "${COPILOT_HOME:-$HOME/.copilot}/pstack-models.md"` in `bash` and write exactly that path in one tool call. `${COPILOT_HOME:-~/.copilot}` exists whenever Copilot runs, so do not test for it or create it. Writing the sheet asks for path access once, because it sits outside the workspace. For the rest of this session, use the values you just wrote; do not read the sheet back. Later sessions get them from the plugin hook's saved pstack model choices and do not ask again.
 
 | Runtime | Sheet | Load | List models | Status |
 | --- | --- | --- | --- | --- |
 | Claude Code | `<config>/pstack-models.md` | `@<config>/pstack-models.md` in `<config>/CLAUDE.md` | the `Agent` tool's model parameter | verified live |
 | Codex | `<codex-home>/pstack-models.md` | model rows: paste into `<codex-home>/AGENTS.md`; hook setting: read by the plugin | your configured Codex models, see [codex-tools.md](../poteto-mode/references/codex-tools.md#model-names) | hook contract tested; discovery verified |
 | Pi | `pstack-models.md` in the Pi agent directory, `$PI_CODING_AGENT_DIR` or `~/.pi/agent` | read by the pstack Pi extension, model rows and hook setting both; no include line | `pi --list-models`, see [pi-tools.md](../poteto-mode/references/pi-tools.md#model-names) and its `setup-pstack` note | extension contract tested offline; live results in the repository's `docs/pi-equivalence.md` |
+| GitHub Copilot (CLI and app) | `${COPILOT_HOME:-~/.copilot}/pstack-models.md` | the plugin hook injects its role lines at session start; skills-only installs read it with `view` | the `task` tool's `model` enum, see [copilot-tools.md](../poteto-mode/references/copilot-tools.md#model-names) | hook contract tested; CLI install smoke-tested |
 | opencode | `~/.config/opencode/pstack-models.md` | add the path to the `instructions` array in `opencode.json` | the `models` slash command in the session | from published docs, no live session |
 | Gemini CLI | `~/.gemini/pstack-models.md` | `@~/.gemini/pstack-models.md` in `~/.gemini/GEMINI.md` | the `model` slash command in the session | from published docs, no live session |
 | Prime Agent | no documented sheet path; Prime's configuration chooses models | | | no live session |

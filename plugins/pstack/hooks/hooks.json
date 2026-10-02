@@ -10,6 +10,18 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "view|task|bash|create|edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-use.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

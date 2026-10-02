@@ -80,7 +80,7 @@ describe("agent tool", () => {
     const id = result.details.agentId;
     const [json, note] = text(result).split("\n\n");
     expect(JSON.parse(json)).toEqual({ agentId: id, status: "running" });
-    expect(note).toContain("Do not sleep, poll");
+    expect(note).toContain("You will be notified automatically when it completes.");
 
     const listed = JSON.parse(text(await pi.call("list_agents", {}, ctx)));
     expect(listed[0]).toMatchObject({ id, status: "running", description: "bg job" });

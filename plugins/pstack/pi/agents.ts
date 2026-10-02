@@ -515,10 +515,9 @@ const agentSchema = {
   additionalProperties: false,
 };
 
-// Claude Code's background launch result says the same, and without it models
-// wait for a notice with sleep loops that cost a model call per check.
+// Claude Code's background launch result, word for word.
 const BACKGROUND_NOTE =
-  "The agent runs in the background. Its completion notice arrives on its own, after your current tool calls or as a new turn when you are idle. Do not sleep, poll, or call list_agents to wait for it, and do not start other agents on its part of the task. Once nothing else the task needs is left, end your turn; the notice starts a new one.";
+  "The agent is working in the background. You will be notified automatically when it completes. You know nothing about its results until that notification arrives — do not report, assume, or predict them; continue other work or respond to the user in the meantime.\nDo not duplicate this agent's work — avoid working with the same files or topics it is using.";
 
 // model-only exposure keeps every tool declared to the model even under
 // codemode.mode "only", which would otherwise reach them only through scripts.
@@ -528,7 +527,7 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
     label: "Agent",
     exposure: "model-only",
     description:
-      "Launch a subagent: a separate pi process with its own context. Foreground (default) waits and returns its final text; run_in_background returns an agentId at once and a completion notice arrives on its own when it exits, so never sleep or poll to wait for one. Use send_message to steer a running agent or continue a finished one, stop_agent to stop one, list_agents to see them.",
+      "Launch a subagent: a separate pi process with its own context. Foreground (default) waits and returns its final text; run_in_background returns an agentId at once and a completion notice arrives when it exits. Use send_message to steer a running agent or continue a finished one, stop_agent to stop one, list_agents to see them.",
     promptSnippet: "Launch a subagent (foreground or background, optional worktree isolation)",
     parameters: agentSchema as any,
     async execute(_id, params: AgentParams, signal, _onUpdate, ctx) {

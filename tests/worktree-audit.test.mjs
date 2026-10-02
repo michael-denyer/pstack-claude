@@ -260,6 +260,13 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(warning);
   });
+
+  test("every missing transcripts directory is named", () => {
+    const fixture = createFixture();
+    const absent = ["absent-a", "absent-b"].map((name) => join(fixture.root, name));
+    const { warnings } = runAudit(fixture, { transcripts: [absent[0], fixture.transcripts, absent[1]] });
+    expect(warnings).toEqual(absent.map((root) => `warn: ${root} not found; LAST_CHAT column will be empty`));
+  });
 });
 
 describe("the trunk comes from the remote", () => {

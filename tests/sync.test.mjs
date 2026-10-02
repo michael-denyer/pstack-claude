@@ -17,6 +17,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deriveSkill, loadLeadLines, loadModels } from "../tools/generate.mjs";
+import { RUNTIMES } from "../tools/runtimes.mjs";
 import {
   applySubstitutions,
   changedLines,
@@ -1216,9 +1217,10 @@ describe("sync CLI", () => {
     cpSync(join(import.meta.dir, "../plugins/pstack/models.json"), join(port, "plugins/pstack/models.json"));
     mkdirSync(join(port, "plugins/pstack/skills"));
     writeFileSync(join(port, "plugins/pstack/skills/s.md"), localText);
-    const codexTools = join(port, "plugins/pstack/skills/poteto-mode/references/codex-tools.md");
-    mkdirSync(join(codexTools, ".."), { recursive: true });
-    writeFileSync(codexTools, "| Skill | On Codex |\n|-------|----------|\n");
+    for (const runtime of RUNTIMES) {
+      mkdirSync(join(port, runtime.tools, ".."), { recursive: true });
+      writeFileSync(join(port, runtime.tools), `${runtime.notesHeader}\n|-------|----------|\n`);
+    }
     for (const { skill } of JSON.parse(readFileSync(join(port, "plugins/pstack/models.json"), "utf8")).roles) {
       mkdirSync(join(port, "plugins/pstack/skills", skill), { recursive: true });
       writeFileSync(join(port, "plugins/pstack/skills", skill, "SKILL.md"), "");
@@ -1290,7 +1292,10 @@ describe("sync CLI", () => {
       "\nforked (upstream untouched): 1\n     1 policy plugins/pstack/skills/s.md\n     1 total changed lines\n",
     );
     expect(result.stderr).not.toContain("tools/forks.json");
-    const portOnly = [...roleSkills.map((skill) => `${skill}/SKILL.md`), "poteto-mode/references/codex-tools.md"];
+    const portOnly = [
+      ...roleSkills.map((skill) => `${skill}/SKILL.md`),
+      ...RUNTIMES.map((runtime) => runtime.tools.replace("plugins/pstack/skills/", "")),
+    ];
     expect(result.stdout).toContain(`\nport-only: ${portOnly.length} files\n`);
     for (const rel of portOnly) expect(result.stdout).toContain(`\n  plugins/pstack/skills/${rel}\n`);
   });

@@ -5,7 +5,7 @@
 // nothing and fails when a committed copy is stale, so it cannot ship.
 //
 // Sources of truth:
-//   VERSION  -> the "version" field in the three plugin manifests
+//   VERSION  -> the "version" field in the plugin manifests and the Pi package.json
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
 //   each skill's frontmatter (name + description) defines the shared Agent
 //   Skills boundary consumed natively by Codex, Prime, opencode, and Gemini CLI
@@ -16,11 +16,11 @@
 //   user-invocable: false); a skill without a row or a row without a skill
 //   fails by name.
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
-//   available slugs, and one block per RUNTIMES row: Codex equivalents)
+//   available slugs, and one block per RUNTIMES row: Codex equivalents, Pi IDs)
 //     -> each model-consuming skill's "## Models" and "## Reasoning effort" sections
 //     -> setup-pstack's Models section and override-sheet block, and interrogate's reviewer table
 //     -> the "## Model names" section of each runtime's mapping file
-//        (poteto-mode/references/codex-tools.md)
+//        (poteto-mode/references/codex-tools.md, pi-tools.md)
 //     -> one effort agent pair per level in plugins/pstack/effort-agents/
 //   the Per-skill notes table in poteto-mode/references/codex-tools.md
 //     -> the Codex preamble under the first heading of each listed skill's SKILL.md,
@@ -37,7 +37,8 @@
 //
 // Also validated: .agents/plugins/marketplace.json points at a real plugin
 // directory whose Codex manifest name matches (it carries no version; Codex
-// reads the version from .codex-plugin/plugin.json).
+// reads the version from .codex-plugin/plugin.json), and the repo-root
+// package.json that makes the repo a Pi package lists paths that exist.
 
 import {
   existsSync,
@@ -53,7 +54,7 @@ import {
 import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { code, codeList, PLUGIN, RUNTIMES, SKILLS, validateCodexMarketplace } from "./runtimes.mjs";
+import { code, codeList, PLUGIN, RUNTIMES, SKILLS, validateCodexMarketplace, validatePiPackage } from "./runtimes.mjs";
 import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -65,6 +66,7 @@ const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
   "plugins/pstack/.claude-plugin/plugin.json",
   "plugins/pstack/.codex-plugin/plugin.json",
+  "package.json",
 ];
 
 export const PORTABLE_ASSETS = [
@@ -453,9 +455,10 @@ export function parseModels(raw, skillExists) {
       seen.add(item);
     }
   };
+  const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
   for (const key of ["available", "efforts", "roles"]) if (!Array.isArray(raw[key])) fail(`"${key}" must be a list`);
   for (const key of ["tiers", ...RUNTIMES.map((runtime) => runtime.key)]) {
-    if (!raw[key] || typeof raw[key] !== "object") fail(`"${key}" must be an object`);
+    if (!isObject(raw[key])) fail(`"${key}" must be an object`);
   }
   const available = new Set(raw.available);
   unique(raw.available, "available");
@@ -495,7 +498,7 @@ export function parseModels(raw, skillExists) {
   if (!raw.efforts.includes(raw.defaultEffort) && raw.defaultEffort !== "session") {
     fail(`defaultEffort "${raw.defaultEffort}" is not an effort level or "session"`);
   }
-  for (const runtime of RUNTIMES) runtime.checkModels(raw[runtime.key], { raw, fail, unique });
+  for (const runtime of RUNTIMES) runtime.checkModels(raw[runtime.key], { raw, fail, unique, isObject });
   return resolveModels(raw);
 }
 
@@ -896,6 +899,11 @@ export function problems(root, models) {
       }),
     );
   }
+  attempt(() =>
+    validatePiPackage(readFileSync(join(root, "package.json"), "utf8"), {
+      pathExists: (p) => existsSync(join(root, p)),
+    }),
+  );
   attempt(() => validatePluginLayout(pluginRoot));
   attempt(() => validateAgentFrontmatter(pluginRoot));
   for (const file of ["hooks/hooks.json", ...(codexManifest ? [codexManifest.hooks] : [])]) {
@@ -927,7 +935,7 @@ function main() {
   if (pending?.length === 0) console.log(`ok: ${Object.keys(intended.files).length} generated files current`);
   for (const failure of failures) console.error(`FAIL: ${failure}`);
   if (failures.length) process.exit(1);
-  console.log("ok: skill links, prose paths, model slugs, marketplace, plugin layout, agent frontmatter, and hooks pass their checks");
+  console.log("ok: skill links, prose paths, model slugs, marketplace, Pi package, plugin layout, agent frontmatter, and hooks pass their checks");
 }
 
 // Guarded so importing the generator's validation and rendering functions does

@@ -32,7 +32,7 @@
     },
     "plugins/pstack/skills/poteto-mode/SKILL.md": {
       "kind": "policy",
-      "why": "Adds the deploy-platform and defect-severity triggers, the port's principle summaries and the project playbooks paragraph beside the Claude Code Platform Adaptation section and run-or-verify driver line.",
+      "why": "Adds the deploy-platform and defect-severity triggers, the port's principle summaries and the project playbooks paragraph beside the Claude Code, Codex, and Pi Platform Adaptation section and run-or-verify driver line.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },
@@ -230,7 +230,7 @@
     },
     "plugins/pstack/skills/setup-pstack/SKILL.md": {
       "kind": "port-feature",
-      "why": "Writes the override sheet at the Claude Code or Codex config path and loads it by @-include, since neither runtime has Cursor's always-applied rules or its reasoning-budget step.",
+      "why": "Writes the override sheet at the Claude Code or Codex config path and loads it by @-include, since neither runtime has Cursor's always-applied rules or its reasoning-budget step, and lists the Pi sheet path in the runtime table.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },

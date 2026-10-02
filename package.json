@@ -1,0 +1,50 @@
+{
+  "name": "pstack",
+  "private": true,
+  "version": "0.9.58",
+  "description": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Pi package of the Claude Code plugin; skills are shared, tool names resolve via skills/poteto-mode/references/pi-tools.md. Original pstack by Lauren Tan (poteto).",
+  "author": {
+    "name": "Michael Denyer",
+    "email": "mdenyer@gmail.com",
+    "url": "https://github.com/michael-denyer"
+  },
+  "homepage": "https://github.com/michael-denyer/pstack-claude",
+  "repository": "https://github.com/michael-denyer/pstack-claude",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pstack",
+    "poteto-mode",
+    "workflow",
+    "principles",
+    "agent-style",
+    "subagents",
+    "unslop",
+    "claude-code",
+    "skills",
+    "tdd",
+    "code-review",
+    "parallel-agents",
+    "codex",
+    "opencode",
+    "gemini-cli",
+    "prime-agent"
+  ],
+  "pi": {
+    "skills": [
+      "./plugins/pstack/skills"
+    ],
+    "extensions": [
+      "./plugins/pstack/pi/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
+  }
+}

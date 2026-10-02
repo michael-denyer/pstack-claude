@@ -48,13 +48,13 @@ import {
   tableRows,
   validateHooks,
 } from "../tools/generate.mjs";
-import { RUNTIMES, validateCodexMarketplace } from "../tools/runtimes.mjs";
+import { piModelNamesSection, RUNTIMES, validateCodexMarketplace, validatePiPackage } from "../tools/runtimes.mjs";
 import { walk } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const models = loadModels();
 const leads = loadLeadLines();
-const [codex] = RUNTIMES;
+const [codex, pi] = RUNTIMES;
 
 const lines = (text) => text.split("\n");
 const spanned = (locate, doc) => {
@@ -131,6 +131,25 @@ describe("regions", () => {
   test("applyRegions leaves a file the generator does not own untouched", () => {
     const text = "# other\n\n## Models\n\nprose\n";
     expect(applyRegions("plugins/pstack/skills/other/SKILL.md", text, models)).toBe(text);
+  });
+});
+
+describe("runtime model names", () => {
+  test("each runtime's mapping file owns a stamped Model names section", () => {
+    for (const runtime of RUNTIMES) {
+      expect(regions(models).filter((r) => r.file === runtime.tools).map((r) => r.name)).toEqual(["Model names section"]);
+    }
+  });
+
+  test("the Pi section tables every alias per provider, names the fallback, and names the sheet override", () => {
+    const tables = { ...models.pi.models, marker: { opus: "marker/o", fable: "marker/f", sonnet: "marker/s", haiku: "marker/h" } };
+    const text = piModelNamesSection({ ...models, pi: { fallback: "marker", models: tables } });
+    expect(text).toContain(`| Alias | ${Object.keys(tables).map((p) => `\`${p}\``).join(" | ")} |`);
+    for (const alias of models.available) {
+      expect(text).toContain(`| \`${alias}\` | ${Object.values(tables).map((t) => `\`${t[alias]}\``).join(" | ")} |`);
+    }
+    expect(text).toContain("in the `marker` column for any other provider");
+    expect(text).toContain("`pi models: ");
   });
 });
 
@@ -213,6 +232,7 @@ describe("manifests", () => {
   const codex = json("plugins/pstack/.codex-plugin/plugin.json");
   const claudeMarketplace = json(".claude-plugin/marketplace.json");
   const codexMarketplace = json(".agents/plugins/marketplace.json");
+  const piPackage = json("package.json");
 
   test("the plugin and marketplace manifests agree on every fact they repeat", () => {
     const shared = ({ name, author, homepage, repository, license, keywords }) =>
@@ -221,11 +241,51 @@ describe("manifests", () => {
     expect(shared(codex)).toEqual(shared(claude));
     expect(claudeMarketplace.owner).toEqual(claude.author);
     expect(claudeMarketplace.plugins.map(({ name, source }) => [name, source])).toEqual([[claude.name, "./plugins/pstack"]]);
+    expect(shared(piPackage)).toEqual({ ...shared(claude), keywords: ["pi-package", ...claude.keywords] });
+    expect(piPackage.version).toBe(claude.version);
     expect(codexMarketplace.name).toBe(claudeMarketplace.name);
     expect(codexMarketplace.interface.displayName).toBe(codex.interface.displayName);
     expect(codexMarketplace.plugins.map(({ name, source, category }) => [name, source.path, category])).toEqual([
       [codex.name, claudeMarketplace.plugins[0].source, codex.interface.category],
     ]);
+  });
+});
+
+describe("validatePiPackage", () => {
+  const ENTRY = "plugins/pstack/pi/index.ts";
+  const manifest = (pi, extra = {}) => JSON.stringify({ name: "pstack", keywords: ["pi-package"], ...extra, pi });
+  const good = { skills: ["./plugins/pstack/skills"], extensions: [`./${ENTRY}`] };
+  const everything = () => true;
+
+  test("accepts the skills tree and the extension entry when both exist", () => {
+    expect(() => validatePiPackage(manifest(good), { pathExists: everything })).not.toThrow();
+  });
+
+  test("names each listed path that does not exist", () => {
+    const pathExists = (rel) => rel !== "plugins/pstack/skill";
+    expect(() =>
+      validatePiPackage(manifest({ ...good, skills: ["./plugins/pstack/skill"] }), { pathExists }),
+    ).toThrow("package.json: pi.skills names ./plugins/pstack/skill, which does not exist");
+  });
+
+  test("requires the skills tree, and the extension entry whenever it exists", () => {
+    expect(() => validatePiPackage(manifest({ ...good, skills: [] }), { pathExists: everything })).toThrow(
+      "package.json: pi.skills must list ./plugins/pstack/skills",
+    );
+    const { extensions, ...skillsOnly } = good;
+    expect(() => validatePiPackage(manifest(skillsOnly), { pathExists: everything })).toThrow(
+      `package.json: pi.extensions must list ./${ENTRY}`,
+    );
+    expect(() => validatePiPackage(manifest(skillsOnly), { pathExists: (rel) => rel !== ENTRY })).not.toThrow();
+  });
+
+  test("requires the pi-package keyword and no runtime dependencies", () => {
+    expect(() => validatePiPackage(manifest(good, { keywords: [] }), { pathExists: everything })).toThrow(
+      'package.json: keywords must include "pi-package"',
+    );
+    expect(() => validatePiPackage(manifest(good, { dependencies: { x: "1" } }), { pathExists: everything })).toThrow(
+      "package.json: the Pi package has no runtime dependencies",
+    );
   });
 });
 
@@ -454,10 +514,19 @@ describe("lead lines", () => {
     expect(stampLeadLine("no heading\n", "Lead.")).toBeNull();
   });
 
-  test("the Codex notes table lists its skills in row order and rejects a row without one", () => {
-    const table = (...rows) => ["| Skill | On Codex |", "|-------|----------|", ...rows, "", "after"].join("\n");
-    expect(noteSkills(codex, table("| `how` | fan-out |", "| `teach` | images |"))).toEqual(["how", "teach"]);
-    expect(() => noteSkills(codex, table("| how | fan-out |"))).toThrow("does not start with a backticked skill: | how |");
+  test("Codex stamps a preamble on its noted skills and Pi stamps none", () => {
+    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi"]);
+    expect(codex.preamble).toBe(
+      "On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.",
+    );
+    expect(pi.preamble).toBeNull();
+    expect([...leads.values()].filter((line) => line.includes("pi-tools.md"))).toEqual([]);
+  });
+
+  test("a notes table lists its skills in row order and rejects a row without one", () => {
+    const table = (...rows) => ["| Skill | On Pi |", "|-------|-------|", ...rows, "", "after"].join("\n");
+    expect(noteSkills(pi, table("| `how` | fan-out |", "| `teach` | images |"))).toEqual(["how", "teach"]);
+    expect(() => noteSkills(pi, table("| how | fan-out |"))).toThrow("does not start with a backticked skill: | how |");
     expect(() => noteSkills(codex, "no table\n")).toThrow('"| Skill | On Codex |" table header not found');
   });
 
@@ -766,8 +835,7 @@ describe("plan, changes, apply", () => {
 
   test("problems reports a lead line in a file that does not own it", () => {
     const root = repoCopy();
-    const [, preamble] = [...loadLeadLines(root)].find(([, line]) => line.startsWith("On Codex"));
-    append(root, "plugins/pstack/skills/tdd/SKILL.md", `\n${preamble}\n`);
+    append(root, "plugins/pstack/skills/tdd/SKILL.md", `\n${codex.preamble}\n`);
     const codexTools = "plugins/pstack/skills/poteto-mode/references/codex-tools.md";
     writeFileSync(join(root, codexTools), readFileSync(join(root, codexTools), "utf8").replace(/^\| `why` \|.*\n/m, ""));
     const failures = problems(root).filter((f) => f.startsWith("generator-owned lead lines"));

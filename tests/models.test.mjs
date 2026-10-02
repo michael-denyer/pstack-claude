@@ -17,6 +17,14 @@ const raw = JSON.parse(readFileSync(join(repoRoot, "plugins/pstack/models.json")
 const models = loadModels();
 
 describe("committed models.json", () => {
+  test("the pi block gives every available alias a Pi model on anthropic, openai, and openai-codex", () => {
+    expect(raw.pi.fallback).toBe("anthropic");
+    expect(Object.keys(raw.pi.models).sort()).toEqual(["anthropic", "openai", "openai-codex"]);
+    for (const table of Object.values(raw.pi.models)) {
+      expect(Object.keys(table).sort()).toEqual([...models.available].sort());
+    }
+  });
+
   test("available models are the names the Claude Code Agent tool accepts", () => {
     // The Agent tool's `model` parameter is an enum of family names; a full ID
     // such as claude-opus-5-5 is rejected before the subagent starts.
@@ -106,6 +114,26 @@ describe("parseModels", () => {
   test("a defaultEffort that is neither a level nor session throws naming it", () => {
     expect(parse((p) => (p.defaultEffort = "hgih"))).toThrow(
       'models.json: defaultEffort "hgih" is not an effort level or "session"',
+    );
+  });
+
+  test("each pi provider table must map exactly the available aliases to that provider's models", () => {
+    expect(parse((p) => delete p.pi)).toThrow('models.json: "pi" must be an object');
+    expect(parse((p) => delete p.pi.models)).toThrow('models.json: pi needs a "models" object');
+    expect(parse((p) => (p.pi.extra = 1))).toThrow('models.json: pi names "extra"; its keys are "fallback" and "models"');
+    expect(parse((p) => (p.pi.fallback = "google"))).toThrow('models.json: pi.fallback "google" is not a provider in pi.models');
+    expect(parse((p) => (p.pi.models.openai = "openai/gpt"))).toThrow("models.json: pi.models.openai must be an object");
+    expect(parse((p) => delete p.pi.models["openai-codex"].haiku)).toThrow(
+      'models.json: pi.models.openai-codex has no Pi model for "haiku"',
+    );
+    expect(parse((p) => (p.pi.models.anthropic.gpt = "anthropic/gpt"))).toThrow(
+      'models.json: pi.models.anthropic names "gpt", which is not in available',
+    );
+    expect(parse((p) => (p.pi.models.anthropic.opus = "claude-opus"))).toThrow(
+      'models.json: pi.models.anthropic "opus" is "claude-opus", not a anthropic/<id>',
+    );
+    expect(parse((p) => (p.pi.models.anthropic.opus = "openai-codex/gpt-6-sol"))).toThrow(
+      'models.json: pi.models.anthropic "opus" is "openai-codex/gpt-6-sol", not a anthropic/<id>',
     );
   });
 

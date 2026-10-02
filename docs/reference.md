@@ -4,7 +4,7 @@ Start with the [README](../README.md) for installation and your first task.
 
 ## Slash commands
 
-The package includes 54 skill directories: 31 public skills and 23 `principle-*` references. Claude Code uses `/pstack:<name>`. In Codex, request a skill by name or install the [optional shortcuts](#codex) for the `/name` form below.
+The package includes 54 skill directories: 31 public skills and 23 `principle-*` references. Claude Code uses `/pstack:<name>`, and Pi uses `/skill:<name>`. In Codex, request a skill by name or install the [optional shortcuts](#codex) for the `/name` form below.
 
 Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
@@ -44,21 +44,22 @@ Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
 ## Runtime support
 
-All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code and Codex plugins also install automatic routing hooks. Codex command shortcuts are separate.
+All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code and Codex plugins also install automatic routing hooks, and the Pi package adds an extension that injects the same routing and supplies the subagent tools. Codex command shortcuts are separate.
 
 | Runtime | Setup and recorded verification |
 | --- | --- |
 | Claude Code | Install the marketplace plugin. Skills use Claude tool names and model defaults; the plugin installs automatic routing. |
 | Codex | Install the native plugin through the repository's marketplace and trust its hook through `/hooks`. The [Codex mapping](../plugins/pstack/skills/poteto-mode/references/codex-tools.md) translates Claude tools and model names. Shared skill symlinks were also detected in a live session. |
+| Pi | Install the repository as a Pi package with `pi install`. The [Pi extension](../plugins/pstack/pi/index.ts) registers the subagent, question, and wake-up tools and `/loop`, and the [Pi mapping](../plugins/pstack/skills/poteto-mode/references/pi-tools.md) translates Claude tools and model names. The [equivalence table](pi-equivalence.md) records each Claude Code mechanism and how it was verified on Pi 1.0. |
 | Prime Agent | Its documentation describes shared-directory discovery; it has not been tested in a live session. Choose tools and models through Prime's configuration. |
 | opencode | Discovery and reading a linked skill were verified on version 1.18.25. Configure agents, commands, and permissions in `opencode.json`. Its picker also lists principle skills. |
 | Gemini CLI | Its documentation describes shared-directory discovery; it has not been tested in a live session. Use `/skills list` to check discovery and `/skills reload` after changes. |
 
-These checks cover skill discovery. Delegation and multi-model workflows remain unverified on Prime Agent, opencode, and Gemini CLI. On those runtimes, agents must adapt Claude-specific tools, models, and configuration. The Codex mapping applies only to Codex.
+These checks cover skill discovery. Delegation and multi-model workflows remain unverified on Prime Agent, opencode, and Gemini CLI. On those runtimes, agents must adapt Claude-specific tools, models, and configuration. Each mapping applies only to its runtime.
 
 ### Automatic routing
 
-The Claude Code and Codex plugins share a [SessionStart hook](../plugins/pstack/hooks/session-start.sh) that loads a short [routing instruction](../plugins/pstack/hooks/session-start-context.md) on startup, resume, clear, and compact. Codex requires the user to trust plugin hooks through `/hooks`. The instruction invokes `poteto-mode` when a task meets any of these conditions:
+The Claude Code and Codex plugins share a [SessionStart hook](../plugins/pstack/hooks/session-start.sh) that loads a short [routing instruction](../plugins/pstack/hooks/session-start-context.md) on startup, resume, clear, and compact. Codex requires the user to trust plugin hooks through `/hooks`. On Pi, the [extension](../plugins/pstack/pi/prompt.ts) adds the same instruction to the system prompt at every agent start, so it survives compaction. The instruction invokes `poteto-mode` when a task meets any of these conditions:
 
 - It touches more than one file or changes a signature other files call.
 - It involves a design or architecture choice.
@@ -68,7 +69,7 @@ Smaller tasks proceed directly. The full skill loads when invoked, and explicit 
 
 To disable routing, run `setup-pstack` and turn off the session hook. In Claude Code, use `/pstack:setup-pstack`. You can also write `session hook: off` in the runtime's sheet, at the path in [setup-pstack's runtime table](../plugins/pstack/skills/setup-pstack/SKILL.md#other-runtimes). The hook reads that setting before injecting its instruction. Without the setting, routing stays on.
 
-Skills-only installs and other runtimes do not include the hook. Request `poteto-mode` explicitly, or add a standing instruction to the runtime's instruction file.
+Skills-only installs and other runtimes do not include the hook or the Pi extension. Request `poteto-mode` explicitly, or add a standing instruction to the runtime's instruction file.
 
 ### Shared skills installation
 
@@ -131,6 +132,19 @@ done
 
 Each shortcut invokes its skill. The commands skip existing files and links. Remove a shortcut by deleting its link at `~/.codex/prompts/<name>.md`. Both native-plugin and skills-only installations work without these shortcuts.
 
+### Pi
+
+The repository root is a [Pi package](https://pi.dev/packages): its [`package.json`](../package.json) lists the shared skills directory and the [pstack Pi extension](../plugins/pstack/pi/index.ts). Install it with `pi install git:github.com/michael-denyer/pstack-claude`, or `pi install <clone path>` for a local checkout.
+
+The extension supplies what Pi lacks natively, under the Claude Code names the skills use:
+
+- `agent` dispatches a child `pi --mode rpc` process with the skill's `subagent_type`, model, and effort, in the foreground or background, optionally in its own git worktree. A background agent's completion joins the running turn after its current tool calls, or starts a turn when the session is idle.
+- `send_message`, `list_agents`, and `stop_agent` message, list, and stop those agents. A message to a running agent is an RPC `steer` on the child's stdin, which the agent reads after its current tool calls before it carries on in the same run. A finished agent resumes with the message. An agent's status follows its process.
+- `ask_user_question` and `schedule_wakeup` match `AskUserQuestion` and `ScheduleWakeup`, and `/loop` matches the `loop` skill. In a child agent, asking a question and scheduling a wakeup both return an error.
+- At every agent start it adds the routing instruction, the override sheet `~/.pi/agent/pstack-models.md`, and a pointer to the Pi mapping to the system prompt.
+
+Family names such as `opus` resolve through the `pi` block of [`models.json`](../plugins/pstack/models.json) to model IDs for the provider the Pi session runs on. A ChatGPT sign-in (`openai`, or the legacy `openai-codex`) gets OpenAI models, and Anthropic or any other provider gets Claude models. Pi warns that Anthropic bills Claude used through Pi per token, as extra usage, even on a Claude subscription, and every subagent pstack starts adds to that bill. Run pstack in Claude Code to stay within a Claude plan's limits. A `pi models:` line in the sheet remaps any family name. The [Pi mapping](../plugins/pstack/skills/poteto-mode/references/pi-tools.md) lists every translation, and the [equivalence table](pi-equivalence.md) records what was verified and how.
+
 ## Configuration and dependencies
 
 Invoke [setup-pstack](../plugins/pstack/skills/setup-pstack/SKILL.md) to choose models for each role. It detects available models, confirms the choices, and writes an override sheet. Its [runtime table](../plugins/pstack/skills/setup-pstack/SKILL.md#other-runtimes) names the sheet path and loading mechanism for each runtime. Defaults live in [models.json](../plugins/pstack/models.json).
@@ -166,9 +180,11 @@ Use [create-verification-skill](../plugins/pstack/skills/create-verification-ski
 ```text
 .claude-plugin/marketplace.json    Claude Code marketplace
 .agents/plugins/marketplace.json  Codex marketplace
+package.json                      Pi package manifest
 plugins/pstack/
   .claude-plugin/plugin.json      Claude Code plugin manifest
   .codex-plugin/                  Codex manifest and generated prompt stubs
+  pi/                            Pi extension (subagent, question, and wake-up tools)
   skills/                        Shared skills, references, and scripts
   agents/                        Claude Code subagent definitions
   hooks/                         Claude Code startup routing
@@ -180,16 +196,19 @@ Skills-only installs use `plugins/pstack/skills/`. Agent references and license 
 
 ### Generated files and checks
 
-The [generator](../tools/generate.mjs) updates versions, model defaults, Codex prompts, and portable reference files. The [slash-command table](#slash-commands) supplies the Codex prompt descriptions and order. Edit that table when changing a menu description, then regenerate. Keep a row for every public skill, with `poteto-mode` first.
+The [generator](../tools/generate.mjs) updates versions, model defaults, Codex prompts, and portable reference files, and validates the Pi package manifest. The [slash-command table](#slash-commands) supplies the Codex prompt descriptions and order. Edit that table when changing a menu description, then regenerate. Keep a row for every public skill, with `poteto-mode` first.
 
 [Documentation fact tests](../tests/readme-facts.test.mjs) check the skill counts and upstream pin. The table parser requires the header `| command | use it when |`.
 
 Run the generator and repository tests with Bun:
 
 ```shell
+bun install --frozen-lockfile
 bun tools/generate.mjs
 bun test tests/
 ```
+
+The install step reads the root `bun.lock` and fetches `typebox`, which the Pi extension and its tests import.
 
 CI also checks shell scripts, workflows, Markdown, relative links, and the bundled Bun tools. See [local checks](../CONTRIBUTING.md#things-that-will-fail-ci) for commands and [release instructions](../CONTRIBUTING.md#releasing) for versioning and the live Claude Code command check.
 
@@ -197,7 +216,7 @@ CI also checks shell scripts, workflows, Markdown, relative links, and the bundl
 
 The skill tree is synced against upstream `12d587d` (v0.15.5).
 
-This repository ports Lauren Tan's pstack from Cursor to Claude Code and shares the skills with other runtimes. It includes seven cursor-team-kit skills and an independently authored `babysit` skill. The port supplies Claude Code plugin registration and routing, Codex manifests and shortcuts, and the Codex tool mapping.
+This repository ports Lauren Tan's pstack from Cursor to Claude Code and shares the skills with other runtimes. It includes seven cursor-team-kit skills and an independently authored `babysit` skill. The port supplies Claude Code plugin registration and routing, Codex manifests and shortcuts, the Codex tool mapping, and the Pi package, extension, and tool mapping.
 
 Cursor-specific automations, sticky-mode metadata, the Grok Bot UI workflow, and the Cursor UI tutorial are excluded. [tools/upstream.json](../tools/upstream.json) records the revisions and exclusions, [tools/substitutions.json](../tools/substitutions.json) holds the Cursor-to-Claude rewrite rules, and [CHANGES.md](../CHANGES.md) records each release. The bundled `thermo-nuclear-code-quality-review` provides a maintainability review when a workflow calls for one.
 

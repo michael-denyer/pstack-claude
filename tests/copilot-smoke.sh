@@ -161,7 +161,7 @@ fi
 rm "$home/pstack-models.md"
 
 # 5 and 6 run once per setup model; the tally shows how each one did.
-known="$(copilot help config 2>/dev/null | awk '/^ *`model`:/{on=1; next} on && /^ *- "/{gsub(/[ "]/, ""); sub(/^-/, ""); print; next} on && NF==0{exit}')"
+known="$(copilot help config 2>/dev/null | awk '/^ *`model`:/{on=1; next} on && /^ *- "/{gsub(/[ "]/, ""); sub(/^-/, ""); print; next} on && NF==0{on=0}')"
 gpt="$(grep -m1 '^gpt-' <<<"$known" || true)"
 gemini="$(grep -m1 '^gemini-' <<<"$known" || true)"
 setup_probes() {

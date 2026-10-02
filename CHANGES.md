@@ -2,9 +2,11 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.59 - no `$PWD` in the repository
+## 0.9.59 - no `$PWD` in the repository and no listing fields in `plugin.json`
 
 The Claude plugin directory validator reads `$PWD` as a credential-named variable and holds a plugin when a file that names it also names a remote URL. The shared-skills and Codex prompt install loops in `docs/reference.md` link with `$(pwd)`, the CI and Security workflows mount `$GITHUB_WORKSPACE`, and the skills-only CI job installs `./plugins/pstack/skills`. Each resolves to the same path as before.
+
+The Claude `plugin.json` no longer carries `icon`, `documentationUrl`, `supportUrl`, `privacyPolicyUrl`, or `termsOfServiceUrl`. Claude Code ignores all five at load time, and the validator reports each one as a finding. `assets/pstack-icon.png` stays for the Codex manifest.
 
 ## 0.9.58 - run pstack on Pi
 

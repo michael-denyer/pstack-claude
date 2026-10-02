@@ -4,15 +4,15 @@ import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
 const STATUSES = new Set(["native", "extension", "script", "mapping", "difference", "n/a"]);
-const LIVE = new Set(["pending", "VERIFIED", "NOT VERIFIED", "INCONCLUSIVE", "n/a"]);
+const LIVE = new Set(["VERIFIED", "n/a"]);
 
-export function equivalenceRows(markdown) {
+function equivalenceRows(markdown) {
   const rows = [];
   for (const line of markdown.split("\n")) {
     if (!/^\| [A-Z]\d{2}[a-z]? \|/.test(line)) continue;
     const cells = line.slice(1, -1).split(" | ").map((c) => c.trim());
-    const [id, mechanism, onPi, status, evidence, live] = cells;
-    rows.push({ id, mechanism, onPi, status, evidence, live, cells: cells.length });
+    const [id, , , status, evidence, live] = cells;
+    rows.push({ id, status, evidence, live, cells: cells.length });
   }
   return rows;
 }
@@ -57,14 +57,5 @@ describe("docs/pi-equivalence.md", () => {
       .filter((r) => !titles.has(r.evidence.replace(/^`|`$/g, "")))
       .map((r) => `${r.id}: ${r.evidence}`);
     expect(missing).toEqual([]);
-  });
-
-  test("every difference row says why no skill depends on it", () => {
-    for (const r of rows.filter((r) => r.status === "difference")) expect(r.evidence.length).toBeGreaterThan(20);
-  });
-
-  test("a row still pending live verification is an extension or script row", () => {
-    const stray = rows.filter((r) => r.live === "pending" && r.status !== "extension" && r.status !== "script");
-    expect(stray.map((r) => r.id)).toEqual([]);
   });
 });

@@ -45,9 +45,7 @@ export class PiChild {
   private readonly pending = new Map<string, (response: RpcResponse | undefined) => void>();
   private nextId = 0;
   private open = true;
-  // Pi answers a steer it reads after settling with "queued" and never runs
-  // it, since it exits on EOF. A steer answered after this is set was lost.
-  settled = false;
+  private settled = false;
   private finalText = "";
   private errorMessage = "";
   private stderr = "";
@@ -102,7 +100,7 @@ export class PiChild {
         finish();
       });
     });
-    void this.command({ type: "prompt", message: prompt })?.then((response) => {
+    void this.command({ type: "prompt", message: prompt }).then((response) => {
       if (!response) return;
       if (!response.success) this.errorMessage = response.error ?? "pi rejected the prompt";
       else if (response.command === "prompt" && response.data?.disposition === "handled") {
@@ -112,13 +110,27 @@ export class PiChild {
     });
   }
 
-  // Resolves with pi's response, or undefined when the process exits first.
-  command(command: RpcCommand): Promise<RpcResponse | undefined> | undefined {
-    if (!this.open) return undefined;
+  // Resolves with pi's response, or undefined when stdin is closed or the
+  // process exits first.
+  command(command: RpcCommand): Promise<RpcResponse | undefined> {
+    return new Promise((resolve) => this.send(command, resolve));
+  }
+
+  // Pi answers a steer it reads after settling with "queued" and never runs
+  // it, since it exits on EOF. So a steer was taken into the run only when the
+  // run had not settled as its response was read, which is when `taken` is
+  // decided: the settle can follow in the same chunk of output.
+  steer(message: string): Promise<{ response: RpcResponse | undefined; taken: boolean }> {
+    return new Promise((resolve) =>
+      this.send({ type: "steer", message }, (response) => resolve({ response, taken: response?.success === true && !this.settled })),
+    );
+  }
+
+  private send(command: RpcCommand, onResponse: (response: RpcResponse | undefined) => void): void {
+    if (!this.open) return onResponse(undefined);
     const id = `c${++this.nextId}`;
-    const response = new Promise<RpcResponse | undefined>((resolve) => this.pending.set(id, resolve));
+    this.pending.set(id, onResponse);
     this.proc.stdin.write(`${JSON.stringify({ id, ...command })}\n`);
-    return response;
   }
 
   // Pi exits on EOF once idle. One that does not is ended, since nothing else
@@ -127,18 +139,19 @@ export class PiChild {
     if (!this.open) return;
     this.open = false;
     this.proc.stdin.end();
-    setTimeout(() => this.signal("SIGTERM"), this.exitGraceMs).unref();
-    setTimeout(() => this.signal("SIGKILL"), 2 * this.exitGraceMs).unref();
+    setTimeout(() => this.terminate(this.exitGraceMs), this.exitGraceMs).unref();
+  }
+
+  // SIGTERM now, SIGKILL if the child is still there after the grace period.
+  terminate(graceMs: number): void {
+    this.signal("SIGTERM");
+    setTimeout(() => this.signal("SIGKILL"), graceMs).unref();
   }
 
   // Signals the child's group only while the child itself is alive: once it
   // has exited the group id may belong to a process this runner never spawned.
   signal(signal: NodeJS.Signals): void {
     if (this.pid && this.proc.exitCode === null && this.proc.signalCode === null) signalGroup(this.pid, signal);
-  }
-
-  groupAlive(): boolean {
-    return this.pid !== undefined && alive(-this.pid);
   }
 
   private onLine(line: string): void {

@@ -130,12 +130,11 @@ export function validateCodexMarketplace(text, { expectedName, pathExists }) {
   }
 }
 
-const PI_SKILLS = `./${SKILLS}`;
-const PI_EXTENSION = `./${PLUGIN}/pi/index.ts`;
+const PI_PACKAGE = { skills: SKILLS, extensions: `${PLUGIN}/pi/index.ts` };
 
 // `pi install` reads the repo-root package.json's `pi` key. A path there that
-// does not exist loads nothing without failing the install, and an extension
-// entry the key omits never loads, so both directions are checked here.
+// does not exist loads nothing without failing the install, and an entry the
+// key omits never loads, so both directions are checked here.
 export function validatePiPackage(text, { pathExists }) {
   const manifest = JSON.parse(text);
   const fail = (message) => {
@@ -143,14 +142,11 @@ export function validatePiPackage(text, { pathExists }) {
   };
   if (!manifest.keywords?.includes("pi-package")) fail('keywords must include "pi-package"');
   if (Object.keys(manifest.dependencies ?? {}).length) fail("the Pi package has no runtime dependencies");
-  const pi = manifest.pi ?? {};
-  for (const key of ["skills", "extensions"]) {
-    for (const path of pi[key] ?? []) {
+  for (const [key, required] of Object.entries(PI_PACKAGE)) {
+    const listed = manifest.pi?.[key] ?? [];
+    for (const path of listed) {
       if (!pathExists(path.replace(/^\.\//, ""))) fail(`pi.${key} names ${path}, which does not exist`);
     }
-  }
-  if (!pi.skills?.includes(PI_SKILLS)) fail(`pi.skills must list ${PI_SKILLS}`);
-  if (pathExists(PI_EXTENSION.slice(2)) && !pi.extensions?.includes(PI_EXTENSION)) {
-    fail(`pi.extensions must list ${PI_EXTENSION}`);
+    if (!listed.includes(`./${required}`)) fail(`pi.${key} must list ./${required}`);
   }
 }

@@ -15,24 +15,37 @@ export function truncateUtf8(text: string, cap: number): string {
   return buf.subarray(0, end).toString("utf8");
 }
 
-function header(record: AgentRecord): string {
-  const lines = [`agentId: ${record.id}`, `description: ${record.description}`, `status: ${record.status}`];
-  if (record.status !== "running") lines.push(`exit code: ${record.exitCode}`);
+function header(record: EndedRecord): string {
+  const lines = [`agentId: ${record.id}`, `description: ${record.description}`, `status: ${record.status}`, `exit code: ${record.exitCode}`];
   if (record.worktree) {
-    const removed = record.status !== "running" && record.worktreeKept === false;
-    lines.push(removed ? `worktree: ${record.worktree.path} (no changes; removed)` : `worktree: ${record.worktree.path} (branch ${record.worktree.branch})`);
+    const state = record.worktreeKept === false ? "no changes; removed" : `branch ${record.worktree.branch}`;
+    lines.push(`worktree: ${record.worktree.path} (${state})`);
   }
   return lines.join("\n");
 }
 
-// The final text, cut to the cap with the full copy on disk.
+// The record's text is already cut to the cap, with the full copy on disk.
 function report(record: EndedRecord): string {
   if (!record.outputFile) return record.finalText;
-  return `${truncateUtf8(record.finalText, OUTPUT_CAP_BYTES)}\n\n[Output truncated at ${OUTPUT_CAP_BYTES / 1024} KB. Full output: ${record.outputFile}]`;
+  return `${record.finalText}\n\n[Output truncated at ${OUTPUT_CAP_BYTES / 1024} KB. Full output: ${record.outputFile}]`;
 }
 
-export function resultText(record: AgentRecord): string {
-  return record.status === "running" ? header(record) : `${header(record)}\n\n${report(record)}`;
+export function resultText(record: EndedRecord): string {
+  return `${header(record)}\n\n${report(record)}`;
+}
+
+export function listing(records: AgentRecord[]): object[] {
+  return records.map((r) => ({
+    id: r.id,
+    description: r.description,
+    subagent_type: r.subagentType,
+    model: r.model ?? "(pi default)",
+    status: r.status,
+    pid: r.pid,
+    startedAt: r.startedAt,
+    endedAt: r.status === "running" ? undefined : r.endedAt,
+    worktree: r.worktree?.path,
+  }));
 }
 
 export function noticeOf(record: EndedRecord): Parameters<ExtensionAPI["sendMessage"]>[0] {

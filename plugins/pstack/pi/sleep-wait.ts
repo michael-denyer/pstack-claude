@@ -13,7 +13,7 @@
 // backgrounded sleep with a redirection before the `&`, and
 // `timeout 5 sleep 30`. tests/pi/sleep-wait.test.mjs lists each, so changing
 // one is a visible decision.
-export const MIN_WAIT_S = 2;
+const MIN_WAIT_S = 2;
 const SLEEP_UNITS: Record<string, number> = { "": 1, s: 1, m: 60, h: 3600, d: 86400 };
 
 // Seconds a literal sleep argument asks for (30, 2.5, 1m, 1m30s, infinity);

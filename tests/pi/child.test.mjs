@@ -22,10 +22,27 @@ test("a response whose success is not a boolean settles its command as failed in
       " setTimeout(() => process.exit(0), 3000)",
   );
   await sleep(200);
-  const response = await Promise.race([child.command({ type: "steer", message: "m" }), sleep(1500).then(() => "pending")]);
-  expect(response).not.toBe("pending");
+  const response = await child.command({ type: "steer", message: "m" });
   expect(response.success).toBe(false);
   child.close();
+  await child.exited;
+});
+
+// Answers each command; a steer's response is `before` or `after` the settle, in one write.
+const steerAndSettle = (order) =>
+  'process.stdin.setEncoding("utf8"); let b = ""; process.stdin.on("end", () => process.exit(0)); process.stdin.on("data", (d) => { b += d; const lines = b.split("\\n"); b = lines.pop();' +
+  ' for (const l of lines) { const c = JSON.parse(l); const r = JSON.stringify({ id: c.id, type: "response", command: c.type, success: true }) + "\\n";' +
+  ` const s = JSON.stringify({ type: "agent_settled" }) + "\\n"; process.stdout.write(c.type === "steer" ? ${order === "before" ? "r + s" : "s + r"} : r); } });`;
+
+test("a steer answered before the run settles was taken, even when the settle follows in the same chunk", async () => {
+  const child = scripted(steerAndSettle("before"));
+  expect((await child.steer("m")).taken).toBe(true);
+  await child.exited;
+});
+
+test("a steer answered after the run settled was not taken", async () => {
+  const child = scripted(steerAndSettle("after"));
+  expect((await child.steer("m")).taken).toBe(false);
   await child.exited;
 });
 

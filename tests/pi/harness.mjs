@@ -1,18 +1,19 @@
 // A minimal stand-in for Pi's ExtensionAPI and ExtensionContext that records
-// what the extension registers and sends, plus per-test fixtures.
+// what the extension registers and sends, plus per-test fixtures over the fake
+// pi. What only the real-pi suite needs is in live-harness.mjs.
+import { afterEach } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 
-import { parseSheet } from "../../plugins/pstack/pi/config.ts";
+import { install } from "../../plugins/pstack/pi/index.ts";
 
 export const pluginRoot = fileURLToPath(new URL("../../plugins/pstack/", import.meta.url));
-export const fakePiBin = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
+const fakePiBin = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
 
-export const fixtureModels = {
+const fixtureModels = {
   available: ["opus", "fable", "sonnet", "haiku"],
   pi: {
     fallback: "anthropic",
@@ -33,7 +34,7 @@ export const fixtureModels = {
   },
 };
 
-export function fakePi({ thinking = "medium" } = {}) {
+export function fakePi() {
   const tools = new Map();
   const commands = new Map();
   const handlers = new Map();
@@ -49,7 +50,7 @@ export function fakePi({ thinking = "medium" } = {}) {
     },
     sendMessage: (message, options) => messages.push({ message, options }),
     sendUserMessage: (content, options) => userMessages.push({ content, options }),
-    getThinkingLevel: () => thinking,
+    getThinkingLevel: () => "medium",
     appendEntry: (customType, data) =>
       entries.push({ type: "custom", customType, data: JSON.parse(JSON.stringify(data)) }),
   };
@@ -71,7 +72,7 @@ export function fakePi({ thinking = "medium" } = {}) {
   };
 }
 
-export function fakeCtx({ cwd, sessionId = "parent-session", entries = [], model, mode = "tui", hasUI = false, ui, idle = true, pending = () => false } = {}) {
+export function fakeCtx({ cwd, entries = [], model, mode = "tui", hasUI = false, ui, idle = true, pending = () => false } = {}) {
   return {
     cwd,
     mode,
@@ -80,12 +81,12 @@ export function fakeCtx({ cwd, sessionId = "parent-session", entries = [], model
     model: model === undefined ? { provider: "anthropic", id: "parent-model" } : model,
     isIdle: () => (typeof idle === "function" ? idle() : idle),
     hasPendingMessages: pending,
-    sessionManager: { getSessionId: () => sessionId, getEntries: () => entries },
+    sessionManager: { getSessionId: () => "parent-session", getEntries: () => entries },
   };
 }
 
 // A temp world: agent dir, a fixture models.json, a fake-pi script and log.
-export function world({ script = {}, sheet = null, killGraceMs = 300, exitGraceMs = 1500 } = {}) {
+export function world({ script = {}, sheet = null } = {}) {
   // realpath: macOS's tmpdir is a symlink, and git and the child report real paths.
   const root = realpathSync(mkdtempSync(join(tmpdir(), "pstack-pi-")));
   const agentDir = join(root, "agent");
@@ -111,34 +112,80 @@ export function world({ script = {}, sheet = null, killGraceMs = 300, exitGraceM
       PSTACK_FAKE_PI_LOG: logFile,
     },
     depth: 0,
-    killGraceMs,
-    exitGraceMs,
+    killGraceMs: 300,
+    exitGraceMs: 1500,
   };
+  const strays = [];
   return {
-    root,
     agentDir,
     cwd,
     settings,
-    setScript: (s) => writeFileSync(scriptFile, JSON.stringify(s)),
     log: () => (existsSync(logFile) ? readEntries(logFile) : []),
-    invocations() {
-      return this.log().filter((r) => r.kind === "invocation");
+    logged(kind) {
+      return this.log().filter((r) => r.kind === kind);
     },
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    until(kind, n = 1) {
+      return waitFor(() => this.logged(kind).length >= n);
+    },
+    invocations() {
+      return this.logged("invocation");
+    },
+    // A process the test itself starts; cleanup ends it.
+    spawn(command, args, options) {
+      const proc = spawn(command, args, { stdio: "ignore", ...options });
+      strays.push(proc.pid);
+      return proc;
+    },
+    // Ends every process the fake logged or the test spawned, with its group,
+    // so a test that fails midway leaves nothing running. `pids` adds the
+    // children the extension recorded, for one that has not logged yet.
+    cleanup(pids = []) {
+      for (const pid of new Set([...strays, ...pids, ...this.log().map((r) => r.pid)])) {
+        // Zero or a negative pid would signal this process's own group.
+        if (!Number.isInteger(pid) || pid <= 1) continue;
+        for (const target of [-pid, pid]) {
+          try {
+            process.kill(target, "SIGKILL");
+          } catch {}
+        }
+      }
+      rmSync(root, { recursive: true, force: true });
+    },
   };
 }
 
-// The sheet and alias map the real-pi runs use: the shipped table of
-// PSTACK_PI_LIVE_PROVIDER (default openai), with any aliases the
-// `pi models:` line in PSTACK_PI_LIVE_MODELS names replaced.
-export function liveModels(root, head = "", extra = "") {
-  const line = process.env.PSTACK_PI_LIVE_MODELS;
-  const provider = process.env.PSTACK_PI_LIVE_PROVIDER ?? "openai";
-  const sheet = `${head}${line ? `${line}\n` : ""}${extra}session hook: on\n`;
-  const shipped = JSON.parse(readFileSync(join(root, "models.json"), "utf8")).pi.models[provider];
-  if (!shipped) throw new Error(`models.json has no pi table for "${provider}"`);
-  return { sheet, models: new Map([...Object.entries(shipped), ...parseSheet(sheet).piModels]) };
+// One per test file: registers the cleanup and returns the setup function.
+export function useWorld() {
+  let w;
+  let pi;
+  afterEach(() => w?.cleanup(pi.entries.map((e) => e.data?.pid)));
+  return ({ script, sheet, settings = {}, ctx = {} } = {}) => {
+    w = world({ script, sheet });
+    pi = fakePi();
+    install(pi.api, { ...w.settings, ...settings });
+    return { w, pi, ctx: fakeCtx({ cwd: w.cwd, ...ctx }) };
+  };
 }
+
+// A second extension instance over the same world, as after a reload or resume.
+export async function restore(w, entries, reason = "resume") {
+  const pi = fakePi();
+  install(pi.api, w.settings);
+  await pi.emit("session_start", { reason }, fakeCtx({ cwd: w.cwd, entries }));
+  return pi;
+}
+
+export const resultText = (result) => result.content.map((c) => c.text).join("");
+
+export const listAgents = async (pi, ctx) => JSON.parse(resultText(await pi.call("list_agents", {}, ctx)));
+
+export const agentEntry = (data) => ({ type: "custom", customType: "pstack-agents", data });
+
+// An agent file's body, which is what its child gets as a system prompt.
+export const agentBody = (rel) => /^---\n[\s\S]*?\n---\n([\s\S]*)$/.exec(readFileSync(join(pluginRoot, rel), "utf8"))[1].trim();
+
+// The value an invocation's argv gives a flag, or null without the flag.
+export const flag = (inv, name) => (inv.argv.includes(name) ? inv.argv[inv.argv.indexOf(name) + 1] : null);
 
 export function gitRepo(dir) {
   const run = (...args) => {
@@ -173,112 +220,6 @@ export function alive(pid) {
   }
 }
 
-export const MINUTE = 60_000;
-
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export const readEntries = (file) => readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
-
-export const textOf = (m) =>
-  typeof m.content === "string" ? m.content : (m.content ?? []).map((p) => p.text ?? "").filter(Boolean).join("\n");
-
-// Splits only on LF: a Unicode line separator is valid inside a JSON string.
-export function jsonLines(onRecord) {
-  const decoder = new StringDecoder("utf8");
-  let buf = "";
-  return (chunk) => {
-    buf += decoder.write(chunk);
-    for (let i = buf.indexOf("\n"); i >= 0; i = buf.indexOf("\n")) {
-      const line = buf.slice(0, i).replace(/\r$/, "");
-      buf = buf.slice(i + 1);
-      if (line.trim()) onRecord(JSON.parse(line));
-    }
-  };
-}
-
-// Drives a real `pi --mode rpc` process: commands get responses, everything
-// else is kept as a timestamped event.
-export class PiRpc {
-  events = [];
-  pending = new Map();
-  nextId = 0;
-  stderr = "";
-
-  constructor({ cwd, env, model, thinking = "low" }) {
-    this.proc = spawn("pi", ["--mode", "rpc", "--model", model, "--thinking", thinking], {
-      cwd,
-      env,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    this.proc.stdout.on(
-      "data",
-      jsonLines((record) => {
-        const resolve = record.type === "response" && this.pending.get(record.id);
-        if (resolve) {
-          this.pending.delete(record.id);
-          resolve(record);
-        } else this.events.push({ ...record, at: Date.now() });
-      }),
-    );
-    this.proc.stderr.on("data", (d) => (this.stderr += d));
-    this.exited = new Promise((r) => this.proc.on("close", r));
-  }
-
-  async command(type, fields = {}) {
-    const id = `c${++this.nextId}`;
-    const response = new Promise((r) => this.pending.set(id, r));
-    this.proc.stdin.write(JSON.stringify({ id, type, ...fields }) + "\n");
-    const res = await response;
-    if (!res.success) throw new Error(`${type} failed: ${res.error}`);
-    return res.data;
-  }
-
-  async until(predicate, timeoutMs, what) {
-    const deadline = Date.now() + timeoutMs;
-    for (;;) {
-      const value = predicate();
-      if (value) return value;
-      if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}. stderr: ${this.stderr.slice(-800)}`);
-      await sleep(250);
-    }
-  }
-
-  // Sends a prompt and waits until the session is settled and idle.
-  async run(message, timeoutMs = 3 * MINUTE) {
-    const from = this.events.length;
-    await this.command("prompt", { message });
-    await this.idle(from, timeoutMs);
-    return from;
-  }
-
-  async idle(from, timeoutMs = 3 * MINUTE) {
-    await this.until(() => this.events.slice(from).some((e) => e.type === "agent_settled"), timeoutMs, "agent_settled");
-    for (;;) {
-      const state = await this.command("get_state");
-      if (!state.isStreaming && !state.isCompacting && state.pendingMessageCount === 0) return state;
-      await sleep(250);
-    }
-  }
-
-  messages(from = 0) {
-    return this.events.slice(from).filter((e) => e.type === "message_end").map((e) => ({ ...e.message, at: e.at }));
-  }
-
-  notices(from = 0) {
-    return this.messages(from).filter((m) => m.role === "custom" && m.customType === "pstack-agent");
-  }
-
-  toolResults(name, from = 0) {
-    return this.messages(from).filter((m) => m.role === "toolResult" && m.toolName === name);
-  }
-
-  async sessionFile() {
-    return (await this.command("get_state")).sessionFile;
-  }
-
-  async close() {
-    this.proc.stdin.end();
-    const done = await Promise.race([this.exited.then(() => true), sleep(20_000).then(() => false)]);
-    if (!done) this.proc.kill("SIGKILL");
-  }
-}

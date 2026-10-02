@@ -385,14 +385,15 @@ export function noteSkills(runtime, markdown) {
 
 // The line the generator owns under a file's first heading, by repo-relative
 // file: a runtime's preamble on each skill its Per-skill notes table has a row
-// for, and the driver-skill line on the playbooks that drive an app.
+// for, and the driver-skill line on the playbooks that drive an app. Every
+// runtime's table must name real skills, whether or not it stamps a preamble.
 export function loadLeadLines(root = repo) {
   const leads = new Map();
-  for (const runtime of PREAMBLE_RUNTIMES) {
+  for (const runtime of RUNTIMES) {
     for (const skill of noteSkills(runtime, readFileSync(join(root, runtime.tools), "utf8"))) {
       const file = `${SKILLS}/${skill}/SKILL.md`;
       if (!existsSync(join(root, file))) throw new Error(`${runtime.tools}: per-skill note for "${skill}", which has no SKILL.md`);
-      leads.set(file, runtime.preamble);
+      if (runtime.preamble) leads.set(file, runtime.preamble);
     }
   }
   for (const playbook of DRIVER_PLAYBOOKS) leads.set(`${SKILLS}/poteto-mode/playbooks/${playbook}.md`, DRIVER_LINE);

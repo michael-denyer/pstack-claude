@@ -112,8 +112,9 @@ export function resolveModel(
   return id;
 }
 
+export const GENERAL_PURPOSE = "general-purpose";
+
 interface AgentDefinition {
-  type: string;
   body: string;
   model?: string;
   effort?: Effort;
@@ -129,22 +130,20 @@ export function frontmatter(text: string): { fields: Map<string, string>; body: 
   return { fields, body: (m?.[2] ?? text).trim() };
 }
 
-function isEffort(value: string): value is Effort {
-  return (EFFORT_LEVELS as readonly string[]).includes(value);
-}
-
 function parseAgentFile(type: string, text: string): AgentDefinition {
   const { fields, body } = frontmatter(text);
-  const effort = fields.get("effort");
-  if (effort !== undefined && !isEffort(effort)) {
-    throw new Error(`${type}: effort "${effort}" is not one of ${EFFORT_LEVELS.join(", ")}`);
+  const named = fields.get("effort");
+  const effort = EFFORT_LEVELS.find((level) => level === named);
+  if (named !== undefined && !effort) {
+    throw new Error(`${type}: effort "${named}" is not one of ${EFFORT_LEVELS.join(", ")}`);
   }
-  return { type, body, model: fields.get("model") || undefined, effort };
+  return { body, model: fields.get("model") || undefined, effort };
 }
 
-// Claude Code registers each plugin agent file as pstack:<file name>.
+// Claude Code registers each plugin agent file as pstack:<file name>, beside
+// the built-in general-purpose type, which has no agent file.
 export function loadAgentTypes(pluginRoot: string): Map<string, AgentDefinition> {
-  const types = new Map<string, AgentDefinition>();
+  const types = new Map<string, AgentDefinition>([[GENERAL_PURPOSE, { body: "" }]]);
   for (const dir of ["agents", "effort-agents"]) {
     const full = join(pluginRoot, dir);
     if (!existsSync(full)) continue;
@@ -154,8 +153,4 @@ export function loadAgentTypes(pluginRoot: string): Map<string, AgentDefinition>
     }
   }
   return types;
-}
-
-export function stateDir(settings: Settings, sessionId: string): string {
-  return join(settings.agentDir, "pstack", sessionId);
 }

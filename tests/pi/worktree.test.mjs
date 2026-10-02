@@ -1,14 +1,14 @@
-// settleWorktree against real git state: it must never drop a commit the agent made.
-import { afterEach, expect, test } from "bun:test";
+// settleWorktree against real git state: it must never drop a commit the agent
+// made. Then the agent tool's worktree isolation over it.
+import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ensureWorktree, planWorktree, settleWorktree } from "../../plugins/pstack/pi/worktree.ts";
-import { gitRepo, world } from "./harness.mjs";
+import { gitRepo, resultText, useWorld, waitFor } from "./harness.mjs";
 
-let w;
-afterEach(() => w?.cleanup());
+const setup = useWorld();
 
 function commitIn(path, file) {
   writeFileSync(join(path, file), "important\n");
@@ -20,7 +20,7 @@ function commitIn(path, file) {
 }
 
 test("a commit on the agent branch is kept even when the worktree is detached at the base afterwards", () => {
-  w = world();
+  const { w } = setup();
   const git = gitRepo(w.cwd);
   const wt = planWorktree(w.cwd, "c2");
   ensureWorktree(wt);
@@ -34,7 +34,7 @@ test("a commit on the agent branch is kept even when the worktree is detached at
 });
 
 test("a commit on a detached HEAD inside the worktree keeps it too", () => {
-  w = world();
+  const { w } = setup();
   gitRepo(w.cwd);
   const wt = planWorktree(w.cwd, "c2b");
   ensureWorktree(wt);
@@ -46,7 +46,7 @@ test("a commit on a detached HEAD inside the worktree keeps it too", () => {
 });
 
 test("a commit made on a detached HEAD and left behind by checking the branch out again is kept, through the reflog", () => {
-  w = world();
+  const { w } = setup();
   gitRepo(w.cwd);
   const wt = planWorktree(w.cwd, "c2d");
   ensureWorktree(wt);
@@ -62,7 +62,7 @@ test("a commit made on a detached HEAD and left behind by checking the branch ou
 });
 
 test("output written only to a gitignored path keeps the worktree", () => {
-  w = world();
+  const { w } = setup();
   const git = gitRepo(w.cwd);
   writeFileSync(join(w.cwd, ".gitignore"), "build/\n");
   git("add", ".gitignore");
@@ -77,7 +77,7 @@ test("output written only to a gitignored path keeps the worktree", () => {
 });
 
 test("a reflog longer than an argument list allows still settles, and a git error names only a short command", () => {
-  w = world();
+  const { w } = setup();
   gitRepo(w.cwd);
   const wt = planWorktree(w.cwd, "c2f");
   ensureWorktree(wt);
@@ -102,7 +102,7 @@ test("a reflog longer than an argument list allows still settles, and a git erro
 });
 
 test("a clean worktree still on its branch at the base is removed with its branch", () => {
-  w = world();
+  const { w } = setup();
   const git = gitRepo(w.cwd);
   const wt = planWorktree(w.cwd, "c2c");
   ensureWorktree(wt);
@@ -110,4 +110,60 @@ test("a clean worktree still on its branch at the base is removed with its branc
   expect(settleWorktree(wt)).toBe(false);
   expect(existsSync(wt.path)).toBe(false);
   expect(git("branch", "--list", wt.branch)).toBe("");
+});
+
+describe("worktree isolation", () => {
+  test("runs in its own worktree and removes it when the agent changed nothing", async () => {
+    const { w, pi, ctx } = setup();
+    const git = gitRepo(w.cwd);
+    const result = await pi.call("agent", { description: "w", prompt: "x", isolation: "worktree" }, ctx);
+    const id = result.details.agentId;
+    const path = join(w.cwd, ".claude", "worktrees", `agent-${id}`);
+    expect(w.invocations()[0].cwd).toBe(path);
+    expect(resultText(result)).toContain("no changes; removed");
+    expect(existsSync(path)).toBe(false);
+    expect(git("branch", "--list", `worktree-agent-${id}`)).toBe("");
+  });
+
+  test("keeps a worktree with changes and reports its path and branch", async () => {
+    const { w, pi, ctx } = setup({ script: { default: [{ touch: "new-file" }, { reply: "wrote" }] } });
+    const git = gitRepo(w.cwd);
+    const result = await pi.call("agent", { description: "w", prompt: "x", isolation: "worktree" }, ctx);
+    const id = result.details.agentId;
+    const path = join(w.cwd, ".claude", "worktrees", `agent-${id}`);
+    expect(resultText(result)).toContain(`worktree: ${path} (branch worktree-agent-${id})`);
+    expect(existsSync(join(path, "new-file"))).toBe(true);
+    expect(git("branch", "--list", `worktree-agent-${id}`)).toContain(`worktree-agent-${id}`);
+  });
+
+  test("a failed agent's worktree with changes is kept and reported like a completed one's", async () => {
+    const { w, pi, ctx } = setup({ script: { default: [{ touch: "partial" }, { exit: 3 }] } });
+    gitRepo(w.cwd);
+    const result = await pi.call("agent", { description: "w", prompt: "x", isolation: "worktree" }, ctx);
+    const path = join(w.cwd, ".claude", "worktrees", `agent-${result.details.agentId}`);
+    expect(result.details.status).toBe("failed");
+    expect(resultText(result)).toContain(`worktree: ${path} (branch worktree-agent-${result.details.agentId})`);
+    expect(existsSync(join(path, "partial"))).toBe(true);
+  });
+
+  test("a resume whose worktree cannot be re-created fails with a notice", async () => {
+    const { w, pi, ctx } = setup({ script: { default: [{ touch: "kept" }, { reply: "ok" }] } });
+    gitRepo(w.cwd);
+    const { details } = await pi.call("agent", { description: "w", prompt: "first", isolation: "worktree" }, ctx);
+    rmSync(w.invocations()[0].cwd, { recursive: true, force: true });
+
+    const err = await pi.call("send_message", { to: details.agentId, message: "again" }, ctx).catch((e) => e);
+    expect(err.message).toContain("git worktree add");
+    await waitFor(() => pi.entries.at(-1).data.status === "failed");
+    expect(pi.entries.at(-1).data.finalText).toContain("git worktree add");
+    expect(w.invocations()).toHaveLength(1);
+  });
+
+  test("outside a git repo it is an error and nothing runs", async () => {
+    const { w, pi, ctx } = setup();
+    mkdirSync(join(w.cwd, "sub"));
+    const err = await pi.call("agent", { description: "w", prompt: "x", isolation: "worktree" }, { ...ctx, cwd: join(w.cwd, "sub") }).catch((e) => e);
+    expect(err.message).toContain("git rev-parse");
+    expect(w.invocations()).toEqual([]);
+  });
 });

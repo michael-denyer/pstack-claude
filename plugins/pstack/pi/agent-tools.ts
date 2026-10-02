@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
 
-import { resultText } from "./agent-text.ts";
+import { listing, resultText } from "./agent-text.ts";
 import type { AgentRunner } from "./agents.ts";
 import { isForegroundWait } from "./sleep-wait.ts";
 
@@ -107,7 +107,7 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
       "List every agent this session started with its status. running means the process is alive; completed, failed, and stopped are reported only after the process exited.",
     parameters: Type.Object({}, { additionalProperties: false }),
     async execute() {
-      const agents = runner.list();
+      const agents = listing(runner.list());
       return { content: [{ type: "text", text: JSON.stringify(agents, null, 2) }], details: { agents } };
     },
   });
@@ -121,9 +121,8 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
     parameters: stopParams,
     async execute(_id, params) {
       const record = await runner.stop(params.id);
-      const exitCode = record.status === "running" ? undefined : record.exitCode;
       return {
-        content: [{ type: "text", text: JSON.stringify({ agentId: record.id, status: record.status, exitCode }) }],
+        content: [{ type: "text", text: JSON.stringify({ agentId: record.id, status: record.status, exitCode: record.exitCode }) }],
         details: { agentId: record.id, status: record.status },
       };
     },

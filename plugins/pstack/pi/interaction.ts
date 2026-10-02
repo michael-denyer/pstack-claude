@@ -35,25 +35,22 @@ type Ui = ExtensionContext["ui"];
 async function ask(ui: Ui, q: Question, signal: AbortSignal | undefined): Promise<string | undefined> {
   const title = q.header ? `${q.header}: ${q.question}` : q.question;
   const shown = (o: Question["options"][number]) => (o.description ? `${o.label} - ${o.description}` : o.label);
-  const other = () => ui.input(title, "Your answer", { signal });
+  const labels = new Map(q.options.map((o) => [shown(o), o.label]));
+  // The label of a listed pick, or what the user types for OTHER.
+  const answer = (pick: string) => (pick === OTHER ? ui.input(title, "Your answer", { signal }) : labels.get(pick));
   if (!q.multiSelect) {
-    const pick = await ui.select(title, [...q.options.map(shown), OTHER], { signal });
-    if (pick === undefined) return undefined;
-    return pick === OTHER ? other() : q.options.find((o) => shown(o) === pick)!.label;
+    const pick = await ui.select(title, [...labels.keys(), OTHER], { signal });
+    return pick === undefined ? undefined : answer(pick);
   }
   const chosen: string[] = [];
   for (;;) {
-    const remaining = q.options.filter((o) => !chosen.includes(o.label));
-    const pick = await ui.select(`${title} (one at a time; ${DONE} when finished)`, [...remaining.map(shown), OTHER, DONE], {
-      signal,
-    });
+    const remaining = [...labels].filter(([, label]) => !chosen.includes(label)).map(([text]) => text);
+    const pick = await ui.select(`${title} (one at a time; ${DONE} when finished)`, [...remaining, OTHER, DONE], { signal });
     if (pick === undefined) return undefined;
     if (pick === DONE) return chosen.join(", ");
-    if (pick === OTHER) {
-      const text = await other();
-      if (text === undefined) return undefined;
-      chosen.push(text);
-    } else chosen.push(remaining.find((o) => shown(o) === pick)!.label);
+    const text = await answer(pick);
+    if (text === undefined) return undefined;
+    chosen.push(text);
   }
 }
 
@@ -75,7 +72,7 @@ export class Scheduler {
       this.wakeup = undefined;
       this.fire(prompt);
     }, seconds * 1000);
-    this.wakeup.unref?.();
+    this.wakeup.unref();
   }
 
   cancelWakeup(): boolean {
@@ -89,7 +86,7 @@ export class Scheduler {
     this.stopLoop();
     // A tick that lands mid-run is dropped, so a slow iteration cannot pile up a backlog.
     this.loop = setInterval(() => ctx.isIdle() && this.fire(prompt), seconds * 1000);
-    this.loop.unref?.();
+    this.loop.unref();
   }
 
   stopLoop(): boolean {

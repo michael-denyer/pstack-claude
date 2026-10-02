@@ -68,6 +68,11 @@ jobs:
         run: npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.0.0 # zizmor: ignore[adhoc-packages]
       - name: Typecheck the extension against Pi
         run: bun tools/typecheck-pi.mjs
+      # Skipped in every job without Pi; here a catalog that is not found fails.
+      - name: Check the shipped model tables against Pi's catalog
+        run: bun test tests/pi/catalog.test.mjs
+        env:
+          PSTACK_PI_REQUIRE_CATALOG: "1"
 
   scripts:
     name: Vendored bun tooling

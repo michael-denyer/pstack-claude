@@ -4,6 +4,9 @@
 import { expect, test } from "bun:test";
 
 import { isForegroundWait } from "../../plugins/pstack/pi/sleep-wait.ts";
+import { useWorld, waitFor } from "./harness.mjs";
+
+const setup = useWorld();
 
 const waits = [
   "sleep 20", "  sleep 2.5 && ls", "npm test; sleep 30", "sleep 5 && gh pr checks 1", "(sleep 30; ls)", "ls\nsleep 10", "sleep 1m", "sleep 2s",
@@ -63,4 +66,15 @@ test("a 200 KB adversarial command line classifies in well under a second", () =
     isForegroundWait(input);
     expect(performance.now() - started).toBeLessThan(250);
   }
+});
+
+test("a foreground sleep is blocked only while a background agent runs", async () => {
+  const { pi, ctx } = setup({ script: { default: [{ sleep: 400 }, { reply: "done" }] } });
+  const bash = async (command) => (await pi.emit("tool_call", { toolName: "bash", toolCallId: "t", input: { command } }, ctx)).find(Boolean);
+  expect(await bash("sleep 20")).toBeUndefined();
+  await pi.call("agent", { description: "bg", prompt: "go", run_in_background: true }, ctx);
+  expect(await bash("sleep 20")).toMatchObject({ block: true });
+  expect(await bash("sleep 1")).toBeUndefined();
+  await waitFor(() => pi.messages.length === 1);
+  expect(await bash("sleep 20")).toBeUndefined();
 });

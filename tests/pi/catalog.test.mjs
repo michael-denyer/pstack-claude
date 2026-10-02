@@ -16,11 +16,14 @@ function npmRoot() {
 }
 
 function catalogDir() {
+  const npm = npmRoot();
   const roots = [
     process.env.PSTACK_PI_AI_DIR && join(process.env.PSTACK_PI_AI_DIR, ".."),
     join(homedir(), ".cache/.bun/install/global/node_modules/@earendil-works"),
     join(homedir(), ".bun/install/global/node_modules/@earendil-works"),
-    npmRoot() && join(npmRoot(), "@earendil-works"),
+    npm && join(npm, "@earendil-works"),
+    // npm nests a global package's dependencies under the package.
+    npm && join(npm, "@earendil-works/pi-coding-agent/node_modules/@earendil-works"),
   ].filter(Boolean);
   for (const r of roots) {
     const dir = join(r, "pi-ai/dist/providers/data");
@@ -40,9 +43,13 @@ function catalogIds(dir, provider) {
 }
 
 const dir = catalogDir();
+// CI's pi-types job installs Pi and sets this, so a catalog that moved fails
+// there instead of skipping.
+const required = process.env.PSTACK_PI_REQUIRE_CATALOG === "1";
 
 describe("models.json pi block", () => {
-  test.skipIf(!dir)("every provider table maps each family name to a model in the installed Pi catalog", () => {
+  test.skipIf(!dir && !required)("every provider table maps each family name to a model in the installed Pi catalog", () => {
+    if (!dir) throw new Error("PSTACK_PI_REQUIRE_CATALOG=1, but no installed Pi catalog was found. Set PSTACK_PI_AI_DIR to the pi-ai package.");
     const missing = Object.entries(piModels).flatMap(([provider, table]) =>
       Object.entries(table)
         .filter(([, ref]) => !catalogIds(dir, provider).has(ref.slice(provider.length + 1)))

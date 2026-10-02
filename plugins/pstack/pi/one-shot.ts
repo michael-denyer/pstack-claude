@@ -3,14 +3,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import type { AgentRunner } from "./agents.ts";
 import type { Settings } from "./config.ts";
 
-type ExtensionMode = ExtensionContext["mode"];
 const PENDING_POLL_MS = 50;
-
-// Print and json runs exit once the agent settles. A pstack child is an rpc
-// process whose parent closes its stdin at the same moment, so it is one-shot too.
-function exitsOnSettle(mode: ExtensionMode, depth: number): boolean {
-  return mode === "print" || mode === "json" || depth > 0;
-}
 
 export interface OneShot {
   exits(ctx: Pick<ExtensionContext, "mode">): boolean;
@@ -36,13 +29,16 @@ function pendingMessage(ctx: ExtensionContext, signal: { done: boolean }): Promi
 // exits or a message arrives; /loop must wait for the run it started; a wakeup
 // could never fire; Ctrl-C must take the children along, since pi leaves SIGINT
 // at its default in print mode.
-export function registerOneShot(pi: ExtensionAPI, settings: Settings, runner: Pick<AgentRunner, "nextExit" | "signalAll">): OneShot {
-  const exits = (ctx: Pick<ExtensionContext, "mode">) => exitsOnSettle(ctx.mode, settings.depth);
-  let settleWaiters: (() => void)[] = [];
-  const onSigint = () => {
-    runner.signalAll();
-    process.exit(130);
+export function registerOneShot(pi: ExtensionAPI, settings: Settings, runner: Pick<AgentRunner, "nextExit">): OneShot {
+  // Print and json runs exit once the agent settles. A pstack child is an rpc
+  // process whose parent closes its stdin at the same moment, so it is one-shot too.
+  const exits = (ctx: Pick<ExtensionContext, "mode">) => ctx.mode === "print" || ctx.mode === "json" || settings.depth > 0;
+  const settleWaiters: (() => void)[] = [];
+  const settle = () => {
+    for (const resolve of settleWaiters.splice(0)) resolve();
   };
+  // The exit hook in index.ts signals the children.
+  const onSigint = () => process.exit(130);
   pi.on("session_start", (_event, ctx) => {
     if (exits(ctx) && process.listenerCount("SIGINT") === 0) process.on("SIGINT", onSigint);
   });
@@ -52,15 +48,13 @@ export function registerOneShot(pi: ExtensionAPI, settings: Settings, runner: Pi
     await Promise.race([runner.nextExit(), pendingMessage(ctx, signal)]);
     signal.done = true;
   });
-  pi.on("agent_settled", () => {
-    for (const resolve of settleWaiters.splice(0)) resolve();
-  });
+  pi.on("agent_settled", settle);
   return {
     exits,
     untilSettled: () => new Promise<void>((resolve) => settleWaiters.push(resolve)),
     dispose: () => {
       process.off("SIGINT", onSigint);
-      settleWaiters = [];
+      settle();
     },
   };
 }

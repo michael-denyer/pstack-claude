@@ -1,19 +1,10 @@
 // The note a tool result carries when its file matches a skill's `paths:` globs.
-import { afterEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { install } from "../../plugins/pstack/pi/index.ts";
-import { fakeCtx, fakePi, pluginRoot, world } from "./harness.mjs";
+import { pluginRoot, useWorld } from "./harness.mjs";
 
-let w;
-afterEach(() => w?.cleanup());
-
-function setup() {
-  w = world();
-  const pi = fakePi();
-  install(pi.api, w.settings);
-  return { pi, ctx: fakeCtx({ cwd: w.cwd }) };
-}
+const setup = useWorld();
 
 const result = (toolName, path, extra = {}) => ({
   toolName,

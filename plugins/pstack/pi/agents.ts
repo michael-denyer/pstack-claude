@@ -9,8 +9,8 @@ import { Value } from "typebox/value";
 import { noticeOf, OUTPUT_CAP_BYTES, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
 import { alive, type ChildExit, PiChild, signalGroup } from "./child.ts";
-import { loadAgentTypes, readSheet, resolveModel, type Settings, stateDir } from "./config.ts";
-import { ensureWorktree, planWorktree, settleWorktree, worktreeSchema } from "./worktree.ts";
+import { GENERAL_PURPOSE, loadAgentTypes, readSheet, resolveModel, type Settings } from "./config.ts";
+import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
 
 const ENTRY_TYPE = "pstack-agents";
 // Claude Code lets agents nest three layers below the main session and withholds
@@ -75,9 +75,9 @@ function identityOf(record: AgentRecord): AgentIdentity {
 interface Run {
   child: PiChild;
   background: boolean;
-  // Set by stop(): the exit code no longer decides the status. silent means the
-  // session is being torn down, so no notice.
-  stop?: { silent: boolean };
+  // Set once the run is told to end: the exit code no longer decides the
+  // status. teardown means the session is going away, so no notice follows.
+  ending?: "stopped" | "teardown";
   done: Promise<EndedRecord>;
 }
 
@@ -91,6 +91,27 @@ function outcomeOf(exit: ChildExit, stopped: boolean): { status: EndedStatus; fi
   const diagnostics = exit.errorMessage || exit.stderr.trim();
   const finalText = exit.finalText && diagnostics ? `${exit.finalText}\n\n${diagnostics}` : exit.finalText || diagnostics || "(no output)";
   return { status: "failed", finalText };
+}
+
+// The text a record keeps: capped, with the full copy on disk when it was cut.
+function saveOutput(identity: AgentIdentity, text: string): Pick<EndedRecord, "finalText" | "outputFile"> {
+  const capped = truncateUtf8(text, OUTPUT_CAP_BYTES);
+  if (capped === text) return { finalText: text };
+  const outputFile = join(identity.sessionDir, `${identity.id}.out.md`);
+  try {
+    writeFileSync(outputFile, text);
+    return { finalText: capped, outputFile };
+  } catch (e) {
+    return { finalText: `${capped}\n\n(full output not saved: ${(e as Error).message})` };
+  }
+}
+
+function settle(worktree: Worktree): { kept: boolean; note: string } {
+  try {
+    return { kept: settleWorktree(worktree), note: "" };
+  } catch (e) {
+    return { kept: true, note: `\n\n(worktree cleanup failed: ${(e as Error).message})` };
+  }
 }
 
 function childArgs(identity: AgentIdentity, depth: number): string[] {
@@ -124,7 +145,6 @@ function reapOrphan(record: RunningRecord, killGraceMs: number): void {
   setTimeout(() => ours() && signalGroup(pid, "SIGKILL"), killGraceMs).unref();
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const now = () => new Date().toISOString();
 
 export class AgentRunner {
@@ -140,21 +160,19 @@ export class AgentRunner {
   ) {}
 
   start(params: AgentParams, ctx: ExtensionContext): RunningRecord {
-    const type = params.subagent_type || "general-purpose";
+    const type = params.subagent_type || GENERAL_PURPOSE;
     const types = loadAgentTypes(this.settings.pluginRoot);
-    const def = type === "general-purpose" ? undefined : types.get(type);
-    if (type !== "general-purpose" && !def) {
-      throw new Error(`Unknown subagent_type "${type}". Valid types: ${["general-purpose", ...types.keys()].join(", ")}.`);
-    }
+    const def = types.get(type);
+    if (!def) throw new Error(`Unknown subagent_type "${type}". Valid types: ${[...types.keys()].join(", ")}.`);
     const parentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
-    const model = resolveModel(params.model ?? def?.model, this.settings, readSheet(this.settings.agentDir), parentModel);
+    const model = resolveModel(params.model ?? def.model, this.settings, readSheet(this.settings.agentDir), parentModel);
 
     const id = `a${randomBytes(8).toString("hex")}`;
-    const state = stateDir(this.settings, ctx.sessionManager.getSessionId());
+    const state = join(this.settings.agentDir, "pstack", ctx.sessionManager.getSessionId());
     const sessionDir = join(state, "agents");
     mkdirSync(sessionDir, { recursive: true });
     let systemPromptFile: string | undefined;
-    if (def?.body) {
+    if (def.body) {
       mkdirSync(join(state, "prompts"), { recursive: true });
       systemPromptFile = join(state, "prompts", `${id}.md`);
       writeFileSync(systemPromptFile, def.body, { mode: 0o600 });
@@ -166,7 +184,7 @@ export class AgentRunner {
       subagentType: type,
       model,
       // Claude Code subagents without an effort run at the session's effort.
-      thinking: def?.effort ?? this.pi.getThinkingLevel(),
+      thinking: def.effort ?? this.pi.getThinkingLevel(),
       readonly: params.readonly || undefined,
       sessionId: randomUUID(),
       sessionDir,
@@ -196,42 +214,42 @@ export class AgentRunner {
       prompt,
     );
     const record: RunningRecord = { ...identity, status: "running", pid: child.pid, parentPid: process.pid };
-    this.records.set(identity.id, record);
-    this.persist(record);
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
+    this.records.set(identity.id, record);
     this.runs.set(identity.id, run);
+    this.persist(record);
     return record;
   }
 
+  // The record and the run table change together, before the entry is written:
+  // a running record without a run reads as another process's agent.
   private finish(identity: AgentIdentity, run: Run, exit: ChildExit): EndedRecord {
-    this.runs.delete(identity.id);
-    const { status, finalText } = outcomeOf(exit, run.stop !== undefined);
-    const record: EndedRecord = { ...identity, status, pid: run.child.pid, exitCode: exit.exitCode, endedAt: now(), finalText };
-    if (identity.worktree) {
-      try {
-        record.worktreeKept = settleWorktree(identity.worktree);
-      } catch (e) {
-        record.worktreeKept = true;
-        record.finalText += `\n\n(worktree cleanup failed: ${(e as Error).message})`;
-      }
-    }
-    if (Buffer.byteLength(record.finalText, "utf8") > OUTPUT_CAP_BYTES) {
-      record.outputFile = join(identity.sessionDir, `${identity.id}.out.md`);
-      writeFileSync(record.outputFile, record.finalText);
-    }
+    const { status, finalText } = outcomeOf(exit, run.ending !== undefined);
+    const worktree = identity.worktree && settle(identity.worktree);
+    const record: EndedRecord = {
+      ...identity,
+      status,
+      pid: run.child.pid,
+      exitCode: exit.exitCode,
+      endedAt: now(),
+      worktreeKept: worktree?.kept,
+      ...saveOutput(identity, finalText + (worktree?.note ?? "")),
+    };
     this.records.set(identity.id, record);
+    this.runs.delete(identity.id);
     this.persist(record);
     // The model that called stop_agent already has the result, so a stop's
     // notice joins the context without starting another turn.
-    if (run.background && !run.stop?.silent) {
+    if (run.background && run.ending !== "teardown") {
       this.pi.sendMessage(noticeOf(record), status !== "stopped" ? { triggerTurn: true, deliverAs: "steer" } : { triggerTurn: false });
     }
     return record;
   }
 
-  async wait(id: string): Promise<AgentRecord> {
-    await this.runs.get(id)?.done;
-    return this.find(id);
+  // The end of the agent's run in flight, or its record when it has ended.
+  async wait(id: string): Promise<EndedRecord> {
+    const { record, run } = this.owned(id);
+    return run ? run.done : record;
   }
 
   get busy(): boolean {
@@ -255,77 +273,66 @@ export class AgentRunner {
     throw new Error(`No agent "${to}". Known agents: ${known.join(", ") || "none"}.`);
   }
 
-  // A record still running without a run here belongs to the live pi process
-  // restore left it to; only that process holds its stdin and can stop it.
-  private findOwned(to: string): AgentRecord {
+  // An ended agent, or a running one with its run. A record still running
+  // without a run here belongs to the live pi process restore left it to; only
+  // that process holds its stdin and can stop it.
+  private owned(to: string): { record: EndedRecord; run?: undefined } | { record: RunningRecord; run: Run } {
     const record = this.find(to);
-    if (record.status === "running" && !this.runs.has(record.id)) {
+    if (record.status !== "running") return { record };
+    const run = this.runs.get(record.id);
+    if (!run) {
       throw new Error(`Agent ${record.id} is running under another pi process (pid ${record.parentPid}); only that process can message or stop it.`);
     }
-    return record;
+    return { record, run };
   }
 
   // A running agent takes the message as a steer, after its current tool calls.
   // A finished one, or one that has settled and is exiting, resumes with it,
   // including one that settled just before the steer reached it.
   async send(to: string, message: string): Promise<{ record: AgentRecord; running: boolean }> {
-    const { id } = this.findOwned(to);
+    const { id } = this.owned(to).record;
     // Another send may have launched a run while this one awaited, so the run
     // table is read again after every wait and the launch follows the last read.
     for (let run = this.runs.get(id); run; run = this.runs.get(id)) {
-      const response = await run.child.command({ type: "steer", message });
-      if (response?.success && !run.child.settled) return { record: this.find(id), running: true };
+      const { response, taken } = await run.child.steer(message);
+      if (taken) return { record: this.find(id), running: true };
       if (response && !response.success) throw new Error(`Agent ${id} did not take the message: ${response.error}`);
       await run.done;
-      if (run.stop) throw new Error(`Agent ${id} was stopped before it read the message; it was not delivered.`);
+      if (run.ending) throw new Error(`Agent ${id} was stopped before it read the message; it was not delivered.`);
     }
     return { record: this.launch(identityOf(this.find(id)), message, true), running: false };
   }
 
-  async stop(to: string, silent = false): Promise<AgentRecord> {
-    const record = this.findOwned(to);
-    const run = this.runs.get(record.id);
+  async stop(to: string, ending: NonNullable<Run["ending"]> = "stopped"): Promise<EndedRecord> {
+    const { record, run } = this.owned(to);
     if (!run) return record;
-    run.stop = { silent: silent || run.stop?.silent === true };
+    if (run.ending !== "teardown") run.ending = ending;
     void run.child.command({ type: "abort" });
     run.child.close();
-    run.child.signal("SIGTERM");
-    const deadline = Date.now() + this.settings.killGraceMs;
-    while (run.child.groupAlive() && Date.now() < deadline) await sleep(25);
-    if (run.child.groupAlive()) run.child.signal("SIGKILL");
+    run.child.terminate(this.settings.killGraceMs);
     return run.done;
   }
 
   async stopAll(): Promise<void> {
     this.closed = true;
-    await Promise.all([...this.runs.keys()].map((id) => this.stop(id, true)));
+    await Promise.all([...this.runs.keys()].map((id) => this.stop(id, "teardown")));
   }
 
   // For an exit that cannot wait: SIGTERM lets each child pi stop its own agents.
   signalAll(): void {
     this.closed = true;
     for (const run of this.runs.values()) {
-      run.stop = { silent: true };
+      run.ending = "teardown";
       run.child.signal("SIGTERM");
     }
   }
 
-  list(): object[] {
-    return [...this.records.values()].map((r) => ({
-      id: r.id,
-      description: r.description,
-      subagent_type: r.subagentType,
-      model: r.model ?? "(pi default)",
-      status: r.status,
-      pid: r.pid,
-      startedAt: r.startedAt,
-      endedAt: r.status === "running" ? undefined : r.endedAt,
-      worktree: r.worktree?.path,
-    }));
+  list(): AgentRecord[] {
+    return [...this.records.values()];
   }
 
   private persist(record: AgentRecord): void {
-    this.pi.appendEntry(ENTRY_TYPE, record.status === "running" ? record : { ...record, finalText: truncateUtf8(record.finalText, OUTPUT_CAP_BYTES) });
+    this.pi.appendEntry(ENTRY_TYPE, record);
   }
 
   // Folds persisted snapshots. A snapshot still marked running whose launching

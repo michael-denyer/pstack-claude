@@ -268,7 +268,7 @@ describe("validatePiPackage", () => {
     ).toThrow("package.json: pi.skills names ./plugins/pstack/skill, which does not exist");
   });
 
-  test("requires the skills tree, and the extension entry whenever it exists", () => {
+  test("requires the skills tree and the extension entry", () => {
     expect(() => validatePiPackage(manifest({ ...good, skills: [] }), { pathExists: everything })).toThrow(
       "package.json: pi.skills must list ./plugins/pstack/skills",
     );
@@ -276,7 +276,6 @@ describe("validatePiPackage", () => {
     expect(() => validatePiPackage(manifest(skillsOnly), { pathExists: everything })).toThrow(
       `package.json: pi.extensions must list ./${ENTRY}`,
     );
-    expect(() => validatePiPackage(manifest(skillsOnly), { pathExists: (rel) => rel !== ENTRY })).not.toThrow();
   });
 
   test("requires the pi-package keyword and no runtime dependencies", () => {
@@ -831,6 +830,13 @@ describe("plan, changes, apply", () => {
     } finally {
       PORTABLE_ASSETS.pop();
     }
+  });
+
+  test.each(RUNTIMES.map((runtime) => [runtime.name, runtime]))("a %s per-skill note for a skill that does not exist fails", (_, runtime) => {
+    const root = repoCopy();
+    const tools = join(root, runtime.tools);
+    writeFileSync(tools, readFileSync(tools, "utf8").replace(/^\| `why` \|/m, "| `gone` |"));
+    expect(() => loadLeadLines(root)).toThrow(`${runtime.tools}: per-skill note for "gone", which has no SKILL.md`);
   });
 
   test("problems reports a lead line in a file that does not own it", () => {

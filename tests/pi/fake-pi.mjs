@@ -9,14 +9,14 @@
 // and "${steered}" expand; history is the earlier prompts of the same
 // --session-id, steered the steer messages taken so far); { error } emits a
 // failed assistant message; { raw } writes stdout verbatim; { stderr },
-// { sleep: ms }, { exit: code } ends the process at once, { grandchild: true }
-// spawns a sleeping process as a running bash command would (detached, killed
-// on SIGTERM) and { grandchild: "background" } one a finished command left
-// behind (detached, never killed), { ignoreSigterm: true },
+// { sleep: ms }, { exit: code } ends the process at once, { spawn: "<kind>" }
+// starts a sleeping process of a kind in SPAWNS below and logs it as
+// "grandchild" with that kind in `as`, { ignoreSigterm: true },
 // { touch: "<file>" } writes a file in the working directory, { mute: true }
-// stops answering commands from then on, { grandchildHoldingPipes: true }
-// spawns a SIGTERM-ignoring process on this process's stdio, { askUser: true }
-// sends a notify and a select UI request and waits for a response to either.
+// stops answering commands from then on, { askUser: true } sends a notify and
+// a select UI request and waits for a response to either.
+// A step key or spawn kind this file does not know ends the process with
+// exit code 64, so a misspelled step cannot pass for the behaviour it names.
 //
 // A steer command is queued and taken at the next step boundary, where it is
 // emitted as a user message_end and logged as "steered", as pi delivers a steer
@@ -61,6 +61,34 @@ if (sessionFile) {
 const remember = (text) => sessionFile && appendFileSync(sessionFile, JSON.stringify(text) + "\n");
 
 const script = process.env.PSTACK_FAKE_PI_SCRIPT ? JSON.parse(readFileSync(process.env.PSTACK_FAKE_PI_SCRIPT, "utf8")) : {};
+
+const STEP_KEYS = new Set([
+  "reply", "error", "raw", "touch", "stderr", "sleep", "exit", "mute", "ignoreSigterm", "spawn", "askUser",
+  "lingerAfterSettle", "holdSettle", "awaitMessage",
+]);
+const DEAF = ["sh", ["-c", 'trap "" TERM; exec sleep 300']];
+const SPAWNS = {
+  // A bash command still running: pi's bash tool detaches it into its own
+  // group, and pi kills that group when it gets SIGTERM.
+  running: { detached: true, tracked: true },
+  // One a finished bash command left behind: its own group, never killed.
+  background: { detached: true },
+  // In this process's group, which is not how pi spawns anything; it shows
+  // which signals reach the group.
+  ingroup: {},
+  // In this process's group and ignoring SIGTERM.
+  deaf: { command: DEAF },
+  // The same, holding this process's stdio open.
+  "holding-pipes": { command: DEAF, stdio: "inherit" },
+};
+for (const step of [...(script.default ?? []), ...Object.values(script.byPrompt ?? {}).flat()]) {
+  const unknown = Object.keys(step).find((key) => !STEP_KEYS.has(key));
+  const problem = unknown ? `unknown step key "${unknown}"` : "spawn" in step && !SPAWNS[step.spawn] && `unknown spawn kind "${step.spawn}"`;
+  if (problem) {
+    process.stderr.write(`fake-pi: ${problem}\n`);
+    process.exit(64);
+  }
+}
 
 const steerQueue = [];
 const steered = [];
@@ -130,7 +158,6 @@ log({
   pid: process.pid,
   depth: process.env.PSTACK_PI_DEPTH ?? null,
   systemPrompt: systemFile && existsSync(systemFile) ? readFileSync(systemFile, "utf8") : null,
-  history,
 });
 const steps = script.byPrompt?.[prompt] ?? script.default ?? [{ reply: "ok" }];
 
@@ -178,19 +205,11 @@ for (const step of steps) {
     process.on("SIGTERM", () => log({ kind: "sigterm-ignored", pid: process.pid }));
     log({ kind: "ignoring-sigterm", pid: process.pid });
   }
-  if (step.grandchild) {
-    // As pi's bash tool: detached, so in its own process group. A running
-    // command is tracked and killed on SIGTERM; one a finished command left in
-    // the background is not.
-    // "ingroup" is not how pi spawns anything; it pins down that the runner
-    // sends no signal to the group after a clean exit.
-    const g = spawn("sleep", ["300"], { stdio: "ignore", detached: step.grandchild !== "ingroup" });
-    if (step.grandchild === true) trackedCommands.add(g.pid);
-    log({ kind: "grandchild", pid: g.pid, background: step.grandchild === "background" });
-  }
-  if (step.grandchildHoldingPipes) {
-    const g = spawn("sh", ["-c", 'trap "" TERM; exec sleep 300'], { stdio: "inherit" });
-    log({ kind: "grandchild", pid: g.pid });
+  if ("spawn" in step) {
+    const { command = ["sleep", ["300"]], detached = false, stdio = "ignore", tracked = false } = SPAWNS[step.spawn];
+    const g = spawn(...command, { stdio, detached });
+    if (tracked) trackedCommands.add(g.pid);
+    log({ kind: "grandchild", as: step.spawn, pid: g.pid });
   }
   if (step.askUser) {
     out({ type: "extension_ui_request", id: "u0", method: "notify", message: "fyi", notifyType: "info" });

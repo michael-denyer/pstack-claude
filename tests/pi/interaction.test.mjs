@@ -1,19 +1,10 @@
 // ask_user_question, schedule_wakeup, and /loop through the fake ExtensionAPI.
 import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 
-import { install } from "../../plugins/pstack/pi/index.ts";
 import { DONE, OTHER } from "../../plugins/pstack/pi/interaction.ts";
-import { fakeCtx, fakePi, world } from "./harness.mjs";
+import { useWorld } from "./harness.mjs";
 
-let w;
-afterEach(() => w?.cleanup());
-
-function setup(ctxOpts = {}) {
-  w = world();
-  const pi = fakePi();
-  install(pi.api, w.settings);
-  return { pi, ctx: fakeCtx({ cwd: w.cwd, ...ctxOpts }) };
-}
+const setup = useWorld();
 
 // A scripted UI: each select/input call takes the next answer.
 function scriptedUi(answers) {
@@ -44,7 +35,7 @@ const q = (extra = {}) => ({
 describe("ask_user_question", () => {
   test("without a UI it fails and tells the model to ask in plain text", async () => {
     const ui = scriptedUi([]);
-    const { pi, ctx } = setup({ hasUI: false, ui });
+    const { pi, ctx } = setup({ ctx: { hasUI: false, ui } });
     const err = await pi.call("ask_user_question", { questions: [q()] }, ctx).catch((e) => e);
     expect(err.message).toContain("Ask the user in plain text");
     expect(ui.calls).toEqual([]);
@@ -52,7 +43,7 @@ describe("ask_user_question", () => {
 
   test("a single-select question returns the chosen label", async () => {
     const ui = scriptedUi(["Redis - in memory"]);
-    const { pi, ctx } = setup({ hasUI: true, ui });
+    const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
     const result = await pi.call("ask_user_question", { questions: [q()] }, ctx);
     expect(ui.calls).toEqual([
       { kind: "select", title: "Store: Which store?", options: ["Postgres - relational", "Redis - in memory", OTHER] },
@@ -63,14 +54,14 @@ describe("ask_user_question", () => {
 
   test("Other takes free text", async () => {
     const ui = scriptedUi([OTHER, "SQLite"]);
-    const { pi, ctx } = setup({ hasUI: true, ui });
+    const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
     const result = await pi.call("ask_user_question", { questions: [q()] }, ctx);
     expect(result.details.answers[0].answer).toBe("SQLite");
   });
 
   test("multiSelect picks one at a time until Done, including typed answers", async () => {
     const ui = scriptedUi(["Postgres - relational", OTHER, "SQLite", DONE]);
-    const { pi, ctx } = setup({ hasUI: true, ui });
+    const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
     const result = await pi.call("ask_user_question", { questions: [q({ multiSelect: true })] }, ctx);
     expect(result.details.answers[0].answer).toBe("Postgres, SQLite");
     const selects = ui.calls.filter((c) => c.kind === "select");
@@ -79,10 +70,16 @@ describe("ask_user_question", () => {
 
   test("several questions are asked in order, and a dismissal stops the run", async () => {
     const ui = scriptedUi(["Postgres - relational", undefined]);
-    const { pi, ctx } = setup({ hasUI: true, ui });
+    const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
     const result = await pi.call("ask_user_question", { questions: [q(), q({ question: "Cache?" })] }, ctx);
     expect(result.details).toEqual({ answers: [{ question: "Which store?", answer: "Postgres" }], dismissed: true });
     expect(result.content[0].text).toContain("dismissed");
+  });
+
+  test("a child agent refuses ask_user_question even though rpc mode reports a UI", async () => {
+    const { pi, ctx } = setup({ settings: { depth: 1 }, ctx: { mode: "rpc", hasUI: true, ui: {} } });
+    const err = await pi.call("ask_user_question", { questions: [q()] }, ctx).catch((e) => e);
+    expect(err.message).toContain("Ask the user in plain text");
   });
 });
 
@@ -93,7 +90,7 @@ describe("schedule_wakeup", () => {
   const wake = (pi, ctx, params) => pi.call("schedule_wakeup", { reason: "waiting on CI", ...params }, ctx);
 
   test("clamps to 60 s and fires the prompt as a follow-up user message", async () => {
-    const { pi, ctx } = setup({ idle: true });
+    const { pi, ctx } = setup({ ctx: { idle: true } });
     const result = await wake(pi, ctx, { delaySeconds: 5, prompt: "check CI" });
     expect(result.details.delaySeconds).toBe(60);
     jest.advanceTimersByTime(59_000);
@@ -104,7 +101,7 @@ describe("schedule_wakeup", () => {
 
   for (const mode of ["print", "json"]) {
     test(`in ${mode} mode it is an error, since pi exits before a wakeup could fire`, async () => {
-      const { pi, ctx } = setup({ mode });
+      const { pi, ctx } = setup({ ctx: { mode } });
       const err = await wake(pi, ctx, { delaySeconds: 60, prompt: "later" }).catch((e) => e);
       expect(err.message).toContain("exits when this run ends");
       jest.advanceTimersByTime(3_600_000);
@@ -113,7 +110,7 @@ describe("schedule_wakeup", () => {
   }
 
   test("clamps to 3600 s and queues as a follow-up when the agent is busy", async () => {
-    const { pi, ctx } = setup({ idle: false });
+    const { pi, ctx } = setup({ ctx: { idle: false } });
     expect((await wake(pi, ctx, { delaySeconds: 99999, prompt: "later" })).details.delaySeconds).toBe(3600);
     jest.advanceTimersByTime(3_599_000);
     expect(pi.userMessages).toEqual([]);
@@ -175,8 +172,8 @@ describe("/loop", () => {
 
   function loop(ctxOpts = {}) {
     const ui = scriptedUi([]);
-    const { pi, ctx } = setup(ctxOpts);
-    return { pi, ui, run: (args) => pi.commands.get("loop").handler(args, { ...ctx, ui }) };
+    const { pi, ctx } = setup({ ctx: ctxOpts });
+    return { pi, ctx, ui, run: (args) => pi.commands.get("loop").handler(args, { ...ctx, ui }) };
   }
 
   test("a fixed interval runs now and then on every interval until /loop stop", async () => {
@@ -234,7 +231,7 @@ describe("/loop", () => {
 
   for (const mode of ["print", "json"]) {
     test(`in ${mode} mode /loop returns only once the run it started settles, since pi disposes the session when it returns`, async () => {
-      const { pi, run } = loop({ mode });
+      const { pi, ctx, run } = loop({ mode });
       let returned = false;
       const done = run("tick").then(() => (returned = true));
       await Promise.resolve();
@@ -242,15 +239,14 @@ describe("/loop", () => {
       jest.advanceTimersByTime(60_000);
       await Promise.resolve();
       expect(returned).toBe(false);
-      await pi.emit("agent_settled", {}, fakeCtx({ cwd: w.cwd, mode }));
+      await pi.emit("agent_settled", {}, ctx);
       await done;
       expect(returned).toBe(true);
     });
   }
 
   test("/loop stop also cancels a self-paced wakeup", async () => {
-    const { pi, run } = loop();
-    const ctx = fakeCtx({ cwd: w.cwd });
+    const { pi, ctx, run } = loop();
     await pi.call("schedule_wakeup", { delaySeconds: 120, prompt: "/loop watch", reason: "r" }, ctx);
     await run("stop");
     jest.advanceTimersByTime(3_600_000);

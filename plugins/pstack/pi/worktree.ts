@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { type Static, Type } from "typebox";
 
 export const worktreeSchema = Type.Object({ repo: Type.String(), path: Type.String(), branch: Type.String(), base: Type.String() });
-type Worktree = Static<typeof worktreeSchema>;
+export type Worktree = Static<typeof worktreeSchema>;
 
 // The error message ends up in an agent's final text, so it stays short. The
 // buffer is sized for a long reflog, which the default 1 MB is not.
@@ -28,7 +28,7 @@ export function planWorktree(cwd: string, agentId: string): Worktree {
 // clean finish removed it.
 export function ensureWorktree(wt: Worktree): void {
   if (existsSync(wt.path)) return;
-  const branchExists = spawnSync("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${wt.branch}`], { cwd: wt.repo }).status === 0;
+  const branchExists = git(wt.repo, ["branch", "--list", wt.branch]) !== "";
   git(wt.repo, branchExists ? ["worktree", "add", wt.path, wt.branch] : ["worktree", "add", wt.path, "-b", wt.branch, wt.base]);
 }
 

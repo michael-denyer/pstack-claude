@@ -15,11 +15,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { openingPrompt } from "../../plugins/pstack/skills/reflect/scripts/find-transcript.mjs";
-import { alive as pidAlive, gitRepo, jsonLines, liveModels, MINUTE, PiRpc, readEntries, sleep, textOf } from "./harness.mjs";
+import { agentBody, alive as pidAlive, gitRepo, pluginRoot, readEntries, sleep } from "./harness.mjs";
+import { agentByDescription, assistantModels, childEntries, descendants, jsonLines, liveModels, MINUTE, PiRpc, processTable, sections, textOf } from "./live-harness.mjs";
 
 const LIVE = process.env.PSTACK_PI_LIVE === "1";
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
-const pluginRoot = join(repoRoot, "plugins/pstack");
 const { sheet: SHEET, models: MODELS } = liveModels(pluginRoot, "# pstack live test sheet\n\n");
 const PARENT_MODEL = MODELS.get("sonnet");
 const MANDATE = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
@@ -32,6 +32,7 @@ let root;
 let agentDir;
 let work;
 let env;
+let git;
 
 function writeSheet(text) {
   writeFileSync(join(agentDir, "pstack-models.md"), text);
@@ -46,84 +47,12 @@ async function withParent(fn) {
   }
 }
 
-// The agent registry as persisted in the parent session: every snapshot per id, in order.
-function registry(sessionFile) {
-  const byId = new Map();
-  for (const e of readEntries(sessionFile)) {
-    if (e.type !== "custom" || e.customType !== "pstack-agents") continue;
-    byId.set(e.data.id, [...(byId.get(e.data.id) ?? []), e.data]);
-  }
-  return byId;
-}
-
-function agentByDescription(sessionFile, description) {
-  const found = [...registry(sessionFile).values()].filter((snaps) => snaps[0].description === description);
-  expect(found).toHaveLength(1);
-  return found[0];
-}
-
 function parentSessionFile(sessionId) {
   const dir = join(agentDir, "sessions");
   const files = readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(`_${sessionId}.jsonl`));
   expect(files).toHaveLength(1);
   return join(dir, files[0]);
 }
-
-function childSessionFiles(record) {
-  return readdirSync(record.sessionDir)
-    .filter((f) => f.endsWith(`_${record.sessionId}.jsonl`))
-    .map((f) => join(record.sessionDir, f));
-}
-
-function childEntries(record) {
-  const files = childSessionFiles(record);
-  expect(files).toHaveLength(1);
-  return readEntries(files[0]);
-}
-
-// The system prompt sections in force at the end of the session: a compaction
-// checkpoint resets them, later system messages patch them by name.
-function sections(entries) {
-  let current = {};
-  for (const e of entries) {
-    if (e.type === "compaction" && e.systemMessage) current = { ...(e.systemMessage.sections ?? {}) };
-    if (e.type !== "message" || e.message.role !== "system") continue;
-    for (const [key, value] of Object.entries(e.message.sections ?? {})) {
-      if (value === null) delete current[key];
-      else current[key] = value;
-    }
-  }
-  return current;
-}
-
-const assistantModels = (entries) =>
-  new Set(entries.filter((e) => e.type === "message" && e.message.role === "assistant").map((e) => `${e.message.provider}/${e.message.model}`));
-
-function processTable() {
-  const out = spawnSync("ps", ["-eo", "pid=,ppid=,pgid=,args="], { encoding: "utf8" }).stdout;
-  return out
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      const [, pid, ppid, pgid, args] = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/.exec(line);
-      return { pid: Number(pid), ppid: Number(ppid), pgid: Number(pgid), args };
-    });
-}
-
-function descendants(pid) {
-  const table = processTable();
-  const found = [];
-  const walk = (p) => {
-    for (const row of table.filter((r) => r.ppid === p)) {
-      found.push(row);
-      walk(row.pid);
-    }
-  };
-  walk(pid);
-  return found;
-}
-
-const git = (...args) => spawnSync("git", args, { cwd: work, encoding: "utf8" }).stdout.trim();
 
 const suite = LIVE ? describe : describe.skip;
 
@@ -145,7 +74,7 @@ suite("pstack on live pi", () => {
     const settings = JSON.parse(readFileSync(settingsFile, "utf8"));
     writeFileSync(settingsFile, JSON.stringify({ ...settings, compaction: { keepRecentTokens: 0 } }, null, 2));
     writeSheet(SHEET);
-    gitRepo(work);
+    git = gitRepo(work);
     console.log(`live root: ${root}`);
   });
 
@@ -329,9 +258,8 @@ suite("pstack on live pi", () => {
         const child = childEntries(record);
         const levels = child.filter((e) => e.type === "thinking_level_change").map((e) => e.thinkingLevel);
         expect(levels.at(-1)).toBe("high");
-        const body = /^---\n[\s\S]*?\n---\n([\s\S]*)$/.exec(readFileSync(join(pluginRoot, "effort-agents/effort-high.md"), "utf8"))[1].trim();
         const childSections = sections(child);
-        expect(childSections.addendum).toContain(body);
+        expect(childSections.addendum).toContain(agentBody("effort-agents/effort-high.md"));
         expect(childSections[SHEET_KEY]).toBe(tagged(SHEET_KEY, SHEET));
         expect(childSections[MANDATE_KEY]).toBeUndefined();
       });
@@ -365,8 +293,7 @@ suite("pstack on live pi", () => {
         );
         const dirty = agentByDescription(file, "wt-dirty").at(-1);
         expect(dirty.subagentType).toBe("pstack:poteto-agent");
-        const agentBody = /^---\n[\s\S]*?\n---\n([\s\S]*)$/.exec(readFileSync(join(pluginRoot, "agents/poteto-agent.md"), "utf8"))[1].trim();
-        expect(sections(childEntries(dirty)).addendum).toContain(agentBody);
+        expect(sections(childEntries(dirty)).addendum).toContain(agentBody("agents/poteto-agent.md"));
         const [dirtyResult] = parent.toolResults("agent", dirtyFrom);
         expect(textOf(dirtyResult)).toContain(`worktree: ${dirty.worktree.path} (branch ${dirty.worktree.branch})`);
         expect(readFileSync(join(dirty.worktree.path, "note.txt"), "utf8")).toBe("hi\n");

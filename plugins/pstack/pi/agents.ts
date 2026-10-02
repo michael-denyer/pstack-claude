@@ -21,10 +21,8 @@ const endedStatus = Type.Union([Type.Literal("completed"), Type.Literal("failed"
 type EndedStatus = Static<typeof endedStatus>;
 
 // Fixed when the agent starts and reused by every launch of it, so a resume
-// runs the same session, model, thinking, system prompt, and worktree. This is
-// the one list of those fields: the type, the copy a resume takes from an ended
-// record, and the check on a restored record all come from it.
-const identityFields = {
+// runs the same session, model, thinking, system prompt, and worktree.
+const identitySchema = Type.Object({
   id: Type.String(),
   description: Type.String(),
   subagentType: Type.String(),
@@ -39,17 +37,16 @@ const identityFields = {
   cwd: Type.String(),
   worktree: Type.Optional(worktreeSchema),
   startedAt: Type.String(),
-};
-const identitySchema = Type.Object(identityFields);
+});
 const runningSchema = Type.Object({
-  ...identityFields,
+  agent: identitySchema,
   status: Type.Literal("running"),
   pid: Type.Optional(Type.Number()),
   // The pi process that launched it. Only that process may reap it.
   parentPid: Type.Number(),
 });
 const endedSchema = Type.Object({
-  ...identityFields,
+  agent: identitySchema,
   status: endedStatus,
   pid: Type.Optional(Type.Number()),
   exitCode: Type.Union([Type.Number(), Type.Null()]),
@@ -58,19 +55,13 @@ const endedSchema = Type.Object({
   outputFile: Type.Optional(Type.String()),
   worktreeKept: Type.Optional(Type.Boolean()),
 });
-// Persisted as a session entry, last write per id wins.
+// Persisted as a session entry, last write per agent id wins.
 const recordSchema = Type.Union([runningSchema, endedSchema]);
 
 type AgentIdentity = Static<typeof identitySchema>;
 type RunningRecord = Static<typeof runningSchema>;
 export type EndedRecord = Static<typeof endedSchema>;
 export type AgentRecord = Static<typeof recordSchema>;
-
-const IDENTITY_KEYS = Object.keys(identityFields) as (keyof AgentIdentity)[];
-
-function identityOf(record: AgentRecord): AgentIdentity {
-  return Object.fromEntries(IDENTITY_KEYS.filter((key) => record[key] !== undefined).map((key) => [key, record[key]])) as AgentIdentity;
-}
 
 interface Run {
   child: PiChild;
@@ -139,7 +130,7 @@ function runsSession(pid: number, sessionId: string): boolean {
 function reapOrphan(record: RunningRecord, killGraceMs: number): void {
   const pid = record.pid;
   if (pid === undefined) return;
-  const ours = () => alive(pid) && runsSession(pid, record.sessionId);
+  const ours = () => alive(pid) && runsSession(pid, record.agent.sessionId);
   if (!ours()) return;
   signalGroup(pid, "SIGTERM");
   setTimeout(() => ours() && signalGroup(pid, "SIGKILL"), killGraceMs).unref();
@@ -201,7 +192,7 @@ export class AgentRunner {
     try {
       if (identity.worktree) ensureWorktree(identity.worktree);
     } catch (e) {
-      const failed: EndedRecord = { ...identity, status: "failed", exitCode: null, endedAt: now(), finalText: (e as Error).message };
+      const failed: EndedRecord = { agent: identity, status: "failed", exitCode: null, endedAt: now(), finalText: (e as Error).message };
       this.records.set(identity.id, failed);
       this.persist(failed);
       throw e;
@@ -213,7 +204,7 @@ export class AgentRunner {
       { cwd: identity.cwd, env: this.settings.childEnv, exitGraceMs: this.settings.exitGraceMs },
       prompt,
     );
-    const record: RunningRecord = { ...identity, status: "running", pid: child.pid, parentPid: process.pid };
+    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, parentPid: process.pid };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
     this.records.set(identity.id, record);
     this.runs.set(identity.id, run);
@@ -227,7 +218,7 @@ export class AgentRunner {
     const { status, finalText } = outcomeOf(exit, run.ending !== undefined);
     const worktree = identity.worktree && settle(identity.worktree);
     const record: EndedRecord = {
-      ...identity,
+      agent: identity,
       status,
       pid: run.child.pid,
       exitCode: exit.exitCode,
@@ -264,12 +255,12 @@ export class AgentRunner {
   find(to: string): AgentRecord {
     const byId = this.records.get(to);
     if (byId) return byId;
-    const matches = [...this.records.values()].filter((r) => r.description === to);
+    const matches = [...this.records.values()].filter((r) => r.agent.description === to);
     if (matches.length === 1) return matches[0];
     if (matches.length > 1) {
-      throw new Error(`"${to}" matches several agents (${matches.map((r) => r.id).join(", ")}); pass an agentId.`);
+      throw new Error(`"${to}" matches several agents (${matches.map((r) => r.agent.id).join(", ")}); pass an agentId.`);
     }
-    const known = [...this.records.values()].map((r) => `${r.id} (${r.description})`);
+    const known = [...this.records.values()].map((r) => `${r.agent.id} (${r.agent.description})`);
     throw new Error(`No agent "${to}". Known agents: ${known.join(", ") || "none"}.`);
   }
 
@@ -279,9 +270,9 @@ export class AgentRunner {
   private owned(to: string): { record: EndedRecord; run?: undefined } | { record: RunningRecord; run: Run } {
     const record = this.find(to);
     if (record.status !== "running") return { record };
-    const run = this.runs.get(record.id);
+    const run = this.runs.get(record.agent.id);
     if (!run) {
-      throw new Error(`Agent ${record.id} is running under another pi process (pid ${record.parentPid}); only that process can message or stop it.`);
+      throw new Error(`Agent ${record.agent.id} is running under another pi process (pid ${record.parentPid}); only that process can message or stop it.`);
     }
     return { record, run };
   }
@@ -290,7 +281,7 @@ export class AgentRunner {
   // A finished one, or one that has settled and is exiting, resumes with it,
   // including one that settled just before the steer reached it.
   async send(to: string, message: string): Promise<{ record: AgentRecord; running: boolean }> {
-    const { id } = this.owned(to).record;
+    const { id } = this.owned(to).record.agent;
     // Another send may have launched a run while this one awaited, so the run
     // table is read again after every wait and the launch follows the last read.
     for (let run = this.runs.get(id); run; run = this.runs.get(id)) {
@@ -300,7 +291,7 @@ export class AgentRunner {
       await run.done;
       if (run.ending) throw new Error(`Agent ${id} was stopped before it read the message; it was not delivered.`);
     }
-    return { record: this.launch(identityOf(this.find(id)), message, true), running: false };
+    return { record: this.launch(this.find(id).agent, message, true), running: false };
   }
 
   async stop(to: string, ending: NonNullable<Run["ending"]> = "stopped"): Promise<EndedRecord> {
@@ -341,20 +332,20 @@ export class AgentRunner {
   restore(entries: readonly SessionEntry[]): void {
     for (const entry of entries) {
       if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE || !Value.Check(recordSchema, entry.data)) continue;
-      if (!this.runs.has(entry.data.id)) this.records.set(entry.data.id, entry.data);
+      if (!this.runs.has(entry.data.agent.id)) this.records.set(entry.data.agent.id, entry.data);
     }
     for (const record of this.records.values()) {
-      if (record.status !== "running" || this.runs.has(record.id)) continue;
+      if (record.status !== "running" || this.runs.has(record.agent.id)) continue;
       if (record.parentPid !== process.pid && alive(record.parentPid)) continue;
       const stopped: EndedRecord = {
-        ...identityOf(record),
+        agent: record.agent,
         status: "stopped",
         pid: record.pid,
         exitCode: null,
         endedAt: now(),
         finalText: "(interrupted: the session that started it ended)",
       };
-      this.records.set(record.id, stopped);
+      this.records.set(record.agent.id, stopped);
       this.persist(stopped);
       reapOrphan(record, this.settings.killGraceMs);
     }

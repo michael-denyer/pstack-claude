@@ -181,6 +181,9 @@ export const listAgents = async (pi, ctx) => JSON.parse(resultText(await pi.call
 
 export const agentEntry = (data) => ({ type: "custom", customType: "pstack-agents", data });
 
+// A persisted record with fields replaced: identity ones under `agent`, the rest beside it.
+export const recordWith = (data, { agent = {}, ...state } = {}) => ({ ...data, ...state, agent: { ...data.agent, ...agent } });
+
 // An agent file's body, which is what its child gets as a system prompt.
 export const agentBody = (rel) => /^---\n[\s\S]*?\n---\n([\s\S]*)$/.exec(readFileSync(join(pluginRoot, rel), "utf8"))[1].trim();
 

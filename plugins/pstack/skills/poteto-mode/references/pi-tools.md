@@ -87,7 +87,7 @@ Affected skill entry points point here. Most skills need only the tables above. 
 |-------|-------|
 | `poteto-mode` | The todolist falls back to `todo.md`, and the Subagents defaults map through Subagent policy above. The Eval and Session pickup playbooks read transcripts from the Pi sessions directory (see Tool actions). |
 | `interrogate` | Reviewers dispatch through `agent` with the same `subagent_type`, `model`, and `readonly` (see Subagent policy). Keep the panel on distinct models (see Model names). |
-| `recall` | Search the Pi sessions directory for this workspace (see Tool actions), not `~/.claude/projects/`. Match on `type: "message"` entries and their `message.role`. |
+| `recall` | Search the Pi sessions directory for this workspace (see Tool actions). Do not list or read `~/.claude/projects/`: it holds Claude Code transcripts, not this session's history. Match on `type: "message"` entries and their `message.role`. |
 | `show-me-your-work` | Check the log against this run's Pi session file (see Tool actions), not a Claude Code transcript. |
 | `setup-pstack` | The Pi sheet is `pstack-models.md` in the Pi agent directory (see Session routing), and the extension loads it, so no include line is needed. List models with `pi --list-models`. The role rows are identical, and a `pi models:` line remaps aliases (see Model names). |
 | `no-comments` | `pstack:comment-sicko` resolves through `agent` as written. |

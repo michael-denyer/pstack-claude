@@ -704,17 +704,19 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json" }) 
   for (const [event, groups] of Object.entries(JSON.parse(hooksJson).hooks ?? {})) {
     for (const group of groups) {
       for (const hook of group.hooks ?? []) {
-        const refs = [...hook.command.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)/g)].map((m) => m[1]);
-        if (!refs.length) {
-          faults.push(`${event}: command does not reference \${CLAUDE_PLUGIN_ROOT}: ${hook.command}`);
-          continue;
+        for (const command of [hook.command, hook.commandWindows].filter((value) => value !== undefined)) {
+          const refs = [...command.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)/g)].map((m) => m[1]);
+          if (!refs.length) {
+            faults.push(`${event}: command does not reference \${CLAUDE_PLUGIN_ROOT}: ${command}`);
+            continue;
+          }
+          const executed = command.replace(/^"/, "").startsWith("${CLAUDE_PLUGIN_ROOT}/");
+          refs.forEach((rel, i) => {
+            const st = statOf(rel);
+            if (!st) faults.push(`${event}: ${rel} does not exist`);
+            else if (i === 0 && executed && !(st.mode & 0o111)) faults.push(`${event}: ${rel} is not executable`);
+          });
         }
-        const executed = hook.command.replace(/^"/, "").startsWith("${CLAUDE_PLUGIN_ROOT}/");
-        refs.forEach((rel, i) => {
-          const st = statOf(rel);
-          if (!st) faults.push(`${event}: ${rel} does not exist`);
-          else if (i === 0 && executed && !(st.mode & 0o111)) faults.push(`${event}: ${rel} is not executable`);
-        });
       }
     }
   }

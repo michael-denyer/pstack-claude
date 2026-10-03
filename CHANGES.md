@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.62 - no author email in the manifests
+
+The Claude and Codex plugin manifests, the marketplace, and `package.json` name the author and link to the GitHub profile, without an email address.
+
 ## 0.9.61 - Pi agents learn their depth from a flag
 
 The Pi extension passed each agent it started a copy of the session's environment with `PSTACK_PI_DEPTH` added, the last place the plugin handed a copy of the whole environment to a child process. Agents now inherit the environment unchanged, and the extension registers a `--pstack-depth` flag that a parent passes to each agent it starts. An agent reads its depth from that flag. Depth limits and behaviour are unchanged.

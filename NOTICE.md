@@ -19,6 +19,7 @@ This plugin is a port of upstream MIT-licensed work. The port's modifications an
 | `plugins/pstack/skills/poteto-mode/playbooks/multi-phase-plan.md`, `plugins/pstack/skills/poteto-mode/scripts/check-plan.mjs` (v0.14.8 additions) | [cursor/plugins/pstack @ 7314f72](https://github.com/cursor/plugins/tree/7314f72/pstack) | (c) 2026 Lauren Tan | MIT | [LICENSE](LICENSE) |
 | `plugins/pstack/skills/principle-attack-the-premise/`, `plugins/pstack/skills/principle-test-behavior-not-implementation/` (post-v0.14.8 additions) | [cursor/plugins/pstack @ e8d856f](https://github.com/cursor/plugins/tree/e8d856f/pstack) | (c) 2026 Lauren Tan | MIT | [LICENSE](LICENSE) |
 | `plugins/pstack/skills/benchmark-checklist/`, `plugins/pstack/skills/principle-explain-the-number/` (v0.15.6 additions) | [cursor/plugins/pstack @ 23e4138](https://github.com/cursor/plugins/tree/23e4138/pstack) | (c) 2026 Lauren Tan | MIT | [LICENSE](LICENSE) |
+| `plugins/pstack/skills/correct/` (v0.15.9 addition) | [cursor/plugins/pstack @ e43c7ee](https://github.com/cursor/plugins/tree/e43c7ee/pstack) | (c) 2026 Lauren Tan | MIT | [LICENSE](LICENSE) |
 
 ## What changed in the port
 

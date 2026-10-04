@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.65 - sync to upstream e43c7ee (v0.15.9)
+
+The upstream pin moves from `23e4138` to `e43c7ee`, upstream v0.15.9, three commits. The first adds the `/correct` skill. It finds the mistakes agents keep repeating in a repo and fixes each class at the highest level that works: architecture first, then types and lint, then a test, with docs last. The package now carries 33 public skills and 24 principles.
+
+`architect` now screens candidates on the assumption that the next contributor is an agent that sees only the files it opened and copies the nearest example. `design-red-flags.md` gains four red flags: split ownership, two ways to do one task, importable internals, and a hand-synced list. The Perf issue playbook replaces its eight strategy families with seven performance mantras tried in order, cheapest first, and stops at the first one that meets the target. Hillclimb orders perf hypotheses by those mantras, and `benchmark-checklist` points at them.
+
+Measured with `bun tools/sync.mjs pstack e43c7ee`: 4 files updated clean, 1 added, 1 merged three-way (`architect/SKILL.md`), 76 unchanged, 36 excluded, and no conflicts. The new upstream text carries no Cursor-only terms, so `tools/substitutions.json` is unchanged. No file became port-only.
+
 ## 0.9.64 - sync to upstream 23e4138 (v0.15.6)
 
 The upstream pin moves from `12d587d` to `23e4138`, upstream v0.15.6, one commit. It adds the `benchmark-checklist` skill and the `principle-explain-the-number` principle, which together vet a measured speedup or regression before anyone reports or acts on it. `poteto-mode` triggers `benchmark-checklist` on a benchmark and indexes the new principle, so the package now carries 32 public skills and 24 principles.

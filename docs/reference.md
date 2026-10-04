@@ -4,7 +4,7 @@ Start with the [README](../README.md) for installation and your first task.
 
 ## Slash commands
 
-The package includes 56 skill directories: 32 public skills and 24 `principle-*` references. Claude Code uses `/pstack:<name>`, and Pi uses `/skill:<name>`. In Codex, request a skill by name or install the [optional shortcuts](#codex) for the `/name` form below.
+The package includes 57 skill directories: 33 public skills and 24 `principle-*` references. Claude Code uses `/pstack:<name>`, and Pi uses `/skill:<name>`. In Codex, request a skill by name or install the [optional shortcuts](#codex) for the `/name` form below.
 
 Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
@@ -18,6 +18,7 @@ Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 | `/interrogate` | have three different models try to break a diff |
 | `/automate-me` | draft your own personal -mode skill from recent transcripts |
 | `/reflect` | capture a long task's lessons as a skill edit |
+| `/correct` | find the mistakes agents keep repeating in a repo and make each one impossible, enforced at the highest level that works |
 | `/tdd` | fix a bug by writing the failing test first, then the fix |
 | `/benchmark-checklist` | vet a measured speedup or regression (limiter, tuning, errors, repeat runs, end-to-end relevance) before you report or act on it |
 | `/typescript-best-practices` | ground type-system discipline in TypeScript syntax |
@@ -215,7 +216,7 @@ CI also checks shell scripts, workflows, Markdown, relative links, and the bundl
 
 ### Port scope and attribution
 
-The skill tree is synced against upstream `23e4138` (v0.15.6).
+The skill tree is synced against upstream `e43c7ee` (v0.15.9).
 
 This repository ports Lauren Tan's pstack from Cursor to Claude Code and shares the skills with other runtimes. It includes seven cursor-team-kit skills and an independently authored `babysit` skill. The port supplies Claude Code plugin registration and routing, Codex manifests and shortcuts, the Codex tool mapping, and the Pi package, extension, and tool mapping.
 

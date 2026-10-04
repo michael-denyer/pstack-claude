@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { sheetCases } from "./session-hook-sheets.mjs";
+import { sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
 const manifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8"));
@@ -22,7 +22,7 @@ function runHook({ sheet, codexHome, homeSheet, context = mandate, host = "cmd" 
     for (const [dir, content] of [[join(profile, ".codex"), homeSheet], [sheetRoot, sheet]]) {
       if (content !== undefined) {
         mkdirSync(dir, { recursive: true });
-        writeFileSync(join(dir, "pstack-models.md"), content);
+        writeSheet(join(dir, "pstack-models.md"), content);
       }
     }
     const contextPath = join(plugin, "hooks/session-start-context.md");

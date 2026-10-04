@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.67 - session hook sheet parity
+
+The POSIX hook, the PowerShell hook, and Pi now read the sheet the same way in two more cases. A `session hook: off` line after a UTF-8 byte-order mark counts as off, which covers sheets saved by editors that add one. A sheet that exists but cannot be read as a file leaves the hook on, the same as a missing sheet, instead of failing the PowerShell hook or printing an error from the POSIX one. Both cases join the shared table in `tests/session-hook-sheets.mjs`. The Windows CI job's test timeout drops from 60 to 10 seconds, so a return of the slow PowerShell start fails the job.
+
 ## 0.9.66 - Windows Codex SessionStart hook
 
 The Codex plugin's `SessionStart` hook now runs on Windows. `codex-hooks.json` adds a `commandWindows` override that runs `session-start.ps1` through PowerShell, so Windows Codex loads the routing instruction without Bash (#171). Windows users must trust the changed hook again through `/hooks`.

@@ -2,13 +2,13 @@
 // injected unless that runtime's model sheet turns it off.
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { agentSkills } from "../tools/generate.mjs";
-import { sheetCases } from "./session-hook-sheets.mjs";
+import { sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
 const mandate = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
@@ -47,7 +47,7 @@ function runHook(runtime, sheet, command = sessionStart[runtimes[runtime].hooks]
   const sheetRoot = join(home, sheetDir);
   if (sheet !== null) {
     mkdirSync(sheetRoot);
-    writeFileSync(join(sheetRoot, "pstack-models.md"), sheet);
+    writeSheet(join(sheetRoot, "pstack-models.md"), sheet);
   }
   try {
     const r = spawnSync("sh", ["-c", command], {

@@ -43,7 +43,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Test Windows session hooks
-        run: bun test --timeout 60000 tests/session-hook-windows.test.mjs
+        run: bun test --timeout 10000 tests/session-hook-windows.test.mjs
         env:
           PSTACK_REQUIRE_WINDOWS_HOOK: "1"
 

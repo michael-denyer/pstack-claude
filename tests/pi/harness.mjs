@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
+import { writeSheet } from "../session-hook-sheets.mjs";
 
 export const pluginRoot = fileURLToPath(new URL("../../plugins/pstack/", import.meta.url));
 const fakePiBin = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
@@ -91,7 +92,7 @@ export function world({ script = {}, sheet = null } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "pstack-pi-")));
   const agentDir = join(root, "agent");
   mkdirSync(agentDir);
-  if (sheet !== null) writeFileSync(join(agentDir, "pstack-models.md"), sheet);
+  if (sheet !== null) writeSheet(join(agentDir, "pstack-models.md"), sheet);
   const modelsFile = join(root, "models.json");
   writeFileSync(modelsFile, JSON.stringify(fixtureModels));
   const scriptFile = join(root, "script.json");

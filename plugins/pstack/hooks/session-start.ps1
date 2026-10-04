@@ -5,7 +5,12 @@ if (-not $sheetRoot) {
     $sheetRoot = Join-Path $env:USERPROFILE '.codex'
 }
 $sheet = Join-Path $sheetRoot 'pstack-models.md'
-if ((Test-Path -LiteralPath $sheet) -and ([System.IO.File]::ReadAllLines($sheet) -ccontains 'session hook: off')) {
+$off = $false
+if (Test-Path -LiteralPath $sheet -PathType Leaf) {
+    # An unreadable sheet leaves the hook on, as session-start.sh does.
+    try { $off = [System.IO.File]::ReadAllLines($sheet) -ccontains 'session hook: off' } catch { }
+}
+if ($off) {
     exit 0
 }
 

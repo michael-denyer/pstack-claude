@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -63,7 +63,7 @@ interface Sheet {
 }
 
 export function parseSheet(text: string): Sheet {
-  const lines = text.split(/\r?\n/);
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
   const piModels = new Map<string, string>();
   for (const line of lines) {
     const m = /^pi models:\s*(.*)$/.exec(line.trim());
@@ -78,7 +78,7 @@ export function parseSheet(text: string): Sheet {
 
 export function readSheet(agentDir: string): Sheet | undefined {
   const file = join(agentDir, "pstack-models.md");
-  return existsSync(file) ? parseSheet(readFileSync(file, "utf8")) : undefined;
+  return statSync(file, { throwIfNoEntry: false })?.isFile() ? parseSheet(readFileSync(file, "utf8")) : undefined;
 }
 
 // The parts of models.json the extension reads; the generator checks the rest.

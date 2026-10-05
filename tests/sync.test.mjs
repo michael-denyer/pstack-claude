@@ -1214,6 +1214,7 @@ describe("sync CLI", () => {
     for (const file of ["sync.mjs", "generate.mjs", "runtimes.mjs", "validate-skills.mjs", "substitutions.json"]) {
       cpSync(join(import.meta.dir, "../tools", file), join(port, "tools", file));
     }
+    symlinkSync(join(import.meta.dir, "../node_modules"), join(port, "node_modules"));
     cpSync(join(import.meta.dir, "../plugins/pstack/models.json"), join(port, "plugins/pstack/models.json"));
     mkdirSync(join(port, "plugins/pstack/skills"));
     writeFileSync(join(port, "plugins/pstack/skills/s.md"), localText);

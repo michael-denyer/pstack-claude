@@ -1,8 +1,10 @@
 // What the agent tool registers and the child command a call produces.
 import { describe, expect, test } from "bun:test";
-import { statSync } from "node:fs";
+import { chmodSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
+import { chmodDeniesReads } from "../session-hook-sheets.mjs";
 import { agentBody, fakeCtx, fakePi, flag, useWorld } from "./harness.mjs";
 
 const setup = useWorld();
@@ -123,6 +125,16 @@ describe("model resolution", () => {
       "anthropic/fixture-opus",
       "anthropic/fixture-opus",
     ]);
+  });
+
+  test.skipIf(!chmodDeniesReads)("an unreadable sheet leaves the default model until it is readable again", async () => {
+    const { w, pi, ctx } = setup({ sheet: "pi models: sonnet=openai/sheet-sonnet\n" });
+    const sheet = join(w.agentDir, "pstack-models.md");
+    chmodSync(sheet, 0o000);
+    await pi.call("agent", { description: "m", prompt: "x", model: "sonnet" }, ctx);
+    chmodSync(sheet, 0o600);
+    await pi.call("agent", { description: "m", prompt: "x", model: "sonnet" }, ctx);
+    expect(w.invocations().map(modelOf)).toEqual(["anthropic/fixture-sonnet", "openai/sheet-sonnet"]);
   });
 
   test("an unknown alias is an error naming the valid values", async () => {

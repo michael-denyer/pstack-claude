@@ -226,7 +226,7 @@ describe("find-transcript", () => {
 
   // Copilot's layout: <session-state>/<id>/events.jsonl, a session.start event,
   // then one event per line with each typed prompt as a user.message.
-  const copilotStart = JSON.stringify({ type: "session.start", data: { sessionId: "c1", context: { cwd: "/work/repo" } } });
+  const copilotStart = JSON.stringify({ type: "session.start", data: { sessionId: "c1", context: { cwd: process.cwd() } } });
   const copilotEvent = (type, content) => JSON.stringify({ type, data: { content } });
 
   test("a Copilot session's opening prompt is its first user.message, not the injected context", async () => {
@@ -246,6 +246,39 @@ describe("find-transcript", () => {
     transcript(dir, "claude.jsonl", [meta, user("review issue 59")], 100);
     const copilot = transcript(dir, "c1/events.jsonl", [copilotStart, copilotEvent("user.message", "review issue 59 on Copilot")], 200);
     expect(await findTranscript(dir, "on Copilot")).toBe(copilot);
+  });
+
+  test("the CLI scopes Copilot sessions to the workspace when opening prompts match", () => {
+    const dir = tempDir();
+    const sessions = join(dir, "session-state");
+    const workspace = join(dir, "work");
+    const unrelated = join(dir, "private");
+    mkdirSync(workspace);
+    mkdirSync(unrelated);
+    const start = (cwd) => JSON.stringify({ type: "session.start", data: { context: { cwd } } });
+    const prompt = copilotEvent("user.message", "fix the failing tests");
+    const current = transcript(sessions, "current/events.jsonl", [start(workspace), prompt], 100);
+    transcript(sessions, "unrelated/events.jsonl", [start(unrelated), prompt], 200);
+    transcript(sessions, "missing-cwd/events.jsonl", [start(undefined), prompt], 300);
+    transcript(sessions, "deleted-workspace/events.jsonl", [start(join(dir, "deleted")), prompt], 400);
+
+    const run = (cwd, args = []) => spawnSync("node", [script, sessions, "fix the failing tests", ...args], { cwd, encoding: "utf8" });
+    const hit = run(workspace);
+    expect(hit.status).toBe(0);
+    expect(hit.stdout.trim()).toBe(current);
+    const explicit = run(unrelated, [workspace]);
+    expect(explicit.status).toBe(0);
+    expect(explicit.stdout.trim()).toBe(current);
+    const link = join(dir, "linked-work");
+    symlinkSync(workspace, link);
+    const alias = run(unrelated, [link]);
+    expect(alias.status).toBe(0);
+    expect(alias.stdout.trim()).toBe(current);
+    rmSync(current);
+    const miss = run(workspace);
+    expect(miss.status).toBe(1);
+    expect(miss.stdout).toBe("");
+    expect(miss.stderr).toContain("no transcript");
   });
 
   test("a Codex rollout is refused by name instead of read as an empty Claude transcript", async () => {

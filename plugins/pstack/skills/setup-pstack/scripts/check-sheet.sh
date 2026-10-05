@@ -13,8 +13,5 @@ if [ ! -f "$sheet" ] || [ ! -r "$sheet" ]; then
   exit 1
 fi
 dir=$(cd "$(dirname "$0")" && pwd)
-if [ "$(od -An -tx1 -N2 "$sheet" | tr -d ' ')" = fffe ]; then
-  iconv -f UTF-16LE -t UTF-8 "$sheet"
-else
-  cat "$sheet"
-fi | LC_ALL=C awk -f "$dir/sheet.awk" -f "$dir/check-sheet.awk"
+normalized=$(sh "$dir/read-sheet.sh" "$sheet")
+printf '%s\n' "$normalized" | LC_ALL=C awk -f "$dir/sheet.awk" -f "$dir/check-sheet.awk"

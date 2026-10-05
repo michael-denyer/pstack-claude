@@ -12,13 +12,13 @@ case "${1:-}" in
     ;;
 esac
 
-bom=$(printf '\357\273\277')
-cr=$(printf '\r')
-# Windows PowerShell 5.1's `>` writes UTF-16 LE with a byte-order mark.
-read_sheet() {
-  if [ "$(od -An -tx1 -N2 "$sheet" | tr -d ' ')" = fffe ]; then iconv -f UTF-16LE -t UTF-8 "$sheet"; else cat "$sheet"; fi
-}
-if [ -f "$sheet" ] && [ -r "$sheet" ] && read_sheet | sed -e "1s/^$bom//" -e "s/$cr\$//" | grep -qx 'session hook: off'; then
+found=0
+normalized=
+if [ -f "$sheet" ] && [ -r "$sheet" ]; then
+  normalized=$(sh "$(dirname "$0")/../skills/setup-pstack/scripts/read-sheet.sh" "$sheet")
+  found=1
+fi
+if printf '%s\n' "$normalized" | grep -qx 'session hook: off'; then
   exit 0
 fi
 
@@ -26,9 +26,7 @@ fi
 # Copilot's path sandbox, so the hook checks the sheet and adds its role lines
 # to the mandate, and the agent never reads the file.
 if [ "$1" = copilot ]; then
-  found=0
-  if [ -f "$sheet" ] && [ -r "$sheet" ]; then found=1; fi
-  if [ "$found" = 1 ]; then read_sheet; fi | LC_ALL=C awk -v found="$found" -v hooks="${COPILOT_PLUGIN_ROOT}/hooks" \
+  printf '%s\n' "$normalized" | LC_ALL=C awk -v found="$found" -v hooks="${COPILOT_PLUGIN_ROOT}/hooks" \
     -f "${COPILOT_PLUGIN_ROOT}/hooks/json.awk" \
     -f "${COPILOT_PLUGIN_ROOT}/skills/setup-pstack/scripts/sheet.awk" \
     -f "${COPILOT_PLUGIN_ROOT}/hooks/copilot-context.awk"

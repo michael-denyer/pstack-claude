@@ -40,20 +40,24 @@ function sheet_roles(roles, panel,    n) {
   return n
 }
 
-# Adds one input line to SHEET[1..SHEET_N], without a trailing carriage return
-# or, on the first line, a UTF-8 byte-order mark.
+# Adds one line decoded by read-sheet.sh to SHEET[1..SHEET_N].
 function sheet_add(line) {
-  sub(/\r$/, "", line)
-  if (SHEET_N == 0 && substr(line, 1, 3) == "\357\273\277") line = substr(line, 4)
   SHEET[++SHEET_N] = line
 }
 
-# Reads file into SHEET. Returns 0 when it cannot be read.
-function sheet_read(file,    line, r) {
+# Quote one literal shell argument, including paths containing apostrophes.
+function sheet_quote(s) {
+  gsub(/'/, "'\"'\"'", s)
+  return "'" s "'"
+}
+
+# Every consumer uses the same decoder. A failed read publishes no policy.
+function sheet_read(file,    line, r, cmd, status) {
   SHEET_N = 0
-  while ((r = (getline line < file)) > 0) sheet_add(line)
-  close(file)
-  return r == 0
+  cmd = "sh " sheet_quote(ENVIRON["PSTACK_SHEET_READER"]) " " sheet_quote(file)
+  while ((r = (cmd | getline line)) > 0) sheet_add(line)
+  status = close(cmd)
+  return r == 0 && status == 0
 }
 
 function sheet_trim(s) {
@@ -99,11 +103,16 @@ function sheet_value(line) {
 # with models from fewer than two vendors without a `panel vendors: any` line.
 # A problem quotes no unchecked sheet text, since the hook adds it to the
 # session context.
+# On success, SHEET_MODELS is the model set, MODEL_LIST its display list of
+# explicit IDs, and MODEL_ALIASES records whether any role inherits its model.
 function sheet_problems(    roles, panel, n, want, any, i, key, out, E, m, j, e, V, nv, vl, real) {
   n = sheet_roles(roles, panel)
   split("", want)
   for (i = 1; i <= n; i++) want[roles[i]] = 1
   split("", VALUE)
+  split("", SHEET_MODELS)
+  MODEL_LIST = ""
+  MODEL_ALIASES = 0
   any = 0
   for (i = 1; i <= SHEET_N; i++) {
     key = sheet_key(SHEET[i])
@@ -127,8 +136,10 @@ function sheet_problems(    roles, panel, n, want, any, i, key, out, E, m, j, e,
     for (j = 1; j <= m; j++) {
       e = sheet_model(sheet_trim(E[j]))
       if (e == "") { out = out "; an empty entry in `" key "`"; continue }
-      if (sheet_alias(e)) continue
+      if (sheet_alias(e)) { MODEL_ALIASES = 1; SHEET_MODELS[e] = 1; continue }
       if (e !~ /^[a-z0-9][a-z0-9.-]*$/) { out = out "; `" key "` has an entry that is not a model ID"; continue }
+      if (!(e in SHEET_MODELS)) MODEL_LIST = MODEL_LIST (MODEL_LIST == "" ? "" : ", ") "`" e "`"
+      SHEET_MODELS[e] = 1
       real = 1
       if (!(sheet_vendor(e) in V)) {
         V[sheet_vendor(e)] = 1

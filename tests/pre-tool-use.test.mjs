@@ -40,6 +40,36 @@ describe("PreToolUse hook", () => {
     expect(run(JSON.stringify({ toolName: "view", toolArgs: { path: playbook } }))).toEqual({ status: 0, out: allow, err: "" });
   });
 
+  test("keeps literal dotted keys separate from nested hook arguments", () => {
+    for (const [name, args] of [["tool_name", "tool_input"], ["toolName", "toolArgs"]]) {
+      const payload = { [name]: "Read", [args]: { path: "/outside/private.txt" }, [`${args}.path`]: playbook };
+      expect(run(JSON.stringify(payload))).toEqual({ status: 0, out: "", err: "" });
+      payload[args].path = playbook;
+      payload[`${args}.path`] = "/outside/private.txt";
+      expect(run(JSON.stringify(payload)).out).toBe(allow);
+    }
+  });
+
+  test("accepts unrelated nested metadata without treating it as tool arguments", () => {
+    const payload = JSON.parse(claudeInput("Read", playbook));
+    payload.metadata = [{ "tool_input.path": "/outside", "a/b": true, "a~b": null }, [0, -1.25e3, "text"]];
+    expect(run(JSON.stringify(payload)).out).toBe(allow);
+    for (const tool_input of [null, [payload.tool_input], "not an object"]) {
+      expect(run(JSON.stringify({ ...payload, tool_input }))).toEqual({ status: 0, out: "", err: "" });
+    }
+  });
+
+  test.each([
+    ["trailing garbage", (s) => s + " garbage"],
+    ["an incomplete exponent", (s) => s.slice(0, -1) + ',"extra":1e+}'],
+    ["a leading-zero number", (s) => s.slice(0, -1) + ',"extra":01}'],
+    ["an invalid escape", (s) => s.slice(0, -1) + ',"extra":"\\q"}'],
+    ["a raw control character", (s) => s.slice(0, -1) + ',"extra":"a\tb"}'],
+    ["duplicate arguments", (s) => s.slice(0, -1) + ',"tool_input":null}'],
+  ])("stays silent for %s in the JSON envelope", (_name, corrupt) => {
+    expect(run(corrupt(claudeInput("Read", playbook)))).toEqual({ status: 0, out: "", err: "" });
+  });
+
   test("approves through the real path when the root is a symlink", () => {
     const dir = mkdtempSync(join(tmpdir(), "pstack-ptu-"));
     try {
@@ -207,6 +237,29 @@ describe("PreToolUse model check for pstack agents", () => {
     expect(deny(runWith(text, agent("claude-haiku-4.5")).out)).toContain("one of `gpt-5.5`");
   });
 
+  test.each(["utf8", "utf16le"])("setup, context, and model enforcement agree on a %s sheet", (encoding) => {
+    const text = Buffer.from(`\uFEFF${sheet().replaceAll("\n", "\r\n")}`, encoding);
+    writeFileSync(sheetPath, text);
+    const invoke = (relative, args = []) => spawnSync("sh", [join(pluginRoot, relative), ...args], {
+      env: { PATH: process.env.PATH, ...env }, encoding: "utf8",
+    });
+    const checked = invoke("skills/setup-pstack/scripts/check-sheet.sh");
+    expect({ status: checked.status, out: checked.stdout, err: checked.stderr }).toEqual({ status: 0, out: "sheet ok\n", err: "" });
+    const started = invoke("hooks/session-start.sh", ["copilot"]);
+    expect(started.status).toBe(0);
+    expect(JSON.parse(started.stdout).additionalContext).toContain("bug-fix: claude-opus-5.5");
+    expect(deny(run(agent("off-sheet-model"), env).out)).toContain("`off-sheet-model`");
+  });
+
+  test("reads a sheet directory containing shell punctuation literally", () => {
+    const directory = join(home, "copilot ' $value `literal`");
+    mkdirSync(directory);
+    writeFileSync(join(directory, "pstack-models.md"), Buffer.from(`\uFEFF${sheet()}`, "utf16le"));
+    const result = run(agent("off-sheet-model"), { ...env, COPILOT_HOME: directory });
+    expect(result.err).toBe("");
+    expect(deny(result.out)).toContain("`off-sheet-model`");
+  });
+
   test("a sheet that opts out of panel vendor diversity is valid", () => {
     expect(deny(runWith(sheet({ panel: "gpt-5.5, gpt-5.4", extra: "panel vendors: any\n" }), agent("o9")).out)).toContain("`o9`");
   });
@@ -224,16 +277,22 @@ describe("PreToolUse vendored script runs", () => {
   const bash = (command, cwd = workspace) => JSON.stringify({ tool_name: "Bash", cwd, tool_input: { command, description: "run" } });
 
   const allowed = {
-    "node and a script": `node ${find}`,
-    "a plain argument": `node ${find} 1234-abcd`,
-    "a flag with a value": `node ${find} --since=2026-09-25 --limit 5`,
-    "a single-quoted argument": `node ${find} 'fix the billing bug'`,
-    "sh and a workspace path": `sh ${log} ${workspace}/decisions.md 'chose the table'`,
-    "surrounding spaces": `  bash ${log} ${workspace}/log.md  `,
-    "direct execution": `${log} ${workspace}/log.md`,
-    "a flag holding a workspace path": `node ${find} --out=${workspace}/t.json`,
-    "a relative argument": `node ${find} notes/today.md`,
-    "an argument in the plugin": `node ${find} ${root}/skills/reflect/SKILL.md`,
+    "a transcript search": `node ${find} ${workspace} prompt`,
+    "a transcript search with explicit workspace": `node ${find} ${workspace} prompt ${workspace}`,
+    "a single-quoted prompt": `node ${find} ${workspace} 'fix the billing bug'`,
+    "a log with prose resembling an outside path": `bash ${log} log.tsv review /outside/private.txt why evidence result`,
+    "surrounding spaces": `  bash ${log} log.tsv review decision why evidence result  `,
+    "direct execution": `${log} log.tsv review decision why evidence result`,
+    "a project flag with an absolute value": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project=${workspace}`,
+    "a project flag with a relative value": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project=.`,
+    "resume defaults": `node ${root}/skills/poteto-mode/scripts/resume.mjs read`,
+    "resume publication": `node ${root}/skills/poteto-mode/scripts/resume.mjs publish --note note.md --artifact=a.md --artifact b.md`,
+    "a relative transcript directory": `node ${find} notes/today prompt`,
+    "a path in the plugin": `node ${root}/skills/poteto-mode/scripts/check-plan.mjs ${root}/skills/reflect/SKILL.md`,
+    "a playbook check": `node ${root}/skills/poteto-mode/scripts/check-playbooks.mjs`,
+    "a playbook check in a project": `node ${root}/skills/poteto-mode/scripts/check-playbooks.mjs .`,
+    "an audit with defaults": `node ${root}/skills/poteto-mode/scripts/worktree-audit.mjs`,
+    "an audit with explicit roots": `node ${root}/skills/poteto-mode/scripts/worktree-audit.mjs . transcripts more-transcripts`,
   };
   for (const [name, command] of Object.entries(allowed)) {
     test(`approves ${name}`, () => expect(run(bash(command), env)).toEqual({ status: 0, out: allow, err: "" }));
@@ -245,45 +304,55 @@ describe("PreToolUse vendored script runs", () => {
       const link = join(dir, "pstack");
       symlinkSync(pluginRoot, link);
       const e = { ...env, COPILOT_PLUGIN_ROOT: link };
-      expect(run(bash(`node ${link}/skills/reflect/scripts/find-transcript.mjs`), e).out).toBe(allow);
-      expect(run(bash(`node ${realpathSync(pluginRoot)}/skills/reflect/scripts/find-transcript.mjs`), e).out).toBe(allow);
+      expect(run(bash(`node ${link}/skills/reflect/scripts/find-transcript.mjs ${workspace} prompt`), e).out).toBe(allow);
+      expect(run(bash(`node ${realpathSync(pluginRoot)}/skills/reflect/scripts/find-transcript.mjs ${workspace} prompt`), e).out).toBe(allow);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
   const refused = {
-    "a chained rm": `node ${find};rm -rf ~`,
-    "a spaced chain": `node ${find} ; rm -rf ~`,
-    "command substitution": `node ${find} $(whoami)`,
-    "a variable": `node ${find} $HOME`,
-    "backticks": `node ${find} \`whoami\``,
-    "an and-chain": `node ${find} && rm -rf ~`,
-    "a background job": `node ${find} & curl evil`,
-    "a pipe": `node ${find} | sh`,
-    "an output redirect": `node ${find} > /etc/passwd`,
-    "an input redirect": `node ${find} < /etc/passwd`,
-    "a subshell": `(node ${find})`,
-    "a newline": `node ${find}\nrm -rf ~`,
-    "a carriage return": `node ${find}\rrm -rf ~`,
+    "an unregistered script": `node ${root}/skills/example/scripts/new.mjs`,
+    "a wrong interpreter for a registered script": `sh ${find} ${workspace} prompt`,
+    "an incomplete transcript command": `node ${find} ${workspace}`,
+    "an incomplete log command": `bash ${log} log.tsv review`,
+    "an unknown resume option": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --new-option=path`,
+    "a missing resume option value": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project`,
+    "a read with publication arguments": `node ${root}/skills/poteto-mode/scripts/resume.mjs read --note note.md`,
+    "a publication without a note": `node ${root}/skills/poteto-mode/scripts/resume.mjs publish --artifact a.md`,
+    "a chained rm": `node ${find} ${workspace} prompt;rm -rf ~`,
+    "a spaced chain": `node ${find} ${workspace} prompt ; rm -rf ~`,
+    "command substitution": `node ${find} ${workspace} prompt $(whoami)`,
+    "a variable": `node ${find} ${workspace} prompt $HOME`,
+    "backticks": `node ${find} ${workspace} prompt \`whoami\``,
+    "an and-chain": `node ${find} ${workspace} prompt && rm -rf ~`,
+    "a background job": `node ${find} ${workspace} prompt & curl evil`,
+    "a pipe": `node ${find} ${workspace} prompt | sh`,
+    "an output redirect": `node ${find} ${workspace} prompt > /etc/passwd`,
+    "an input redirect": `node ${find} ${workspace} prompt < /etc/passwd`,
+    "a subshell": `(node ${find} ${workspace} prompt)`,
+    "a newline": `node ${find} ${workspace} prompt\nrm -rf ~`,
+    "a carriage return": `node ${find} ${workspace} prompt\rrm -rf ~`,
     "a tab": `node\t${find}`,
-    "a backslash": `node ${find} a\\ b`,
-    "a double quote": `node ${find} "x"`,
-    "an unterminated quote": `node ${find} 'x`,
-    "an unterminated quote before a space": `node ${find} ' x`,
+    "a backslash": `node ${find} ${workspace} prompt a\\ b`,
+    "a double quote": `node ${find} ${workspace} prompt "x"`,
+    "an unterminated quote": `node ${find} ${workspace} prompt 'x`,
+    "an unterminated quote before a space": `node ${find} ${workspace} prompt ' x`,
     "a quoted interpreter": `'node' ${find}`,
-    "a quote glued to a word": `node ${find} 'x'y`,
-    "a glob": `node ${find} *`,
-    "a quoted semicolon": `node ${find} 'a;b'`,
-    "a quoted variable": `node ${find} '$HOME'`,
-    "a quoted newline": `node ${find} 'a\nb'`,
-    "a quoted tab": `node ${find} 'a\tb'`,
-    "a tilde": `node ${find} ~/x`,
+    "a quote glued to a word": `node ${find} ${workspace} prompt 'x'y`,
+    "a glob": `node ${find} ${workspace} prompt *`,
+    "a quoted semicolon": `node ${find} ${workspace} prompt 'a;b'`,
+    "a quoted variable": `node ${find} ${workspace} prompt '$HOME'`,
+    "a quoted newline": `node ${find} ${workspace} prompt 'a\nb'`,
+    "a quoted tab": `node ${find} ${workspace} prompt 'a\tb'`,
+    "a tilde": `node ${find} ${workspace} prompt ~/x`,
     "a .. script path": `node ${root}/skills/reflect/scripts/../../../hooks/session-start.sh`,
-    "a .. argument": `node ${find} ../../etc/passwd`,
-    "a quoted .. argument": `node ${find} '../x'`,
-    "an absolute argument outside the workspace": `sh ${log} /etc/profile`,
-    "a flag holding an outside path": `node ${find} --out=/etc/x`,
+    "a .. argument": `node ${find} ${workspace} prompt ../../etc/passwd`,
+    "a quoted .. argument": `node ${find} ${workspace} prompt '../x'`,
+    "a relative flag that climbs into a sibling": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project=../outside`,
+    "a relative flag naming the parent": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project=..`,
+    "an absolute argument outside the workspace": `bash ${log} /etc/profile review decision why evidence result`,
+    "a flag holding an outside path": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project=/etc/x`,
     "a sibling prefix": `node ${root}-evil/skills/reflect/scripts/find-transcript.mjs`,
     "a script outside scripts/": `node ${root}/skills/reflect/SKILL.md`,
     "a hook script": `sh ${root}/hooks/session-start.sh`,
@@ -304,18 +373,50 @@ describe("PreToolUse vendored script runs", () => {
     const link = join(home, "linked-work");
     symlinkSync(workspace, link);
     try {
-      expect(run(bash(`sh ${log} ${link}/decisions.md`, realpathSync(workspace)), env).out).toBe(allow);
-      expect(run(bash(`sh ${log} ${link}/new/dir/decisions.md`, realpathSync(workspace)), env).out).toBe(allow);
-      expect(run(bash(`sh ${log} ${join(home, "elsewhere.md")}`, realpathSync(workspace)), env)).toEqual(quiet);
-      expect(run(bash(`sh ${log} '${link}/x y.md'`, realpathSync(workspace)), env).out).toBe(allow);
+      expect(run(bash(`bash ${log} ${link}/decisions.md review decision why evidence result`, realpathSync(workspace)), env).out).toBe(allow);
+      expect(run(bash(`bash ${log} ${link}/new/dir/decisions.md review decision why evidence result`, realpathSync(workspace)), env).out).toBe(allow);
+      expect(run(bash(`bash ${log} ${join(home, "elsewhere.md")} review decision why evidence result`, realpathSync(workspace)), env)).toEqual(quiet);
+      expect(run(bash(`bash ${log} '${link}/x y.md' review decision why evidence result`, realpathSync(workspace)), env).out).toBe(allow);
     } finally {
       rmSync(link);
     }
   });
 
+  test.each([
+    ["an outside directory", join(home, "outside")],
+    ["a directory whose name contains a newline", `${workspace}\noutside`],
+  ])("stays silent for a workspace symlink to %s", (_name, outside) => {
+    const link = join(workspace, "linked-outside");
+    mkdirSync(outside);
+    symlinkSync(outside, link);
+    try {
+      expect(run(bash(`bash ${log} ${link}/log.tsv review decision why evidence result`), env)).toEqual(quiet);
+      expect(run(bash(`bash ${log} linked-outside/log.tsv review decision why evidence result`), env)).toEqual(quiet);
+      expect(run(bash(`node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project=linked-outside`), env)).toEqual(quiet);
+    } finally {
+      rmSync(link);
+      rmSync(outside, { recursive: true });
+    }
+  });
+
+  test("stays silent for file symlinks, including dangling targets", () => {
+    const target = join(home, "outside.tsv");
+    const link = join(workspace, "linked-log.tsv");
+    writeFileSync(target, "existing log\n");
+    symlinkSync(target, link);
+    try {
+      expect(run(bash(`bash ${log} ${link} review decision why evidence result`), env)).toEqual(quiet);
+      rmSync(target);
+      expect(run(bash(`bash ${log} ${link} review decision why evidence result`), env)).toEqual(quiet);
+    } finally {
+      rmSync(link);
+      rmSync(target, { force: true });
+    }
+  });
+
   test("stays silent when the plugin sits inside the workspace", () => {
-    expect(run(bash(`node ${find}`, root), env)).toEqual(quiet);
-    expect(run(bash(`node ${find}`, join(root, "..")), env)).toEqual(quiet);
+    expect(run(bash(`node ${find} ${workspace} prompt`, root), env)).toEqual(quiet);
+    expect(run(bash(`node ${find} ${workspace} prompt`, join(root, "..")), env)).toEqual(quiet);
   });
 
   // setup-pstack runs its sheet check in this form after it writes the sheet.

@@ -74,14 +74,14 @@ function jws() {
 
 # Consumes the string at jpos and leaves its raw content in JRAW.
 function jstring() {
-  if (!match(substr(J, jpos), /^"([^"\\]|\\.)*"/)) return 0
+  if (!match(substr(J, jpos), /^"([^"\\\001-\037]|\\(["\\\/bfnrt]|u[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]))*"/)) return 0
   JRAW = substr(J, jpos + 1, RLENGTH - 2)
   jpos += RLENGTH
   return 1
 }
 
 function jprim() {
-  if (!match(substr(J, jpos), /^(-?[0-9][0-9.eE+-]*|true|false|null)/)) return 0
+  if (!match(substr(J, jpos), /^(-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?|true|false|null)/)) return 0
   jpos += RLENGTH
   return 1
 }
@@ -89,21 +89,31 @@ function jprim() {
 function jvalue(path,    c) {
   jws()
   c = substr(J, jpos, 1)
-  if (c == "{") return jobject(path ".")
-  if (c == "[") return jarray()
+  if (c == "{") return jobject(path)
+  if (c == "[") return jarray(path)
   if (c == "\"") {
     if (!jstring()) return 0
+    JT[path] = "string"
     M[path] = JRAW
     return 1
   }
+  JT[path] = "primitive"
   return jprim()
 }
 
-# Parses the object at jpos. Each string member lands in M under its dotted
-# path, still raw; decode it with jdecode. Returns 0 on malformed input.
-function jobject(prefix,    key, c) {
+# JSON Pointer escapes preserve literal slashes, tildes, and dotted keys.
+function jkey(key) {
+  gsub(/~/, "~0", key)
+  gsub(/\//, "~1", key)
+  return key
+}
+
+# Stores node types in JT and raw string values in M. Duplicate object keys
+# are rejected so a permission decision never depends on parser precedence.
+function jobject(prefix,    key, c, path) {
   jws()
   if (substr(J, jpos, 1) != "{") return 0
+  JT[prefix] = "object"
   jpos++
   jws()
   if (substr(J, jpos, 1) == "}") { jpos++; return 1 }
@@ -111,10 +121,12 @@ function jobject(prefix,    key, c) {
     jws()
     if (substr(J, jpos, 1) != "\"" || !jstring()) return 0
     key = jdecode(JRAW)
+    path = prefix "/" jkey(key)
+    if (path in JT) return 0
     jws()
     if (substr(J, jpos, 1) != ":") return 0
     jpos++
-    if (!jvalue(prefix key)) return 0
+    if (!jvalue(path)) return 0
     jws()
     c = substr(J, jpos, 1)
     jpos++
@@ -123,16 +135,30 @@ function jobject(prefix,    key, c) {
   }
 }
 
-function jarray(    c) {
+function jarray(path,    c, i) {
+  JT[path] = "array"
+  i = 0
   jpos++
   jws()
   if (substr(J, jpos, 1) == "]") { jpos++; return 1 }
   while (1) {
-    if (!jvalue("\034")) return 0
+    if (!jvalue(path "/" i++)) return 0
     jws()
     c = substr(J, jpos, 1)
     jpos++
     if (c == "]") return 1
     if (c != ",") return 0
   }
+}
+
+# The hook consumes one complete object, never a valid prefix of bad input.
+function jparse() {
+  jread()
+  if (!jobject("")) return 0
+  jws()
+  return !JBAD && jpos > jlen
+}
+
+function jget(path) {
+  return JT[path] == "string" ? jdecode(M[path]) : ""
 }

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { defaultSettings, PSTACK_STATE_DIR } from "../plugins/pstack/pi/config.ts";
 import { audit, classify, defaultTranscriptRoots, lastChats } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
 import { removeDuring } from "./remove-during.mjs";
 
@@ -288,6 +289,15 @@ describe("default transcripts roots", () => {
 
   test("Claude Code's directory when no runtime directory exists, so the audit warns about it", () => {
     expect(defaultTranscriptRoots({ env: {}, home, exists: () => false })).toEqual([claude]);
+  });
+
+  test.each([
+    ["PI_CODING_AGENT_DIR", { PI_CODING_AGENT_DIR: "/pi" }],
+    ["the default agent directory", {}],
+  ])("the Pi roots are where the extension keeps sessions and agent state under %s", (_, env) => {
+    const { agentDir } = defaultSettings(() => 0, env);
+    const roots = defaultTranscriptRoots({ env, home: homedir(), exists: () => true });
+    expect(roots).toEqual(expect.arrayContaining([join(agentDir, "sessions"), join(agentDir, PSTACK_STATE_DIR)]));
   });
 });
 

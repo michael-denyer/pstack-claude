@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh\" copilot"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "view|task|bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${COPILOT_PLUGIN_ROOT}/hooks/pre-tool-use.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

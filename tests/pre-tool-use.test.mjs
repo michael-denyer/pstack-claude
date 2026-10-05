@@ -1,6 +1,6 @@
-// The shipped PreToolUse command, run for real. On GitHub Copilot it approves
+// The shipped GitHub Copilot PreToolUse command, run for real. It approves
 // `view` of the plugin's own files and strict vendored-script runs, denies
-// off-sheet pstack models and malformed sheet writes, and stays silent for
+// pstack agents on models a valid sheet does not name, and stays silent for
 // everything else.
 import { afterAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
-const preToolUse = JSON.parse(readFileSync(join(pluginRoot, "hooks/hooks.json"), "utf8")).hooks.PreToolUse;
+const preToolUse = JSON.parse(readFileSync(join(pluginRoot, "hooks/copilot-hooks.json"), "utf8")).hooks.PreToolUse;
 const command = preToolUse[0].hooks[0].command;
 const allow = '{"permissionDecision":"allow"}\n';
 const playbook = join(pluginRoot, "skills/poteto-mode/playbooks/bug-fix.md");
@@ -23,18 +23,16 @@ const claudeInput = (tool, path) =>
 function run(input, env = { COPILOT_PLUGIN_ROOT: pluginRoot }) {
   const r = spawnSync("sh", ["-c", command], {
     input,
-    env: { PATH: process.env.PATH, CLAUDE_PLUGIN_ROOT: pluginRoot, ...env },
+    env: { PATH: process.env.PATH, ...env },
     encoding: "utf8",
   });
   return { status: r.status, out: r.stdout, err: r.stderr };
 }
 
 describe("PreToolUse hook", () => {
-  // Claude Code tool names are capitalized and Codex sends Bash, so the
-  // literal matcher `view` fires only on Copilot.
-  test("matches only Copilot's lowercase tool names", () => {
+  test("matches only the tools it decides", () => {
     expect(preToolUse).toHaveLength(1);
-    expect(preToolUse[0].matcher).toBe("view|task|bash|create|edit");
+    expect(preToolUse[0].matcher).toBe("view|task|bash");
   });
 
   test("approves view inside the plugin root", () => {
@@ -74,9 +72,35 @@ describe("PreToolUse hook", () => {
     });
   }
 
-  test("stays silent outside Copilot", () => {
-    expect(run(claudeInput("Read", playbook), {})).toEqual({ status: 0, out: "", err: "" });
-    expect(run(claudeInput("Read", playbook), { PLUGIN_ROOT: pluginRoot })).toEqual({ status: 0, out: "", err: "" });
+  // Copilot denies the call when the hook exits non-zero.
+  test("exits 0 with no decision and reports the error when awk fails", () => {
+    const bin = mkdtempSync(join(tmpdir(), "pstack-ptu-bin-"));
+    try {
+      writeFileSync(join(bin, "awk"), "#!/bin/sh\necho 'awk: broken' >&2\nexit 2\n", { mode: 0o755 });
+      const r = spawnSync("sh", ["-c", command], {
+        input: claudeInput("Read", playbook),
+        env: { PATH: `${bin}:${process.env.PATH}`, COPILOT_PLUGIN_ROOT: pluginRoot },
+        encoding: "utf8",
+      });
+      expect({ status: r.status, out: r.stdout, err: r.stderr }).toEqual({ status: 0, out: "", err: "awk: broken\n" });
+    } finally {
+      rmSync(bin, { recursive: true, force: true });
+    }
+  });
+
+  test("drops a decision from an awk run that fails", () => {
+    const bin = mkdtempSync(join(tmpdir(), "pstack-ptu-bin-"));
+    try {
+      writeFileSync(join(bin, "awk"), `#!/bin/sh\nprintf '%s\\n' '${allow.trim()}'\nexit 2\n`, { mode: 0o755 });
+      const r = spawnSync("sh", ["-c", command], {
+        input: claudeInput("Read", playbook),
+        env: { PATH: `${bin}:${process.env.PATH}`, COPILOT_PLUGIN_ROOT: pluginRoot },
+        encoding: "utf8",
+      });
+      expect({ status: r.status, out: r.stdout }).toEqual({ status: 0, out: "" });
+    } finally {
+      rmSync(bin, { recursive: true, force: true });
+    }
   });
 });
 
@@ -96,13 +120,9 @@ const workspace = join(home, "work");
 mkdirSync(workspace);
 afterAll(() => rmSync(home, { recursive: true, force: true }));
 
-const ROLES = [
-  "feature, refactoring", "bug-fix", "perf-issue", "hillclimb", "judgment and prose", "strongest judgment",
-  "how explorer", "how explainer", "why investigators", "why synthesizer", "reflect tooling",
-  "reflect judgment, divergent, synthesizer", "arena runners", "arena cross-judge pool", "swarm workers",
-  "architect runners", "interrogate reviewers",
-];
-const PANELS = new Set(["arena runners", "arena cross-judge pool", "architect runners", "interrogate reviewers"]);
+const models = JSON.parse(readFileSync(join(pluginRoot, "models.json"), "utf8"));
+const ROLES = models.roles.map((r) => r.role);
+const PANELS = new Set(models.roles.filter((r) => r.models === "panel").map((r) => r.role));
 
 function sheet({ one = "gpt-5.5", strong = "claude-opus-5.5", panel = "claude-sonnet-5, gpt-5.5, gemini-3.8-flash", drop, set = {}, extra = "" } = {}) {
   const lines = ROLES.filter((r) => r !== drop).map((r) => {
@@ -172,128 +192,28 @@ describe("PreToolUse model check for pstack agents", () => {
     "an agent type that only contains pstack:": [sheet(), agent("claude-haiku-4.5", "my-pstack:agent")],
     "no sheet": [null, agent("claude-haiku-4.5")],
     "a sheet with no role lines": ["session hook: on\n", agent("claude-haiku-4.5")],
+    "a sheet missing a role": [sheet({ drop: "hillclimb" }), agent("claude-haiku-4.5")],
+    "a sheet with a malformed ID": [sheet({ set: { "swarm workers": "Claude Opus" } }), agent("claude-haiku-4.5")],
+    "a single-vendor panel": [sheet({ panel: "gpt-5.5, gpt-5.4" }), agent("claude-haiku-4.5")],
+    "a payload json.awk cannot decode": [sheet(), agent("claude-haiku-4.5").replace("haiku", "h\\u00e9iku")],
   };
   for (const [name, [text, payload]] of Object.entries(silent)) {
     test(`stays silent for ${name}`, () => expect(runWith(text, payload)).toEqual(quiet));
   }
 
-  test("stays silent outside Copilot", () => {
-    writeFileSync(sheetPath, sheet());
-    expect(run(agent("claude-haiku-4.5"), { COPILOT_HOME: copilotHome, HOME: home })).toEqual(quiet);
+  test("checks a CRLF sheet with a byte-order mark", () => {
+    const text = `\uFEFF${sheet().replaceAll("\n", "\r\n")}`;
+    expect(runWith(text, agent("gpt-5.5"))).toEqual(quiet);
+    expect(deny(runWith(text, agent("claude-haiku-4.5")).out)).toContain("one of `gpt-5.5`");
+  });
+
+  test("a sheet that opts out of panel vendor diversity is valid", () => {
+    expect(deny(runWith(sheet({ panel: "gpt-5.5, gpt-5.4", extra: "panel vendors: any\n" }), agent("o9")).out)).toContain("`o9`");
   });
 
   test("finds the sheet under HOME when COPILOT_HOME is unset", () => {
     writeFileSync(sheetPath, sheet());
     expect(deny(run(agent("claude-haiku-4.5"), { COPILOT_PLUGIN_ROOT: pluginRoot, HOME: home }).out)).toContain(sheetPath);
-  });
-});
-
-describe("PreToolUse sheet check", () => {
-  const create = (text, path = sheetPath) => input("Write", { path, file_text: text });
-
-  test("a complete multi-vendor sheet writes without a decision", () => {
-    expect(runWith(null, create(sheet()))).toEqual(quiet);
-    expect(runWith(null, create(sheet({ one: "inherit-parent", panel: "inherit-parent, inherit-parent" })))).toEqual(quiet);
-    expect(runWith(null, create(sheet({ panel: "mai-code-1.1-flash, kimi-k3" })))).toEqual(quiet);
-  });
-
-  // The session-model answer in setup-pstack/copilot.md writes this shape.
-  test("an all-session-model sheet with three-entry panels needs no vendor opt-out", () => {
-    const text = sheet({ one: "inherit-parent", strong: "inherit-parent", panel: "inherit-parent, inherit-parent, inherit-parent" });
-    expect(text).not.toContain("panel vendors:");
-    expect(runWith(null, create(text))).toEqual(quiet);
-  });
-
-  test("effort suffixes and a default effort line are well formed", () => {
-    const text = sheet({ strong: "claude-opus-5.5 @xhigh", panel: "claude-sonnet-5 @high, gpt-5.5 @max", extra: "default effort: medium\n" });
-    expect(runWith(null, create(text))).toEqual(quiet);
-    expect(deny(runWith(null, create(sheet({ strong: "claude-opus-5.5 @turbo" }))).out)).toContain("`claude-opus-5.5 @turbo` in bug-fix");
-  });
-
-  test("a missing role is denied by name", () => {
-    const reason = deny(runWith(null, create(sheet({ drop: "why synthesizer" }))).out);
-    expect(reason).toContain("Missing roles: why synthesizer.");
-    expect(reason).not.toContain("Malformed");
-  });
-
-  test("a malformed ID is denied by value", () => {
-    for (const bad of ["Claude Opus", "gpt_5", "-gpt", "opus?"]) {
-      const reason = deny(runWith(null, create(sheet({ set: { "swarm workers": bad } }))).out);
-      expect(reason).toContain(`Malformed entries: \`${bad}\` in swarm workers.`);
-    }
-    expect(deny(runWith(null, create(sheet({ set: { hillclimb: "gpt-5.5,, gpt-5.4" } }))).out)).toContain("an empty entry in hillclimb");
-  });
-
-  test("a single-vendor panel is denied unless the sheet opts out", () => {
-    const one = sheet({ set: { "architect runners": "claude-opus-5.5, claude-sonnet-5, inherit-parent" } });
-    const reason = deny(runWith(null, create(one)).out);
-    expect(reason).toContain("Panels from fewer than two vendors: architect runners (claude).");
-    expect(reason).toContain("`panel vendors: any`");
-    expect(runWith(null, create(`${one}panel vendors: any\n`))).toEqual(quiet);
-    expect(deny(runWith(null, create(sheet({ panel: "gpt-5.5" }))).out)).toContain("arena runners (gpt); arena cross-judge pool (gpt)");
-  });
-
-  test("names every problem at once", () => {
-    const reason = deny(runWith(null, create(sheet({ drop: "bug-fix", panel: "gpt-5.5, GPT", set: { "how explorer": "x y" } }))).out);
-    expect(reason).toContain("Missing roles: bug-fix.");
-    expect(reason).toContain("`x y` in how explorer");
-    expect(reason).toContain("`GPT` in arena runners");
-    expect(reason).toContain("arena runners (gpt)");
-  });
-
-  test("an edit is checked on the text it would leave", () => {
-    const text = sheet();
-    const edit = (old_str, new_str) => input("Edit", { path: sheetPath, old_str, new_str });
-    expect(runWith(text, edit("swarm workers: gpt-5.5", "swarm workers: gpt-5.4"))).toEqual(quiet);
-    expect(deny(runWith(text, edit("swarm workers: gpt-5.5\n", "")).out)).toContain("Missing roles: swarm workers.");
-    expect(deny(runWith(text, edit("interrogate reviewers: claude-sonnet-5, gpt-5.5, gemini-3.8-flash", "interrogate reviewers: gpt-5.5, gpt-5.4")).out))
-      .toContain("interrogate reviewers (gpt)");
-  });
-
-  test("an edit it cannot apply exactly once stays silent", () => {
-    const text = sheet();
-    expect(runWith(text, input("Edit", { path: sheetPath, old_str: "gpt-5.5", new_str: "bad id" }))).toEqual(quiet);
-    expect(runWith(text, input("Edit", { path: sheetPath, old_str: "not there", new_str: "" }))).toEqual(quiet);
-    expect(runWith(null, input("Edit", { path: sheetPath, old_str: "a", new_str: "b" }))).toEqual(quiet);
-  });
-
-  test("a heredoc that replaces the sheet is checked", () => {
-    const heredoc = (text, target = `'${sheetPath}'`) => input("Bash", { command: `cat > ${target} <<'EOF'\n${text}EOF`, description: "write" });
-    expect(runWith(sheet(), heredoc(sheet()))).toEqual(quiet);
-    expect(deny(runWith(sheet(), heredoc(sheet({ drop: "hillclimb" }))).out)).toContain("Missing roles: hillclimb.");
-    expect(deny(runWith(sheet(), heredoc(sheet({ drop: "hillclimb" }), sheetPath)).out)).toContain("Missing roles: hillclimb.");
-    expect(runWith(sheet(), input("Bash", { command: `cat ${sheetPath}` }))).toEqual(quiet);
-    const other = join(workspace, "notes.md");
-    expect(runWith(sheet(), input("Bash", { command: `cat > '${other}' <<'EOF'\nsee ${sheetPath}\nEOF` }))).toEqual(quiet);
-    expect(runWith(sheet(), input("Bash", { command: `cat > '${sheetPath}' <<EOF\nx\nEOF` }))).toEqual(quiet);
-    expect(runWith(sheet(), input("Bash", { command: `cat > '${sheetPath}' <<'EOF'\n${sheet({ drop: "hillclimb" })}EOF\nchmod 600 '${sheetPath}'` }))).toEqual(quiet);
-  });
-
-  test("other paths are not the sheet", () => {
-    const text = sheet({ drop: "hillclimb" });
-    expect(runWith(null, create(text, join(workspace, "pstack-models.md")))).toEqual(quiet);
-    expect(runWith(null, create(text, join(home, ".claude/pstack-models.md")))).toEqual(quiet);
-  });
-
-  test("the sheet is matched through its real path", () => {
-    const link = join(home, "linked-home");
-    symlinkSync(copilotHome, link);
-    try {
-      const reason = deny(run(create(sheet({ drop: "hillclimb" }), join(realpathSync(copilotHome), "pstack-models.md")), { ...env, COPILOT_HOME: link }).out);
-      expect(reason).toContain("Missing roles: hillclimb.");
-    } finally {
-      rmSync(link);
-    }
-  });
-
-  test("the 17 roles match setup-pstack's sheet shape", () => {
-    const skill = readFileSync(join(pluginRoot, "skills/setup-pstack/SKILL.md"), "utf8");
-    const shape = skill.slice(skill.indexOf("### 6. Write the override sheet"), skill.indexOf("### 7."));
-    const roles = [...shape.matchAll(/^([a-z][a-z ,-]*): /gm)].map((m) => m[1]).filter((r) => r !== "session hook" && r !== "default effort");
-    expect(roles).toEqual(ROLES);
-    const awk = readFileSync(join(pluginRoot, "hooks/sheet.awk"), "utf8");
-    const listed = awk.slice(awk.indexOf('split("feature'), awk.indexOf('roles, "|")')).match(/"[^"]*"/g).map((s) => s.slice(1, -1)).join("").split("|");
-    expect(listed).toEqual(ROLES);
   });
 });
 
@@ -350,6 +270,8 @@ describe("PreToolUse vendored script runs", () => {
     "a backslash": `node ${find} a\\ b`,
     "a double quote": `node ${find} "x"`,
     "an unterminated quote": `node ${find} 'x`,
+    "an unterminated quote before a space": `node ${find} ' x`,
+    "a quoted interpreter": `'node' ${find}`,
     "a quote glued to a word": `node ${find} 'x'y`,
     "a glob": `node ${find} *`,
     "a quoted semicolon": `node ${find} 'a;b'`,
@@ -396,8 +318,8 @@ describe("PreToolUse vendored script runs", () => {
     expect(run(bash(`node ${find}`, join(root, "..")), env)).toEqual(quiet);
   });
 
-  test("stays silent outside Copilot", () => {
-    expect(run(bash(`node ${find}`), { HOME: home })).toEqual(quiet);
-    expect(run(bash(`node ${find}`), { HOME: home, PLUGIN_ROOT: pluginRoot })).toEqual(quiet);
+  // setup-pstack runs its sheet check in this form after it writes the sheet.
+  test("approves setup-pstack's sheet check", () => {
+    expect(run(bash(`sh ${root}/skills/setup-pstack/scripts/check-sheet.sh`), env)).toEqual({ status: 0, out: allow, err: "" });
   });
 });

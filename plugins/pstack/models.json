@@ -53,10 +53,5 @@
         "haiku": "openai-codex/gpt-6-luna"
       }
     }
-  },
-  "copilot": {
-    "default": null,
-    "strongest": null,
-    "panel": []
   }
 }

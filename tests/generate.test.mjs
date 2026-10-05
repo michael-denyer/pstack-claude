@@ -48,7 +48,7 @@ import {
   tableRows,
   validateHooks,
 } from "../tools/generate.mjs";
-import { piModelNamesSection, RUNTIMES, validateCodexMarketplace, validatePiPackage } from "../tools/runtimes.mjs";
+import { piModelNamesSection, RUNTIMES, validateCodexMarketplace, validateCopilotManifest, validatePiPackage } from "../tools/runtimes.mjs";
 import { walk } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -226,6 +226,22 @@ describe("validateCodexMarketplace", () => {
   });
 });
 
+describe("validateCopilotManifest", () => {
+  const claude = { name: "pstack" };
+  const ok = { name: "pstack", hooks: "hooks/copilot-hooks.json" };
+  test("needs the Claude Code name and a hooks file that exists", () => {
+    const pathExists = (rel) => rel === "plugins/pstack/hooks/copilot-hooks.json";
+    expect(() => validateCopilotManifest(ok, { claude, pathExists })).not.toThrow();
+    expect(() => validateCopilotManifest({ ...ok, name: "other" }, { claude, pathExists })).toThrow(
+      'name "other" != Claude Code manifest name "pstack"',
+    );
+    expect(() => validateCopilotManifest({ ...ok, hooks: "hooks/nope.json" }, { claude, pathExists })).toThrow(
+      'hooks "hooks/nope.json" is not a file in the plugin',
+    );
+    expect(() => validateCopilotManifest({ name: "pstack" }, { claude, pathExists })).toThrow("is not a file in the plugin");
+  });
+});
+
 describe("manifests", () => {
   const json = (rel) => JSON.parse(readFileSync(join(repoRoot, rel), "utf8"));
   const claude = json("plugins/pstack/.claude-plugin/plugin.json");
@@ -233,6 +249,7 @@ describe("manifests", () => {
   const claudeMarketplace = json(".claude-plugin/marketplace.json");
   const codexMarketplace = json(".agents/plugins/marketplace.json");
   const piPackage = json("package.json");
+  const copilot = json("plugins/pstack/.github/plugin/plugin.json");
 
   test("the plugin and marketplace manifests agree on every fact they repeat", () => {
     const shared = ({ name, author, homepage, repository, license, keywords }) =>
@@ -243,6 +260,8 @@ describe("manifests", () => {
     expect(claudeMarketplace.plugins.map(({ name, source }) => [name, source])).toEqual([[claude.name, "./plugins/pstack"]]);
     expect(shared(piPackage)).toEqual({ ...shared(claude), keywords: ["pi-package", ...claude.keywords] });
     expect(piPackage.version).toBe(claude.version);
+    expect({ ...shared(copilot), keywords: claude.keywords }).toEqual(shared(claude));
+    expect(copilot.version).toBe(claude.version);
     expect(codexMarketplace.name).toBe(claudeMarketplace.name);
     expect(codexMarketplace.interface.displayName).toBe(codex.interface.displayName);
     expect(codexMarketplace.plugins.map(({ name, source, category }) => [name, source.path, category])).toEqual([
@@ -306,6 +325,16 @@ describe("validateHooks", () => {
     expect(() => validateHooks(cmd, { statOf: () => plain })).toThrow("hooks/session-start.sh is not executable");
     expect(() => validateHooks(cmd, { statOf: () => null, file: "hooks/codex-hooks.json" })).toThrow(
       "hooks/codex-hooks.json:\n  SessionStart: hooks/session-start.sh does not exist",
+    );
+  });
+
+  test("checks references under the runtime's own root variable", () => {
+    const statOf = (rel) => (rel === "hooks/session-start.sh" ? exec : null);
+    const copilotCmd = hooks('"${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh" copilot');
+    expect(() => validateHooks(copilotCmd, { statOf, root: "COPILOT_PLUGIN_ROOT" })).not.toThrow();
+    expect(() => validateHooks(copilotCmd, { statOf })).toThrow("command does not reference ${CLAUDE_PLUGIN_ROOT}");
+    expect(() => validateHooks(hooks('"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"'), { statOf, root: "COPILOT_PLUGIN_ROOT" })).toThrow(
+      "command does not reference ${COPILOT_PLUGIN_ROOT}",
     );
   });
 
@@ -974,5 +1003,19 @@ describe("plan, changes, apply", () => {
         expect.stringContaining("plugins/pstack/skills/tdd/SKILL.md:"),
       ]);
     }
+  });
+
+  test("problems checks the Copilot manifest and the hooks file it names", () => {
+    const root = repoCopy();
+    const manifest = "plugins/pstack/.github/plugin/plugin.json";
+    const hooks = "plugins/pstack/hooks/copilot-hooks.json";
+    writeFileSync(join(root, hooks), readFileSync(join(root, hooks), "utf8").replace("hooks/pre-tool-use.sh", "hooks/gone.sh"));
+    expect(problems(root)).toEqual([expect.stringContaining("hooks/gone.sh does not exist")]);
+    const text = readFileSync(join(root, manifest), "utf8");
+    writeFileSync(join(root, manifest), text.replace('"name": "pstack"', '"name": "other"'));
+    expect(problems(root)).toEqual([
+      expect.stringContaining(`${manifest}: name "other"`),
+      expect.stringContaining("hooks/gone.sh does not exist"),
+    ]);
   });
 });

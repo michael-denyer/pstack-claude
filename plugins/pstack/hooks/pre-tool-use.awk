@@ -1,6 +1,8 @@
 # Decides one GitHub Copilot PreToolUse call for pstack. Run after json.awk and
-# sheet.awk, with the payload on stdin. Prints one decision object, or nothing,
-# which leaves the call to Copilot's normal permission flow.
+# setup-pstack's sheet.awk, with the payload on stdin. Prints one decision
+# object, or nothing, which leaves the call to Copilot's normal permission flow.
+# Copilot sends Claude-format input to PascalCase hooks, so `view` arrives as
+# `Read`.
 BEGIN {
   jread()
   if (!jobject("")) exit 0
@@ -10,17 +12,13 @@ BEGIN {
   root = ENVIRON["PSTACK_ROOT"]
   real = ENVIRON["PSTACK_REAL_ROOT"]
   sheet = ENVIRON["PSTACK_SHEET"]
-  sheet_real = ENVIRON["PSTACK_SHEET_REAL"]
   if (tool == "Read" || tool == "view") view_rule()
   else if (tool == "Agent" || tool == "Task" || tool == "task") task_rule()
-  else if (tool == "Bash" || tool == "bash") bash_rule()
-  else if (tool == "Write" || tool == "create") write_rule("create")
-  else if (tool == "Edit" || tool == "edit") write_rule("edit")
+  else if (tool == "Bash" || tool == "bash") script_rule(arg("command"))
   exit 0
 }
 
-function has(k) { return (P k) in M }
-function arg(k) { return has(k) ? jdecode(M[P k]) : "" }
+function arg(k) { return (P k) in M ? jdecode(M[P k]) : "" }
 
 function allow() { print "{\"permissionDecision\":\"allow\"}" }
 function deny(reason) { print "{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"" esc(reason) "\"}" }
@@ -45,19 +43,28 @@ function view_rule(    path) {
 }
 
 # A pstack agent dispatched with an explicit model must use one of the user's
-# saved choices. A call with no model, or for another agent, is not ours.
-function task_rule(    type, model, seen, order, lines, i, list, aliases) {
+# saved choices in a valid sheet. A call with no model, or for another agent,
+# is not ours.
+function task_rule(    type, model, n, roles, panel, i, j, m, E, e, seen, list, aliases) {
   type = arg("agent_type")
   model = arg("model")
   if (JBAD || index(type, "pstack:") != 1 || model == "") return
-  lines = sheet_ids(sheet, seen, order)
-  if (lines <= 0 || (model in seen)) return
+  if (!sheet_read(sheet) || sheet_problems() != "") return
+  n = sheet_roles(roles, panel)
+  split("", seen)
   list = ""
   aliases = 0
-  for (i = 1; i <= SHEET_IDS; i++) {
-    if (sheet_alias(order[i])) { aliases = 1; continue }
-    list = list (list == "" ? "" : ", ") "`" order[i] "`"
+  for (i = 1; i <= n; i++) {
+    m = split(VALUE[roles[i]], E, ",")
+    for (j = 1; j <= m; j++) {
+      e = sheet_model(sheet_trim(E[j]))
+      if (e in seen) continue
+      seen[e] = 1
+      if (sheet_alias(e)) aliases = 1
+      else list = list (list == "" ? "" : ", ") "`" e "`"
+    }
   }
+  if (model in seen) return
   if (list == "") {
     deny("pstack model check: every role in the user's saved pstack model choices (" sheet ") is inherit-parent or auto, so call `task` for " type " without `model`.")
     return
@@ -67,77 +74,12 @@ function task_rule(    type, model, seen, order, lines, i, list, aliases) {
     " To change the choices, the user reruns setup-pstack.")
 }
 
-# The sheet is checked before it is written, when the resulting text is known.
-function write_rule(kind,    path, text, cur, old, rep, i, problems) {
-  path = arg("path")
-  if (path == "" || (path != sheet && path != sheet_real)) return
-  if (kind == "create") {
-    if (!has("file_text")) return
-    text = arg("file_text")
-  } else {
-    if (!has("old_str") || !has("new_str")) return
-    old = arg("old_str")
-    rep = arg("new_str")
-    if (old == "" || !slurp(path)) return
-    cur = SLURP
-    i = index(cur, old)
-    if (i == 0 || index(substr(cur, i + 1), old) > 0) return
-    text = substr(cur, 1, i - 1) rep substr(cur, i + length(old))
-  }
-  if (JBAD) return
-  check_sheet(text)
-}
-
-function check_sheet(text,    problems) {
-  problems = sheet_problems(text)
-  if (problems == "") return
-  deny("pstack sheet check: this write to " sheet " was blocked." problems \
-    " Every role needs a line; each entry is inherit-parent, auto, or a model ID of lowercase letters, digits, dots, and hyphens;" \
-    " and each panel needs models from at least two vendors, unless the user chose to keep a single-vendor panel, which the sheet records as the line `panel vendors: any`." \
-    " Fix the text and write the sheet again.")
-}
-
-function slurp(file,    line, r) {
-  SLURP = ""
-  while ((r = (getline line < file)) > 0) SLURP = SLURP line "\n"
-  close(file)
-  return r == 0
-}
-
-function bash_rule(    cmd) {
-  cmd = arg("command")
-  if (JBAD) return
-  if (index(cmd, sheet) || (sheet_real != "" && index(cmd, sheet_real))) heredoc_rule(cmd)
-  else script_rule(cmd)
-}
-
-# setup-pstack replaces a saved sheet with `cat > '<sheet>' <<'EOF'`. A quoted
-# delimiter keeps the body literal, so the written text is known.
-function heredoc_rule(cmd,    L, n, h, tag, last, i, text, target) {
-  n = split(cmd, L, "\n")
-  h = L[1]
-  if (!match(h, /[ ]+<<[ ]*('[A-Za-z_][A-Za-z0-9_]*'|"[A-Za-z_][A-Za-z0-9_]*")[ ]*$/)) return
-  tag = substr(h, RSTART, RLENGTH)
-  sub(/^[ ]+<<[ ]*./, "", tag)
-  sub(/.[ ]*$/, "", tag)
-  target = substr(h, 1, RSTART - 1)
-  if (!sub(/^[ ]*cat[ ]+>[ ]*/, "", target)) return
-  if (target ~ /^'.*'$/ || target ~ /^".*"$/) target = substr(target, 2, length(target) - 2)
-  if (target != sheet && target != sheet_real) return
-  last = n
-  while (last > 1 && L[last] == "") last--
-  if (last < 2 || L[last] != tag) return
-  text = ""
-  for (i = 2; i < last; i++) text = text L[i] "\n"
-  check_sheet(text)
-}
-
 # Runs a vendored script without a prompt only in the strict form
 # `[node|sh|bash] <plugin>/skills/<skill>/scripts/<path> [arg ...]`, where each
 # argument is a plain word or a single-quoted string, and any path argument
 # stays in the workspace or the plugin.
 function script_rule(cmd,    n, T, Q, i, first, script) {
-  if (cmd ~ /[;|&$`<>()\\"]/ || control(cmd)) return
+  if (JBAD || cmd ~ /[;|&$`<>()\\"]/ || control(cmd)) return
   if (root == "" || (cwd != "" && (root == cwd || under(root, cwd) || real == cwd || under(real, cwd)))) return
   n = words(cmd, T, Q)
   if (n <= 0) return

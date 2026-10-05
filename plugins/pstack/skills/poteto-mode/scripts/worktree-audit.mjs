@@ -14,9 +14,9 @@
 // Every probe yields a Fact, { known: true, value } or { known: false }. A hold
 // bucket needs only its own fact; `safe` needs every fact known.
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, sep } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
@@ -79,16 +79,42 @@ export function defaultTranscriptRoots({ env = process.env, home = homedir(), ex
   return found.length ? found : [claude];
 }
 
-// A transcript names a worktree up to a path boundary (a separator, a quote,
-// whitespace, or the end of the JSON string), never a bare prefix, so
-// `/x/candidate` does not inherit a chat that ran in `/x/candidate-long`. Only
-// JSONL is scanned, so a path and its boundary appear JSON-escaped. Git on
-// Windows may spell a path with forward slashes while the session uses backslashes.
-const PATH_BOUNDARIES = ["/", "\\", '"', "'", " ", "\t", "\n", "\r"];
+// Git reports a worktree by its resolved path, while a session may name it
+// through a symlink in an ancestor directory, as macOS spells /private/tmp/x
+// as /tmp/x.
+function pathSpellings(path) {
+  const resolved = probe(() => realpathSync(path));
+  if (!resolved.known) return [path];
+  const spellings = new Set([path, resolved.value]);
+  let dir = resolved.value;
+  do {
+    dir = dirname(dir);
+    const entries = probe(() => readdirSync(dir, { withFileTypes: true }));
+    for (const entry of entries.known ? entries.value : []) {
+      if (!entry.isSymbolicLink()) continue;
+      const link = join(dir, entry.name);
+      const target = probe(() => realpathSync(link));
+      if (!target.known) continue;
+      if (resolved.value === target.value || resolved.value.startsWith(target.value + sep)) {
+        spellings.add(link + resolved.value.slice(target.value.length));
+      }
+    }
+  } while (dir !== dirname(dir));
+  return [...spellings];
+}
+
+// A transcript names a worktree up to a path boundary or the end of the JSON
+// string, never a bare prefix, so `/x/candidate` does not inherit a chat that
+// ran in `/x/candidate-long`. `.` stays out because `/x/candidate.bak` is a
+// plausible sibling. Only JSONL is scanned, so a path and its boundary appear
+// JSON-escaped. Git on Windows may spell a path with forward slashes while the
+// session uses backslashes.
+const PATH_BOUNDARIES = ["/", "\\", '"', "'", " ", "\t", "\n", "\r", "`", ":", ";", ")", ",", "|", "&", "<", ">"];
 function transcriptNeedles(path) {
   const windows = /^(?:[a-z]:[\\/]|\\\\|\/\/)/i.test(path);
-  const spellings = windows ? [path.replaceAll("\\", "/"), path.replaceAll("/", "\\")] : [path];
-  return spellings.flatMap((spelling) => [
+  const spellings = new Set(pathSpellings(path).flatMap((spelling) =>
+    windows ? [spelling.replaceAll("\\", "/"), spelling.replaceAll("/", "\\")] : [spelling]));
+  return [...spellings].flatMap((spelling) => [
     ...PATH_BOUNDARIES.map((end) => JSON.stringify(spelling + end).slice(1, -1)),
     JSON.stringify(spelling).slice(1),
   ]).map((needle) => Buffer.from(needle));

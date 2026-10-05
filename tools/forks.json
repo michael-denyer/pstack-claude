@@ -32,19 +32,19 @@
     },
     "plugins/pstack/skills/poteto-mode/SKILL.md": {
       "kind": "policy",
-      "why": "Adds the deploy-platform and defect-severity triggers, the port's principle summaries, the project playbooks paragraph and the closed-review-gate rule that the Codex and Pi mappings point to, beside the Claude Code, Codex, and Pi Platform Adaptation section and run-or-verify driver line.",
+      "why": "Adds the Claude Code, Codex, and Pi Platform Adaptation section with its task-tool and todo.md fallback, the run-or-verify driver line, the deploy-platform and defect-severity triggers, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it points the Agent-call defaults at the Models section with full tool access and the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and describes Autopilot-full as stopping at merge-ready for the operator's click.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/playbooks/autopilot-full.md": {
       "kind": "policy",
-      "why": "Owners stop at merge-ready and the operator clicks every merge, instead of each owner merging after a clean verdict.",
+      "why": "Owners stop at merge-ready and the operator clicks every merge, with the patch-id rule governing re-verification if trunk moves first, instead of each owner merging after a clean verdict, and the root writes the program objective into standing orders on the go and re-reads it each tick, arms the tick as a dynamic-mode /loop, proves the live lane through the driver skill, and takes the pre-review checks from CLAUDE.md files.",
       "since": "0.9.39",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/playbooks/autopilot-stack.md": {
       "kind": "policy",
-      "why": "Records each verdict's base SHA and patch-id and cancels pending merges before the root rewrites or retargets the chain.",
+      "why": "Records each verdict's base SHA, base branch, and patch-id, cancels pending merges and leases each push against the captured remote head before the root rewrites or retargets the chain, and re-verifies a verdict whose applicability to the new base is uncertain, while the root writes the program objective into standing orders on the go, re-reads it each tick, and arms the tick as a dynamic-mode /loop.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
@@ -68,7 +68,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/multi-phase-plan.md": {
       "kind": "port-feature",
-      "why": "Plans read skills from the installed plugin, keep the store under ~/.claude/orchestrate, and write the goal into standing orders because Claude Code has no /goal, and they leave rebase and merge authority to the execution playbook.",
+      "why": "Plans read skills from the installed plugin, keep the store under ~/.claude/orchestrate, write the goal into standing orders because Claude Code has no /goal, run the tick as a dynamic-mode /loop that re-reads that objective, run live lanes in worktrees through the driver skill the Non-negotiables resolve instead of on cloud VMs with control-ui or control-cli, name the configured swarm workers model instead of a placeholder, and leave rebase and merge authority to the execution playbook.",
       "since": "0.9.19",
       "upstream": "not-proposed"
     },
@@ -98,7 +98,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/shipping.md": {
       "kind": "policy",
-      "why": "Lands one PR at a time, cancelling pending merges before any chain change and merging only under a service-enforced head condition.",
+      "why": "Lands one PR at a time under the user's landing authority, cancelling pending merges before any chain change, merging only under a service-enforced head condition, arming auto-merge or a queue only behind repository rules that enforce the verdict, and confirming each landing in the destination's history before advancing, with verifiers that drive the real surface through the driver skill in their own worktrees, a matching patch-id that keeps a review only after its applicability to the new base is checked, and the watcher owning blocker classification.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
@@ -116,7 +116,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/orch/orch.test.ts": {
       "kind": "policy",
-      "why": "Covers the guards the port adds to orch/store.ts.",
+      "why": "Covers the guards the port adds to orch/store.ts: nested-paren status rows, leading-dash branch names, single-line table cells, frontier SHAs from exact branch refs, and colour and hyperlink codes in gt output, injecting the fake gt through the store's gt option instead of rewriting PATH and giving the CLI only PATH and ORCH_STORE instead of the whole environment.",
       "since": "0.9.47",
       "upstream": "not-proposed"
     },
@@ -134,7 +134,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/cli.test.ts": {
       "kind": "policy",
-      "why": "Supplies the shared deadline and landing revision the port's watcher requires.",
+      "why": "Supplies the shared deadline and landing revision the port's watcher requires, and checks that a PR with no checks configured gets a no-checks status cell and a READY verdict that names the absence.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
@@ -146,37 +146,37 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/fakes.test-helper.ts": {
       "kind": "policy",
-      "why": "Extends the fake reader with the revision and review fields the port's watcher reads.",
+      "why": "Extends the fake reader with the base revision and the revision read the port's watcher makes, parses its facts through the real parsePullRequest, and tags each rollup page so a test can replay a head commit with no rollup.",
       "since": "0.9.10",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/github.test.ts": {
       "kind": "policy",
-      "why": "Covers the port's check-bucket mapping, repository pairing, and revision fields in the GitHub reader.",
+      "why": "Covers the port's GitHub reader: completed conclusions that gh buckets as pending, a checkout PR paired with a different explicit repository, a full open-PR page refused as a possibly cut stack, the base revision field, and a no-checks reading that needs both check reads to agree and fails closed otherwise.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/github.ts": {
       "kind": "policy",
-      "why": "Reads review decision, merge state, and head and base revisions under the shared deadline, and refuses a checkout PR paired with a different explicit repository.",
+      "why": "Runs every gh and git call under the shared deadline, reads the base revision and a landing revision, pages through every review thread, fails completed conclusions that gh buckets as pending, refuses a checkout PR paired with a different explicit repository, orders a stack only through branches in the PR's own repository while rejecting duplicate head branches, cycles, and a full open-PR page, and reads a repository with no checks configured as its own result when gh reports none and the head commit has no rollup.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.test.ts": {
       "kind": "policy",
-      "why": "Covers the review gate and the shared deadline in the poll loop.",
+      "why": "Covers the review-required and branch-protection merge gates and their wait for pending checks, a PR with no checks configured (ready when mergeable, still stopped by conflicts, threads, and gates, and failing closed while the head may not have reported), the revision read in the snapshot plan, and the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.ts": {
       "kind": "policy",
-      "why": "Stops at the review gate, binds readiness to one head and base revision, and honours the shared deadline in the poll loop.",
+      "why": "Stops at the review-required and branch-protection merge gates once checks finish, binds readiness to one head and base revision and retries a snapshot that changed while it was read, reports a PR with no checks configured as ready only when no commit on it has reported checks and GitHub has computed mergeability, and honours the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/render.ts": {
       "kind": "policy",
-      "why": "Renders the review-required, merge-blocked, and changes-requested states with their next action.",
+      "why": "Renders the review-required and merge-blocked states as status cells and as merge-gate blockers with their next action, and shows a PR with no checks configured as a no-checks cell and a checks=none line on its READY verdict.",
       "since": "0.9.43",
       "upstream": "not-proposed"
     },
@@ -188,7 +188,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/types.ts": {
       "kind": "policy",
-      "why": "Adds the merge gate, landing revision, and deadline failure types the port's watcher reports.",
+      "why": "Adds the review-required and merge-blocked gate reasons, the landing revision on open PR facts, in the ready proof, and as a reader method, the head repository of an open PR, deadline, snapshot-changed, and invalid-stack query failures, and the no-checks reading (a none-reported fast path, a no-rollup page, and the ci-none state).",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },

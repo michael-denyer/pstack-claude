@@ -174,8 +174,8 @@ test("audits every worktree of a fixture repo end to end", () => {
   const stale = addWorktree(fixture, "stale");
   const staleAt = now - 10 * 86400;
   writeTranscript(fixture, "-proj/old.jsonl", stale, staleAt);
-  const broken = noChmod ? null : addWorktree(fixture, "broken");
-  if (broken) chmodSync(join(fixture.repo, ".git/worktrees/broken/index"), 0o000);
+  const broken = addWorktree(fixture, "broken");
+  writeFileSync(join(fixture.repo, ".git/worktrees/broken/index"), "not an index\n");
   const gone = addWorktree(fixture, "gone");
   rmSync(gone, { recursive: true });
 
@@ -204,9 +204,9 @@ test("audits every worktree of a fixture repo end to end", () => {
   expect(columns(chatted)).toEqual(["0d", "YES", "clean", "no-remote", "-", today, "verify-recent-chat", chatted]);
   expect(columns(prefix)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", prefix]);
   expect(columns(stale)).toEqual(["0d", "YES", "clean", "no-remote", "-", ymd(staleAt), "safe", stale]);
-  if (broken) expect(columns(broken)).toEqual(["0d", "YES", "unknown", "no-remote", "-", "-", "review", broken]);
+  expect(columns(broken)).toEqual(["0d", "YES", "unknown", "no-remote", "-", "-", "review", broken]);
   expect(rowFor(rows, gone)).toEqual(["-", "?", "-", "-", "-", "-", "-", "prunable", gone]);
-  expect(rows).toHaveLength(broken ? 13 : 12);
+  expect(rows).toHaveLength(13);
 });
 
 test("a Pi session in a second transcripts root marks the worktree it ran in as a recent chat", () => {
@@ -214,7 +214,9 @@ test("a Pi session in a second transcripts root marks the worktree it ran in as 
   const piChatted = addWorktree(fixture, "pi-chatted");
   const quiet = addWorktree(fixture, "quiet");
   const sessions = join(fixture.root, "pi-agent/sessions");
-  const session = join(sessions, `--${piChatted.replace(/^[^/]*\//, "").replaceAll("/", "-")}--`, "2026-10-01T00-00-00-000Z_s.jsonl");
+  // Pi names the session directory after the cwd with its leading "/" or "C:/" removed.
+  const cwdSlug = piChatted.replace(/^[^/]*\//, "").replaceAll("/", "-");
+  const session = join(sessions, `--${cwdSlug}--`, "2026-10-01T00-00-00-000Z_s.jsonl");
   mkdirSync(dirname(session), { recursive: true });
   writeFileSync(
     session,
@@ -456,11 +458,6 @@ test.skipIf(noNode)("a session resumed during the scan keeps its active worktree
 });
 
 describe("a discovery failure keeps an ancestor out of safe", () => {
-  const chmodCases = new Set([
-    "an unreadable transcripts directory",
-    "a transcripts directory with an inaccessible parent",
-    "a worktree ancestor that cannot be listed",
-  ]);
   const failures = [
     ["the trunk fetch", (fixture) => {
       git("-C", fixture.repo, "remote", "set-url", "origin", join(fixture.root, "missing.git"));
@@ -470,6 +467,8 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
     ["gh output that is not JSON", () => ({ gh: () => "rate limited" }), /gh pr list failed/],
     ["gh output that is not a list", () => ({ gh: () => "{}" }), /gh pr list failed/],
     ["a missing transcripts directory", (fixture) => ({ transcripts: [fixture.transcripts, join(fixture.root, "absent")] }), /^warn: \S+[\\/]absent not found; LAST_CHAT column will be empty$/],
+  ];
+  const chmodFailures = [
     ["an unreadable transcripts directory", (fixture) => {
       const project = join(fixture.transcripts, "-proj");
       mkdirSync(project);
@@ -492,7 +491,7 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
     }, /^warn: could not resolve the spellings of \S+\/ancestor; LAST_CHAT column will be empty: EACCES/],
   ];
 
-  test.each(failures.filter(([name]) => !(noChmod && chmodCases.has(name))))("%s", (_, inject, warning) => {
+  const keepsAncestorOutOfSafe = (_, inject, warning) => {
     const fixture = createFixture();
     const ancestor = addWorktree(fixture, "ancestor");
     const { rows, warnings } = runAudit(fixture, inject(fixture));
@@ -501,7 +500,9 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
     expect(row[7]).toBe("review");
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(warning);
-  });
+  };
+  test.each(failures)("%s", keepsAncestorOutOfSafe);
+  test.skipIf(noChmod).each(chmodFailures)("%s", keepsAncestorOutOfSafe);
 
   test("every missing transcripts directory is named", () => {
     const fixture = createFixture();

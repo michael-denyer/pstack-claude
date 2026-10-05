@@ -121,8 +121,13 @@ export async function openingPrompt(path) {
 
 export async function findTranscript(projectsDir, fragment) {
   for (const path of candidates(projectsDir)) {
-    const prompt = await openingPrompt(path);
-    if (prompt?.includes(fragment)) return path;
+    try {
+      const prompt = await openingPrompt(path);
+      if (prompt?.includes(fragment)) return path;
+    } catch (error) {
+      // Session cleanup can remove a candidate after it was enumerated.
+      if (error.code !== "ENOENT") throw error;
+    }
   }
   return null;
 }

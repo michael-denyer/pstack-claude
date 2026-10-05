@@ -95,6 +95,31 @@ describe("find-transcript", () => {
     expect(await findTranscript(dir, "nothing matches this")).toBeNull();
   });
 
+  test("a transcript deleted after enumeration does not abort the scan", async () => {
+    const dir = tempDir();
+    transcript(dir, "newest.jsonl", [meta, user("unrelated prompt")], 300);
+    const removed = transcript(dir, "removed.jsonl", [meta, user("another prompt")], 200);
+    const older = transcript(dir, "older.jsonl", [meta, user("resume the audit")], 100);
+    const search = findTranscript(dir, "resume the audit");
+    // Enumeration has completed; the first streamed read yields before this candidate opens.
+    rmSync(removed);
+    expect(await search).toBe(older);
+  });
+
+  test("other candidate read errors still propagate", async () => {
+    const dir = tempDir();
+    transcript(dir, "newest.jsonl", [meta, user("unrelated prompt")], 300);
+    const changed = transcript(dir, "changed.jsonl", [meta], 200);
+    const search = findTranscript(dir, "audit");
+    rmSync(changed);
+    mkdirSync(changed);
+    await expect(search).rejects.toMatchObject({ code: "EISDIR" });
+  });
+
+  test("a missing project directory still reports the filesystem error", async () => {
+    await expect(findTranscript(join(tempDir(), "missing"), "audit")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   test("a truncated trailing line does not abort the scan", async () => {
     const dir = tempDir();
     const live = join(dir, "live.jsonl");

@@ -421,8 +421,8 @@ describe("default transcripts roots", () => {
   test("Copilot's session-state, under COPILOT_HOME when set", () => {
     const present = new Set([claude, "/cp/session-state", "/home/u/.copilot/session-state"]);
     const exists = (path) => present.has(path);
-    expect(defaultTranscriptRoots({ env: { COPILOT_HOME: "/cp" }, home, exists })).toEqual([claude, "/cp/session-state"]);
-    expect(defaultTranscriptRoots({ env: {}, home, exists })).toEqual([claude, "/home/u/.copilot/session-state"]);
+    expect(roots({ env: { COPILOT_HOME: "/cp" }, exists })).toEqual([claude, "/cp/session-state"]);
+    expect(roots({ env: {}, exists })).toEqual([claude, "/home/u/.copilot/session-state"]);
   });
 
   test("Claude Code's directory when no runtime directory exists, so the audit warns about it", () => {

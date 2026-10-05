@@ -205,10 +205,11 @@ export function gitRepo(dir) {
   return run;
 }
 
-export async function waitFor(predicate, timeoutMs = 5000) {
+// The default stays under bun's 5 s test timeout, so this error is the one reported.
+export async function waitFor(predicate, timeoutMs = 4000) {
   const deadline = Date.now() + timeoutMs;
   while (!(await predicate())) {
-    if (Date.now() > deadline) throw new Error("waitFor timed out");
+    if (Date.now() > deadline) throw new Error(`waitFor timed out after ${timeoutMs} ms: ${predicate}`);
     await sleep(20);
   }
 }

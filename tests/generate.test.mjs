@@ -333,8 +333,40 @@ describe("validateHooks", () => {
   test("names a hook without a command, even when it has a Windows override", () => {
     const windows = 'powershell.exe -File "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ps1"';
     for (const cmd of [hooks(undefined), hooks(undefined, windows)]) {
-      expect(() => validateHooks(cmd, { statOf: () => plain })).toThrow("SessionStart: a hook has no command");
+      expect(() => validateHooks(cmd, { statOf: () => plain })).toThrow(
+        "SessionStart: hook must have required properties command",
+      );
     }
+  });
+
+  test("faults a Windows override that is not a string and names the file", () => {
+    const cmd = hooks('"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"', 5);
+    expect(() => validateHooks(cmd, { statOf: () => exec, file: "hooks/codex-hooks.json" })).toThrow(
+      "hooks/codex-hooks.json:\n  SessionStart: commandWindows must be string",
+    );
+  });
+
+  test("faults a key no hook type documents, so a misspelt override is not dropped", () => {
+    const hook = { type: "command", command: '"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"', commandWindow: "x.ps1" };
+    const cmd = JSON.stringify({ hooks: { SessionStart: [{ hooks: [hook] }] } });
+    expect(() => validateHooks(cmd, { statOf: () => exec })).toThrow("SessionStart: unknown key commandWindow");
+  });
+
+  test("accepts a prompt hook, which carries a prompt instead of a command", () => {
+    const stop = (hook) => JSON.stringify({ hooks: { Stop: [{ hooks: [hook] }] } });
+    expect(() => validateHooks(stop({ type: "prompt", prompt: "Review $ARGUMENTS" }), { statOf: () => null })).not.toThrow();
+    expect(() => validateHooks(stop({ type: "prompt" }), { statOf: () => null })).toThrow(
+      "Stop: hook must have required properties prompt",
+    );
+    expect(() => validateHooks(stop({ type: "webhook", command: "x" }), { statOf: () => null })).toThrow(
+      'Stop: hook type "webhook" is not one of command, http, mcp_tool, prompt, agent',
+    );
+  });
+
+  test("faults an event whose value is not a list of matcher groups", () => {
+    expect(() => validateHooks(JSON.stringify({ hooks: { SessionStart: {} } }), { statOf: () => exec })).toThrow(
+      "hooks/hooks.json:\n  hooks.SessionStart must be array",
+    );
   });
 
   test("a file the command reads only has to exist", () => {

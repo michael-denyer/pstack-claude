@@ -54,6 +54,9 @@ import {
 import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { Type } from "typebox";
+import { Value } from "typebox/value";
+
 import { code, codeList, PLUGIN, RUNTIMES, SKILLS, validateCodexMarketplace, validatePiPackage } from "./runtimes.mjs";
 import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, walk } from "./validate-skills.mjs";
 
@@ -696,31 +699,91 @@ export function strayModelSlugs(file, text, models) {
   return strays;
 }
 
-// Every ${CLAUDE_PLUGIN_ROOT}/<path> a hook command names must exist in the
-// plugin, and one the command executes directly must be executable, or the
-// SessionStart hook fails silently for every user.
+// The hook handler shapes Claude Code documents, one schema per `type`
+// (https://code.claude.com/docs/en/hooks, "Hook handler fields"), plus Codex's
+// commandWindows on a command hook. A key no type lists is a fault, so a
+// misspelt override cannot be dropped without notice.
+const HOOK_FIELDS = {
+  if: Type.Optional(Type.String()),
+  timeout: Type.Optional(Type.Number()),
+  statusMessage: Type.Optional(Type.String()),
+  once: Type.Optional(Type.Boolean()),
+};
+const hookType = (type, fields) =>
+  Type.Object({ type: Type.Literal(type), ...fields, ...HOOK_FIELDS }, { additionalProperties: false });
+const HOOK_TYPES = {
+  command: hookType("command", {
+    command: Type.String(),
+    commandWindows: Type.Optional(Type.String()),
+    args: Type.Optional(Type.Array(Type.String())),
+    async: Type.Optional(Type.Boolean()),
+    asyncRewake: Type.Optional(Type.Boolean()),
+    shell: Type.Optional(Type.Union([Type.Literal("bash"), Type.Literal("powershell")])),
+  }),
+  http: hookType("http", {
+    url: Type.String(),
+    headers: Type.Optional(Type.Record(Type.String(), Type.String())),
+    allowedEnvVars: Type.Optional(Type.Array(Type.String())),
+  }),
+  mcp_tool: hookType("mcp_tool", {
+    server: Type.String(),
+    tool: Type.String(),
+    input: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+  }),
+  prompt: hookType("prompt", { prompt: Type.String(), model: Type.Optional(Type.String()) }),
+  agent: hookType("agent", { prompt: Type.String(), model: Type.Optional(Type.String()) }),
+};
+const MATCHER_GROUP = Type.Object(
+  { matcher: Type.Optional(Type.String()), hooks: Type.Array(Type.Object({ type: Type.String() })) },
+  { additionalProperties: false },
+);
+const HOOKS_FILE = Type.Object({ hooks: Type.Record(Type.String(), Type.Array(MATCHER_GROUP)) });
+
+// typebox reports an unknown key twice, as a false schema at the key and as
+// additionalProperties on its object; the second names every such key.
+function shapeFaults(schema, value, subject) {
+  return [...Value.Errors(schema, value)]
+    .filter((error) => error.keyword !== "boolean")
+    .map((error) =>
+      error.keyword === "additionalProperties"
+        ? `unknown key ${error.params.additionalProperties.join(", ")}`
+        : `${error.instancePath.slice(1).replaceAll("/", ".") || subject} ${error.message}`,
+    );
+}
+
+// A hooks file must have the documented shape, every ${CLAUDE_PLUGIN_ROOT}/<path>
+// a command hook names must exist in the plugin, and one the command executes
+// directly must be executable, or the SessionStart hook fails silently for
+// every user.
 export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json" }) {
-  const faults = [];
-  for (const [event, groups] of Object.entries(JSON.parse(hooksJson).hooks ?? {})) {
-    for (const group of groups) {
-      for (const hook of group.hooks ?? []) {
-        if (typeof hook.command !== "string") {
-          faults.push(`${event}: a hook has no command`);
+  const raw = JSON.parse(hooksJson);
+  const faults = shapeFaults(HOOKS_FILE, raw, "file");
+  if (faults.length) throw new Error(`${file}:\n  ${faults.join("\n  ")}`);
+  for (const [event, groups] of Object.entries(raw.hooks)) {
+    for (const hook of groups.flatMap((group) => group.hooks)) {
+      const schema = HOOK_TYPES[hook.type];
+      if (!schema) {
+        faults.push(`${event}: hook type "${hook.type}" is not one of ${Object.keys(HOOK_TYPES).join(", ")}`);
+        continue;
+      }
+      const shape = shapeFaults(schema, hook, "hook");
+      if (shape.length) {
+        faults.push(...shape.map((fault) => `${event}: ${fault}`));
+        continue;
+      }
+      if (hook.type !== "command") continue;
+      for (const command of [hook.command, hook.commandWindows].filter((value) => value !== undefined)) {
+        const refs = [...command.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)/g)].map((m) => m[1]);
+        if (!refs.length) {
+          faults.push(`${event}: command does not reference \${CLAUDE_PLUGIN_ROOT}: ${command}`);
           continue;
         }
-        for (const command of [hook.command, hook.commandWindows].filter((value) => value !== undefined)) {
-          const refs = [...command.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)/g)].map((m) => m[1]);
-          if (!refs.length) {
-            faults.push(`${event}: command does not reference \${CLAUDE_PLUGIN_ROOT}: ${command}`);
-            continue;
-          }
-          const executed = command.replace(/^"/, "").startsWith("${CLAUDE_PLUGIN_ROOT}/");
-          refs.forEach((rel, i) => {
-            const st = statOf(rel);
-            if (!st) faults.push(`${event}: ${rel} does not exist`);
-            else if (i === 0 && executed && !(st.mode & 0o111)) faults.push(`${event}: ${rel} is not executable`);
-          });
-        }
+        const executed = command.replace(/^"/, "").startsWith("${CLAUDE_PLUGIN_ROOT}/");
+        refs.forEach((rel, i) => {
+          const st = statOf(rel);
+          if (!st) faults.push(`${event}: ${rel} does not exist`);
+          else if (i === 0 && executed && !(st.mode & 0o111)) faults.push(`${event}: ${rel} is not executable`);
+        });
       }
     }
   }

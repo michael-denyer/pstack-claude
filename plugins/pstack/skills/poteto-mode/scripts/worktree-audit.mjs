@@ -19,7 +19,7 @@ import { join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { candidates } from "../../reflect/scripts/find-transcript.mjs";
+import { candidates, rethrowUnlessRemoved } from "../../reflect/scripts/find-transcript.mjs";
 
 const known = (value) => ({ known: true, value });
 const UNKNOWN = Object.freeze({ known: false });
@@ -83,8 +83,14 @@ export function lastChats(roots, paths) {
   const needles = paths.map((path) => [path, [Buffer.from(`${path}/`), Buffer.from(`${path}"`)]]);
   const latest = new Map();
   for (const file of roots.flatMap((root) => candidates(root, Infinity))) {
-    const text = readFileSync(file);
-    const mtime = Math.floor(statSync(file).mtimeMs / 1000);
+    let text, mtime;
+    try {
+      text = readFileSync(file);
+      mtime = Math.floor(statSync(file).mtimeMs / 1000);
+    } catch (error) {
+      rethrowUnlessRemoved(error);
+      continue;
+    }
     for (const [path, forms] of needles) {
       if (mtime > (latest.get(path) ?? 0) && forms.some((form) => text.includes(form))) latest.set(path, mtime);
     }

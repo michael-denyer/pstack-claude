@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 import { candidates, findTranscript, openingPrompt } from "../plugins/pstack/skills/reflect/scripts/find-transcript.mjs";
+import { removeDuring } from "./remove-during.mjs";
 
 const script = join(import.meta.dir, "../plugins/pstack/skills/reflect/scripts/find-transcript.mjs");
 const noNode = spawnSync("node", ["--version"]).status !== 0;
@@ -105,6 +106,21 @@ describe("find-transcript", () => {
     rmSync(removed);
     expect(await search).toBe(older);
   });
+
+  test.skipIf(noNode)(
+    "a session directory or transcript removed while the tree is listed is skipped (skipped without node)",
+    () => {
+      const dir = tempDir();
+      const kept = transcript(dir, "kept.jsonl", [meta], 100);
+      const flat = transcript(dir, "flat.jsonl", [meta], 200);
+      transcript(dir, "s1/s1.jsonl", [meta], 300);
+      const body = `const { candidates } = await import(${JSON.stringify(script)});
+        console.log(JSON.stringify(candidates(${JSON.stringify(dir)})));`;
+      const run = removeDuring("readdirSync", dir, [join(dir, "s1"), flat], body);
+      expect(run.stderr).toBe("");
+      expect(JSON.parse(run.stdout)).toEqual([kept]);
+    },
+  );
 
   test("other candidate read errors still propagate", async () => {
     const dir = tempDir();

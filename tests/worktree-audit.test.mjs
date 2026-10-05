@@ -5,8 +5,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { audit, classify, defaultTranscriptRoots } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
+import { removeDuring } from "./remove-during.mjs";
 
 const script = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs");
+const noNode = spawnSync("node", ["--version"]).status !== 0;
 
 const known = (value) => ({ known: true, value });
 const unknown = { known: false };
@@ -222,6 +224,25 @@ describe("default transcripts roots", () => {
   test("Claude Code's directory when no runtime directory exists, so the audit warns about it", () => {
     expect(defaultTranscriptRoots({ env: {}, home, exists: () => false })).toEqual([claude]);
   });
+});
+
+test.skipIf(noNode)("a transcript removed after it was listed drops out of the chat scan (skipped without node)", () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-test-")));
+  fixtures.push(dir);
+  const chat = (name, mtimeSeconds) => {
+    const path = join(dir, name);
+    writeFileSync(path, `${JSON.stringify({ cwd: "/x/wt" })}\n`);
+    utimesSync(path, mtimeSeconds, mtimeSeconds);
+    return path;
+  };
+  chat("kept.jsonl", 100);
+  const removed = chat("removed.jsonl", 200);
+  // Removed once candidates() has stat-ed it, so only lastChats' own read sees it gone.
+  const body = `const { lastChats } = await import(${JSON.stringify(script)});
+    console.log(JSON.stringify([...lastChats([${JSON.stringify(dir)}], ["/x/wt"])]));`;
+  const run = removeDuring("statSync", removed, [removed], body);
+  expect(run.stderr).toBe("");
+  expect(JSON.parse(run.stdout)).toEqual([["/x/wt", 100]]);
 });
 
 describe("a discovery failure keeps an ancestor out of safe", () => {

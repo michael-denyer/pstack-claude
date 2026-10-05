@@ -1363,4 +1363,20 @@ describe("sync CLI", () => {
       );
     }
   });
+
+  test.each([
+    ["an abbreviated pin and a full argument", 7, 40],
+    ["a full pin and an abbreviated argument", 40, 7],
+  ])("the pinned-SHA check resolves both commits, so %s still count as the pin", (_, pinLength, argLength) => {
+    const { runAt, oldSha, port } = cli({ oldText: "one\n", newText: "one\n", localText: "one\n", forks: declareS("policy") });
+    const upstreamJson = join(port, "tools/upstream.json");
+    const upstream = JSON.parse(readFileSync(upstreamJson, "utf8"));
+    upstream.components.kit.sha = oldSha.slice(0, pinLength);
+    writeFileSync(upstreamJson, JSON.stringify(upstream));
+
+    const result = runAt(oldSha.slice(0, argLength), "--dry-run");
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("FAIL: tools/forks.json declares paths under kit that are not forked at the pinned SHA");
+  });
 });

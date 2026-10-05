@@ -78,7 +78,15 @@ export function parseSheet(text: string): Sheet {
 
 export function readSheet(agentDir: string): Sheet | undefined {
   const file = join(agentDir, "pstack-models.md");
-  return statSync(file, { throwIfNoEntry: false })?.isFile() ? parseSheet(readFileSync(file, "utf8")) : undefined;
+  let text: string;
+  try {
+    if (!statSync(file, { throwIfNoEntry: false })?.isFile()) return undefined;
+    text = readFileSync(file, "utf8");
+  } catch {
+    // An unreadable sheet leaves the defaults in place, as the session hooks do.
+    return undefined;
+  }
+  return parseSheet(text);
 }
 
 // The parts of models.json the extension reads; the generator checks the rest.

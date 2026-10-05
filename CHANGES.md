@@ -2,6 +2,22 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.69 - hook validation names a missing command
+
+`tools/generate.mjs` reports a hook with no `command` as a fault. Since the `commandWindows` override landed in 0.9.66, such a hook passed validation with nothing checked, including one that carried only a Windows override and so ran nowhere else.
+
+## 0.9.68 - resume links with parentheses, BOM-led plans, Codex sessions in the worktree audit, and Pi fixes
+
+Resume checkpoint publication now accepts Markdown angle-bracket destinations such as `[Questions](<questions (draft).md>)`. A linked local file still has to be registered with `--artifact`. A CLI regression test covers publication and a subsequent read.
+
+`check-plan.mjs` and `check-playbooks.mjs` strip a leading UTF-8 byte-order mark, so a plan or project playbook saved by an editor that adds one no longer fails with a missing title, a missing `when:` line, or frontmatter linted as prose.
+
+`worktree-audit.mjs` scans Codex's `sessions` and `archived_sessions` under `$CODEX_HOME` (default `~/.codex`) and honours `$CLAUDE_CONFIG_DIR`, so a worktree with a recent Codex session lands in `verify-recent-chat` instead of `safe`. It matches a worktree path as JSONL spells it, which covers Windows backslash and forward-slash spellings, UNC paths, and paths with escaped characters, without matching a sibling that shares the prefix.
+
+In Pi, starting a new `/loop` cancels the previous loop's pending wakeup in both modes, so an old self-paced prompt no longer fires after a replacement. A sheet the user cannot read leaves the defaults in place instead of failing session start or an agent launch, and the shared sheet table in `tests/session-hook-sheets.mjs` now holds every hook to that case. A retained agent worktree is checked before reuse and cleanup: a plain directory, a link, an unrelated repository, or an unregistered gitdir at that path is refused, and its files are left alone, so an isolated agent can no longer run in the parent checkout.
+
+`tools/forks.json` drops the stale `watch-pr/transport.test.ts` entry that the sync dry-run warned about.
+
 ## 0.9.67 - session hook sheet parity
 
 The POSIX hook, the PowerShell hook, and Pi now read the sheet the same way in two more cases. A `session hook: off` line after a UTF-8 byte-order mark counts as off, which covers sheets saved by editors that add one. A sheet that exists but cannot be read as a file leaves the hook on, the same as a missing sheet, instead of failing the PowerShell hook or printing an error from the POSIX one. Both cases join the shared table in `tests/session-hook-sheets.mjs`. The Windows CI job's test timeout drops from 60 to 10 seconds, so a return of the slow PowerShell start fails the job.

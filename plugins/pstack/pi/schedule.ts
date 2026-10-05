@@ -51,7 +51,7 @@ export class Scheduler {
     this.loop.unref();
   }
 
-  stopLoop(): boolean {
+  private stopLoop(): boolean {
     const had = this.loop !== undefined;
     clearInterval(this.loop);
     this.loop = undefined;
@@ -150,14 +150,14 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
           return;
         case "fixed": {
           const seconds = Math.max(MIN_DELAY_S, cmd.seconds);
-          scheduler.cancelWakeup();
+          scheduler.stopAll();
           scheduler.startLoop(seconds, cmd.prompt, ctx);
           ctx.ui.notify(`Looping every ${seconds}s. /loop stop ends it.`, "info");
           await fire(cmd.prompt);
           return;
         }
         case "dynamic":
-          scheduler.stopLoop();
+          scheduler.stopAll();
           await fire(dynamicPrompt(cmd.prompt));
       }
     },

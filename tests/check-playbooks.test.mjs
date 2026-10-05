@@ -71,4 +71,11 @@ describe("project playbooks", () => {
     });
     expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
   });
+
+  test("a playbook saved with a UTF-8 byte-order mark passes", () => {
+    const result = run({
+      "bug-fix.md": '\uFEFF---\r\nextends: bug-fix\r\nwhen: Use it for any bug report.\r\n---\r\n- **In** "Binary-search the cause": compare with main.\r\n',
+    });
+    expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
+  });
 });

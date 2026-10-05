@@ -2,8 +2,8 @@
 // made. Then the agent tool's worktree isolation over it.
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import { ensureWorktree, planWorktree, settleWorktree } from "../../plugins/pstack/pi/worktree.ts";
 import { gitRepo, resultText, useWorld, waitFor } from "./harness.mjs";
@@ -40,6 +40,7 @@ test("a commit on a detached HEAD inside the worktree keeps it too", () => {
   ensureWorktree(wt);
   spawnSync("git", ["checkout", "--detach"], { cwd: wt.path });
   commitIn(wt.path, "work.txt");
+  ensureWorktree(wt);
 
   expect(settleWorktree(wt)).toBe(true);
   expect(existsSync(wt.path)).toBe(true);
@@ -106,10 +107,117 @@ test("a clean worktree still on its branch at the base is removed with its branc
   const git = gitRepo(w.cwd);
   const wt = planWorktree(w.cwd, "c2c");
   ensureWorktree(wt);
+  ensureWorktree(wt);
 
   expect(settleWorktree(wt)).toBe(false);
   expect(existsSync(wt.path)).toBe(false);
   expect(git("branch", "--list", wt.branch)).toBe("");
+});
+
+test("a cleanly removed worktree is re-created on resume, and a missing one needs no cleanup", () => {
+  const { w } = setup();
+  gitRepo(w.cwd);
+  const wt = planWorktree(w.cwd, "c2g");
+  expect(settleWorktree(wt)).toBe(false);
+  ensureWorktree(wt);
+  expect(settleWorktree(wt)).toBe(false);
+  ensureWorktree(wt);
+  expect(spawnSync("git", ["rev-parse", "HEAD"], { cwd: wt.path, encoding: "utf8" }).stdout.trim()).toBe(wt.base);
+});
+
+test("a parent session already in a linked worktree gets its own child worktree", () => {
+  const { w } = setup();
+  const git = gitRepo(w.cwd);
+  const parent = join(dirname(w.cwd), "parent-worktree");
+  git("worktree", "add", "-q", "-b", "parent", parent);
+  const wt = planWorktree(parent, "c2h");
+  ensureWorktree(wt);
+  ensureWorktree(wt);
+  expect(spawnSync("git", ["rev-parse", "HEAD"], { cwd: wt.path, encoding: "utf8" }).stdout.trim()).toBe(wt.base);
+  expect(settleWorktree(wt)).toBe(false);
+});
+
+// Whatever sits at a retained path, only this agent's registered linked
+// worktree may run a writer or be cleaned up.
+describe("a path that is not the agent's linked worktree", () => {
+  const rejected = (fn) => expect(fn).toThrow(/not the expected linked worktree/);
+  const link = (target, path) => {
+    mkdirSync(dirname(path), { recursive: true });
+    symlinkSync(target, path, process.platform === "win32" ? "junction" : "dir");
+  };
+  const replaced = (git, wt) => {
+    ensureWorktree(wt);
+    git("worktree", "remove", wt.path);
+    mkdirSync(wt.path, { recursive: true });
+    writeFileSync(join(wt.path, "keep.txt"), "do not remove\n");
+  };
+
+  test("an ordinary directory, which git resolves to the primary checkout, is rejected", () => {
+    const { w } = setup();
+    gitRepo(w.cwd);
+    const wt = planWorktree(w.cwd, "id1");
+    mkdirSync(wt.path, { recursive: true });
+    expect(spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: wt.path, encoding: "utf8" }).stdout.trim()).toBe(w.cwd);
+    rejected(() => ensureWorktree(wt));
+  });
+
+  test("an unrelated repository is rejected and left as it was", () => {
+    const { w } = setup();
+    gitRepo(w.cwd);
+    const wt = planWorktree(w.cwd, "id2");
+    mkdirSync(wt.path, { recursive: true });
+    const other = gitRepo(wt.path);
+    const head = other("rev-parse", "HEAD");
+    rejected(() => ensureWorktree(wt));
+    expect(other("rev-parse", "HEAD")).toBe(head);
+  });
+
+  test("a link to the primary checkout is rejected", () => {
+    const { w } = setup();
+    gitRepo(w.cwd);
+    const wt = planWorktree(w.cwd, "id3");
+    link(w.cwd, wt.path);
+    rejected(() => ensureWorktree(wt));
+  });
+
+  test("a link to another agent's worktree is rejected and that worktree survives", () => {
+    const { w } = setup();
+    gitRepo(w.cwd);
+    const other = planWorktree(w.cwd, "id4-other");
+    ensureWorktree(other);
+    const wt = planWorktree(w.cwd, "id4");
+    link(other.path, wt.path);
+    rejected(() => ensureWorktree(wt));
+    expect(existsSync(other.path)).toBe(true);
+  });
+
+  test("an unregistered gitdir file pointing at the primary repository is rejected", () => {
+    const { w } = setup();
+    gitRepo(w.cwd);
+    const wt = planWorktree(w.cwd, "id5");
+    mkdirSync(wt.path, { recursive: true });
+    writeFileSync(join(wt.path, ".git"), `gitdir: ${join(w.cwd, ".git").replaceAll("\\", "/")}\n`);
+    rejected(() => ensureWorktree(wt));
+  });
+
+  test("a removed worktree replaced by a plain directory cannot be resumed, and its files stay", () => {
+    const { w } = setup();
+    const git = gitRepo(w.cwd);
+    const wt = planWorktree(w.cwd, "id6");
+    replaced(git, wt);
+    rejected(() => ensureWorktree(wt));
+    expect(readFileSync(join(wt.path, "keep.txt"), "utf8")).toBe("do not remove\n");
+  });
+
+  test("cleanup refuses a replacement directory without deleting its files or the branch", () => {
+    const { w } = setup();
+    const git = gitRepo(w.cwd);
+    const wt = planWorktree(w.cwd, "id7");
+    replaced(git, wt);
+    rejected(() => settleWorktree(wt));
+    expect(readFileSync(join(wt.path, "keep.txt"), "utf8")).toBe("do not remove\n");
+    expect(git("branch", "--list", wt.branch)).toContain(wt.branch);
+  });
 });
 
 describe("worktree isolation", () => {

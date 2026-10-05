@@ -247,7 +247,8 @@ describe("stop_agent", () => {
   });
 
   test("escalates to SIGKILL when the child ignores SIGTERM", async () => {
-    const { w, pi, ctx } = setup({ script: { default: [{ ignoreSigterm: true }, { sleep: 30000 }] } });
+    // Muted, so the abort cannot end the run and let the child exit before the SIGTERM lands.
+    const { w, pi, ctx } = setup({ script: { default: [{ ignoreSigterm: true }, { mute: true }, { sleep: 30000 }] } });
     const { details } = await pi.call("agent", { description: "stubborn", prompt: "x", run_in_background: true }, ctx);
     await w.until("ignoring-sigterm");
     const started = Date.now();

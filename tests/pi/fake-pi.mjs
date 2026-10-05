@@ -98,15 +98,20 @@ let stdinClosed = false;
 let started = false;
 let muted = false;
 let uiAnswered = () => {};
-// As pi's rpc mode: SIGTERM kills the process trees of the bash commands still
-// running, then exits 143.
+// As pi: an abort or SIGTERM kills the process trees of the bash commands still
+// running, and SIGTERM then exits 143. Killing on abort too matters when an
+// abort, a stdin close, and a SIGTERM arrive together: the run can settle and
+// exit before the SIGTERM handler runs.
 const trackedCommands = new Set();
-process.on("SIGTERM", () => {
+const killTracked = () => {
   for (const pid of trackedCommands) {
     try {
       process.kill(-pid, "SIGKILL");
     } catch {}
   }
+};
+process.on("SIGTERM", () => {
+  killTracked();
   process.exit(143);
 });
 let settledAt;
@@ -133,6 +138,7 @@ const prompted = new Promise((resolve) => {
       wake();
     } else if (command.type === "abort") {
       aborted = true;
+      killTracked();
       wake();
       respond(command);
     } else if (command.type === "extension_ui_response") {

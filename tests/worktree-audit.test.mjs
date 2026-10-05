@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -245,6 +245,16 @@ describe("lastChats matches a path as JSONL spells it, never a sibling's prefix"
     ["a path followed by a tab", "/repo/worktree", "ls\t/repo/worktree\tsrc"],
     ["a path followed by a newline", "/repo/worktree", "cd /repo/worktree\nls"],
     ["a quoted Windows path inside a command", "C:/repo/worktree", String.raw`cd "C:\repo\worktree" && dir`],
+    ["a path in backticks", "/repo/worktree", "the worktree `/repo/worktree` is done"],
+    ["a path followed by a colon", "/repo/worktree", "/repo/worktree:12"],
+    ["a path followed by a semicolon", "/repo/worktree", "cd /repo/worktree;ls"],
+    ["a path closing a Markdown link", "/repo/worktree", "[wt](/repo/worktree)"],
+    ["a path followed by a comma", "/repo/worktree", "removed /repo/worktree, done"],
+    ["a path followed by a pipe", "/repo/worktree", "ls /repo/worktree|wc"],
+    ["a path followed by an ampersand", "/repo/worktree", "cd /repo/worktree&&ls"],
+    ["a path followed by a process substitution", "/repo/worktree", "diff /repo/worktree<(git status)"],
+    ["a path followed by a redirect", "/repo/worktree", "ls /repo/worktree>out"],
+    ["a Windows path followed by a semicolon", "C:/repo/worktree", String.raw`cd C:\repo\worktree;dir`],
   ])("finds %s", (_, path, cwd) => {
     expect(scan(path, cwd)).toBe(true);
   });
@@ -254,8 +264,36 @@ describe("lastChats matches a path as JSONL spells it, never a sibling's prefix"
     ["C:/repo/worktree", String.raw`C:\repo\worktree-long\src\file.ts`],
     ["/repo/worktree", 'cd "/repo/worktree-long" && ls'],
     ["/repo/worktree", "cd /repo/worktree-long && ls"],
+    ["/repo/worktree", "cd /repo/worktree.bak"],
+    ["/repo/worktree", "/repo/worktree_2 ls"],
+    ["C:/repo/worktree", "C:/repo/worktree.bak/x"],
   ])("does not match %s in %s", (path, cwd) => {
     expect(scan(path, cwd)).toBe(false);
+  });
+
+  describe("a worktree under a symlinked ancestor", () => {
+    const layout = () => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-links-")));
+      fixtures.push(root);
+      mkdirSync(join(root, "real/worktree"), { recursive: true });
+      symlinkSync(join(root, "real"), join(root, "link"));
+      return root;
+    };
+
+    test("git's resolved spelling finds a session whose shell kept the symlink", () => {
+      const root = layout();
+      expect(scan(join(root, "real/worktree"), join(root, "link/worktree"))).toBe(true);
+    });
+
+    test("the symlink spelling finds a session that resolved it", () => {
+      const root = layout();
+      expect(scan(join(root, "link/worktree"), join(root, "real/worktree"))).toBe(true);
+    });
+
+    test("the symlink spelling does not match a sibling", () => {
+      const root = layout();
+      expect(scan(join(root, "real/worktree"), join(root, "link/worktree-long/file.ts"))).toBe(false);
+    });
   });
 });
 

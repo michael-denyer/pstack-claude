@@ -22,22 +22,25 @@ type Ui = ExtensionContext["ui"];
 // undefined means the user dismissed the dialog.
 async function ask(ui: Ui, q: Question, signal: AbortSignal | undefined): Promise<string | undefined> {
   const title = q.header ? `${q.header}: ${q.question}` : q.question;
-  const shown = (o: Question["options"][number]) => (o.description ? `${o.label} - ${o.description}` : o.label);
-  const labels = new Map(q.options.map((o) => [shown(o), o.label]));
+  // Pi returns the displayed string, so number choices to distinguish them
+  // from controls and from other choices with the same rendered text.
+  const labels = new Map(q.options.map((o, i) => [`${i + 1}. ${o.label}${o.description ? ` - ${o.description}` : ""}`, o.label]));
   // The label of a listed pick, or what the user types for OTHER.
   const answer = (pick: string) => (pick === OTHER ? ui.input(title, "Your answer", { signal }) : labels.get(pick));
   if (!q.multiSelect) {
     const pick = await ui.select(title, [...labels.keys(), OTHER], { signal });
     return pick === undefined ? undefined : answer(pick);
   }
+  const picked = new Set<string>();
   const chosen: string[] = [];
   for (;;) {
-    const remaining = [...labels].filter(([, label]) => !chosen.includes(label)).map(([text]) => text);
+    const remaining = [...labels.keys()].filter((text) => !picked.has(text));
     const pick = await ui.select(`${title} (one at a time; ${DONE} when finished)`, [...remaining, OTHER, DONE], { signal });
     if (pick === undefined) return undefined;
     if (pick === DONE) return chosen.join(", ");
     const text = await answer(pick);
     if (text === undefined) return undefined;
+    picked.add(pick);
     chosen.push(text);
   }
 }

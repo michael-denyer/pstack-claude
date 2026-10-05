@@ -420,6 +420,36 @@ test.skipIf(noNode)("a transcript removed after it was listed drops out of the c
   expect(JSON.parse(run.stdout)).toEqual([["/x/wt", 100]]);
 });
 
+test.skipIf(noNode)("a session resumed during the scan keeps its active worktree out of safe", () => {
+  const fixture = createFixture();
+  const worktree = addWorktree(fixture, "resumed");
+  const old = Math.floor(Date.now() / 1000) - 10 * 86400;
+  writeTranscript(fixture, "resumed.jsonl", worktree, old);
+  const session = join(fixture.transcripts, "resumed.jsonl");
+  const body = `
+    import fs from "node:fs";
+    import { syncBuiltinESMExports } from "node:module";
+    const stat = fs.statSync;
+    let resumed = false;
+    fs.statSync = (path, ...args) => {
+      const result = stat(path, ...args);
+      if (path === ${JSON.stringify(session)} && !resumed) {
+        resumed = true;
+        fs.appendFileSync(path, JSON.stringify({ cwd: ${JSON.stringify(worktree)}, message: "resume" }) + "\\n");
+      }
+      return result;
+    };
+    syncBuiltinESMExports();
+    const { audit } = await import(${JSON.stringify(script)});
+    console.log(audit({ repo: ${JSON.stringify(fixture.repo)}, transcripts: [${JSON.stringify(fixture.transcripts)}], gh: () => "[]" }));
+  `;
+  const run = spawnSync("node", ["--input-type=module", "-e", body], { encoding: "utf8" });
+  expect(run.status).toBe(0);
+  expect(run.stderr).toBe("");
+  const row = run.stdout.trim().split("\n")[1].split("\t");
+  expect(row.slice(6, 8)).toEqual([ymd(Math.floor(Date.now() / 1000)), "verify-recent-chat"]);
+});
+
 describe("a discovery failure keeps an ancestor out of safe", () => {
   const failures = [
     ["the trunk fetch", (fixture) => {

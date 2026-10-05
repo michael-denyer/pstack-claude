@@ -201,7 +201,7 @@ export class AgentRunner {
     const { command, args } = this.settings.pi;
     const child = new PiChild(
       command,
-      [...args, ...childArgs(identity, this.settings.depth)],
+      [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills"), ...childArgs(identity, this.settings.depth)],
       { cwd: identity.cwd, exitGraceMs: this.settings.exitGraceMs },
       prompt,
     );

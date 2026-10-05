@@ -145,11 +145,13 @@ function transcriptNeedles(spellings) {
 export function lastChats(roots, spellings) {
   const needles = [...spellings].map(([path, forms]) => [path, transcriptNeedles(forms)]);
   const latest = new Map();
-  for (const { path: file, mtime: mtimeMs } of roots.flatMap((root) => candidates(root, Infinity))) {
-    const mtime = Math.floor(mtimeMs / 1000);
-    let text;
+  for (const { path: file } of roots.flatMap((root) => candidates(root, Infinity))) {
+    let text, mtime;
     try {
       text = readFileSync(file);
+      // A session can resume after enumeration. Its new content must use its
+      // current timestamp, not the old one used to order the candidates.
+      mtime = Math.floor(statSync(file).mtimeMs / 1000);
     } catch (error) {
       rethrowUnlessRemoved(error);
       continue;

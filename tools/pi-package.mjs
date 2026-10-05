@@ -18,3 +18,20 @@ export function findPiPackage() {
   const roots = [npmRoot(), join(homedir(), ".bun/install/global/node_modules"), join(homedir(), ".cache/.bun/install/global/node_modules")];
   return roots.filter(Boolean).map((root) => join(root, "@earendil-works/pi-coding-agent")).find((dir) => existsSync(join(dir, "package.json"))) ?? null;
 }
+
+export function piCompilerPaths(piDir) {
+  // npm nests the package's dependencies in its own node_modules; bun's global
+  // directory is flat, so there they sit beside the package's scope.
+  const dep = (name) => [join(piDir, "node_modules", name), join(piDir, "..", "..", name)].find(existsSync) ?? join(piDir, "node_modules", name);
+  return {
+    typeRoots: [dep("@types")],
+    baseUrl: piDir,
+    paths: {
+      "@earendil-works/pi-coding-agent": ["dist/index.d.ts"],
+      "@earendil-works/pi-ai": [join(dep("@earendil-works/pi-ai"), "dist/index.d.ts")],
+      "@earendil-works/pi-agent-core": [join(dep("@earendil-works/pi-agent-core"), "dist/index.d.ts")],
+      typebox: [join(dep("typebox"), "build/index.d.mts")],
+      "typebox/*": [join(dep("typebox"), "build/*/index.d.mts")],
+    },
+  };
+}

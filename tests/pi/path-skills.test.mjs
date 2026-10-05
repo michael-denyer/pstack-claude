@@ -1,7 +1,10 @@
 // The note a tool result carries when its file matches a skill's `paths:` globs.
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { registerPathSkills } from "../../plugins/pstack/pi/path-skills.ts";
 import { pluginRoot, useWorld } from "./harness.mjs";
 
 const setup = useWorld();
@@ -46,5 +49,29 @@ describe("paths: auto-load note", () => {
     const { pi, ctx } = setup();
     const [r] = await pi.emit("tool_result", result("bash", "src/a.ts"), ctx);
     expect(r).toBeUndefined();
+  });
+});
+
+describe("paths: frontmatter that is not a JSON array of globs", () => {
+  const register = (pathsLine) => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-paths-"));
+    const file = join(root, "skills", "csv", "SKILL.md");
+    mkdirSync(join(root, "skills", "csv"), { recursive: true });
+    writeFileSync(file, `---\nname: csv\npaths: ${pathsLine}\n---\nbody\n`);
+    try {
+      registerPathSkills({ on() {} }, { pluginRoot: root });
+      return { file };
+    } catch (error) {
+      return { file, error };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+
+  test("a line that is not a JSON array of strings throws naming the skill file", () => {
+    for (const line of ["a/**, b/**", '"a/**"', '["a/**", 1]']) {
+      const { file, error } = register(line);
+      expect(error?.message).toBe(`${file}: paths must be a JSON array of globs`);
+    }
   });
 });

@@ -13,9 +13,15 @@ interface PathSkill {
 }
 
 function parsePaths(file: string, line: string): string[] {
-  const globs: unknown = JSON.parse(line);
+  const fault = new Error(`${file}: paths must be a JSON array of globs`);
+  let globs: unknown;
+  try {
+    globs = JSON.parse(line);
+  } catch {
+    throw fault;
+  }
   if (Array.isArray(globs) && globs.every((g): g is string => typeof g === "string")) return globs;
-  throw new Error(`${file}: paths must be a JSON array of globs`);
+  throw fault;
 }
 
 // Skills whose frontmatter names `paths:` globs, the files that should load them.

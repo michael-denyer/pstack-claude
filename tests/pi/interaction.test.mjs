@@ -33,6 +33,39 @@ const q = (extra = {}) => ({
 });
 
 describe("ask_user_question", () => {
+  test("a choice named Done is selectable independently of the completion control", async () => {
+    let step = 0;
+    const ui = { select: async (_title, options) => options[step++ === 0 ? 0 : options.length - 1] };
+    const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
+    const result = await pi.call("ask_user_question", {
+      questions: [q({ multiSelect: true, options: [{ label: "Done" }, { label: "In progress" }] })],
+    }, ctx);
+    expect(result.details).toEqual({ answers: [{ question: "Which store?", answer: "Done" }], dismissed: false });
+  });
+
+  test("a choice named Other stays a choice and equal rendered labels stay distinct", async () => {
+    const ui = { select: async (_title, options) => options[0] };
+    const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
+    const result = await pi.call("ask_user_question", {
+      questions: [
+        q({ options: [{ label: OTHER }, { label: "Listed" }] }),
+        q({ options: [{ label: "A", description: "B" }, { label: "A - B" }] }),
+      ],
+    }, ctx);
+    expect(result.details.answers.map((a) => a.answer)).toEqual([OTHER, "A"]);
+  });
+
+  test("multiSelect keeps a choice selectable after its same-label twin is picked", async () => {
+    const ui = scriptedUi(["1. Same - first", "2. Same - second", DONE]);
+    const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
+    const result = await pi.call("ask_user_question", {
+      questions: [q({ multiSelect: true, options: [{ label: "Same", description: "first" }, { label: "Same", description: "second" }] })],
+    }, ctx);
+    const selects = ui.calls.filter((c) => c.kind === "select");
+    expect(selects[1].options).toEqual(["2. Same - second", OTHER, DONE]);
+    expect(result.details.answers).toEqual([{ question: "Which store?", answer: "Same, Same" }]);
+  });
+
   test("without a UI it fails and tells the model to ask in plain text", async () => {
     const ui = scriptedUi([]);
     const { pi, ctx } = setup({ ctx: { hasUI: false, ui } });
@@ -42,11 +75,11 @@ describe("ask_user_question", () => {
   });
 
   test("a single-select question returns the chosen label", async () => {
-    const ui = scriptedUi(["Redis - in memory"]);
+    const ui = scriptedUi(["2. Redis - in memory"]);
     const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
     const result = await pi.call("ask_user_question", { questions: [q()] }, ctx);
     expect(ui.calls).toEqual([
-      { kind: "select", title: "Store: Which store?", options: ["Postgres - relational", "Redis - in memory", OTHER] },
+      { kind: "select", title: "Store: Which store?", options: ["1. Postgres - relational", "2. Redis - in memory", OTHER] },
     ]);
     expect(result.details.answers).toEqual([{ question: "Which store?", answer: "Redis" }]);
     expect(result.content[0].text).toContain('"Which store?"="Redis"');
@@ -60,16 +93,16 @@ describe("ask_user_question", () => {
   });
 
   test("multiSelect picks one at a time until Done, including typed answers", async () => {
-    const ui = scriptedUi(["Postgres - relational", OTHER, "SQLite", DONE]);
+    const ui = scriptedUi(["1. Postgres - relational", OTHER, "SQLite", DONE]);
     const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
     const result = await pi.call("ask_user_question", { questions: [q({ multiSelect: true })] }, ctx);
     expect(result.details.answers[0].answer).toBe("Postgres, SQLite");
     const selects = ui.calls.filter((c) => c.kind === "select");
-    expect(selects[1].options).toEqual(["Redis - in memory", OTHER, DONE]);
+    expect(selects[1].options).toEqual(["2. Redis - in memory", OTHER, DONE]);
   });
 
   test("a later dismissal preserves completed answers in model-facing content and stops the run", async () => {
-    const ui = scriptedUi(["Postgres - relational", undefined]);
+    const ui = scriptedUi(["1. Postgres - relational", undefined]);
     const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
     const result = await pi.call("ask_user_question", { questions: [q(), q({ question: "Cache?" }), q({ question: "Queue?" })] }, ctx);
     expect(result.details).toEqual({ answers: [{ question: "Which store?", answer: "Postgres" }], dismissed: true });
@@ -90,7 +123,7 @@ describe("ask_user_question", () => {
   });
 
   test("dismissing Other input preserves earlier typed and completed multi-select answers", async () => {
-    const ui = scriptedUi([OTHER, "SQLite", "Postgres - relational", "Redis - in memory", DONE, OTHER, undefined]);
+    const ui = scriptedUi([OTHER, "SQLite", "1. Postgres - relational", "2. Redis - in memory", DONE, OTHER, undefined]);
     const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
     const result = await pi.call("ask_user_question", {
       questions: [q(), q({ question: "Caches?", multiSelect: true }), q({ question: "Queue?" })],
@@ -105,7 +138,7 @@ describe("ask_user_question", () => {
   });
 
   test("completing all questions retains the success message and answer order", async () => {
-    const ui = scriptedUi(["Postgres - relational", "Redis - in memory"]);
+    const ui = scriptedUi(["1. Postgres - relational", "2. Redis - in memory"]);
     const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
     const result = await pi.call("ask_user_question", { questions: [q(), q({ question: "Cache?" })] }, ctx);
     expect(result.details).toEqual({
@@ -131,6 +164,32 @@ describe("schedule_wakeup", () => {
 
   const wake = (pi, ctx, params) => pi.call("schedule_wakeup", { reason: "waiting on CI", ...params }, ctx);
 
+  test("a due wakeup waits through compaction and runs exactly once after idle", async () => {
+    let idle = false;
+    const { pi, ctx } = setup({ ctx: { idle: () => idle } });
+    await wake(pi, ctx, { delaySeconds: 60, prompt: "resume after compaction" });
+    jest.advanceTimersByTime(65_000);
+    expect(pi.userMessages).toEqual([]);
+    idle = true;
+    jest.advanceTimersByTime(1_000);
+    expect(pi.userMessages.map((m) => m.content)).toEqual(["resume after compaction"]);
+    jest.advanceTimersByTime(60_000);
+    expect(pi.userMessages).toHaveLength(1);
+  });
+
+  test.each(["cancel", "replace", "shutdown"])("a wakeup waiting for idle can %s", async (action) => {
+    let idle = false;
+    const { pi, ctx } = setup({ ctx: { idle: () => idle } });
+    await wake(pi, ctx, { delaySeconds: 60, prompt: "old" });
+    jest.advanceTimersByTime(60_000);
+    if (action === "cancel") expect((await wake(pi, ctx, { stop: true })).details.cancelled).toBe(true);
+    if (action === "replace") await wake(pi, ctx, { delaySeconds: 60, prompt: "new" });
+    if (action === "shutdown") await pi.emit("session_shutdown", { reason: "quit" }, ctx);
+    idle = true;
+    jest.advanceTimersByTime(120_000);
+    expect(pi.userMessages.map((m) => m.content)).toEqual(action === "replace" ? ["new"] : []);
+  });
+
   test("clamps to 60 s and fires the prompt as a follow-up user message", async () => {
     const { pi, ctx } = setup({ ctx: { idle: true } });
     const result = await wake(pi, ctx, { delaySeconds: 5, prompt: "check CI" });
@@ -151,11 +210,15 @@ describe("schedule_wakeup", () => {
     });
   }
 
-  test("clamps to 3600 s and queues as a follow-up when the agent is busy", async () => {
-    const { pi, ctx } = setup({ ctx: { idle: false } });
+  test("clamps to 3600 s and retains the wakeup while the agent is busy", async () => {
+    let idle = false;
+    const { pi, ctx } = setup({ ctx: { idle: () => idle } });
     expect((await wake(pi, ctx, { delaySeconds: 99999, prompt: "later" })).details.delaySeconds).toBe(3600);
     jest.advanceTimersByTime(3_599_000);
     expect(pi.userMessages).toEqual([]);
+    jest.advanceTimersByTime(1_000);
+    expect(pi.userMessages).toEqual([]);
+    idle = true;
     jest.advanceTimersByTime(1_000);
     expect(pi.userMessages).toEqual([{ content: "later", options: { deliverAs: "followUp", expandPromptTemplates: true } }]);
   });

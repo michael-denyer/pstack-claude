@@ -55,6 +55,17 @@ describe("ask_user_question", () => {
     expect(result.details.answers.map((a) => a.answer)).toEqual([OTHER, "A"]);
   });
 
+  test("multiSelect keeps a choice selectable after its same-label twin is picked", async () => {
+    const ui = scriptedUi(["1. Same - first", "2. Same - second", DONE]);
+    const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
+    const result = await pi.call("ask_user_question", {
+      questions: [q({ multiSelect: true, options: [{ label: "Same", description: "first" }, { label: "Same", description: "second" }] })],
+    }, ctx);
+    const selects = ui.calls.filter((c) => c.kind === "select");
+    expect(selects[1].options).toEqual(["2. Same - second", OTHER, DONE]);
+    expect(result.details.answers).toEqual([{ question: "Which store?", answer: "Same, Same" }]);
+  });
+
   test("without a UI it fails and tells the model to ask in plain text", async () => {
     const ui = scriptedUi([]);
     const { pi, ctx } = setup({ ctx: { hasUI: false, ui } });

@@ -288,7 +288,6 @@ describe("PreToolUse vendored script runs", () => {
     "resume defaults": `node ${root}/skills/poteto-mode/scripts/resume.mjs read`,
     "resume publication": `node ${root}/skills/poteto-mode/scripts/resume.mjs publish --note note.md --artifact=a.md --artifact b.md`,
     "a relative transcript directory": `node ${find} notes/today prompt`,
-    "a path in the plugin": `node ${root}/skills/poteto-mode/scripts/check-plan.mjs ${root}/skills/reflect/SKILL.md`,
     "a playbook check": `node ${root}/skills/poteto-mode/scripts/check-playbooks.mjs`,
     "a playbook check in a project": `node ${root}/skills/poteto-mode/scripts/check-playbooks.mjs .`,
     "an audit with defaults": `node ${root}/skills/poteto-mode/scripts/worktree-audit.mjs`,
@@ -352,6 +351,9 @@ describe("PreToolUse vendored script runs", () => {
     "a relative flag that climbs into a sibling": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project=../outside`,
     "a relative flag naming the parent": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project=..`,
     "an absolute argument outside the workspace": `bash ${log} /etc/profile review decision why evidence result`,
+    // A path operand in the plugin could rewrite the context every session loads.
+    "a log appended to the plugin's session context": `bash ${log} ${root}/hooks/session-start-copilot.md review decision why evidence result`,
+    "a path in the plugin": `node ${root}/skills/poteto-mode/scripts/check-plan.mjs ${root}/skills/reflect/SKILL.md`,
     "a flag holding an outside path": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project=/etc/x`,
     "a sibling prefix": `node ${root}-evil/skills/reflect/scripts/find-transcript.mjs`,
     "a script outside scripts/": `node ${root}/skills/reflect/SKILL.md`,
@@ -417,6 +419,10 @@ describe("PreToolUse vendored script runs", () => {
   test("stays silent when the plugin sits inside the workspace", () => {
     expect(run(bash(`node ${find} ${workspace} prompt`, root), env)).toEqual(quiet);
     expect(run(bash(`node ${find} ${workspace} prompt`, join(root, "..")), env)).toEqual(quiet);
+  });
+
+  test("stays silent when the workspace sits inside the plugin", () => {
+    expect(run(bash(`bash ${log} session-start-copilot.md review decision why evidence result`, join(root, "hooks")), env)).toEqual(quiet);
   });
 
   // setup-pstack runs its sheet check in this form after it writes the sheet.

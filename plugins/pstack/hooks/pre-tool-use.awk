@@ -65,7 +65,9 @@ function task_rule(    type, model) {
 function script_rule(cmd,    n, T, Q, first, script, runner, rel) {
   if (JBAD || cmd ~ /[;|&$`<>()\\"]/ || control(cmd)) return
   cwd = resolve(cwd)
-  if (root == "" || cwd == "" || root == cwd || under(root, cwd) || real == cwd || under(real, cwd)) return
+  # A workspace that holds the plugin, or sits in it, could rewrite its files.
+  if (root == "" || cwd == "" || root == cwd || under(root, cwd) || under(cwd, root) \
+    || real == cwd || under(real, cwd) || under(cwd, real)) return
   n = words(cmd, T, Q)
   if (n <= 0) return
   first = 1
@@ -93,8 +95,10 @@ function safe_path(p,    n, seg, i) {
   return inside(resolve(p))
 }
 
+# Path operands stay in the workspace: one in the plugin could rewrite the
+# context every later session loads.
 function inside(p) {
-  return p != "" && (p == cwd || under(p, cwd) || under(p, root) || under(p, real))
+  return p != "" && (p == cwd || under(p, cwd))
 }
 
 # Copilot reports cwd as a real path (/private/tmp on macOS), while the agent

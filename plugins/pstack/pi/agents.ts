@@ -202,7 +202,7 @@ export class AgentRunner {
     const child = new PiChild(
       command,
       [...args, ...childArgs(identity, this.settings.depth)],
-      { cwd: identity.cwd, env: this.settings.childEnv, exitGraceMs: this.settings.exitGraceMs },
+      { cwd: identity.cwd, exitGraceMs: this.settings.exitGraceMs },
       prompt,
     );
     const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, parentPid: process.pid };

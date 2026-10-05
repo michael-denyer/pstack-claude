@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Stands in for `pi --mode rpc` (the harness points settings.pi at it). It logs
-// its invocation, each reply, steer, and settle to PSTACK_FAKE_PI_LOG, so a
+// its invocation, each reply, steer, and settle to its second argument, so a
 // test can wait for the moment it needs, reads JSON commands from stdin as real pi
-// does, and plays the steps PSTACK_FAKE_PI_SCRIPT names for the prompt it is
+// does, and plays the steps its first argument's script names for the prompt it is
 // given: { "default": [steps], "byPrompt": { "<prompt>": [steps] } }.
 //
 // Steps: { reply } emits an assistant message_end ("${prompt}", "${history}"
@@ -32,7 +32,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 
-const argv = process.argv.slice(2);
+const [scriptPath, logPath, ...argv] = process.argv.slice(2);
 const flag = (name) => {
   const i = argv.indexOf(name);
   return i === -1 ? undefined : argv[i + 1];
@@ -41,9 +41,7 @@ const sessionId = flag("--session-id");
 const sessionDir = flag("--session-dir");
 const systemFile = flag("--append-system-prompt");
 
-const log = (record) => {
-  if (process.env.PSTACK_FAKE_PI_LOG) appendFileSync(process.env.PSTACK_FAKE_PI_LOG, JSON.stringify(record) + "\n");
-};
+const log = (record) => appendFileSync(logPath, JSON.stringify(record) + "\n");
 let held;
 const out = (event) => {
   const line = JSON.stringify(event) + "\n";
@@ -60,7 +58,7 @@ if (sessionFile) {
 }
 const remember = (text) => sessionFile && appendFileSync(sessionFile, JSON.stringify(text) + "\n");
 
-const script = process.env.PSTACK_FAKE_PI_SCRIPT ? JSON.parse(readFileSync(process.env.PSTACK_FAKE_PI_SCRIPT, "utf8")) : {};
+const script = JSON.parse(readFileSync(scriptPath, "utf8"));
 
 const STEP_KEYS = new Set([
   "reply", "error", "raw", "touch", "stderr", "sleep", "exit", "mute", "ignoreSigterm", "spawn", "askUser",

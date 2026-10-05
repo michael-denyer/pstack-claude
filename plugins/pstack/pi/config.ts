@@ -17,9 +17,6 @@ export interface Settings {
   modelsFile: string;
   agentDir: string;
   pi: { command: string; args: string[] };
-  // Unset, so an agent inherits the session's environment. Tests set it to
-  // configure their fake pi.
-  childEnv?: NodeJS.ProcessEnv;
   // Layers below the main session: 0 there, 1 in its agents, and so on.
   readonly depth: number;
   killGraceMs: number;

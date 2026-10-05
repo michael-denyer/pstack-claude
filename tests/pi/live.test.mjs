@@ -66,7 +66,6 @@ suite("pstack on live pi", () => {
     mkdirSync(work);
     symlinkSync(join(homedir(), ".pi", "agent", "auth.json"), join(agentDir, "auth.json"));
     env = { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_TELEMETRY: "0" };
-    delete env.PSTACK_PI_DEPTH;
     const install = spawnSync("pi", ["install", repoRoot], { cwd: work, env, encoding: "utf8" });
     if (install.status !== 0) throw new Error(`pi install failed: ${install.stderr}`);
     // Keep no recent tokens so a two-turn session is big enough to compact.

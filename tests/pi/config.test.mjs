@@ -14,7 +14,6 @@ test("depth comes from the reader on each use and PI_CODING_AGENT_DIR moves the 
   flag = 2;
   expect(settings.depth).toBe(2);
   expect(settings.agentDir).toBe("/tmp/pi-agent-x");
-  expect(settings.childEnv).toBeUndefined();
   expect(defaultSettings(() => 0, {}).agentDir).toBe(join(homedir(), ".pi", "agent"));
 });
 

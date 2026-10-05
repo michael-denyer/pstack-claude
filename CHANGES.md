@@ -2,6 +2,16 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.70 - preserve active sessions, Pi child startup, wakeups, and question choices
+
+The worktree audit refreshes a transcript's timestamp after reading it. Resuming an old session during the scan now keeps its active worktree in `verify-recent-chat` instead of marking it `safe` with the old timestamp.
+
+Pi children explicitly load pstack's extension and skills, so a project-local install or a parent started with `pi -e` can launch agents in fresh worktrees. The startup tests run against installed Pi without model calls, including when the package is already installed globally.
+
+A due wakeup remains pending until Pi is idle, with at most one second of additional delay. Manual compaction no longer discards the prompt and stops a self-paced loop. Cancellation, replacement, and session shutdown also clear a wakeup waiting for idle.
+
+Structured questions number their choices. A choice named `Done` or `Other (type an answer)` now stays distinct from the completion and free-text controls, and choices with identical display text remain selectable.
+
 ## 0.9.69 - hook validation names a missing command
 
 `tools/generate.mjs` reports a hook with no `command` as a fault. Since the `commandWindows` override landed in 0.9.66, such a hook passed validation with nothing checked, including one that carried only a Windows override and so ran nowhere else.

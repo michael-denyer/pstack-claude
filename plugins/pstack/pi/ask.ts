@@ -22,8 +22,9 @@ type Ui = ExtensionContext["ui"];
 // undefined means the user dismissed the dialog.
 async function ask(ui: Ui, q: Question, signal: AbortSignal | undefined): Promise<string | undefined> {
   const title = q.header ? `${q.header}: ${q.question}` : q.question;
-  const shown = (o: Question["options"][number]) => (o.description ? `${o.label} - ${o.description}` : o.label);
-  const labels = new Map(q.options.map((o) => [shown(o), o.label]));
+  // Pi returns the displayed string, so number choices to distinguish them
+  // from controls and from other choices with the same rendered text.
+  const labels = new Map(q.options.map((o, i) => [`${i + 1}. ${o.label}${o.description ? ` - ${o.description}` : ""}`, o.label]));
   // The label of a listed pick, or what the user types for OTHER.
   const answer = (pick: string) => (pick === OTHER ? ui.input(title, "Your answer", { signal }) : labels.get(pick));
   if (!q.multiSelect) {

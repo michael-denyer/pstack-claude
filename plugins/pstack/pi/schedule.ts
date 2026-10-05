@@ -7,6 +7,7 @@ const MIN_DELAY_S = 60;
 const MAX_DELAY_S = 3600;
 // setInterval treats a delay above 2^31-1 ms as 1 ms.
 const MAX_LOOP_S = 24 * 86400;
+const IDLE_RETRY_MS = 1000;
 
 const wakeupParams = Type.Object({
   delaySeconds: Type.Optional(Type.Number({ description: `Seconds until the wakeup (${MIN_DELAY_S}-${MAX_DELAY_S})` })),
@@ -28,12 +29,19 @@ export class Scheduler {
     this.pi.sendUserMessage(prompt, { deliverAs: "followUp", expandPromptTemplates: true });
   }
 
-  scheduleWakeup(seconds: number, prompt: string): void {
+  scheduleWakeup(seconds: number, prompt: string, ctx: ExtensionContext): void {
     this.cancelWakeup();
-    this.wakeup = setTimeout(() => {
+    const deliver = () => {
+      // Pi rejects prompts during manual compaction. Keep the wakeup pending
+      // until idle, including while a run or compaction is still finishing.
+      if (!ctx.isIdle()) {
+        this.wakeup = setTimeout(deliver, IDLE_RETRY_MS).unref();
+        return;
+      }
       this.wakeup = undefined;
       this.fire(prompt);
-    }, seconds * 1000);
+    };
+    this.wakeup = setTimeout(deliver, seconds * 1000);
     this.wakeup.unref();
   }
 
@@ -104,7 +112,7 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
     name: "schedule_wakeup",
     label: "Schedule wakeup",
     exposure: "model-only",
-    description: `Schedule this session to be re-invoked with a prompt after delaySeconds (clamped to ${MIN_DELAY_S}-${MAX_DELAY_S}). One wakeup is pending at a time: a new call replaces it, and stop: true cancels it. Used by /loop's self-paced mode.`,
+    description: `Schedule this session to be re-invoked with a prompt after delaySeconds (clamped to ${MIN_DELAY_S}-${MAX_DELAY_S}), once the session is idle. One wakeup is pending at a time: a new call replaces it, and stop: true cancels it. Used by /loop's self-paced mode.`,
     parameters: wakeupParams,
     async execute(_id, params, _signal, _onUpdate, ctx) {
       if (params.stop) {
@@ -119,7 +127,7 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
         throw new Error(`schedule_wakeup cannot fire in a ${ctx.mode} run: pi exits when this run ends. Finish the work in this run instead.`);
       }
       const seconds = clampDelay(params.delaySeconds);
-      scheduler.scheduleWakeup(seconds, params.prompt);
+      scheduler.scheduleWakeup(seconds, params.prompt, ctx);
       const fireAt = new Date(Date.now() + seconds * 1000).toISOString();
       const clamped = seconds !== params.delaySeconds ? ` (clamped from ${params.delaySeconds})` : "";
       return {

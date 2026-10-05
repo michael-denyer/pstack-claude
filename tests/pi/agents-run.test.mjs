@@ -20,6 +20,8 @@ describe("agent tool", () => {
     expect(resultText(result)).not.toContain("draft");
     expect(result.details.status).toBe("completed");
     expect(inv.argv).toEqual([
+      "--extension", join(w.settings.pluginRoot, "pi", "index.ts"),
+      "--skill", join(w.settings.pluginRoot, "skills"),
       "--mode", "rpc",
       "--session-id", flag(inv, "--session-id"),
       "--session-dir", join(w.agentDir, "pstack", "parent-session", "agents"),

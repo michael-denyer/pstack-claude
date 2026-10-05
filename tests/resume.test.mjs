@@ -55,6 +55,37 @@ test('publishes a note linking an artifact with a parenthesized angle-bracket de
   assert.equal(run('read').value.checkpoint.artifacts[0].path, artifact);
 }));
 
+const storage = readFileSync(new URL('../plugins/pstack/skills/poteto-mode/references/resume-storage.md', import.meta.url), 'utf8');
+function publishNote(run, text, artifacts, unregistered = []) {
+  const directory = run('begin').value.directory;
+  const resume = join(directory, 'resume.md');
+  for (const name of [...artifacts, ...unregistered]) writeFileSync(join(directory, name), 'Which question is still open?\n');
+  writeFileSync(resume, text);
+  return run('publish', '--note', resume, ...artifacts.flatMap(name => ['--artifact', join(directory, name)]));
+}
+
+for (const [form, text, artifacts, unregistered, names] of [
+  ['balanced parentheses', '[A](a(b).md)\n', ['a(b).md'], [], '[A](a(b)'],
+  ['a link title', '[Q](q.md "Questions")\n', ['q.md'], [], '[Q](q.md "Questions")'],
+  ['a literal % in angle brackets', '[D](<100% done.md>)\n', ['100% done.md'], [], '[D](<100% done.md>)'],
+  ['an unregistered link', '[Q](q.md) and [O](other.md)\n', ['q.md'], ['other.md'], '[O](other.md)'],
+  ['a reference link', '[Q][q]\n\n[q]: q.md\n', ['q.md'], [], 'q.md'],
+  ['nested brackets in the link text', '[see [the] list](q.md)\n', ['q.md'], [], 'q.md'],
+]) test(`rejects ${form} by naming it and stating the documented link rule`, () => fixture(({ run }) => {
+  const result = publishNote(run, text, artifacts, unregistered);
+  assert.equal(result.status, 1);
+  assert.ok(result.value.detail.includes(names), result.value.detail);
+  const rule = result.value.detail.slice(result.value.detail.indexOf('Link each local file'));
+  assert.ok(rule.startsWith('Link each local file') && storage.includes(rule), result.value.detail);
+}));
+
+test('ignores links inside code spans and fenced code blocks', () => fixture(({ run }) => {
+  const text = 'Start with [Q](q.md). Quote `[x](missing.md)` literally.\n\n```markdown\n[y](absent.md)\n```\n\n~~~\n[z](gone.md)\n~~~\n';
+  const published = publishNote(run, text, ['q.md']);
+  assert.equal(published.status, 0, published.value.detail);
+  assert.equal(run('read').status, 0);
+}));
+
 test('failed publication leaves the last complete pointer intact', () => fixture(({ run }) => {
   const first = note(run);
   assert.equal(run('publish', '--note', first.note, '--artifact', first.artifact).status, 0);

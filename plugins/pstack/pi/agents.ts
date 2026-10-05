@@ -72,6 +72,10 @@ interface Run {
   done: Promise<EndedRecord>;
 }
 
+// A remote agent runs under the live pi process that restore left it to.
+type LocalAgent = { kind: "local"; record: RunningRecord; run: Run };
+type AgentState = LocalAgent | { kind: "remote"; record: RunningRecord } | { kind: "ended"; record: EndedRecord };
+
 // How a run ended, from what its process left behind. A run that settled on a
 // reply completed, whatever the exit code of the shutdown after it. Stderr
 // diagnoses a failure; a stopped child's stderr is not its output (pi warns
@@ -140,8 +144,7 @@ function reapOrphan(record: RunningRecord, killGraceMs: number): void {
 const now = () => new Date().toISOString();
 
 export class AgentRunner {
-  private readonly records = new Map<string, AgentRecord>();
-  private readonly runs = new Map<string, Run>();
+  private readonly agents = new Map<string, AgentState>();
   // Set once the session tears its agents down; a launch after that would
   // start a child nothing stops.
   private closed = false;
@@ -194,7 +197,7 @@ export class AgentRunner {
       if (identity.worktree) ensureWorktree(identity.worktree);
     } catch (e) {
       const failed: EndedRecord = { agent: identity, status: "failed", exitCode: null, endedAt: now(), finalText: (e as Error).message };
-      this.records.set(identity.id, failed);
+      this.agents.set(identity.id, { kind: "ended", record: failed });
       this.persist(failed);
       throw e;
     }
@@ -207,14 +210,11 @@ export class AgentRunner {
     );
     const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, parentPid: process.pid };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
-    this.records.set(identity.id, record);
-    this.runs.set(identity.id, run);
+    this.agents.set(identity.id, { kind: "local", record, run });
     this.persist(record);
     return record;
   }
 
-  // The record and the run table change together, before the entry is written:
-  // a running record without a run reads as another process's agent.
   private finish(identity: AgentIdentity, run: Run, exit: ChildExit): EndedRecord {
     const { status, finalText } = outcomeOf(exit, run.ending !== undefined);
     const worktree = identity.worktree && settle(identity.worktree);
@@ -227,8 +227,7 @@ export class AgentRunner {
       worktreeKept: worktree?.kept,
       ...saveOutput(identity, finalText + (worktree?.note ?? "")),
     };
-    this.records.set(identity.id, record);
-    this.runs.delete(identity.id);
+    this.agents.set(identity.id, { kind: "ended", record });
     this.persist(record);
     // The model that called stop_agent already has the result, so a stop's
     // notice joins the context without starting another turn.
@@ -240,42 +239,45 @@ export class AgentRunner {
 
   // The end of the agent's run in flight, or its record when it has ended.
   async wait(id: string): Promise<EndedRecord> {
-    const { record, run } = this.owned(id);
-    return run ? run.done : record;
+    const state = this.owned(id);
+    return state.kind === "local" ? state.run.done : state.record;
+  }
+
+  private locals(): LocalAgent[] {
+    return [...this.agents.values()].filter((state): state is LocalAgent => state.kind === "local");
   }
 
   get busy(): boolean {
-    return this.runs.size > 0;
+    return this.locals().length > 0;
   }
 
   // Resolves once the first running agent exits, at once when none is running.
   async nextExit(): Promise<void> {
-    if (this.runs.size) await Promise.race([...this.runs.values()].map((run) => run.done));
+    const locals = this.locals();
+    if (locals.length) await Promise.race(locals.map((state) => state.run.done));
   }
 
-  find(to: string): AgentRecord {
-    const byId = this.records.get(to);
+  private find(to: string): AgentState {
+    const byId = this.agents.get(to);
     if (byId) return byId;
-    const matches = [...this.records.values()].filter((r) => r.agent.description === to);
+    const states = [...this.agents.values()];
+    const matches = states.filter((state) => state.record.agent.description === to);
     if (matches.length === 1) return matches[0];
     if (matches.length > 1) {
-      throw new Error(`"${to}" matches several agents (${matches.map((r) => r.agent.id).join(", ")}); pass an agentId.`);
+      throw new Error(`"${to}" matches several agents (${matches.map((state) => state.record.agent.id).join(", ")}); pass an agentId.`);
     }
-    const known = [...this.records.values()].map((r) => `${r.agent.id} (${r.agent.description})`);
+    const known = states.map(({ record }) => `${record.agent.id} (${record.agent.description})`);
     throw new Error(`No agent "${to}". Known agents: ${known.join(", ") || "none"}.`);
   }
 
-  // An ended agent, or a running one with its run. A record still running
-  // without a run here belongs to the live pi process restore left it to; only
-  // that process holds its stdin and can stop it.
-  private owned(to: string): { record: EndedRecord; run?: undefined } | { record: RunningRecord; run: Run } {
-    const record = this.find(to);
-    if (record.status !== "running") return { record };
-    const run = this.runs.get(record.agent.id);
-    if (!run) {
-      throw new Error(`Agent ${record.agent.id} is running under another pi process (pid ${record.parentPid}); only that process can message or stop it.`);
+  // An agent this process can act on. One running under another pi process is
+  // not: only that process holds its stdin and can message or stop it.
+  private owned(to: string): Exclude<AgentState, { kind: "remote" }> {
+    const state = this.find(to);
+    if (state.kind === "remote") {
+      throw new Error(`Agent ${state.record.agent.id} is running under another pi process (pid ${state.record.parentPid}); only that process can message or stop it.`);
     }
-    return { record, run };
+    return state;
   }
 
   // A running agent takes the message as a steer, after its current tool calls.
@@ -283,21 +285,23 @@ export class AgentRunner {
   // including one that settled just before the steer reached it.
   async send(to: string, message: string): Promise<{ record: AgentRecord; running: boolean }> {
     const { id } = this.owned(to).record.agent;
-    // Another send may have launched a run while this one awaited, so the run
-    // table is read again after every wait and the launch follows the last read.
-    for (let run = this.runs.get(id); run; run = this.runs.get(id)) {
+    // Another send may have launched a run while this one awaited, so the state
+    // is read again after every wait and the launch follows the last read.
+    for (let state = this.agents.get(id); state?.kind === "local"; state = this.agents.get(id)) {
+      const { run } = state;
       const { response, taken } = await run.child.steer(message);
-      if (taken) return { record: this.find(id), running: true };
+      if (taken) return { record: this.find(id).record, running: true };
       if (response && !response.success) throw new Error(`Agent ${id} did not take the message: ${response.error}`);
       await run.done;
       if (run.ending) throw new Error(`Agent ${id} was stopped before it read the message; it was not delivered.`);
     }
-    return { record: this.launch(this.find(id).agent, message, true), running: false };
+    return { record: this.launch(this.find(id).record.agent, message, true), running: false };
   }
 
   async stop(to: string, ending: NonNullable<Run["ending"]> = "stopped"): Promise<EndedRecord> {
-    const { record, run } = this.owned(to);
-    if (!run) return record;
+    const state = this.owned(to);
+    if (state.kind === "ended") return state.record;
+    const { run } = state;
     if (run.ending !== "teardown") run.ending = ending;
     void run.child.command({ type: "abort" });
     run.child.close();
@@ -307,36 +311,39 @@ export class AgentRunner {
 
   async stopAll(): Promise<void> {
     this.closed = true;
-    await Promise.all([...this.runs.keys()].map((id) => this.stop(id, "teardown")));
+    await Promise.all(this.locals().map((state) => this.stop(state.record.agent.id, "teardown")));
   }
 
   // For an exit that cannot wait: SIGTERM lets each child pi stop its own agents.
   signalAll(): void {
     this.closed = true;
-    for (const run of this.runs.values()) {
+    for (const { run } of this.locals()) {
       run.ending = "teardown";
       run.child.signal("SIGTERM");
     }
   }
 
   list(): AgentRecord[] {
-    return [...this.records.values()];
+    return [...this.agents.values()].map((state) => state.record);
   }
 
   private persist(record: AgentRecord): void {
     this.pi.appendEntry(ENTRY_TYPE, record);
   }
 
-  // Folds persisted snapshots. A snapshot still marked running whose launching
-  // process is gone is an orphan: its process, if it survived, is stopped. One
-  // whose launching process is alive belongs to that process and is left alone.
+  // Folds persisted snapshots. A snapshot still marked running belongs to the
+  // live pi process that launched it. One whose launching process is gone is an
+  // orphan: its process, if it survived, is stopped.
   restore(entries: readonly SessionEntry[]): void {
     for (const entry of entries) {
       if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE || !Value.Check(recordSchema, entry.data)) continue;
-      if (!this.runs.has(entry.data.agent.id)) this.records.set(entry.data.agent.id, entry.data);
+      const { id } = entry.data.agent;
+      if (this.agents.get(id)?.kind === "local") continue;
+      this.agents.set(id, entry.data.status === "running" ? { kind: "remote", record: entry.data } : { kind: "ended", record: entry.data });
     }
-    for (const record of this.records.values()) {
-      if (record.status !== "running" || this.runs.has(record.agent.id)) continue;
+    for (const [id, state] of this.agents) {
+      if (state.kind !== "remote") continue;
+      const { record } = state;
       if (record.parentPid !== process.pid && alive(record.parentPid)) continue;
       const stopped: EndedRecord = {
         agent: record.agent,
@@ -346,7 +353,7 @@ export class AgentRunner {
         endedAt: now(),
         finalText: "(interrupted: the session that started it ended)",
       };
-      this.records.set(record.agent.id, stopped);
+      this.agents.set(id, { kind: "ended", record: stopped });
       this.persist(stopped);
       reapOrphan(record, this.settings.killGraceMs);
     }

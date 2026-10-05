@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -72,13 +72,11 @@ export function parseSheet(text: string): Sheet {
 }
 
 export function readSheet(agentDir: string): Sheet | undefined {
-  const file = join(agentDir, "pstack-models.md");
   let bytes: Buffer;
   try {
-    if (!statSync(file, { throwIfNoEntry: false })?.isFile()) return undefined;
-    bytes = readFileSync(file);
+    bytes = readFileSync(join(agentDir, "pstack-models.md"));
   } catch {
-    // An unreadable sheet leaves the defaults in place, as the session hooks do.
+    // An absent or unreadable sheet leaves the defaults in place, as the session hooks do.
     return undefined;
   }
   // Windows PowerShell 5.1's `>` writes UTF-16 LE with a byte-order mark.

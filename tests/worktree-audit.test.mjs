@@ -1,15 +1,28 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { defaultSettings, PSTACK_STATE_DIR } from "../plugins/pstack/pi/config.ts";
-import { audit, classify, defaultTranscriptRoots, lastChats } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
+import { audit, classify, defaultTranscriptRoots, duSize, lastChats, pathSpellings } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
 import { removeDuring } from "./remove-during.mjs";
 
 const script = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs");
 const noNode = spawnSync("node", ["--version"]).status !== 0;
+// Windows denies symlinkSync without the symlink privilege.
+const noSymlinks = (() => {
+  const dir = mkdtempSync(join(tmpdir(), "worktree-audit-symlink-"));
+  try {
+    symlinkSync(dir, join(dir, "link"));
+    return false;
+  } catch (error) {
+    if (error.code === "EPERM") return true;
+    throw error;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+})();
 
 const known = (value) => ({ known: true, value });
 const unknown = { known: false };
@@ -223,12 +236,12 @@ for (const dir of ["sessions", "archived_sessions"]) {
 }
 
 describe("lastChats matches a path as JSONL spells it, never a sibling's prefix", () => {
-  const scan = (path, cwd) => {
+  const scan = (path, cwd, spellings = [path]) => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-chats-")));
     fixtures.push(root);
     mkdirSync(join(root, "2026/10/05"), { recursive: true });
     writeFileSync(join(root, "2026/10/05/rollout.jsonl"), `${JSON.stringify({ cwd })}\n`);
-    return lastChats([root], [path]).has(path);
+    return lastChats([root], new Map([[path, spellings]])).has(path);
   };
 
   test.each([
@@ -245,8 +258,27 @@ describe("lastChats matches a path as JSONL spells it, never a sibling's prefix"
     ["a path followed by a tab", "/repo/worktree", "ls\t/repo/worktree\tsrc"],
     ["a path followed by a newline", "/repo/worktree", "cd /repo/worktree\nls"],
     ["a quoted Windows path inside a command", "C:/repo/worktree", String.raw`cd "C:\repo\worktree" && dir`],
+    ["a path in backticks", "/repo/worktree", "the worktree `/repo/worktree` is done"],
+    ["a path followed by a colon", "/repo/worktree", "/repo/worktree:12"],
+    ["a path followed by a semicolon", "/repo/worktree", "cd /repo/worktree;ls"],
+    ["a path closing a Markdown link", "/repo/worktree", "[wt](/repo/worktree)"],
+    ["a path followed by a comma", "/repo/worktree", "removed /repo/worktree, done"],
+    ["a path followed by a pipe", "/repo/worktree", "ls /repo/worktree|wc"],
+    ["a path followed by an ampersand", "/repo/worktree", "cd /repo/worktree&&ls"],
+    ["a path followed by a process substitution", "/repo/worktree", "diff /repo/worktree<(git status)"],
+    ["a path followed by a redirect", "/repo/worktree", "ls /repo/worktree>out"],
+    ["a Windows path followed by a semicolon", "C:/repo/worktree", String.raw`cd C:\repo\worktree;dir`],
+    ["a path ending a sentence", "/repo/worktree", "Two commits in /repo/worktree. Files: x"],
+    ["a path ending a line with a period", "/repo/worktree", "removed /repo/worktree.\nnext"],
+    ["a path ending the text with a period", "/repo/worktree", "see /repo/worktree."],
+    ["a path closing a bracket", "/repo/worktree", "[cmd /repo/worktree]"],
+    ["a path closing a shell default", "/repo/worktree", "${WT:-/repo/worktree}"],
   ])("finds %s", (_, path, cwd) => {
     expect(scan(path, cwd)).toBe(true);
+  });
+
+  test("finds a second spelling of the path", () => {
+    expect(scan("/repo/worktree", "cd /mnt/worktree && ls", ["/repo/worktree", "/mnt/worktree"])).toBe(true);
   });
 
   test.each([
@@ -254,8 +286,69 @@ describe("lastChats matches a path as JSONL spells it, never a sibling's prefix"
     ["C:/repo/worktree", String.raw`C:\repo\worktree-long\src\file.ts`],
     ["/repo/worktree", 'cd "/repo/worktree-long" && ls'],
     ["/repo/worktree", "cd /repo/worktree-long && ls"],
+    ["/repo/worktree", "cd /repo/worktree.bak"],
+    ["/repo/worktree", "/repo/worktree.bak/x"],
+    ["/repo/worktree", "/repo/worktree_2 ls"],
+    ["C:/repo/worktree", "C:/repo/worktree.bak/x"],
+    ["/repo/worktree", "ls /repo/worktree*"],
+    ["/repo/worktree", "/repo/worktree$suffix"],
+    ["/repo/worktree", "cp /repo/worktree{a,b} ."],
   ])("does not match %s in %s", (path, cwd) => {
     expect(scan(path, cwd)).toBe(false);
+  });
+});
+
+describe("pathSpellings", () => {
+  test("a worktree whose directory is gone keeps git's spelling", () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-gone-")));
+    fixtures.push(root);
+    expect(pathSpellings(join(root, "missing/worktree"))).toEqual([join(root, "missing/worktree")]);
+  });
+
+  describe.skipIf(noSymlinks)("a worktree under a symlinked ancestor", () => {
+    const layout = () => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-links-")));
+      fixtures.push(root);
+      mkdirSync(join(root, "real/worktree"), { recursive: true });
+      symlinkSync(join(root, "real"), join(root, "link"));
+      return root;
+    };
+
+    test("git's resolved spelling gains the spelling through the symlink", () => {
+      const root = layout();
+      expect(pathSpellings(join(root, "real/worktree"))).toContain(join(root, "link/worktree"));
+    });
+
+    test("the symlink spelling gains the resolved spelling", () => {
+      const root = layout();
+      expect(pathSpellings(join(root, "link/worktree"))).toContain(join(root, "real/worktree"));
+    });
+
+    test("a dangling or looping link in an ancestor is not a spelling and not a failure", () => {
+      const root = layout();
+      const before = pathSpellings(join(root, "real/worktree"));
+      symlinkSync(join(root, "missing"), join(root, "dangling"));
+      symlinkSync(join(root, "loop"), join(root, "loop"));
+      expect(pathSpellings(join(root, "real/worktree"))).toEqual(before);
+    });
+
+    test("the spellings do not match a sibling in the chat scan", () => {
+      const root = layout();
+      const worktree = join(root, "real/worktree");
+      mkdirSync(join(root, "chats"));
+      writeFileSync(join(root, "chats/a.jsonl"), `${JSON.stringify({ cwd: join(root, "link/worktree-long/file.ts") })}\n`);
+      expect(lastChats([join(root, "chats")], new Map([[worktree, pathSpellings(worktree)]])).has(worktree)).toBe(false);
+    });
+
+    test("the audit holds a worktree whose only chat named it through the symlink", () => {
+      const fixture = createFixture();
+      const worktree = addWorktree(fixture, "real/worktree");
+      symlinkSync(join(fixture.root, "real"), join(fixture.root, "link"));
+      writeTranscript(fixture, "-proj/session.jsonl", join(fixture.root, "link/worktree"));
+      const { rows, warnings } = runAudit(fixture);
+      expect(warnings).toEqual([]);
+      expect(rowFor(rows, worktree).slice(6, 8)).toEqual([ymd(Math.floor(Date.now() / 1000)), "verify-recent-chat"]);
+    });
   });
 });
 
@@ -321,7 +414,7 @@ test.skipIf(noNode)("a transcript removed after it was listed drops out of the c
   const removed = chat("removed.jsonl", 200);
   // Removed once candidates() has stat-ed it, so only lastChats' own read sees it gone.
   const body = `const { lastChats } = await import(${JSON.stringify(script)});
-    console.log(JSON.stringify([...lastChats([${JSON.stringify(dir)}], ["/x/wt"])]));`;
+    console.log(JSON.stringify([...lastChats([${JSON.stringify(dir)}], new Map([["/x/wt", ["/x/wt"]]]))]));`;
   const run = removeDuring("statSync", removed, [removed], body);
   expect(run.stderr).toBe("");
   expect(JSON.parse(run.stdout)).toEqual([["/x/wt", 100]]);
@@ -351,6 +444,12 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
       locked.push(fixture.transcripts);
       return { transcripts: [project] };
     }, /transcript scan failed.*EACCES/],
+    // Execute-only: git still reaches the worktree, but its symlinks cannot be listed.
+    ["a worktree ancestor that cannot be listed", (fixture) => {
+      chmodSync(fixture.root, 0o111);
+      locked.push(fixture.root);
+      return {};
+    }, /^warn: could not resolve the spellings of \S+\/ancestor; LAST_CHAT column will be empty: EACCES/],
   ];
 
   test.each(failures)("%s", (_, inject, warning) => {
@@ -409,4 +508,12 @@ test("the CLI exits 1 outside a git repo", () => {
   const result = spawnSync("node", [script, outside, outside], { encoding: "utf8" });
   expect(result.status).toBe(1);
   expect(result.stderr).toBe("not in a git repo; pass a repo path\n");
+});
+
+test.each([
+  ["568K\t/x/wt\n", "568K"],
+  ["  0B\t/x/wt\n", "0B"],
+  [" 48M\t/x/wt\n", "48M"],
+])("reads the size from du output %j", (output, expected) => {
+  expect(duSize(output)).toBe(expected);
 });

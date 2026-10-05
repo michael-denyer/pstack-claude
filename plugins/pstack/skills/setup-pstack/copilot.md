@@ -1,6 +1,6 @@
 # Setup pstack on GitHub Copilot
 
-On GitHub Copilot this file replaces the model, effort, and hook questions in steps 1, 3, and 4 of [setup-pstack](SKILL.md), the sheet header in step 6, and step 7. Steps 2, 5, and 8 still apply. pstack ships no Copilot model defaults, so every model in the sheet comes from the user's answers. Never pick a model the user has not chosen, and never write the Claude Code names in [Models](SKILL.md#models) or step 6's values into a Copilot sheet.
+On GitHub Copilot this file replaces the model, effort, and hook questions in steps 1, 3, and 4 of [setup-pstack](SKILL.md), the sheet header in step 6, and step 7. Steps 2, 5, 8, and 9 still apply. pstack ships no Copilot model defaults, so every model in the sheet comes from the user's answers. Never pick a model the user has not chosen, and never write the Claude Code names in [Models](SKILL.md#models) or step 6's values into a Copilot sheet.
 
 Run setup on a model at least as strong as gpt-5.4-mini or a Sonnet-class Claude model. On a Haiku-class model, setup picked models the user never chose in about half of the smoke runs.
 

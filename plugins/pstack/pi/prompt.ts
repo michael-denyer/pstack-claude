@@ -12,13 +12,13 @@ const TOOLS_SECTION = "pstack-pi-tools";
 // pstack skills name Claude Code tools and models. A session with the hook off,
 // a child agent, or a skill invoked directly may never see the pointer in
 // poteto-mode/SKILL.md, so every session gets it here.
-export function piToolsNote(pluginRoot: string): string {
+function piToolsNote(pluginRoot: string): string {
   const file = join(pluginRoot, "skills", "poteto-mode", "references", "pi-tools.md");
   return `pstack skills are written for Claude Code. When one names a Claude Code tool (Agent, Skill, AskUserQuestion, Bash), a bundled skill, or a Claude model, read ${file} for the Pi equivalent before following it.`;
 }
 // Claude Code's system prompt, word for word but for its function_calls block.
 // pstack skills that say "one message, N Agent calls" rely on it.
-export const PARALLEL_CALLS =
+const PARALLEL_CALLS =
   "If you intend to call multiple tools and there are no dependencies between the calls, make all of the independent calls in the same response, otherwise you MUST wait for previous calls to finish first to determine the dependent values.";
 
 // Claude Code runs the session hook and loads the sheet through a CLAUDE.md

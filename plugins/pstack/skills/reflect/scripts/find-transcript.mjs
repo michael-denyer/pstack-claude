@@ -54,8 +54,7 @@ export function candidates(projectsDir, maxDepth = 2) {
       const stat = statSync(path, { throwIfNoEntry: false });
       return stat ? [{ path, mtime: stat.mtimeMs }] : [];
     })
-    .sort((a, b) => b.mtime - a.mtime)
-    .map(({ path }) => path);
+    .sort((a, b) => b.mtime - a.mtime);
 }
 
 function text(content) {
@@ -136,7 +135,7 @@ export async function openingPrompt(path) {
 }
 
 export async function findTranscript(projectsDir, fragment) {
-  for (const path of candidates(projectsDir)) {
+  for (const { path } of candidates(projectsDir)) {
     try {
       const prompt = await openingPrompt(path);
       if (prompt?.includes(fragment)) return path;

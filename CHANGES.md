@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.69 - hook validation names a missing command
+
+`tools/generate.mjs` reports a hook with no `command` as a fault. Since the `commandWindows` override landed in 0.9.66, such a hook passed validation with nothing checked, including one that carried only a Windows override and so ran nowhere else.
+
 ## 0.9.68 - resume links with parentheses, BOM-led plans, Codex sessions in the worktree audit, and Pi fixes
 
 Resume checkpoint publication now accepts Markdown angle-bracket destinations such as `[Questions](<questions (draft).md>)`. A linked local file still has to be registered with `--artifact`. A CLI regression test covers publication and a subsequent read.

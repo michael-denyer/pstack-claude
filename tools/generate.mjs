@@ -704,6 +704,10 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json" }) 
   for (const [event, groups] of Object.entries(JSON.parse(hooksJson).hooks ?? {})) {
     for (const group of groups) {
       for (const hook of group.hooks ?? []) {
+        if (typeof hook.command !== "string") {
+          faults.push(`${event}: a hook has no command`);
+          continue;
+        }
         for (const command of [hook.command, hook.commandWindows].filter((value) => value !== undefined)) {
           const refs = [...command.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)/g)].map((m) => m[1]);
           if (!refs.length) {

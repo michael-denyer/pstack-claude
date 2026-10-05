@@ -330,6 +330,13 @@ describe("validateHooks", () => {
     );
   });
 
+  test("names a hook without a command, even when it has a Windows override", () => {
+    const windows = 'powershell.exe -File "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ps1"';
+    for (const cmd of [hooks(undefined), hooks(undefined, windows)]) {
+      expect(() => validateHooks(cmd, { statOf: () => plain })).toThrow("SessionStart: a hook has no command");
+    }
+  });
+
   test("a file the command reads only has to exist", () => {
     const cmd = hooks('cat "${CLAUDE_PLUGIN_ROOT}/hooks/session-start-context.md"');
     expect(() => validateHooks(cmd, { statOf: () => plain })).not.toThrow();

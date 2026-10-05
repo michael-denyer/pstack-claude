@@ -361,6 +361,9 @@ describe("validateHooks", () => {
     expect(() => validateHooks(stop({ type: "webhook", command: "x" }), { statOf: () => null })).toThrow(
       'Stop: hook type "webhook" is not one of command, http, mcp_tool, prompt, agent',
     );
+    expect(() => validateHooks(stop({ type: "constructor" }), { statOf: () => null })).toThrow(
+      'Stop: hook type "constructor" is not one of command, http, mcp_tool, prompt, agent',
+    );
   });
 
   test("faults an event whose value is not a list of matcher groups", () => {

@@ -41,7 +41,7 @@ bun tools/generate.mjs
 bun test tests/
 ```
 
-The root `package.json` declares `typebox` and the optional `@earendil-works/pi-coding-agent` as peer dependencies, because Pi provides both to an extension at runtime. The root `bun.lock` pins `typebox` for the tests under `tests/pi/`, which load the extension outside Pi.
+The root `package.json` declares `typebox` and the optional `@earendil-works/pi-coding-agent` as peer dependencies, because Pi provides both to an extension at runtime. The root `bun.lock` pins `typebox` for the generator, which checks hook files against it, and for the tests under `tests/pi/`, which load the extension outside Pi.
 
 The generator writes `VERSION` into all three plugin manifests and the Pi `package.json` and stamps model defaults from `plugins/pstack/models.json`. It also owns one line under the first heading of some files: the Codex preamble on each skill with a row in the Per-skill notes table of `skills/poteto-mode/references/codex-tools.md`, and the driver-skill line on the playbooks in `DRIVER_PLAYBOOKS`. Either line anywhere else fails the generator, so a skill gets the preamble by gaining a notes row. No skill file carries a Pi line: `poteto-mode/SKILL.md` points at `pi-tools.md` once, and a skill's Pi note is a row in that file. It validates each skill's `name` and `description`, then generates a Codex prompt for each public skill using the [slash-command table](docs/reference.md#slash-commands).
 
@@ -106,7 +106,7 @@ uvx zizmor@1.29.0 --persona pedantic --min-severity low --collect all -- .
 
 ## Dependency updates
 
-Dependabot keeps the pinned action SHAs current. The vendored scripts' one runtime dependency (`commander`) follows upstream's pin and moves with `tools/sync.mjs`; `osv-scanner` scans every `bun.lock` weekly, so a CVE still surfaces. The root `bun.lock` pins `typebox`, which the Pi extension tests import. If you bump it by hand, run `bun install` and commit the resulting `bun.lock` in the same change.
+Dependabot keeps the pinned action SHAs current. The vendored scripts' one runtime dependency (`commander`) follows upstream's pin and moves with `tools/sync.mjs`; `osv-scanner` scans every `bun.lock` weekly, so a CVE still surfaces. The root `bun.lock` pins `typebox`, which the generator and the Pi extension tests import. If you bump it by hand, run `bun install` and commit the resulting `bun.lock` in the same change.
 
 ## Releasing
 

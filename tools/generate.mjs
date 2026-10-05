@@ -761,7 +761,7 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json" }) 
   if (faults.length) throw new Error(`${file}:\n  ${faults.join("\n  ")}`);
   for (const [event, groups] of Object.entries(raw.hooks)) {
     for (const hook of groups.flatMap((group) => group.hooks)) {
-      const schema = HOOK_TYPES[hook.type];
+      const schema = Object.hasOwn(HOOK_TYPES, hook.type) ? HOOK_TYPES[hook.type] : undefined;
       if (!schema) {
         faults.push(`${event}: hook type "${hook.type}" is not one of ${Object.keys(HOOK_TYPES).join(", ")}`);
         continue;

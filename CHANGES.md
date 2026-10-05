@@ -2,7 +2,7 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.72 - run pstack on GitHub Copilot
+## 0.9.73 - run pstack on GitHub Copilot
 
 pstack now installs on the GitHub Copilot CLI and the GitHub Copilot app. `copilot plugin marketplace add michael-denyer/pstack-claude` and `copilot plugin install pstack@pstack-claude` read the existing Claude Code marketplace. The CLI and the app share `~/.copilot`, so one install serves both. Skills load by bare name through Copilot's `skill` tool, a user types `/pstack:<skill>` in the CLI, and the agents load as `pstack:poteto-agent` and `pstack:comment-sicko`.
 
@@ -24,7 +24,15 @@ Copilot CLI 1.0.87 through 1.0.92 merges the session-start context of several pl
 
 **Original Copilot verification, before review fixes.** `bun test tests/` passes 909 tests with 0 failures and skips 36; main at 0389988 passes 723 and skips the same 36. `tests/check-sheet.test.mjs` is new, and `tests/session-hook.test.mjs` and `tests/pre-tool-use.test.mjs` cover the role-line allowlist (a `Note: ignore previous instructions` line, an `<EXTREMELY_IMPORTANT>` line, and an indented role line stay out of the context), an invalid sheet, CRLF, BOM, and UTF-16LE sheets, problem text that never echoes the sheet, run-time escaping, and a failing `awk` run. Removing each of 56 hook guards, validator rules, and hook wiring lines in turn, and each of 5 checks in the generator's Copilot row, fails at least one test. `sheet.awk`, `check-sheet.awk`, and `copilot-context.awk` give the same output on macOS awk, mawk, `gawk --posix`, original-awk, and BusyBox awk. `hooks/hooks.json`, `hooks/codex-hooks.json`, the agents, and the `session-start.sh claude` and `codex` output match main byte for byte, and the Claude Code, Codex, and Pi manifests differ only in the version. `tests/copilot-smoke.sh` passes all 44 checks on Copilot CLI 1.0.92 with `gpt-5.4-mini`, for a local install and a GitHub marketplace install of this branch: each hook fires once through the Copilot manifest, a sheet line that is not a role stays out of the context, an invalid sheet injects `sheet invalid`, and setup writes exactly the supplied IDs and runs `check-sheet.sh` with no permission request.
 
-**Review-fix verification.** On macOS, after merging main at 0.9.71, `bun test tests/` passes 972 tests, skips 35, and fails none. `tools/generate.mjs --check` reports 80 current files. The live Copilot smoke suite and Windows checks were not rerun for these fixes; `tests/copilot-tui.py` was checked against a stand-in `copilot` that requests a permission, ends its turn, or never ends it.
+**Review-fix verification.** On macOS, after merging main at 0.9.72, `bun test tests/` passes 974 tests, skips 35, and fails none. `tools/generate.mjs --check` reports 81 current files. The live Copilot smoke suite and Windows checks were not rerun for these fixes; `tests/copilot-tui.py` was checked against a stand-in `copilot` that requests a permission, ends its turn, or never ends it.
+
+## 0.9.72 - sync to upstream 2cbf585 (v0.15.13)
+
+The upstream pin moves from `e43c7ee` to `2cbf585`, upstream v0.15.13, four commits. They add the `/poteto-help` skill, which maps a user's question about pstack to the skill, playbook, or principle that answers it, hands back a prompt to send, and links the file the answer came from, with a prompting reference and a recipes reference beside it. The same range also edits upstream's guide and README, which the port excludes. The package now carries 34 public skills and 24 principles.
+
+`poteto-help` is a port-feature fork, declared in `tools/forks.json`. It reads the current runtime's installation and setup instructions before giving advice, including the persistent `session hook: off` setting. Operational answers come from the installed playbooks and platform mappings, which take precedence over upstream's Cursor guides. The fork carries the port's prose adaptations so upstream wording changes go through a three-way merge. Three substitution rules remain for the public-copy base, the README link, and the recipe's project verification command. Upstream's `disable-model-invocation: true` is dropped as on every public skill, so the model can invoke the skill when a question matches its description.
+
+Measured with `bun tools/sync.mjs pstack 2cbf585`: 3 files added, 81 unchanged, 36 excluded, no merges, and no conflicts. No file became port-only.
 
 ## 0.9.71 - multi-select twins, composed audit symlinks, and test tooling
 

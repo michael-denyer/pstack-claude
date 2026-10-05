@@ -30,6 +30,12 @@
       "since": "0.9.29",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/poteto-help/SKILL.md": {
+      "kind": "port-feature",
+      "why": "Routes installation, model-sheet loading, and persistent routing preferences to the current runtime's setup sources, gives installed playbooks precedence over upstream guides, and keeps the port's public skill loading, hidden principles, verification-skill naming, local-worker advice, driver and built-in equivalents, excluded make-bot-ui row, and orchestrate wording as prose changes in this fork.",
+      "since": "0.9.71",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/poteto-mode/SKILL.md": {
       "kind": "policy",
       "why": "Adds the Claude Code, Codex, Pi, and GitHub Copilot Platform Adaptation section with its task-tool and todo.md fallback, the run-or-verify driver line, the deploy-platform and defect-severity triggers, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it points the Agent-call defaults at the Models section with full tool access and the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and describes Autopilot-full as stopping at merge-ready for the operator's click.",

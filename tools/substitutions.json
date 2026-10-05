@@ -1,6 +1,22 @@
 {
   "substitutions": [
     {
+      "pattern": "`https://github.com/cursor/plugins/blob/main/pstack/` followed by its path",
+      "replacement": "`https://github.com/michael-denyer/pstack-claude/blob/main/plugins/pstack/` followed by its path",
+      "rationale": "the public copy of a port skill file lives in this repository under plugins/pstack"
+    },
+    {
+      "pattern": "[README](../../README.md)",
+      "replacement": "[README](https://github.com/michael-denyer/pstack-claude/blob/main/README.md)",
+      "rationale": "upstream's README is excluded and the port's README sits at the repository root, outside the skills tree"
+    },
+    {
+      "pattern": "repro this with /verify-<app>.",
+      "files": "^skills/poteto-help/",
+      "replacement": "repro this with /verify.",
+      "rationale": "the port's create-verification-skill writes a project skill named verify (#71)"
+    },
+    {
       "pattern": "The system prompt names the workspace's `agent-transcripts/` directory.",
       "replacement": "Claude Code stores them at `~/.claude/projects/<encoded-cwd>/*.jsonl`, where `<encoded-cwd>` is the workspace's working directory with `/` → `-`.",
       "rationale": "Claude Code's system prompt does not name a transcripts directory, so the port names the path and its encoding"

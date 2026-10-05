@@ -428,7 +428,7 @@ describe("slashCommands", () => {
     for (const menu of samples) {
       let parsed;
       try {
-        parsed = Bun.YAML.parse(promptStub({ name: "b", menu }).split("---\n")[1]).description;
+        parsed = Bun.YAML.parse(promptStub({ name: "b", menu }, RUNTIMES[0]).split("---\n")[1]).description;
       } catch {}
       let accepted = true;
       try {
@@ -583,10 +583,11 @@ describe("lead lines", () => {
     expect(() => noteSkills(codex, "no table\n")).toThrow('"| Skill | On Codex |" table header not found');
   });
 
-  test("a prompt stub points at codex-tools.md unless its skill carries the Codex preamble", () => {
+  test("a prompt stub points at its runtime's mapping file unless its skill carries that runtime's preamble", () => {
     const pointer = "through `poteto-mode/references/codex-tools.md`, including its Per-skill notes.";
-    expect(promptStub({ name: "tdd", menu: "m" }, { preamble: false })).toContain(pointer);
-    expect(promptStub({ name: "how", menu: "m" }, { preamble: true })).toBe(
+    expect(promptStub({ name: "tdd", menu: "m" }, codex, { preamble: false })).toContain(pointer);
+    expect(promptStub({ name: "tdd", menu: "m" }, pi, { preamble: false })).toContain("`poteto-mode/references/pi-tools.md`");
+    expect(promptStub({ name: "how", menu: "m" }, codex, { preamble: true })).toBe(
       "---\nname: how\ndescription: m\ndisable-model-invocation: true\n---\n\nInvoke the `how` skill and follow it.\n",
     );
   });

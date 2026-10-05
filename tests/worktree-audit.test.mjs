@@ -332,6 +332,19 @@ describe("pathSpellings", () => {
       expect(pathSpellings(join(root, "real/worktree"))).toEqual(before);
     });
 
+    test("a symlink reached through another symlink composes with it", () => {
+      const root = layout();
+      mkdirSync(join(root, "real/deep/worktree"), { recursive: true });
+      symlinkSync(join(root, "real/deep"), join(root, "real/inner"));
+      expect(pathSpellings(join(root, "real/deep/worktree"))).toContain(join(root, "link/inner/worktree"));
+    });
+
+    test("a link back to its own ancestor spells the worktree once through it", () => {
+      const root = layout();
+      symlinkSync(root, join(root, "real/up"));
+      expect(pathSpellings(join(root, "real/worktree"))).toContain(join(root, "real/up/real/worktree"));
+    });
+
     test("the spellings do not match a sibling in the chat scan", () => {
       const root = layout();
       const worktree = join(root, "real/worktree");
@@ -345,6 +358,17 @@ describe("pathSpellings", () => {
       const worktree = addWorktree(fixture, "real/worktree");
       symlinkSync(join(fixture.root, "real"), join(fixture.root, "link"));
       writeTranscript(fixture, "-proj/session.jsonl", join(fixture.root, "link/worktree"));
+      const { rows, warnings } = runAudit(fixture);
+      expect(warnings).toEqual([]);
+      expect(rowFor(rows, worktree).slice(6, 8)).toEqual([ymd(Math.floor(Date.now() / 1000)), "verify-recent-chat"]);
+    });
+
+    test("the audit holds a worktree whose only chat named it through two composed symlinks", () => {
+      const fixture = createFixture();
+      const worktree = addWorktree(fixture, "real/deep/worktree");
+      symlinkSync(join(fixture.root, "real"), join(fixture.root, "link"));
+      symlinkSync(join(fixture.root, "real/deep"), join(fixture.root, "real/inner"));
+      writeTranscript(fixture, "-proj/session.jsonl", join(fixture.root, "link/inner/worktree"));
       const { rows, warnings } = runAudit(fixture);
       expect(warnings).toEqual([]);
       expect(rowFor(rows, worktree).slice(6, 8)).toEqual([ymd(Math.floor(Date.now() / 1000)), "verify-recent-chat"]);

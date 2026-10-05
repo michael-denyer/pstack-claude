@@ -31,14 +31,16 @@ async function ask(ui: Ui, q: Question, signal: AbortSignal | undefined): Promis
     const pick = await ui.select(title, [...labels.keys(), OTHER], { signal });
     return pick === undefined ? undefined : answer(pick);
   }
+  const picked = new Set<string>();
   const chosen: string[] = [];
   for (;;) {
-    const remaining = [...labels].filter(([, label]) => !chosen.includes(label)).map(([text]) => text);
+    const remaining = [...labels.keys()].filter((text) => !picked.has(text));
     const pick = await ui.select(`${title} (one at a time; ${DONE} when finished)`, [...remaining, OTHER, DONE], { signal });
     if (pick === undefined) return undefined;
     if (pick === DONE) return chosen.join(", ");
     const text = await answer(pick);
     if (text === undefined) return undefined;
+    picked.add(pick);
     chosen.push(text);
   }
 }

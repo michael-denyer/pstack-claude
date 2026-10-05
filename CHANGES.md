@@ -4,7 +4,7 @@ This file is the release changelog, with one `## <version> - <title>` entry per 
 
 ## 0.9.71 - multi-select twins, composed audit symlinks, and test tooling
 
-In Pi, a multi-select question keeps a choice selectable after the user picks another choice with the same label, so two same-label choices can both be picked, as single-select already allowed. Picking a choice now hides only that choice, so a typed `Other` answer no longer hides a listed choice with the same text.
+In Pi, a multi-select question keeps a choice selectable after the user picks another choice with the same label, so two same-label choices can both be picked. Single-select already listed each as its own choice. Picking a choice now hides only that choice, so a typed `Other` answer no longer hides a listed choice with the same text.
 
 `worktree-audit.mjs` composes the ancestor symlinks it spells a worktree through. When `/tmp` points at `/private/tmp` and `/private/tmp/link` points at `/private/tmp/real`, a session that wrote `/tmp/link/x` now counts for the worktree git lists as `/private/tmp/real/x`, which previously could be suggested as `safe`. A link that points back up to an ancestor of its own directory is still applied only through that directory's resolved spelling.
 

@@ -43,6 +43,18 @@ test('a cold process finds all ordered artifacts using only project identity', (
   assert.equal(readFileSync(cold.value.checkpoint.note.path, 'utf8'), 'Start with [the questions](questions.md).\n');
 }));
 
+test('publishes a note linking an artifact with a parenthesized angle-bracket destination', () => fixture(({ run }) => {
+  const directory = run('begin').value.directory;
+  const artifact = join(directory, 'questions (draft).md');
+  const resume = join(directory, 'resume.md');
+  writeFileSync(artifact, 'Which question is still open?\n');
+  writeFileSync(resume, '[Questions](<questions (draft).md>)\n');
+
+  const published = run('publish', '--note', resume, '--artifact', artifact);
+  assert.equal(published.status, 0, published.value.detail);
+  assert.equal(run('read').value.checkpoint.artifacts[0].path, artifact);
+}));
+
 test('failed publication leaves the last complete pointer intact', () => fixture(({ run }) => {
   const first = note(run);
   assert.equal(run('publish', '--note', first.note, '--artifact', first.artifact).status, 0);

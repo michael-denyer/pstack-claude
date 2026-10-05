@@ -17,6 +17,9 @@ if (!piDir || !existsSync(join(piDir, "dist", "index.d.ts"))) {
   console.error(`No Pi package at ${piDir ?? "the global npm or bun root"}. Install one with npm install -g @earendil-works/pi-coding-agent, or set PI_PACKAGE_DIR.`);
   process.exit(2);
 }
+// npm nests the package's dependencies in its own node_modules; bun's global
+// directory is flat, so there they sit beside the package's scope.
+const dep = (name) => [join(piDir, "node_modules", name), join(piDir, "..", "..", name)].find(existsSync) ?? join(piDir, "node_modules", name);
 
 const config = {
   compilerOptions: {
@@ -28,14 +31,14 @@ const config = {
     strict: true,
     skipLibCheck: true,
     types: ["node"],
-    typeRoots: [join(piDir, "node_modules", "@types")],
+    typeRoots: [dep("@types")],
     baseUrl: piDir,
     paths: {
       "@earendil-works/pi-coding-agent": ["dist/index.d.ts"],
-      "@earendil-works/pi-ai": ["node_modules/@earendil-works/pi-ai/dist/index.d.ts"],
-      "@earendil-works/pi-agent-core": ["node_modules/@earendil-works/pi-agent-core/dist/index.d.ts"],
-      typebox: ["node_modules/typebox/build/index.d.mts"],
-      "typebox/*": ["node_modules/typebox/build/*/index.d.mts"],
+      "@earendil-works/pi-ai": [join(dep("@earendil-works/pi-ai"), "dist/index.d.ts")],
+      "@earendil-works/pi-agent-core": [join(dep("@earendil-works/pi-agent-core"), "dist/index.d.ts")],
+      typebox: [join(dep("typebox"), "build/index.d.mts")],
+      "typebox/*": [join(dep("typebox"), "build/*/index.d.mts")],
     },
   },
   include: [join(repo, "plugins", "pstack", "pi", "*.ts")],

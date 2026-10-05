@@ -79,49 +79,70 @@ export function defaultTranscriptRoots({ env = process.env, home = homedir(), ex
   return found.length ? found : [claude];
 }
 
+// A dangling or looping link cannot spell a path that exists. Any other failure
+// propagates so the caller leaves the worktree's chat fact unknown.
+function symlinkTargets(dir) {
+  return readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isSymbolicLink()).flatMap((entry) => {
+    const link = join(dir, entry.name);
+    try {
+      return [[link, realpathSync(link)]];
+    } catch (error) {
+      if (error.code === "ENOENT" || error.code === "ELOOP") return [];
+      throw error;
+    }
+  });
+}
+
 // Git reports a worktree by its resolved path, while a session may name it
 // through a symlink in an ancestor directory, as macOS spells /private/tmp/x
-// as /tmp/x.
-function pathSpellings(path) {
-  const resolved = probe(() => realpathSync(path));
-  if (!resolved.known) return [path];
-  const spellings = new Set([path, resolved.value]);
-  let dir = resolved.value;
-  do {
-    dir = dirname(dir);
-    const entries = probe(() => readdirSync(dir, { withFileTypes: true }));
-    for (const entry of entries.known ? entries.value : []) {
-      if (!entry.isSymbolicLink()) continue;
-      const link = join(dir, entry.name);
-      const target = probe(() => realpathSync(link));
-      if (!target.known) continue;
-      if (resolved.value === target.value || resolved.value.startsWith(target.value + sep)) {
-        spellings.add(link + resolved.value.slice(target.value.length));
-      }
+// as /tmp/x. A worktree whose directory is gone keeps git's spelling.
+export function pathSpellings(path, linksIn = symlinkTargets) {
+  let resolved;
+  try {
+    resolved = realpathSync(path);
+  } catch (error) {
+    if (error.code === "ENOENT") return [path];
+    throw error;
+  }
+  const spellings = new Set([path, resolved]);
+  for (let dir = dirname(resolved); ; dir = dirname(dir)) {
+    for (const [link, target] of linksIn(dir)) {
+      if (resolved === target || resolved.startsWith(target + sep)) spellings.add(link + resolved.slice(target.length));
     }
-  } while (dir !== dirname(dir));
+    if (dir === dirname(dir)) break;
+  }
   return [...spellings];
 }
 
-// A transcript names a worktree up to a path boundary or the end of the JSON
+// A transcript names a worktree up to a boundary byte or the end of the JSON
 // string, never a bare prefix, so `/x/candidate` does not inherit a chat that
-// ran in `/x/candidate-long`. `.` stays out because `/x/candidate.bak` is a
-// plausible sibling. Only JSONL is scanned, so a path and its boundary appear
-// JSON-escaped. Git on Windows may spell a path with forward slashes while the
-// session uses backslashes.
-const PATH_BOUNDARIES = ["/", "\\", '"', "'", " ", "\t", "\n", "\r", "`", ":", ";", ")", ",", "|", "&", "<", ">"];
-function transcriptNeedles(path) {
-  const windows = /^(?:[a-z]:[\\/]|\\\\|\/\/)/i.test(path);
-  const spellings = new Set(pathSpellings(path).flatMap((spelling) =>
-    windows ? [spelling.replaceAll("\\", "/"), spelling.replaceAll("/", "\\")] : [spelling]));
-  return [...spellings].flatMap((spelling) => [
-    ...PATH_BOUNDARIES.map((end) => JSON.stringify(spelling + end).slice(1, -1)),
-    JSON.stringify(spelling).slice(1),
-  ]).map((needle) => Buffer.from(needle));
+// ran in `/x/candidate-long`. Only JSONL is scanned, so the path appears
+// JSON-escaped and a `\` after it opens the escape of a quote, backslash, or
+// control byte. `.` counts only before another boundary (a sentence-final
+// path), because `/x/candidate.bak` is a plausible sibling. `*`, `$`, and `{`
+// stay out: they extend a path by glob or expansion.
+const BOUNDARY = new Set(Buffer.from("/\\\"' `:;),|&<>]}"));
+const DOT = ".".charCodeAt(0);
+const bounded = (text, at) => at === text.length || BOUNDARY.has(text[at]);
+function mentions(text, needle) {
+  for (let at = text.indexOf(needle); at !== -1; at = text.indexOf(needle, at + 1)) {
+    const end = at + needle.length;
+    if (bounded(text, end) || (text[end] === DOT && bounded(text, end + 1))) return true;
+  }
+  return false;
 }
 
-export function lastChats(roots, paths) {
-  const needles = paths.map((path) => [path, transcriptNeedles(path)]);
+// Git on Windows may spell a path with forward slashes while the session uses backslashes.
+function transcriptNeedles(spellings) {
+  const forms = spellings.flatMap((spelling) => (/^(?:[a-z]:[\\/]|\\\\|\/\/)/i.test(spelling)
+    ? [spelling.replaceAll("\\", "/"), spelling.replaceAll("/", "\\")]
+    : [spelling]));
+  return [...new Set(forms)].map((form) => Buffer.from(JSON.stringify(form).slice(1, -1)));
+}
+
+// `spellings` maps each worktree path to every spelling a session could use.
+export function lastChats(roots, spellings) {
+  const needles = [...spellings].map(([path, forms]) => [path, transcriptNeedles(forms)]);
   const latest = new Map();
   for (const { path: file, mtime: mtimeMs } of roots.flatMap((root) => candidates(root, Infinity))) {
     const mtime = Math.floor(mtimeMs / 1000);
@@ -133,7 +154,7 @@ export function lastChats(roots, paths) {
       continue;
     }
     for (const [path, forms] of needles) {
-      if (mtime > (latest.get(path) ?? 0) && forms.some((form) => text.includes(form))) latest.set(path, mtime);
+      if (mtime > (latest.get(path) ?? 0) && forms.some((needle) => mentions(text, needle))) latest.set(path, mtime);
     }
   }
   return latest;
@@ -204,7 +225,7 @@ function auditWorktree(path, { repo, trunk, fetched, prs, chats, now }) {
   });
   const remote = bind(branch, (name) => (name === null ? known("detached") : probe(() => remoteState(path, name, head.value))));
   const pr = bind(prs, (list) => bind(branch, (name) => known(list.find((entry) => name !== null && entry.headRefName === name) ?? null)));
-  const lastChat = bind(chats, (latest) => known(latest.get(path) ?? null));
+  const lastChat = chats.get(path);
   const recent = bind(lastChat, (ts) => known(ts !== null && Math.trunc((now - ts) / DAY) <= RECENT_DAYS));
   const bucket = classify({ trunk: fetched, head, age, ancestry, dirty, remote, pr, recent });
   return [
@@ -251,16 +272,29 @@ export function audit({
 
   const worktrees = parseWorktrees(git(repo, "worktree", "list", "--porcelain", "-z")).slice(1);
   const live = worktrees.filter((worktree) => !worktree.prunable).map((worktree) => worktree.path);
+  // Worktrees share ancestors, so each directory's links are read once.
+  const links = new Map();
+  const linksIn = (dir) => links.get(dir) ?? links.set(dir, symlinkTargets(dir)).get(dir);
+  const spellings = new Map(live.map((path) => [
+    path,
+    discover(() => pathSpellings(path, linksIn), `could not resolve the spellings of ${path}; LAST_CHAT column will be empty`),
+  ]));
   const scanFailed = "transcript scan failed; LAST_CHAT column will be empty";
   const missing = discover(
     () => transcripts.filter((root) => !statSync(root, { throwIfNoEntry: false })?.isDirectory()),
     scanFailed,
   );
   // Every root must be readable: a chat the scan could not see might be recent.
-  const chats = bind(missing, (roots) => {
+  const found = bind(missing, (roots) => {
     for (const root of roots) warn(`warn: ${root} not found; LAST_CHAT column will be empty`);
-    return roots.length ? UNKNOWN : discover(() => lastChats(transcripts, live), scanFailed);
+    if (roots.length) return UNKNOWN;
+    const knownSpellings = new Map([...spellings].filter(([, fact]) => fact.known).map(([path, fact]) => [path, fact.value]));
+    return discover(() => lastChats(transcripts, knownSpellings), scanFailed);
   });
+  const chats = new Map(live.map((path) => [
+    path,
+    bind(spellings.get(path), () => bind(found, (latest) => known(latest.get(path) ?? null))),
+  ]));
 
   const context = { repo, trunk, fetched, prs, chats, now };
   const rows = worktrees.map(({ path, prunable }) =>

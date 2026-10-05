@@ -1,7 +1,7 @@
 // ask_user_question, schedule_wakeup, and /loop through the fake ExtensionAPI.
 import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 
-import { DONE, OTHER } from "../../plugins/pstack/pi/interaction.ts";
+import { DONE, OTHER } from "../../plugins/pstack/pi/ask.ts";
 import { useWorld } from "./harness.mjs";
 
 const setup = useWorld();
@@ -227,6 +227,39 @@ describe("/loop", () => {
     expect(text).toContain('schedule_wakeup with prompt "/loop watch PR 42"');
     jest.advanceTimersByTime(24 * 3_600_000);
     expect(pi.userMessages).toHaveLength(1);
+  });
+
+  test("a new self-paced loop cancels the previous loop's pending wakeup", async () => {
+    const { pi, ctx, run } = loop();
+    await pi.call("schedule_wakeup", { delaySeconds: 60, prompt: "/loop watch old PR" }, ctx);
+    await run("watch new PR");
+    jest.advanceTimersByTime(60_000);
+    expect(pi.userMessages).toHaveLength(1);
+    expect(pi.userMessages[0].content).toStartWith("watch new PR\n");
+
+    await pi.call("schedule_wakeup", { delaySeconds: 120, prompt: "/loop watch new PR" }, ctx);
+    jest.advanceTimersByTime(120_000);
+    expect(pi.userMessages.map((m) => m.content)).toEqual([
+      expect.stringContaining("watch new PR\n"),
+      "/loop watch new PR",
+    ]);
+  });
+
+  test("a new self-paced loop also stops the previous fixed interval", async () => {
+    const { pi, run } = loop();
+    await run("1m old task");
+    await run("new task");
+    jest.advanceTimersByTime(120_000);
+    expect(pi.userMessages.map((m) => m.content)).toEqual(["old task", expect.stringContaining("new task\n")]);
+  });
+
+  test("a new fixed loop cancels the previous loop's pending wakeup and interval", async () => {
+    const { pi, ctx, run } = loop();
+    await pi.call("schedule_wakeup", { delaySeconds: 60, prompt: "/loop watch old PR" }, ctx);
+    await run("1m old task");
+    await run("2m new task");
+    jest.advanceTimersByTime(120_000);
+    expect(pi.userMessages.map((m) => m.content)).toEqual(["old task", "new task", "new task"]);
   });
 
   for (const mode of ["print", "json"]) {

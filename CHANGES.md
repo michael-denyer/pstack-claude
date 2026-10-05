@@ -2,7 +2,7 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.59 - run pstack on GitHub Copilot
+## 0.9.70 - run pstack on GitHub Copilot
 
 pstack now installs on the GitHub Copilot CLI and the GitHub Copilot app. `copilot plugin marketplace add michael-denyer/pstack-claude` and `copilot plugin install pstack@pstack-claude` read the existing Claude Code marketplace and plugin manifest, so the build adds no manifest. The CLI and the app share `~/.copilot`, so one install serves both. Skills load by bare name through Copilot's `skill` tool, a user types `/pstack:<skill>` in the CLI, and the agents load as `pstack:poteto-agent` and `pstack:comment-sicko`.
 
@@ -19,6 +19,76 @@ The Copilot build ships no default model IDs, because the models an account reac
 Copilot CLI 1.0.87 through 1.0.92 merges the session-start context of several plugins. [github/copilot-cli#3589](https://github.com/github/copilot-cli/issues/3589) reported that only the last one survived. The hook runs lazily, before the first model turn, so a slash command as the first message still gets the routing instruction, and a resumed session gets exactly one routing block.
 
 **Verified.** `bun test tests/` passes 687 tests with 0 failures, and skips the same 14 Pi live and catalog tests upstream skips without `PSTACK_PI_LIVE`. New cases in `tests/copilot.test.mjs`, `tests/pre-tool-use.test.mjs`, and `tests/session-hook.test.mjs` cover mapping coverage for every Claude-specific term the skills use, preamble parity, the `copilot` block, the stamped hook JSON, escaping (quotes, backslashes, tabs, CRLF, and control characters), the size cap, `session hook: off`, the no-sheet output, unchanged Claude Code and Codex output, the setup question order, and each `PreToolUse` rule, including the injection attempts `;rm`, `$(...)`, backticks, `&&`, a pipe, a redirect, a newline, a `..` path, a sibling prefix, and a script outside `scripts/`. Removing each of 19 denies and guards in `pre-tool-use.awk` and `sheet.awk` in turn fails at least one test. `tests/copilot-smoke.sh` installs the checkout into a throwaway `HOME` and `COPILOT_HOME` and passed all 42 checks on Copilot CLI 1.0.92, reading each result from the session's `events.jsonl`. It covers the install, routing context, `session hook: off`, both agents, a dispatch on an explicit model, setup on a missing sheet, setup writing only supplied IDs, saved choices without a sheet read or a path prompt, each hook deny, a vendored script without a permission request, a second plugin's context, `-p` and interactive resume, a slash command as the first message, and the same hook checks on a GitHub marketplace install of this branch. Setup passed on both `gpt-5.4-mini` and `claude-sonnet-5`. A manual check of the GitHub Copilot app passed routing, first-run setup, agent dispatch, `session hook: off`, and the app-only tools.
+
+Copilot setup opens with one question, "Run every pstack role on this session's model?". Answering yes sets every role to `inherit-parent` and skips the per-tier model questions, for plans that expose one model or only automatic selection.
+
+## 0.9.69 - hook validation names a missing command
+
+`tools/generate.mjs` reports a hook with no `command` as a fault. Since the `commandWindows` override landed in 0.9.66, such a hook passed validation with nothing checked, including one that carried only a Windows override and so ran nowhere else.
+
+## 0.9.68 - resume links with parentheses, BOM-led plans, Codex sessions in the worktree audit, and Pi fixes
+
+Resume checkpoint publication now accepts Markdown angle-bracket destinations such as `[Questions](<questions (draft).md>)`. A linked local file still has to be registered with `--artifact`. A CLI regression test covers publication and a subsequent read.
+
+`check-plan.mjs` and `check-playbooks.mjs` strip a leading UTF-8 byte-order mark, so a plan or project playbook saved by an editor that adds one no longer fails with a missing title, a missing `when:` line, or frontmatter linted as prose.
+
+`worktree-audit.mjs` scans Codex's `sessions` and `archived_sessions` under `$CODEX_HOME` (default `~/.codex`) and honours `$CLAUDE_CONFIG_DIR`, so a worktree with a recent Codex session lands in `verify-recent-chat` instead of `safe`. It matches a worktree path as JSONL spells it, which covers Windows backslash and forward-slash spellings, UNC paths, and paths with escaped characters, without matching a sibling that shares the prefix.
+
+In Pi, starting a new `/loop` cancels the previous loop's pending wakeup in both modes, so an old self-paced prompt no longer fires after a replacement. A sheet the user cannot read leaves the defaults in place instead of failing session start or an agent launch, and the shared sheet table in `tests/session-hook-sheets.mjs` now holds every hook to that case. A retained agent worktree is checked before reuse and cleanup: a plain directory, a link, an unrelated repository, or an unregistered gitdir at that path is refused, and its files are left alone, so an isolated agent can no longer run in the parent checkout.
+
+`tools/forks.json` drops the stale `watch-pr/transport.test.ts` entry that the sync dry-run warned about.
+
+## 0.9.67 - session hook sheet parity
+
+The POSIX hook, the PowerShell hook, and Pi now read the sheet the same way in two more cases. A `session hook: off` line after a UTF-8 byte-order mark counts as off, which covers sheets saved by editors that add one. A sheet that exists but cannot be read as a file leaves the hook on, the same as a missing sheet, instead of failing the PowerShell hook or printing an error from the POSIX one. Both cases join the shared table in `tests/session-hook-sheets.mjs`. The Windows CI job's test timeout drops from 60 to 10 seconds, so a return of the slow PowerShell start fails the job.
+
+## 0.9.66 - Windows Codex SessionStart hook
+
+The Codex plugin's `SessionStart` hook now runs on Windows. `codex-hooks.json` adds a `commandWindows` override that runs `session-start.ps1` through PowerShell, so Windows Codex loads the routing instruction without Bash (#171). Windows users must trust the changed hook again through `/hooks`.
+
+`session-start.sh` now treats a `session hook: off` line with CRLF endings as off, matching the PowerShell adapter and Pi. One table in `tests/session-hook-sheets.mjs` holds the off-switch cases, and the POSIX hook, the PowerShell adapter, and Pi's sheet parser all run against it. A new Windows CI job runs the adapter's tests and fails instead of skipping if they do not run.
+
+## 0.9.65 - sync to upstream e43c7ee (v0.15.9)
+
+The upstream pin moves from `23e4138` to `e43c7ee`, upstream v0.15.9, three commits. The first adds the `/correct` skill. It finds the mistakes agents keep repeating in a repo and fixes each class at the highest level that works: architecture first, then types and lint, then a test, with docs last. The package now carries 33 public skills and 24 principles.
+
+`architect` now screens candidates on the assumption that the next contributor is an agent that sees only the files it opened and copies the nearest example. `design-red-flags.md` gains four red flags: split ownership, two ways to do one task, importable internals, and a hand-synced list. The Perf issue playbook replaces its eight strategy families with seven performance mantras tried in order, cheapest first, and stops at the first one that meets the target. Hillclimb orders perf hypotheses by those mantras, and `benchmark-checklist` points at them.
+
+Measured with `bun tools/sync.mjs pstack e43c7ee`: 4 files updated clean, 1 added, 1 merged three-way (`architect/SKILL.md`), 76 unchanged, 36 excluded, and no conflicts. The new upstream text carries no Cursor-only terms, so `tools/substitutions.json` is unchanged. No file became port-only.
+
+## 0.9.64 - sync to upstream 23e4138 (v0.15.6)
+
+The upstream pin moves from `12d587d` to `23e4138`, upstream v0.15.6, one commit. It adds the `benchmark-checklist` skill and the `principle-explain-the-number` principle, which together vet a measured speedup or regression before anyone reports or acts on it. `poteto-mode` triggers `benchmark-checklist` on a benchmark and indexes the new principle, so the package now carries 32 public skills and 24 principles.
+
+Subagents are fresh by default. A fix round, a follow-up, a retry, and the next queue item go to a new agent with the consolidated brief. A resume is reserved for work that needs state living in the old agent, such as its checkout, uncommitted changes, or a running process. The autopilots hand each next queue item to a fresh owner, owners push after every verifiable unit, and the audit tick judges an owner by its pushed branch and decision trail. The audit tick runs every hour instead of every 30 minutes, and `check-plan.mjs` pins the new cadence. Opening a PR names the run's built-in PR tool first, and the playbooks gain a "Size and stacks" paragraph. Operator-facing defaults under a full-autonomy grant are reported in plain words, with no shorthand token to type back. `technical-writing` drops its fetch-date source lines, and `typescript-best-practices` takes upstream's schema-first reference edits.
+
+Measured with `bun tools/sync.mjs pstack 23e4138`: 6 files updated clean, 2 added, 1 merged three-way, 72 unchanged, 36 excluded, and 5 conflicted files resolved by hand. The conflicts are `SKILL.md`, `autopilot-full.md`, `autopilot-stack.md`, `multi-phase-plan.md`, and `check-plan.mjs`. The sync's denylist rejects the `control-cli` and `control-ui` lines that those conflicts carry, so the run excluded the five paths and the edits were applied by hand afterward.
+
+Port policy is unchanged where it diverges from upstream. The autopilots stop at merge-ready for the operator's click, so the upstream rule that skips a second rebase before the owner's own merge is not ported. The `/goal` removals already matched the port, which never armed one.
+
+## 0.9.63 - the description starts with a capital
+
+The plugin description in every manifest starts with "If" instead of "if".
+
+## 0.9.62 - no author email in the manifests
+
+The Claude and Codex plugin manifests, the marketplace, and `package.json` name the author and link to the GitHub profile, without an email address.
+
+## 0.9.61 - Pi agents learn their depth from a flag
+
+The Pi extension passed each agent it started a copy of the session's environment with `PSTACK_PI_DEPTH` added, the last place the plugin handed a copy of the whole environment to a child process. Agents now inherit the environment unchanged, and the extension registers a `--pstack-depth` flag that a parent passes to each agent it starts. An agent reads its depth from that flag. Depth limits and behaviour are unchanged.
+
+## 0.9.60 - orch and the watch-pr tests stop handing the whole environment to child processes
+
+The Claude plugin directory holds pstack with "Uses a credential from the user's machine". The orch store passed a copy of `process.env` to `gt` and `git`, and three test files passed one to the processes they start. The orch store now lets `gt` and `git` inherit the environment and strips colour codes from `gt` output, where it set `NO_COLOR` before. `openStore` takes a `gt` option, the path of the `gt` executable, which defaults to `gt`. The orch tests use it to run a fake `gt`, because Bun resolves a command that has no `env` option against the `PATH` it started with. The tests' child processes get only `PATH` and the variables each test sets. The Pi extension still passes `PSTACK_PI_DEPTH` to its child agents in a copy of the environment.
+
+The plugin folder has `.claude-plugin/icon.png`, the path the directory reads for the listing icon.
+
+## 0.9.59 - no `$PWD` in the repository and no listing fields in `plugin.json`
+
+The Claude plugin directory validator reads `$PWD` as a credential-named variable and holds a plugin when a file that names it also names a remote URL. The shared-skills and Codex prompt install loops in `docs/reference.md` link with `$(pwd)`, the CI and Security workflows mount `$GITHUB_WORKSPACE`, and the skills-only CI job installs `./plugins/pstack/skills`. Each resolves to the same path as before.
+
+The Claude `plugin.json` no longer carries `icon`, `documentationUrl`, `supportUrl`, `privacyPolicyUrl`, or `termsOfServiceUrl`. Claude Code ignores all five at load time, and the validator reports each one as a finding. `assets/pstack-icon.png` stays for the Codex manifest.
 
 ## 0.9.58 - run pstack on Pi
 

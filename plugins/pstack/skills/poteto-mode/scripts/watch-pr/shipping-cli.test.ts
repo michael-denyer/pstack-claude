@@ -68,7 +68,6 @@ console.log(JSON.stringify({ data: result }));
       encoding: "utf8",
       timeout: 3000,
       env: {
-        ...process.env,
         PATH: `${dir}:${process.env.PATH}`,
         SHIPPING_STATE: file,
       },

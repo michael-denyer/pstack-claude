@@ -4,7 +4,7 @@ Start with the [README](../README.md) for installation and your first task.
 
 ## Slash commands
 
-The package includes 54 skill directories: 31 public skills and 23 `principle-*` references. Claude Code uses `/pstack:<name>`, and Pi uses `/skill:<name>`. In Codex, request a skill by name or install the [optional shortcuts](#codex) for the `/name` form below.
+The package includes 57 skill directories: 33 public skills and 24 `principle-*` references. Claude Code uses `/pstack:<name>`, and Pi uses `/skill:<name>`. In Codex, request a skill by name or install the [optional shortcuts](#codex) for the `/name` form below.
 
 Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
@@ -18,7 +18,9 @@ Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 | `/interrogate` | have three different models try to break a diff |
 | `/automate-me` | draft your own personal -mode skill from recent transcripts |
 | `/reflect` | capture a long task's lessons as a skill edit |
+| `/correct` | find the mistakes agents keep repeating in a repo and make each one impossible, enforced at the highest level that works |
 | `/tdd` | fix a bug by writing the failing test first, then the fix |
+| `/benchmark-checklist` | vet a measured speedup or regression (limiter, tuning, errors, repeat runs, end-to-end relevance) before you report or act on it |
 | `/typescript-best-practices` | ground type-system discipline in TypeScript syntax |
 | `/teach` | explain a subsystem plainly by composing how + why |
 | `/swarm` | fan out N parallel workers across slices or races, then return one aggregated report |
@@ -60,7 +62,7 @@ These checks cover skill discovery. Delegation and multi-model workflows remain 
 
 ### Automatic routing
 
-The Claude Code, Codex, and GitHub Copilot plugins share a [SessionStart hook](../plugins/pstack/hooks/session-start.sh) that loads a short [routing instruction](../plugins/pstack/hooks/session-start-context.md) on startup, resume, clear, and compact. Codex requires the user to trust plugin hooks through `/hooks`. GitHub Copilot receives the same instruction as JSON `additionalContext`, with a Copilot addendum. On Pi, the [extension](../plugins/pstack/pi/prompt.ts) adds the same instruction to the system prompt at every agent start, so it survives compaction. The instruction invokes `poteto-mode` when a task meets any of these conditions:
+The Claude Code, Codex, and GitHub Copilot plugins load the same short [routing instruction](../plugins/pstack/hooks/session-start-context.md) on startup, resume, clear, and compact. The [POSIX hook](../plugins/pstack/hooks/session-start.sh) runs on Claude Code, POSIX Codex, and GitHub Copilot, where it prints the instruction as JSON `additionalContext` with a Copilot addendum. On Windows, Codex uses a [PowerShell adapter](../plugins/pstack/hooks/session-start.ps1) through its `commandWindows` override and does not require Bash. The adapter runs with `-ExecutionPolicy Bypass`, which a machine or user execution policy set by Group Policy overrides; on such machines the hook fails and no instruction loads. Codex requires the user to trust plugin hooks through `/hooks`. On Pi, the [extension](../plugins/pstack/pi/prompt.ts) adds the same instruction to the system prompt at every agent start, so it survives compaction. The instruction invokes `poteto-mode` when a task meets any of these conditions:
 
 - It touches more than one file or changes a signature other files call.
 - It involves a design or architecture choice.
@@ -82,7 +84,7 @@ cd pstack-claude
 mkdir -p ~/.agents/skills
 for s in plugins/pstack/skills/*/; do
   target=~/.agents/skills/"$(basename "$s")"
-  test -e "$target" || test -L "$target" || ln -s "$PWD/$s" "$target"
+  test -e "$target" || test -L "$target" || ln -s "$(pwd)/$s" "$target"
 done
 ```
 
@@ -127,7 +129,7 @@ For optional slash-command shortcuts, run this from the clone's root:
 mkdir -p ~/.codex/prompts
 for c in plugins/pstack/.codex-plugin/prompts/*.md; do
   target=~/.codex/prompts/"$(basename "$c")"
-  test -e "$target" || test -L "$target" || ln -s "$PWD/$c" "$target"
+  test -e "$target" || test -L "$target" || ln -s "$(pwd)/$c" "$target"
 done
 ```
 
@@ -227,7 +229,7 @@ CI also checks shell scripts, workflows, Markdown, relative links, and the bundl
 
 ### Port scope and attribution
 
-The skill tree is synced against upstream `12d587d` (v0.15.5).
+The skill tree is synced against upstream `e43c7ee` (v0.15.9).
 
 This repository ports Lauren Tan's pstack from Cursor to Claude Code and shares the skills with other runtimes. It includes seven cursor-team-kit skills and an independently authored `babysit` skill. The port supplies Claude Code plugin registration and routing, Codex manifests and shortcuts, the Codex tool mapping, the Pi package, extension, and tool mapping, and the GitHub Copilot hooks and tool mapping.
 

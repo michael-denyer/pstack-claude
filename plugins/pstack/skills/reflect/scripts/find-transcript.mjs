@@ -28,18 +28,34 @@ async function* jsonlLines(stream) {
   if (rest) yield rest;
 }
 
+// Session cleanup can delete a transcript or its session directory while a
+// search runs. Anything under the root that vanishes after it was listed is
+// skipped; a missing root still throws.
+export function rethrowUnlessRemoved(error) {
+  if (error.code !== "ENOENT") throw error;
+}
+
 export function candidates(projectsDir, maxDepth = 2) {
   const files = [];
   const walk = (dir, depth) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name);
       if (entry.isFile() && entry.name.endsWith(".jsonl")) files.push(full);
-      else if (entry.isDirectory() && depth < maxDepth) walk(full, depth + 1);
+      else if (entry.isDirectory() && depth < maxDepth) {
+        try {
+          walk(full, depth + 1);
+        } catch (error) {
+          rethrowUnlessRemoved(error);
+        }
+      }
     }
   };
   walk(projectsDir, 0);
   return files
-    .map((path) => ({ path, mtime: statSync(path).mtimeMs }))
+    .flatMap((path) => {
+      const stat = statSync(path, { throwIfNoEntry: false });
+      return stat ? [{ path, mtime: stat.mtimeMs }] : [];
+    })
     .sort((a, b) => b.mtime - a.mtime)
     .map(({ path }) => path);
 }
@@ -138,8 +154,12 @@ export async function openingPrompt(path) {
 
 export async function findTranscript(projectsDir, fragment) {
   for (const path of candidates(projectsDir)) {
-    const prompt = await openingPrompt(path);
-    if (prompt?.includes(fragment)) return path;
+    try {
+      const prompt = await openingPrompt(path);
+      if (prompt?.includes(fragment)) return path;
+    } catch (error) {
+      rethrowUnlessRemoved(error);
+    }
   }
   return null;
 }

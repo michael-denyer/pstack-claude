@@ -5,6 +5,7 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -50,7 +51,7 @@ async function initializedStore(): Promise<{
   readonly store: Store;
 }> {
   const directory = await makeDirectory();
-  const store = useStore(directory);
+  const store = useStore(directory, { gt: fakeGtPath(directory) });
   await store.init();
   return { directory, store };
 }
@@ -102,6 +103,10 @@ async function makeGitStack(directory: string): Promise<{
   };
 }
 
+function fakeGtPath(directory: string): string {
+  return join(directory, "bin", "gt");
+}
+
 async function withFakeGt<T>({
   directory,
   operation,
@@ -115,7 +120,7 @@ async function withFakeGt<T>({
   const outputPath = join(directory, "gt-output.txt");
   await mkdir(bin);
   await writeFile(outputPath, output);
-  const gt = join(bin, "gt");
+  const gt = fakeGtPath(directory);
   await writeFile(
     gt,
     `#!/usr/bin/env bash
@@ -145,23 +150,12 @@ esac
 `
   );
   await chmod(gt, 0o755);
-
-  const originalPath = process.env.PATH;
-  process.env.PATH = `${bin}:${originalPath ?? ""}`;
-  try {
-    return await operation(outputPath);
-  } finally {
-    if (originalPath === undefined) {
-      delete process.env.PATH;
-    } else {
-      process.env.PATH = originalPath;
-    }
-  }
+  return operation(outputPath);
 }
 
 function runCli(
   args: readonly string[],
-  env: Readonly<Record<string, string | undefined>> = process.env
+  env?: Readonly<Record<string, string | undefined>>
 ): RunResult {
   const result = Bun.spawnSync([process.execPath, SCRIPT, ...args], { env });
   return {
@@ -495,6 +489,23 @@ describe("Store", () => {
     });
   });
 
+  it("parses Graphite output that carries colour codes", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+
+    await withFakeGt({
+      directory,
+      output: "\u001b[2m◯ main\u001b[0m\n\u001b[32m◉ stack/open\u001b[39m \u001b[2m(current)\u001b[22m\n",
+      operation: async () => {
+        expect(
+          (await store.frontier.set({ repo: stack.repo })).prs
+        ).toEqual([
+          { pr: 11, branches: "stack/open", sha: stack.openSha, state: "OPEN" },
+        ]);
+      },
+    });
+  });
+
   it("rejects malformed TSV, verdict, frontier, and inbox data", async () => {
     const { directory, store } = await initializedStore();
 
@@ -558,7 +569,7 @@ describe("orch CLI", () => {
 
   it("accepts ORCH_STORE and emits complete JSON", async () => {
     const directory = await makeDirectory();
-    const env = { ...process.env, ORCH_STORE: directory };
+    const env = { PATH: process.env.PATH, ORCH_STORE: directory };
     expect(runCli(["init"], env).code).toBe(0);
 
     const added = runCli(
@@ -642,20 +653,19 @@ describe("port guards", () => {
       directory,
       output: "◯ main\n◉ stack/paren\n",
       operation: async () => {
-        const shim = join(directory, "paren-bin");
-        await mkdir(shim);
+        const gt = fakeGtPath(directory);
+        await rename(gt, `${gt}-base`);
         await writeFile(
-          join(shim, "gt"),
+          gt,
           `#!/usr/bin/env bash
 if [ "$*" = "--no-interactive info stack/paren" ]; then
   printf 'stack/paren\\nPR #14 (Needs approvals (2)) tricky change\\n'
 else
-  exec "${join(directory, "bin", "gt")}" "$@"
+  exec "${gt}-base" "$@"
 fi
 `,
           { mode: 0o755 }
         );
-        process.env.PATH = `${shim}:${process.env.PATH ?? ""}`;
         await expect(store.frontier.set({ repo: stack.repo })).rejects.toThrow(
           "gt info output has an invalid PR row for branch stack/paren"
         );

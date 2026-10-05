@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { agentSkills } from "../tools/generate.mjs";
+import { sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
 const mandate = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
@@ -27,7 +28,11 @@ const sessionStart = Object.fromEntries(
 
 // The stamped template with the marker replaced by the sheet's role lines,
 // escaped the way JSON.stringify escapes printable text.
-const withChoices = (lines) => copilotContext.replace(marker, JSON.stringify(lines.join("\n")).slice(1, -1));
+// The lines sheet.awk treats as role lines: `key: value`, the two settings excluded.
+const roleLines = (sheet) =>
+  sheet.split(/\r?\n/).filter((line) => /^[A-Za-z][A-Za-z0-9 ,/_()-]*:[ \t]*[^ \t]/.test(line) && !/^(session hook|panel vendors):/.test(line));
+const noRoleLines = "(no role lines: every role omits `model`)";
+const withChoices = (lines) => copilotContext.replace(marker, JSON.stringify(lines.length ? lines.join("\n") : noRoleLines).slice(1, -1));
 
 // GitHub Copilot reads hooks/hooks.json, sets every plugin-root variable plus
 // COPILOT_PLUGIN_ROOT, and sets COPILOT_HOME only when the user relocated
@@ -73,7 +78,7 @@ function runHook(runtime, sheet, command = sessionStart[runtimes[runtime].hooks]
   const sheetRoot = join(home, sheetDir);
   if (sheet !== null) {
     mkdirSync(sheetRoot);
-    writeFileSync(join(sheetRoot, "pstack-models.md"), sheet);
+    writeSheet(join(sheetRoot, "pstack-models.md"), sheet);
   }
   try {
     const r = spawnSync("sh", ["-c", command], {
@@ -117,29 +122,12 @@ describe("SessionStart hook", () => {
         expect(runHook(runtime, null)).toEqual({ status: 0, out: runtimes[runtime].noSheet, err: "" });
       });
 
-      test("injects the mandate when the sheet has no session hook line", () => {
-        expect(runHook(runtime, "bug-fix: configured-model\n")).toEqual({
-          status: 0,
-          out: runtimes[runtime].out(["bug-fix: configured-model"]),
-          err: "",
+      for (const { name, sheet, off } of sheetCases) {
+        test(`${off ? "injects nothing" : "injects the mandate"} when the sheet has ${name}`, () => {
+          const expected = off ? "" : typeof sheet === "string" ? runtimes[runtime].out(roleLines(sheet)) : runtimes[runtime].noSheet;
+          expect(runHook(runtime, sheet)).toEqual({ status: 0, out: expected, err: "" });
         });
-      });
-
-      test("injects the mandate when the sheet says on", () => {
-        expect(runHook(runtime, "bug-fix: configured-model\nsession hook: on\n")).toEqual({
-          status: 0,
-          out: runtimes[runtime].out(["bug-fix: configured-model"]),
-          err: "",
-        });
-      });
-
-      test("injects nothing when the sheet says off", () => {
-        expect(runHook(runtime, "bug-fix: configured-model\nsession hook: off\n")).toEqual({
-          status: 0,
-          out: "",
-          err: "",
-        });
-      });
+      }
     });
   }
 

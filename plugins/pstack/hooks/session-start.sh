@@ -1,18 +1,25 @@
 #!/bin/sh
 set -eu
 
+# Only an exact `session hook: off` line disables injection, with LF or CRLF
+# endings and an optional byte-order mark. An unreadable sheet leaves it on.
+bom=$(printf '\357\273\277')
+hook_off() {
+  [ -f "$1" ] && [ -r "$1" ] && sed "1s/^$bom//" "$1" | tr -d '\r' | grep -qx 'session hook: off'
+}
+
 # GitHub Copilot reads hooks.json too, so it passes `claude`, but it also
 # exports COPILOT_PLUGIN_ROOT and parses stdout as one JSON object. It gets the
 # generator-stamped JSON copy of the mandate, and while no Copilot sheet exists
-# the copy that says to run setup-pstack first.
+# or can be read, the copy that says to run setup-pstack first.
 if [ -n "${COPILOT_PLUGIN_ROOT:-}" ]; then
   hooks=$(dirname "$0")
   sheet="${COPILOT_HOME:-$HOME/.copilot}/pstack-models.md"
-  if [ ! -e "$sheet" ]; then
+  if [ ! -f "$sheet" ] || [ ! -r "$sheet" ]; then
     cat "$hooks/session-start-context-nosheet.json"
     exit 0
   fi
-  if grep -qs '^session hook: off$' "$sheet"; then
+  if hook_off "$sheet"; then
     exit 0
   fi
   # The sheet sits outside Copilot's path sandbox, so the hook puts its role
@@ -31,7 +38,7 @@ case "${1:-}" in
     ;;
 esac
 
-if grep -qs '^session hook: off$' "$sheet"; then
+if hook_off "$sheet"; then
   exit 0
 fi
 

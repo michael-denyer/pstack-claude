@@ -68,16 +68,16 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
       const started = runner.start(params, ctx);
       if (params.run_in_background) {
         return {
-          content: [{ type: "text", text: `${JSON.stringify({ agentId: started.id, status: "running" })}\n\n${BACKGROUND_NOTE}` }],
-          details: { agentId: started.id, status: "running" },
+          content: [{ type: "text", text: `${JSON.stringify({ agentId: started.agent.id, status: "running" })}\n\n${BACKGROUND_NOTE}` }],
+          details: { agentId: started.agent.id, status: "running" },
         };
       }
-      const onAbort = () => void runner.stop(started.id);
+      const onAbort = () => void runner.stop(started.agent.id);
       signal?.addEventListener("abort", onAbort, { once: true });
-      const record = await runner.wait(started.id).finally(() => signal?.removeEventListener("abort", onAbort));
+      const record = await runner.wait(started.agent.id).finally(() => signal?.removeEventListener("abort", onAbort));
       return {
         content: [{ type: "text", text: resultText(record) }],
-        details: { agentId: record.id, status: record.status },
+        details: { agentId: record.agent.id, status: record.status },
         isError: record.status !== "completed",
       };
     },
@@ -93,9 +93,9 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
     async execute(_id, params) {
       const { record, running } = await runner.send(params.to, params.message);
       const text = running
-        ? `Agent ${record.id} is running; it reads the message after its current tool calls.`
-        : JSON.stringify({ agentId: record.id, status: "running" });
-      return { content: [{ type: "text", text }], details: { agentId: record.id, running } };
+        ? `Agent ${record.agent.id} is running; it reads the message after its current tool calls.`
+        : JSON.stringify({ agentId: record.agent.id, status: "running" });
+      return { content: [{ type: "text", text }], details: { agentId: record.agent.id, running } };
     },
   });
 
@@ -122,8 +122,8 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
     async execute(_id, params) {
       const record = await runner.stop(params.id);
       return {
-        content: [{ type: "text", text: JSON.stringify({ agentId: record.id, status: record.status, exitCode: record.exitCode }) }],
-        details: { agentId: record.id, status: record.status },
+        content: [{ type: "text", text: JSON.stringify({ agentId: record.agent.id, status: record.status, exitCode: record.exitCode }) }],
+        details: { agentId: record.agent.id, status: record.status },
       };
     },
   });

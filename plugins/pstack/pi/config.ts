@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,14 +9,19 @@ const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
 type Effort = (typeof EFFORT_LEVELS)[number];
 const PARENT_MODEL_ALIASES = ["inherit-parent", "auto"];
 
+// A parent passes it to each agent it starts, so the agent knows its depth.
+export const DEPTH_FLAG = "pstack-depth";
+
 export interface Settings {
   pluginRoot: string;
   modelsFile: string;
   agentDir: string;
   pi: { command: string; args: string[] };
-  childEnv: NodeJS.ProcessEnv;
+  // Unset, so an agent inherits the session's environment. Tests set it to
+  // configure their fake pi.
+  childEnv?: NodeJS.ProcessEnv;
   // Layers below the main session: 0 there, 1 in its agents, and so on.
-  depth: number;
+  readonly depth: number;
   killGraceMs: number;
   // How long a settled child gets to exit after its stdin closes. It covers a
   // nested child's own shutdown, which stops its agents with killGraceMs each.
@@ -34,16 +39,18 @@ function piInvocation(): Settings["pi"] {
   return /^(node|bun)(\.exe)?$/.test(exe) ? { command: "pi", args: [] } : { command: process.execPath, args: [] };
 }
 
-export function defaultSettings(env: NodeJS.ProcessEnv = process.env): Settings {
+// readDepth is called on each use: pi parses extension flags after it loads
+// the extension.
+export function defaultSettings(readDepth: () => number, env: NodeJS.ProcessEnv = process.env): Settings {
   const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-  const depth = Number(env.PSTACK_PI_DEPTH) || 0;
   return {
     pluginRoot,
     modelsFile: join(pluginRoot, "models.json"),
     agentDir: env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
     pi: piInvocation(),
-    childEnv: { ...env, PSTACK_PI_DEPTH: String(depth + 1) },
-    depth,
+    get depth() {
+      return readDepth();
+    },
     killGraceMs: 5000,
     exitGraceMs: 30_000,
   };
@@ -56,7 +63,7 @@ interface Sheet {
 }
 
 export function parseSheet(text: string): Sheet {
-  const lines = text.split(/\r?\n/);
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
   const piModels = new Map<string, string>();
   for (const line of lines) {
     const m = /^pi models:\s*(.*)$/.exec(line.trim());
@@ -71,7 +78,15 @@ export function parseSheet(text: string): Sheet {
 
 export function readSheet(agentDir: string): Sheet | undefined {
   const file = join(agentDir, "pstack-models.md");
-  return existsSync(file) ? parseSheet(readFileSync(file, "utf8")) : undefined;
+  let text: string;
+  try {
+    if (!statSync(file, { throwIfNoEntry: false })?.isFile()) return undefined;
+    text = readFileSync(file, "utf8");
+  } catch {
+    // An unreadable sheet leaves the defaults in place, as the session hooks do.
+    return undefined;
+  }
+  return parseSheet(text);
 }
 
 // The parts of models.json the extension reads; the generator checks the rest.

@@ -15,11 +15,11 @@ export function truncateUtf8(text: string, cap: number): string {
   return buf.subarray(0, end).toString("utf8");
 }
 
-function header(record: EndedRecord): string {
-  const lines = [`agentId: ${record.id}`, `description: ${record.description}`, `status: ${record.status}`, `exit code: ${record.exitCode}`];
-  if (record.worktree) {
-    const state = record.worktreeKept === false ? "no changes; removed" : `branch ${record.worktree.branch}`;
-    lines.push(`worktree: ${record.worktree.path} (${state})`);
+function header({ agent, ...record }: EndedRecord): string {
+  const lines = [`agentId: ${agent.id}`, `description: ${agent.description}`, `status: ${record.status}`, `exit code: ${record.exitCode}`];
+  if (agent.worktree) {
+    const state = record.worktreeKept === false ? "no changes; removed" : `branch ${agent.worktree.branch}`;
+    lines.push(`worktree: ${agent.worktree.path} (${state})`);
   }
   return lines.join("\n");
 }
@@ -35,16 +35,16 @@ export function resultText(record: EndedRecord): string {
 }
 
 export function listing(records: AgentRecord[]): object[] {
-  return records.map((r) => ({
-    id: r.id,
-    description: r.description,
-    subagent_type: r.subagentType,
-    model: r.model ?? "(pi default)",
+  return records.map(({ agent, ...r }) => ({
+    id: agent.id,
+    description: agent.description,
+    subagent_type: agent.subagentType,
+    model: agent.model ?? "(pi default)",
     status: r.status,
     pid: r.pid,
-    startedAt: r.startedAt,
+    startedAt: agent.startedAt,
     endedAt: r.status === "running" ? undefined : r.endedAt,
-    worktree: r.worktree?.path,
+    worktree: agent.worktree?.path,
   }));
 }
 
@@ -53,6 +53,6 @@ export function noticeOf(record: EndedRecord): Parameters<ExtensionAPI["sendMess
     customType: NOTICE_TYPE,
     content: `pstack agent finished.\n${header(record)}${record.outputFile ? `\nfull output: ${record.outputFile}` : ""}\n\n${report(record)}`,
     display: true,
-    details: { agentId: record.id, status: record.status, exitCode: record.exitCode, outputFile: record.outputFile },
+    details: { agentId: record.agent.id, status: record.status, exitCode: record.exitCode, outputFile: record.outputFile },
   };
 }

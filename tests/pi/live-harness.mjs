@@ -131,21 +131,21 @@ function registry(sessionFile) {
   const byId = new Map();
   for (const e of readEntries(sessionFile)) {
     if (e.type !== "custom" || e.customType !== "pstack-agents") continue;
-    byId.set(e.data.id, [...(byId.get(e.data.id) ?? []), e.data]);
+    byId.set(e.data.agent.id, [...(byId.get(e.data.agent.id) ?? []), e.data]);
   }
   return byId;
 }
 
 export function agentByDescription(sessionFile, description) {
-  const found = [...registry(sessionFile).values()].filter((snaps) => snaps[0].description === description);
+  const found = [...registry(sessionFile).values()].filter((snaps) => snaps[0].agent.description === description);
   expect(found).toHaveLength(1);
   return found[0];
 }
 
-export function childEntries(record) {
-  const files = readdirSync(record.sessionDir).filter((f) => f.endsWith(`_${record.sessionId}.jsonl`));
+export function childEntries({ agent }) {
+  const files = readdirSync(agent.sessionDir).filter((f) => f.endsWith(`_${agent.sessionId}.jsonl`));
   expect(files).toHaveLength(1);
-  return readEntries(join(record.sessionDir, files[0]));
+  return readEntries(join(agent.sessionDir, files[0]));
 }
 
 // The system prompt sections in force at the end of the session: a compaction

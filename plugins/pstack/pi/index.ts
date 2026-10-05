@@ -2,18 +2,20 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { registerAgentTools } from "./agent-tools.ts";
 import { AgentRunner } from "./agents.ts";
-import { defaultSettings, type Settings } from "./config.ts";
-import { registerInteraction, Scheduler } from "./interaction.ts";
+import { registerAsk } from "./ask.ts";
+import { DEPTH_FLAG, defaultSettings, type Settings } from "./config.ts";
 import { registerOneShot } from "./one-shot.ts";
 import { registerPathSkills } from "./path-skills.ts";
 import { registerPromptSections } from "./prompt.ts";
+import { registerSchedule, Scheduler } from "./schedule.ts";
 
 export function install(pi: ExtensionAPI, settings: Settings): void {
   const runner = new AgentRunner(pi, settings);
   const scheduler = new Scheduler(pi);
   const oneShot = registerOneShot(pi, settings, runner);
   registerAgentTools(pi, runner);
-  registerInteraction(pi, scheduler, oneShot);
+  registerAsk(pi, oneShot);
+  registerSchedule(pi, scheduler, oneShot);
   registerPromptSections(pi, settings);
   registerPathSkills(pi, settings);
   // Children run detached, in their own process group, so a parent that exits
@@ -33,5 +35,6 @@ export function install(pi: ExtensionAPI, settings: Settings): void {
 }
 
 export default function pstack(pi: ExtensionAPI): void {
-  install(pi, defaultSettings());
+  pi.registerFlag(DEPTH_FLAG, { type: "string", description: "Layers below the main session; pstack sets it on the agents it starts." });
+  install(pi, defaultSettings(() => Number(pi.getFlag(DEPTH_FLAG)) || 0));
 }

@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { agentEntry, alive, flag, listAgents, restore, sleep, useWorld, waitFor } from "./harness.mjs";
+import { agentEntry, alive, flag, listAgents, recordWith, restore, sleep, useWorld, waitFor } from "./harness.mjs";
 
 const setup = useWorld();
 
@@ -35,7 +35,7 @@ describe("registry", () => {
     await pi.call("agent", { description: "orphan", prompt: "x", run_in_background: true }, ctx);
     await w.until("grandchild");
     const stranger = w.spawn("sleep", ["30"], { detached: true });
-    const entries = [...pi.entries, agentEntry({ ...pi.entries.at(-1).data, id: "astranger", pid: stranger.pid })];
+    const entries = [...pi.entries, agentEntry(recordWith(pi.entries.at(-1).data, { agent: { id: "astranger" }, pid: stranger.pid }))];
 
     const resumed = await restore(w, entries);
     await waitFor(() => w.log().every((r) => !alive(r.pid)));
@@ -52,7 +52,7 @@ describe("registry", () => {
     await exitOf(parent);
     const base = pi.entries.at(0).data;
     const entries = ["sleep", "300", ""].map((sessionId, i) =>
-      agentEntry({ ...base, id: `aword${i}`, status: "running", pid: stranger.pid, parentPid: parent.pid, sessionId }),
+      agentEntry(recordWith(base, { agent: { id: `aword${i}`, sessionId }, status: "running", pid: stranger.pid, parentPid: parent.pid })),
     );
 
     const resumed = await restore(w, entries);
@@ -74,7 +74,7 @@ describe("registry", () => {
       p.on("exit", () => r(Number(out.trim().split("\n")[0])));
     });
     expect(alive(member)).toBe(true);
-    const entries = [...pi.entries, agentEntry({ ...pi.entries.at(0).data, id: "agroup", status: "running", pid: leader.pid, parentPid: parent.pid })];
+    const entries = [...pi.entries, agentEntry(recordWith(pi.entries.at(0).data, { agent: { id: "agroup" }, status: "running", pid: leader.pid, parentPid: parent.pid }))];
 
     await restore(w, entries);
     await sleep(2 * w.settings.killGraceMs);
@@ -85,10 +85,12 @@ describe("registry", () => {
     const { w, pi, ctx } = setup();
     const { details } = await pi.call("agent", { description: "sound", prompt: "x" }, ctx);
     const bad = [
-      { id: "anoparent", status: "running", pid: 1 },
-      { id: 7, status: "completed" },
-      { ...pi.entries.at(-1).data, id: "abadstatus", status: "done" },
-      { ...pi.entries.at(-1).data, id: "anoexit", exitCode: "0" },
+      { agent: { id: "anoparent" }, status: "running", pid: 1 },
+      { agent: { id: 7 }, status: "completed" },
+      recordWith(pi.entries.at(-1).data, { agent: { id: "abadstatus" }, status: "done" }),
+      recordWith(pi.entries.at(-1).data, { agent: { id: "anoexit" }, exitCode: "0" }),
+      // The shape before identity moved under `agent`.
+      (({ agent, ...state }) => ({ ...agent, ...state, id: "aflat" }))(pi.entries.at(-1).data),
       "garbage",
       null,
     ];
@@ -118,7 +120,7 @@ describe("registry", () => {
     await w.until("invocation");
     const otherPi = w.spawn("sleep", ["30"], { detached: true });
     const entries = pi.entries.map((e) => ({ ...e, data: { ...e.data, parentPid: otherPi.pid } }));
-    const id = entries[0].data.id;
+    const id = entries[0].data.agent.id;
 
     const resumed = await restore(w, entries);
     const sent = await resumed.call("send_message", { to: id, message: "more" }, ctx).catch((e) => e);
@@ -138,7 +140,9 @@ describe("registry", () => {
     await w.until("grandchild", 2);
 
     await pi.emit("session_shutdown", { reason: "quit" }, ctx);
-    for (const r of w.log()) expect(alive(r.pid)).toBe(false);
+    for (const inv of w.invocations()) expect(alive(inv.pid)).toBe(false);
+    // A child kills its running command as it exits and does not wait for it.
+    await waitFor(() => w.logged("grandchild").every((r) => !alive(r.pid)));
     expect((await listAgents(pi, ctx)).map((a) => a.status)).toEqual(["stopped", "stopped"]);
     expect(pi.messages).toEqual([]);
 

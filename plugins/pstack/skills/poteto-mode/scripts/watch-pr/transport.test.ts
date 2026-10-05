@@ -81,7 +81,6 @@ console.log(JSON.stringify(value));
       encoding: "utf8",
       timeout: 3000,
       env: {
-        ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
         WATCH_FIXTURE: scenario,
         WATCH_CALLS: callsFile,

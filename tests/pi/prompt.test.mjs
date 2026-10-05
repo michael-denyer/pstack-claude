@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { PARALLEL_CALLS, piToolsNote } from "../../plugins/pstack/pi/prompt.ts";
+import { sheetCases } from "../session-hook-sheets.mjs";
 import { pluginRoot, useWorld } from "./harness.mjs";
 
 const mandate = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
@@ -37,6 +38,14 @@ describe("before_agent_start", () => {
     const { pi, ctx } = setup({ sheet });
     expect(await sectionsAfterStart(pi, ctx)).toEqual({ ...always, "pstack-models": sheet });
   });
+
+  for (const { name, sheet, off } of sheetCases) {
+    test(`${off ? "drops" : "keeps"} the mandate when the sheet has ${name}`, async () => {
+      const { pi, ctx } = setup({ sheet });
+      const sections = await sectionsAfterStart(pi, ctx);
+      expect(sections["pstack-session-start"]).toBe(off ? undefined : mandate);
+    });
+  }
 
   test("a child pi gets the sheet but not the mandate", async () => {
     const sheet = "swarm workers: opus\n";

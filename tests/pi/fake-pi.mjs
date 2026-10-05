@@ -156,7 +156,7 @@ log({
   prompt,
   cwd: process.cwd(),
   pid: process.pid,
-  depth: process.env.PSTACK_PI_DEPTH ?? null,
+  depth: flag("--pstack-depth") ?? null,
   systemPrompt: systemFile && existsSync(systemFile) ? readFileSync(systemFile, "utf8") : null,
 });
 const steps = script.byPrompt?.[prompt] ?? script.default ?? [{ reply: "ok" }];

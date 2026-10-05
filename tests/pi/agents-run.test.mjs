@@ -25,6 +25,7 @@ describe("agent tool", () => {
       "--session-dir", join(w.agentDir, "pstack", "parent-session", "agents"),
       "--model", "anthropic/parent-model",
       "--thinking", "medium",
+      "--pstack-depth", "1",
     ]);
     expect(inv.prompt).toBe("-do it");
     expect(flag(inv, "--session-id")).toMatch(/^[0-9a-f-]{36}$/);
@@ -237,7 +238,8 @@ describe("stop_agent", () => {
     const result = await pi.call("stop_agent", { id: details.agentId }, ctx);
     expect(JSON.parse(resultText(result)).status).toBe("stopped");
     expect(alive(pid)).toBe(false);
-    expect(alive(spawned("running"))).toBe(false);
+    // The child kills its running command as it exits and does not wait for it.
+    await waitFor(() => !alive(spawned("running")));
     expect(alive(spawned("background"))).toBe(true);
     expect((await listAgents(pi, ctx))[0].status).toBe("stopped");
     await waitFor(() => pi.messages.length === 1);

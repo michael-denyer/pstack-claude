@@ -289,8 +289,8 @@ describe("validatePiPackage", () => {
 });
 
 describe("validateHooks", () => {
-  const hooks = (command) =>
-    JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command }] }] } });
+  const hooks = (command, commandWindows) =>
+    JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command, commandWindows }] }] } });
   const exec = { mode: 0o755 };
   const plain = { mode: 0o644 };
 
@@ -316,6 +316,25 @@ describe("validateHooks", () => {
     expect(() => validateHooks(hooks('"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"'), { statOf: () => plain })).toThrow(
       "hooks/session-start.sh is not executable",
     );
+  });
+
+  test("checks the Windows override path without requiring an executable bit for PowerShell", () => {
+    const cmd = hooks(
+      '"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh" codex',
+      'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ps1"',
+    );
+    const statOf = (rel) => rel.endsWith(".sh") ? exec : plain;
+    expect(() => validateHooks(cmd, { statOf })).not.toThrow();
+    expect(() => validateHooks(cmd, { statOf: (rel) => rel.endsWith(".sh") ? exec : null })).toThrow(
+      "SessionStart: hooks/session-start.ps1 does not exist",
+    );
+  });
+
+  test("names a hook without a command, even when it has a Windows override", () => {
+    const windows = 'powershell.exe -File "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ps1"';
+    for (const cmd of [hooks(undefined), hooks(undefined, windows)]) {
+      expect(() => validateHooks(cmd, { statOf: () => plain })).toThrow("SessionStart: a hook has no command");
+    }
   });
 
   test("a file the command reads only has to exist", () => {

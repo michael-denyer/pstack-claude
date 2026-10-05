@@ -7,8 +7,9 @@
 //   node worktree-audit.mjs [repo-path] [transcripts-path ...]
 //
 // Without a transcripts path it scans every runtime's transcripts directory
-// that exists: Claude Code's ~/.claude/projects, and Pi's sessions and pstack
-// subagent sessions under $PI_CODING_AGENT_DIR (default ~/.pi/agent).
+// that exists: Claude Code's projects under $CLAUDE_CONFIG_DIR, Codex's sessions
+// and archived_sessions under $CODEX_HOME, and Pi's sessions and pstack subagent
+// sessions under $PI_CODING_AGENT_DIR (defaults: ~/.claude, ~/.codex, ~/.pi/agent).
 //
 // Every probe yields a Fact, { known: true, value } or { known: false }. A hold
 // bucket needs only its own fact; `safe` needs every fact known.
@@ -19,7 +20,7 @@ import { join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { candidates } from "../../reflect/scripts/find-transcript.mjs";
+import { candidates, rethrowUnlessRemoved } from "../../reflect/scripts/find-transcript.mjs";
 
 const known = (value) => ({ known: true, value });
 const UNKNOWN = Object.freeze({ known: false });
@@ -70,22 +71,41 @@ export function parseWorktrees(output) {
 }
 
 export function defaultTranscriptRoots({ env = process.env, home = homedir(), exists = existsSync } = {}) {
-  const claude = join(home, ".claude", "projects");
+  const claude = join(env.CLAUDE_CONFIG_DIR || join(home, ".claude"), "projects");
+  const codex = env.CODEX_HOME || join(home, ".codex");
   const piAgent = env.PI_CODING_AGENT_DIR || join(home, ".pi", "agent");
   const copilot = join(env.COPILOT_HOME || join(home, ".copilot"), "session-state");
-  const found = [claude, join(piAgent, "sessions"), join(piAgent, "pstack"), copilot].filter((root) => exists(root));
+  const found = [claude, join(codex, "sessions"), join(codex, "archived_sessions"),
+    join(piAgent, "sessions"), join(piAgent, "pstack"), copilot].filter((root) => exists(root));
   return found.length ? found : [claude];
 }
 
 // A transcript names a worktree as `<path>/` or `<path>"`, never a bare prefix,
 // so `/x/candidate` does not inherit a chat that ran in `/x/candidate-long`.
-// Claude Code, Pi, and Copilot transcripts are all JSONL that quote the paths they touch.
+// Claude Code, Codex, Pi, and Copilot transcripts are all JSONL, and only JSONL
+// is scanned, so a path appears only JSON-escaped. Git on Windows may spell a
+// path with forward slashes while the session uses backslashes.
+function transcriptNeedles(path) {
+  const windows = /^(?:[a-z]:[\\/]|\\\\|\/\/)/i.test(path);
+  const spellings = windows ? [path.replaceAll("\\", "/"), path.replaceAll("/", "\\")] : [path];
+  return spellings.flatMap((spelling) => {
+    const json = JSON.stringify(spelling).slice(1, -1);
+    return ["/", '"', "\\\\"].map((end) => Buffer.from(json + end));
+  });
+}
+
 export function lastChats(roots, paths) {
-  const needles = paths.map((path) => [path, [Buffer.from(`${path}/`), Buffer.from(`${path}"`)]]);
+  const needles = paths.map((path) => [path, transcriptNeedles(path)]);
   const latest = new Map();
   for (const file of roots.flatMap((root) => candidates(root, Infinity))) {
-    const text = readFileSync(file);
-    const mtime = Math.floor(statSync(file).mtimeMs / 1000);
+    let text, mtime;
+    try {
+      text = readFileSync(file);
+      mtime = Math.floor(statSync(file).mtimeMs / 1000);
+    } catch (error) {
+      rethrowUnlessRemoved(error);
+      continue;
+    }
     for (const [path, forms] of needles) {
       if (mtime > (latest.get(path) ?? 0) && forms.some((form) => text.includes(form))) latest.set(path, mtime);
     }

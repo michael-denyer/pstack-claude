@@ -1,0 +1,22 @@
+Use case: infographic-diagram.
+Asset type: the pstack project's README overview PNG.
+Image 1 is the edit target. Update the existing diagram for the current repository while preserving its distinctive visual identity: charcoal background, dark navy technical panel with clipped corners, thin electric-blue outlines, cyan and amber accents, bold white condensed headings, monospace skill names, crisp flat diagrams, and left-to-right request-to-result composition. Keep it landscape, approximately 2:1, with enough height and breathing room for the additions. High-resolution, very legible text for a GitHub README. Remove the distressed texture from lettering so every label is crisp.
+
+Preserve the large title exactly "poteto-mode".
+Add a clearly legible header line or three compact badges beside the title: "Claude Code" "Codex" "Pi". These identify the packaged integrations.
+
+Keep the three main columns:
+1. Heading "Choose a playbook". Keep four stacked selector rows with exact labels "Plan", "Bugs", "Features", "Refactor"; Plan is amber-highlighted. Beneath these add the readable line "PRs, performance, investigations..." to show these are examples.
+2. Heading "Plan and delegate". Preserve "architect" above a branching diagram, with "arena" and its grid of blue candidate blocks and "swarm" with its cyan network below.
+3. Heading "Review and verify". Preserve "interrogate" above a code-diff graphic, with "Test" and a checklist and "Measure" and a bar chart beneath. The chart is symbolic, with no fabricated numeric values.
+
+Retain the terminal/document icon on the far left with the exact label "Your request", and the arrow into the central panel. Retain a code document with a prominent cyan check on the far right, reached by an arrow, but simplify its two-line caption to exactly "Verified work".
+
+Add a distinct slim band inside the central panel below the main columns and above the support-skills footer, with two evenly spaced items, not extra sequential stages:
+- Label "Project playbooks" with the smaller monospace path ".agents/playbooks/".
+- Label "setup-pstack" with the smaller explanation "Model and reasoning effort per role".
+These are customization controls, not mandatory workflow steps.
+
+Keep the bottom support-skills strip with the exact heading "Supporting skills" and three colored badges "how", "why", "unslop", matching the original style.
+
+Constraints: Preserve recognizable original composition, palette, icon language, skill names, and visual hierarchy. Enlarge the panel vertically if necessary to avoid crowding. Render all quoted text verbatim, no extra slogans or version numbers. Spell "poteto-mode", "interrogate", ".agents/playbooks/", and "setup-pstack" exactly. No unrelated new icons or vendor logos. Do not imply automatic merging, add a release step, or include formal verification in this core plugin's diagram.

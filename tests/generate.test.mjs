@@ -333,8 +333,43 @@ describe("validateHooks", () => {
   test("names a hook without a command, even when it has a Windows override", () => {
     const windows = 'powershell.exe -File "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ps1"';
     for (const cmd of [hooks(undefined), hooks(undefined, windows)]) {
-      expect(() => validateHooks(cmd, { statOf: () => plain })).toThrow("SessionStart: a hook has no command");
+      expect(() => validateHooks(cmd, { statOf: () => plain })).toThrow(
+        "SessionStart: hook must have required properties command",
+      );
     }
+  });
+
+  test("faults a Windows override that is not a string and names the file", () => {
+    const cmd = hooks('"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"', 5);
+    expect(() => validateHooks(cmd, { statOf: () => exec, file: "hooks/codex-hooks.json" })).toThrow(
+      "hooks/codex-hooks.json:\n  SessionStart: commandWindows must be string",
+    );
+  });
+
+  test("faults a key no hook type documents, so a misspelt override is not dropped", () => {
+    const hook = { type: "command", command: '"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"', commandWindow: "x.ps1" };
+    const cmd = JSON.stringify({ hooks: { SessionStart: [{ hooks: [hook] }] } });
+    expect(() => validateHooks(cmd, { statOf: () => exec })).toThrow("SessionStart: unknown key commandWindow");
+  });
+
+  test("accepts a prompt hook, which carries a prompt instead of a command", () => {
+    const stop = (hook) => JSON.stringify({ hooks: { Stop: [{ hooks: [hook] }] } });
+    expect(() => validateHooks(stop({ type: "prompt", prompt: "Review $ARGUMENTS" }), { statOf: () => null })).not.toThrow();
+    expect(() => validateHooks(stop({ type: "prompt" }), { statOf: () => null })).toThrow(
+      "Stop: hook must have required properties prompt",
+    );
+    expect(() => validateHooks(stop({ type: "webhook", command: "x" }), { statOf: () => null })).toThrow(
+      'Stop: hook type "webhook" is not one of command, http, mcp_tool, prompt, agent',
+    );
+    expect(() => validateHooks(stop({ type: "constructor" }), { statOf: () => null })).toThrow(
+      'Stop: hook type "constructor" is not one of command, http, mcp_tool, prompt, agent',
+    );
+  });
+
+  test("faults an event whose value is not a list of matcher groups", () => {
+    expect(() => validateHooks(JSON.stringify({ hooks: { SessionStart: {} } }), { statOf: () => exec })).toThrow(
+      "hooks/hooks.json:\n  hooks.SessionStart must be array",
+    );
   });
 
   test("a file the command reads only has to exist", () => {
@@ -393,7 +428,7 @@ describe("slashCommands", () => {
     for (const menu of samples) {
       let parsed;
       try {
-        parsed = Bun.YAML.parse(promptStub({ name: "b", menu }).split("---\n")[1]).description;
+        parsed = Bun.YAML.parse(promptStub({ name: "b", menu }, RUNTIMES[0]).split("---\n")[1]).description;
       } catch {}
       let accepted = true;
       try {
@@ -551,10 +586,11 @@ describe("lead lines", () => {
     expect(() => noteSkills(codex, "no table\n")).toThrow('"| Skill | On Codex |" table header not found');
   });
 
-  test("a prompt stub points at codex-tools.md unless its skill carries the Codex preamble", () => {
+  test("a prompt stub points at its runtime's mapping file unless its skill carries that runtime's preamble", () => {
     const pointer = "through `poteto-mode/references/codex-tools.md`, including its Per-skill notes.";
-    expect(promptStub({ name: "tdd", menu: "m" }, { preamble: false })).toContain(pointer);
-    expect(promptStub({ name: "how", menu: "m" }, { preamble: true })).toBe(
+    expect(promptStub({ name: "tdd", menu: "m" }, codex, { preamble: false })).toContain(pointer);
+    expect(promptStub({ name: "tdd", menu: "m" }, pi, { preamble: false })).toContain("`poteto-mode/references/pi-tools.md`");
+    expect(promptStub({ name: "how", menu: "m" }, codex, { preamble: true })).toBe(
       "---\nname: how\ndescription: m\ndisable-model-invocation: true\n---\n\nInvoke the `how` skill and follow it.\n",
     );
   });
@@ -641,6 +677,7 @@ describe("plan, changes, apply", () => {
   const repoCopy = () => {
     const dir = scratch("pstack-generate-");
     cpSync(repoRoot, dir, { recursive: true, filter: (src) => ![".git", "node_modules"].includes(basename(src)) });
+    symlinkSync(join(repoRoot, "node_modules"), join(dir, "node_modules"));
     return dir;
   };
   const snapshot = (dir) => Object.fromEntries(walk(dir).map((path) => [path, readFileSync(path, "utf8")]));

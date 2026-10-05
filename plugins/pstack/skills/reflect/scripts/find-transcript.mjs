@@ -11,7 +11,8 @@
 // Pi's session header line and Copilot's session.start event. Each candidate is
 // streamed line by line; a Claude Code or Copilot transcript is abandoned at its
 // first typed user record, while a Pi session is read to its last entry to find
-// the active branch.
+// the active branch. A Codex rollout is refused by name rather than read as an
+// empty Claude transcript.
 import { createReadStream, readdirSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
@@ -56,8 +57,7 @@ export function candidates(projectsDir, maxDepth = 2) {
       const stat = statSync(path, { throwIfNoEntry: false });
       return stat ? [{ path, mtime: stat.mtimeMs }] : [];
     })
-    .sort((a, b) => b.mtime - a.mtime)
-    .map(({ path }) => path);
+    .sort((a, b) => b.mtime - a.mtime);
 }
 
 function text(content) {
@@ -79,6 +79,8 @@ const LOCAL_COMMAND = /^\s*<(?:command-name|local-command-stdout|bash-input)>/u;
 // A Pi session opens with this header line; Claude Code transcripts never do.
 const isPiHeader = (record) =>
   record?.type === "session" && Number.isInteger(record.version) && typeof record.cwd === "string";
+// A Codex rollout opens with its session metadata.
+const isCodexHeader = (record) => record?.type === "session_meta";
 
 // A Copilot events.jsonl opens with this event and records each prompt the
 // user typed as a `user.message` event.
@@ -138,22 +140,32 @@ async function piOpening(records) {
   return prompt;
 }
 
+// Readers by opening record. Claude Code writes no header, so its row is last
+// and takes every file the others do not claim.
+const READERS = [
+  [isPiHeader, (head, rest) => piOpening(rest)],
+  [isCopilotHeader, (head, rest) => copilotOpening(rest)],
+  [isCodexHeader, (head, rest, path) => {
+    throw new Error(`${path} is a Codex rollout, which find-transcript does not read; pass the session digest instead`);
+  }],
+  [() => true, (head, rest) => claudeOpening(prepend(head, rest))],
+];
+
 export async function openingPrompt(path) {
   const stream = createReadStream(path, { encoding: "utf8" });
   try {
     const records = parsed(jsonlLines(stream));
     const { value: head, done } = await records.next();
     if (done) return null;
-    if (isPiHeader(head)) return await piOpening(records);
-    if (isCopilotHeader(head)) return await copilotOpening(records);
-    return await claudeOpening(prepend(head, records));
+    const [, read] = READERS.find(([matches]) => matches(head));
+    return await read(head, records, path);
   } finally {
     stream.destroy();
   }
 }
 
 export async function findTranscript(projectsDir, fragment) {
-  for (const path of candidates(projectsDir)) {
+  for (const { path } of candidates(projectsDir)) {
     try {
       const prompt = await openingPrompt(path);
       if (prompt?.includes(fragment)) return path;

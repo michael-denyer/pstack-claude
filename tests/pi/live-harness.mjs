@@ -3,8 +3,8 @@ import { expect } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { StringDecoder } from "node:string_decoder";
 
+import { lineSplitter } from "../../plugins/pstack/pi/child.ts";
 import { parseSheet } from "../../plugins/pstack/pi/config.ts";
 import { readEntries, sleep } from "./harness.mjs";
 
@@ -25,18 +25,10 @@ export function liveModels(root, head = "") {
 export const textOf = (m) =>
   typeof m.content === "string" ? m.content : (m.content ?? []).map((p) => p.text ?? "").filter(Boolean).join("\n");
 
-// Splits only on LF: a Unicode line separator is valid inside a JSON string.
 export function jsonLines(onRecord) {
-  const decoder = new StringDecoder("utf8");
-  let buf = "";
-  return (chunk) => {
-    buf += decoder.write(chunk);
-    for (let i = buf.indexOf("\n"); i >= 0; i = buf.indexOf("\n")) {
-      const line = buf.slice(0, i).replace(/\r$/, "");
-      buf = buf.slice(i + 1);
-      if (line.trim()) onRecord(JSON.parse(line));
-    }
-  };
+  return lineSplitter((line) => {
+    if (line.trim()) onRecord(JSON.parse(line));
+  });
 }
 
 // Drives a real `pi --mode rpc` process: commands get responses, everything
@@ -61,7 +53,7 @@ export class PiRpc {
           this.pending.delete(record.id);
           resolve(record);
         } else this.events.push({ ...record, at: Date.now() });
-      }),
+      }).write,
     );
     this.proc.stderr.on("data", (d) => (this.stderr += d));
     this.exited = new Promise((r) => this.proc.on("close", r));
@@ -142,10 +134,14 @@ export function agentByDescription(sessionFile, description) {
   return found[0];
 }
 
-export function childEntries({ agent }) {
-  const files = readdirSync(agent.sessionDir).filter((f) => f.endsWith(`_${agent.sessionId}.jsonl`));
+export function findSessionFile(dir, sessionId) {
+  const files = readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(`_${sessionId}.jsonl`));
   expect(files).toHaveLength(1);
-  return readEntries(join(agent.sessionDir, files[0]));
+  return join(dir, files[0]);
+}
+
+export function childEntries({ agent }) {
+  return readEntries(findSessionFile(agent.sessionDir, agent.sessionId));
 }
 
 // The system prompt sections in force at the end of the session: a compaction

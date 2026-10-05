@@ -1,25 +1,23 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Static, Type } from "typebox";
 import { Value } from "typebox/value";
 
-const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
-type Effort = (typeof EFFORT_LEVELS)[number];
 const PARENT_MODEL_ALIASES = ["inherit-parent", "auto"];
 
 // A parent passes it to each agent it starts, so the agent knows its depth.
 export const DEPTH_FLAG = "pstack-depth";
+// Under agentDir, holds each session's agent sessions and prompts. The worktree
+// audit scans it by this name, so a rename must reach that script too.
+export const PSTACK_STATE_DIR = "pstack";
 
 export interface Settings {
   pluginRoot: string;
   modelsFile: string;
   agentDir: string;
   pi: { command: string; args: string[] };
-  // Unset, so an agent inherits the session's environment. Tests set it to
-  // configure their fake pi.
-  childEnv?: NodeJS.ProcessEnv;
   // Layers below the main session: 0 there, 1 in its agents, and so on.
   readonly depth: number;
   killGraceMs: number;
@@ -77,27 +75,27 @@ export function parseSheet(text: string): Sheet {
 }
 
 export function readSheet(agentDir: string): Sheet | undefined {
-  const file = join(agentDir, "pstack-models.md");
-  let text: string;
+  let bytes: Buffer;
   try {
-    if (!statSync(file, { throwIfNoEntry: false })?.isFile()) return undefined;
-    text = readFileSync(file, "utf8");
+    bytes = readFileSync(join(agentDir, "pstack-models.md"));
   } catch {
-    // An unreadable sheet leaves the defaults in place, as the session hooks do.
+    // An absent or unreadable sheet leaves the defaults in place, as the session hooks do.
     return undefined;
   }
-  return parseSheet(text);
+  // Windows PowerShell 5.1's `>` writes UTF-16 LE with a byte-order mark.
+  return parseSheet(bytes.toString(bytes[0] === 0xff && bytes[1] === 0xfe ? "utf16le" : "utf8"));
 }
 
 // The parts of models.json the extension reads; the generator checks the rest.
 const modelsConfig = Type.Object({
   available: Type.Array(Type.String()),
+  efforts: Type.Array(Type.String()),
   pi: Type.Object({ fallback: Type.String(), models: Type.Record(Type.String(), Type.Record(Type.String(), Type.String())) }),
 });
 
 function readModels(modelsFile: string): Static<typeof modelsConfig> {
   const raw: unknown = JSON.parse(readFileSync(modelsFile, "utf8"));
-  if (!Value.Check(modelsConfig, raw)) throw new Error(`${modelsFile} is not a pstack models file: it needs available[] and pi.{fallback, models}.`);
+  if (!Value.Check(modelsConfig, raw)) throw new Error(`${modelsFile} is not a pstack models file: it needs available[], efforts[] and pi.{fallback, models}.`);
   return raw;
 }
 
@@ -132,7 +130,7 @@ export const GENERAL_PURPOSE = "general-purpose";
 interface AgentDefinition {
   body: string;
   model?: string;
-  effort?: Effort;
+  effort?: string;
 }
 
 export function frontmatter(text: string): { fields: Map<string, string>; body: string } {
@@ -145,26 +143,26 @@ export function frontmatter(text: string): { fields: Map<string, string>; body: 
   return { fields, body: (m?.[2] ?? text).trim() };
 }
 
-function parseAgentFile(type: string, text: string): AgentDefinition {
+function parseAgentFile(type: string, text: string, efforts: string[]): AgentDefinition {
   const { fields, body } = frontmatter(text);
-  const named = fields.get("effort");
-  const effort = EFFORT_LEVELS.find((level) => level === named);
-  if (named !== undefined && !effort) {
-    throw new Error(`${type}: effort "${named}" is not one of ${EFFORT_LEVELS.join(", ")}`);
+  const effort = fields.get("effort");
+  if (effort !== undefined && !efforts.includes(effort)) {
+    throw new Error(`${type}: effort "${effort}" is not one of ${efforts.join(", ")}`);
   }
   return { body, model: fields.get("model") || undefined, effort };
 }
 
 // Claude Code registers each plugin agent file as pstack:<file name>, beside
 // the built-in general-purpose type, which has no agent file.
-export function loadAgentTypes(pluginRoot: string): Map<string, AgentDefinition> {
+export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "modelsFile">): Map<string, AgentDefinition> {
+  const { efforts } = readModels(settings.modelsFile);
   const types = new Map<string, AgentDefinition>([[GENERAL_PURPOSE, { body: "" }]]);
   for (const dir of ["agents", "effort-agents"]) {
-    const full = join(pluginRoot, dir);
+    const full = join(settings.pluginRoot, dir);
     if (!existsSync(full)) continue;
     for (const file of readdirSync(full).filter((f) => f.endsWith(".md")).sort()) {
       const type = `pstack:${basename(file, ".md")}`;
-      types.set(type, parseAgentFile(type, readFileSync(join(full, file), "utf8")));
+      types.set(type, parseAgentFile(type, readFileSync(join(full, file), "utf8"), efforts));
     }
   }
   return types;

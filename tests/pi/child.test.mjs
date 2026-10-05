@@ -5,8 +5,9 @@ import { expect, test } from "bun:test";
 import { PiChild } from "../../plugins/pstack/pi/child.ts";
 import { sleep } from "./harness.mjs";
 
-const opts = { cwd: process.cwd(), env: process.env, exitGraceMs: 1000 };
+const opts = { cwd: process.cwd(), exitGraceMs: 1000 };
 const scripted = (script) => new PiChild(process.execPath, ["-e", script], opts, "p");
+const commandLines = 'require("node:readline").createInterface({ input: process.stdin })';
 
 test("a command written to a child that closed its stdin resolves undefined once it exits", async () => {
   const child = scripted("process.stdin.destroy(); setTimeout(() => {}, 400)");
@@ -17,8 +18,7 @@ test("a command written to a child that closed its stdin resolves undefined once
 
 test("a response whose success is not a boolean settles its command as failed instead of waiting for exit", async () => {
   const child = scripted(
-    'process.stdin.setEncoding("utf8"); let b = ""; process.stdin.on("data", (d) => { b += d; const lines = b.split("\\n"); b = lines.pop();' +
-      ' for (const l of lines) { const c = JSON.parse(l); process.stdout.write(JSON.stringify({ id: c.id, type: "response", command: c.type, success: c.type === "prompt" ? true : "nope", data: { disposition: "started" } }) + "\\n"); } });' +
+    `${commandLines}.on("line", (l) => { const c = JSON.parse(l); process.stdout.write(JSON.stringify({ id: c.id, type: "response", command: c.type, success: c.type === "prompt" ? true : "nope", data: { disposition: "started" } }) + "\\n"); });` +
       " setTimeout(() => process.exit(0), 3000)",
   );
   await sleep(200);
@@ -30,9 +30,8 @@ test("a response whose success is not a boolean settles its command as failed in
 
 // Answers each command; a steer's response is `before` or `after` the settle, in one write.
 const steerAndSettle = (order) =>
-  'process.stdin.setEncoding("utf8"); let b = ""; process.stdin.on("end", () => process.exit(0)); process.stdin.on("data", (d) => { b += d; const lines = b.split("\\n"); b = lines.pop();' +
-  ' for (const l of lines) { const c = JSON.parse(l); const r = JSON.stringify({ id: c.id, type: "response", command: c.type, success: true }) + "\\n";' +
-  ` const s = JSON.stringify({ type: "agent_settled" }) + "\\n"; process.stdout.write(c.type === "steer" ? ${order === "before" ? "r + s" : "s + r"} : r); } });`;
+  `${commandLines}.on("close", () => process.exit(0)).on("line", (l) => { const c = JSON.parse(l); const r = JSON.stringify({ id: c.id, type: "response", command: c.type, success: true }) + "\\n";` +
+  ` const s = JSON.stringify({ type: "agent_settled" }) + "\\n"; process.stdout.write(c.type === "steer" ? ${order === "before" ? "r + s" : "s + r"} : r); });`;
 
 test("a steer answered before the run settles was taken, even when the settle follows in the same chunk", async () => {
   const child = scripted(steerAndSettle("before"));

@@ -45,7 +45,6 @@ export class Scheduler {
   }
 
   startLoop(seconds: number, prompt: string, ctx: ExtensionContext): void {
-    this.stopLoop();
     // A tick that lands mid-run is dropped, so a slow iteration cannot pile up a backlog.
     this.loop = setInterval(() => ctx.isIdle() && this.fire(prompt), seconds * 1000);
     this.loop.unref();

@@ -1,7 +1,7 @@
 # Run with prek or pre-commit: `prek install` once per clone.
-# The hook is the first step of CI's "Generated files current" job. It reads the
-# working tree, not the index, so an unstaged regenerated file passes here and
-# still fails CI.
+# The hook is the check CI's "Generated files current" job runs after
+# `bun install`. It reads the working tree, not the index, so an unstaged
+# regenerated file passes here and still fails CI.
 repos:
   - repo: local
     hooks:

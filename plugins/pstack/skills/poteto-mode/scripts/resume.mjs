@@ -38,17 +38,27 @@ function verifyFile(value, roots) {
   if (file.sha256 !== string(record.sha256, 'file digest')) throw new Error(`checkpoint file changed: ${file.path}`);
   return file;
 }
+const linkRule = 'Link each local file with an inline Markdown link whose destination is the path, written bare or as `<path>`, with no square brackets in the link text and no title after the path. Reference-style links are not read. The path is relative to the note or absolute, and it is percent-decoded, so write a literal `%` as `%25`. Wrap a path that contains spaces or parentheses in angle brackets, or percent-encode it. Links inside code spans and fenced code blocks are ignored.';
+function resolveLink(note, link, target) {
+  let decoded;
+  try { decoded = decodeURIComponent(target.split('#')[0]); }
+  catch { throw new Error(`link ${link} has malformed percent-encoding. ${linkRule}`); }
+  try { return realpathSync(resolve(dirname(note.path), decoded)); }
+  catch (error) { throw new Error(`link ${link} does not resolve (${error.code}). ${linkRule}`); }
+}
 function verifyLinks(note, artifacts) {
-  const content = readFileSync(note.path, 'utf8');
-  const paths = [...content.matchAll(/\[[^\]]*\]\((?:<([^<>]+)>|([^)]+))\)/g)]
-    .map(match => match[1] ?? match[2])
-    .filter(target => !/^(?:[a-z]+:|#)/i.test(target))
-    .map(target => realpathSync(resolve(dirname(note.path), decodeURIComponent(target.split('#')[0]))));
+  const prose = readFileSync(note.path, 'utf8')
+    .replace(/^ {0,3}((`|~)\2{2,}).*\n[\s\S]*?(?:^ {0,3}\1\2*[ \t]*$|(?![\s\S]))/gm, ' ')
+    .replace(/(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g, ' ');
+  const links = [...prose.matchAll(/\[[^\]]*\]\((?:<([^<>]+)>|([^)]+))\)/g)]
+    .filter(([, angled, bare]) => !/^(?:[a-z]+:|#)/i.test(angled ?? bare))
+    .map(([link, angled, bare]) => ({ link, path: resolveLink(note, link, angled ?? bare) }));
   for (const artifact of artifacts)
-    if (!paths.includes(artifact.path)) throw new Error(`note must link requested artifact: ${artifact.path}`);
-  for (const path of paths)
+    if (!links.some(({ path }) => path === artifact.path))
+      throw new Error(`note must link requested artifact: ${artifact.path}. ${linkRule}`);
+  for (const { link, path } of links)
     if (path !== note.path && !artifacts.some(artifact => artifact.path === path))
-      throw new Error(`register every local note link with --artifact: ${path}`);
+      throw new Error(`register every local note link with --artifact: ${link} resolves to ${path}. ${linkRule}`);
 }
 function load(store, project) {
   const pointer = join(store, 'latest.json');

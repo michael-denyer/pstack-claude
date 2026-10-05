@@ -16,7 +16,7 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 | Dispatch a subagent (the `Agent`/`Task` tool) | `spawn_agent` |
 | Dispatch N parallel subagents in one turn | N `spawn_agent` calls in one response |
 | Wait for a subagent result | `wait_agent` |
-| Free a finished subagent slot | `close_agent` |
+| Free a finished subagent slot | `close_agent`, when the session exposes it. Some Codex hosts don't. |
 | Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | `update_plan` |
 | Ask the human a fixed-choice question (`AskUserQuestion`) | Ask in plain text and let the user answer. Codex has no structured-choice tool. |
 
@@ -27,7 +27,9 @@ Subagent dispatch needs `multi_agent` enabled. Add to `~/.codex/config.toml`:
 multi_agent = true
 ```
 
-Without it, `spawn_agent` is unavailable and the fan-out skills (`interrogate`, `why`, `how`, `arena`, `reflect`) degrade to a single sequential pass.
+Without it, `spawn_agent` is unavailable and the fan-out skills (`interrogate`, `why`, `how`, `arena`, `reflect`) degrade to a single sequential pass. A required independent review does not degrade. It stays blocked, as poteto-mode's [Subagents](../SKILL.md#subagents) section says.
+
+Enabling `multi_agent` does not lift the host's thread limit. A thread-limit error from `spawn_agent` is a capacity error, not a rejected model slug, so the skills' fallback to another model does not apply. After the first capacity rejection, stop spawning. Close a finished agent with `close_agent` before you try again, and where the session has no `close_agent`, do not assume a finished agent's slot is free.
 
 ## Subagent policy
 

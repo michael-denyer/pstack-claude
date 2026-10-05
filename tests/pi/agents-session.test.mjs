@@ -100,12 +100,16 @@ describe("registry", () => {
     expect(resumed.entries).toEqual([]);
   });
 
-  test("a restored agent whose launching pi process is still alive is left running, untouched", async () => {
+  async function launchedByOtherPi() {
     const { w, pi, ctx } = setup({ script: { default: [{ sleep: 30000 }] } });
     await pi.call("agent", { description: "theirs", prompt: "x", run_in_background: true }, ctx);
     await w.until("invocation");
     const otherPi = w.spawn("sleep", ["30"], { detached: true });
-    const entries = pi.entries.map((e) => ({ ...e, data: { ...e.data, parentPid: otherPi.pid } }));
+    return { w, ctx, otherPi, entries: pi.entries.map((e) => agentEntry(recordWith(e.data, { parentPid: otherPi.pid }))) };
+  }
+
+  test("a restored agent whose launching pi process is still alive is left running, untouched", async () => {
+    const { w, ctx, entries } = await launchedByOtherPi();
 
     const resumed = await restore(w, entries);
     await sleep(500);
@@ -115,11 +119,7 @@ describe("registry", () => {
   });
 
   test("send_message and stop_agent refuse an agent another live pi process is running, naming that process", async () => {
-    const { w, pi, ctx } = setup({ script: { default: [{ sleep: 30000 }] } });
-    await pi.call("agent", { description: "theirs", prompt: "x", run_in_background: true }, ctx);
-    await w.until("invocation");
-    const otherPi = w.spawn("sleep", ["30"], { detached: true });
-    const entries = pi.entries.map((e) => ({ ...e, data: { ...e.data, parentPid: otherPi.pid } }));
+    const { w, ctx, otherPi, entries } = await launchedByOtherPi();
     const id = entries[0].data.agent.id;
 
     const resumed = await restore(w, entries);

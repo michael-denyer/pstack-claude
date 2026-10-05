@@ -472,6 +472,57 @@ describe("Store", () => {
     });
   });
 
+  it("pins a branch head when a same-named tag points to another commit", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+    git({
+      repo: stack.repo,
+      args: ["tag", "stack/open", stack.mergedSha],
+    });
+
+    await withFakeGt({
+      directory,
+      output: "◯ main\n◉ stack/open (current)\n",
+      operation: async () => {
+        const frontier = await store.frontier.set({ repo: stack.repo });
+        expect(frontier.prs).toEqual([
+          {
+            pr: 11,
+            branches: "stack/open",
+            sha: stack.openSha,
+            state: "OPEN",
+          },
+        ]);
+        expect(await store.frontier.show()).toEqual(frontier);
+      },
+    });
+  });
+
+  it("rejects a tag without its branch and preserves the saved frontier", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+
+    await withFakeGt({
+      directory,
+      output: "◯ main\n◉ stack/open (current)\n",
+      operation: async () => {
+        const before = await store.frontier.set({ repo: stack.repo });
+        git({
+          repo: stack.repo,
+          args: ["tag", "stack/open", stack.openSha],
+        });
+        git({ repo: stack.repo, args: ["checkout", "main"] });
+        git({ repo: stack.repo, args: ["branch", "-D", "stack/open"] });
+
+        await expect(
+          store.frontier.set({ repo: stack.repo })
+        ).rejects.toThrow("git rev-parse");
+        expect(await store.frontier.show()).toEqual(before);
+        expect(before.generation).toBe(1);
+      },
+    });
+  });
+
   it("rejects unparseable Graphite output loudly", async () => {
     const { directory, store } = await initializedStore();
     const stack = await makeGitStack(directory);
@@ -495,7 +546,9 @@ describe("Store", () => {
 
     await withFakeGt({
       directory,
-      output: "\u001b[2m◯ main\u001b[0m\n\u001b[32m◉ stack/open\u001b[39m \u001b[2m(current)\u001b[22m\n",
+      output:
+        "\u001b[2m◯ main\u001b[0m\n" +
+        "\u001b[38:5:2m◉ \u001b]8;;https://example.test/stack\u0007stack/open\u001b]8;;\u0007\u001b[39m \u001b[2m(current)\u001b[22m\n",
       operation: async () => {
         expect(
           (await store.frontier.set({ repo: stack.repo })).prs

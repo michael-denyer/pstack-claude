@@ -1,35 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+
+import { findPiPackage } from "../../tools/pi-package.mjs";
 
 const root = join(import.meta.dir, "../..");
 const piModels = JSON.parse(readFileSync(join(root, "plugins/pstack/models.json"), "utf8")).pi.models;
 
-function npmRoot() {
-  try {
-    return execFileSync("npm", ["root", "-g"], { encoding: "utf8" }).trim();
-  } catch {
-    return null;
-  }
-}
-
+// pi-ai sits beside the package in a flat install; npm nests it under the package.
 function catalogDir() {
-  const npm = npmRoot();
-  const roots = [
-    process.env.PSTACK_PI_AI_DIR && join(process.env.PSTACK_PI_AI_DIR, ".."),
-    join(homedir(), ".cache/.bun/install/global/node_modules/@earendil-works"),
-    join(homedir(), ".bun/install/global/node_modules/@earendil-works"),
-    npm && join(npm, "@earendil-works"),
-    // npm nests a global package's dependencies under the package.
-    npm && join(npm, "@earendil-works/pi-coding-agent/node_modules/@earendil-works"),
-  ].filter(Boolean);
-  for (const r of roots) {
-    const dir = join(r, "pi-ai/dist/providers/data");
-    if (existsSync(dir)) return dir;
-  }
-  return null;
+  const piDir = findPiPackage();
+  if (!piDir) return null;
+  const candidates = [join(piDir, "../pi-ai/dist/providers/data"), join(piDir, "node_modules/@earendil-works/pi-ai/dist/providers/data")];
+  return candidates.find((dir) => existsSync(dir)) ?? null;
 }
 
 function catalogIds(dir, provider) {
@@ -49,7 +32,7 @@ const required = process.env.PSTACK_PI_REQUIRE_CATALOG === "1";
 
 describe("models.json pi block", () => {
   test.skipIf(!dir && !required)("every provider table maps each family name to a model in the installed Pi catalog", () => {
-    if (!dir) throw new Error("PSTACK_PI_REQUIRE_CATALOG=1, but no installed Pi catalog was found. Set PSTACK_PI_AI_DIR to the pi-ai package.");
+    if (!dir) throw new Error("PSTACK_PI_REQUIRE_CATALOG=1, but no installed Pi catalog was found. Set PI_PACKAGE_DIR to the pi-coding-agent package.");
     const missing = Object.entries(piModels).flatMap(([provider, table]) =>
       Object.entries(table)
         .filter(([, ref]) => !catalogIds(dir, provider).has(ref.slice(provider.length + 1)))

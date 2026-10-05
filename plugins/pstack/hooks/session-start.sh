@@ -1,11 +1,14 @@
 #!/bin/sh
 set -eu
 
-# Only an exact `session hook: off` line disables injection, with LF or CRLF
-# endings and an optional byte-order mark. An unreadable sheet leaves it on.
 bom=$(printf '\357\273\277')
+cr=$(printf '\r')
+# Windows PowerShell 5.1's `>` writes UTF-16 LE with a byte-order mark.
+read_sheet() {
+  if [ "$(od -An -tx1 -N2 "$sheet" | tr -d ' ')" = fffe ]; then iconv -f UTF-16LE -t UTF-8 "$sheet"; else cat "$sheet"; fi
+}
 hook_off() {
-  [ -f "$1" ] && [ -r "$1" ] && sed "1s/^$bom//" "$1" | tr -d '\r' | grep -qx 'session hook: off'
+  [ -f "$sheet" ] && [ -r "$sheet" ] && read_sheet | sed -e "1s/^$bom//" -e "s/$cr\$//" | grep -qx 'session hook: off'
 }
 
 # GitHub Copilot reads hooks.json too, so it passes `claude`, but it also
@@ -19,7 +22,7 @@ if [ -n "${COPILOT_PLUGIN_ROOT:-}" ]; then
     cat "$hooks/session-start-context-nosheet.json"
     exit 0
   fi
-  if hook_off "$sheet"; then
+  if hook_off; then
     exit 0
   fi
   # The sheet sits outside Copilot's path sandbox, so the hook puts its role
@@ -38,7 +41,7 @@ case "${1:-}" in
     ;;
 esac
 
-if hook_off "$sheet"; then
+if hook_off; then
   exit 0
 fi
 

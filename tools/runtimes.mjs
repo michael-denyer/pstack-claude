@@ -1,12 +1,8 @@
 // The runtimes other than Claude Code that pstack ships to: the table the
-// generator iterates, each runtime's Model names renderer and models.json
-// check, and the validators for the Codex and Pi package manifests.
+// generator iterates, with each runtime's Model names renderer, models.json
+// check, versioned manifest, packaging validator, and hooks files.
 
-export const PLUGIN = "plugins/pstack";
-export const SKILLS = `${PLUGIN}/skills`;
-
-export const code = (s) => `\`${s}\``;
-export const codeList = (models) => models.map(code).join(", ");
+import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 
 // Every runtime other than Claude Code that reads the skills through a mapping
 // file under poteto-mode/references/. A row gives the runtime its models.json
@@ -15,8 +11,12 @@ export const codeList = (models) => models.map(code).join(", ");
 // the first heading of each skill its Per-skill notes table lists, and a
 // runtime with a `prompts` directory a slash stub per public skill there. Pi
 // has neither: its one pointer is hand-written in poteto-mode's Platform
-// Adaptation section. GitHub Copilot stamps preambles but has no prompts
-// directory: its CLI and app list plugin skills as slash commands themselves.
+// Adaptation section. `manifest` is the file the generator stamps VERSION
+// into, `validate` checks the runtime's packaging against the tree once that
+// manifest parses, and `hooks` lists the hooks files the manifest names,
+// relative to the plugin root. GitHub Copilot stamps preambles but has no
+// prompts directory: its CLI and app list plugin skills as slash commands
+// themselves.
 export const RUNTIMES = [
   {
     name: "Codex",
@@ -26,8 +26,20 @@ export const RUNTIMES = [
     checkModels: checkCodexModels,
     skillPreambles: true,
     prompts: `${PLUGIN}/.codex-plugin/prompts`,
+    manifest: `${PLUGIN}/.codex-plugin/plugin.json`,
+    validate: ({ manifest, read, pathExists }) =>
+      validateCodexMarketplace(read(".agents/plugins/marketplace.json"), { expectedName: manifest.name, pathExists }),
+    hooks: (manifest) => [manifest.hooks],
   },
-  { name: "Pi", key: "pi", mapping: "pi-tools.md", modelNames: piModelNamesSection, checkModels: checkPiModels },
+  {
+    name: "Pi",
+    key: "pi",
+    mapping: "pi-tools.md",
+    modelNames: piModelNamesSection,
+    checkModels: checkPiModels,
+    manifest: "package.json",
+    validate: ({ text, pathExists }) => validatePiPackage(text, { pathExists }),
+  },
   {
     name: "GitHub Copilot",
     key: "copilot",
@@ -35,6 +47,10 @@ export const RUNTIMES = [
     modelNames: copilotModelNamesSection,
     checkModels: checkCopilotModels,
     skillPreambles: true,
+    // Copilot reads the Claude Code manifest and hooks.json, which the
+    // generator already stamps and validates.
+    manifest: `${PLUGIN}/.claude-plugin/plugin.json`,
+    validate: () => {},
   },
 ].map((runtime) => ({
   ...runtime,

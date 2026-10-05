@@ -247,7 +247,8 @@ describe("stop_agent", () => {
   });
 
   test("escalates to SIGKILL when the child ignores SIGTERM", async () => {
-    const { w, pi, ctx } = setup({ script: { default: [{ ignoreSigterm: true }, { sleep: 30000 }] } });
+    // Muted, so the abort cannot end the run and let the child exit before the SIGTERM lands.
+    const { w, pi, ctx } = setup({ script: { default: [{ ignoreSigterm: true }, { mute: true }, { sleep: 30000 }] } });
     const { details } = await pi.call("agent", { description: "stubborn", prompt: "x", run_in_background: true }, ctx);
     await w.until("ignoring-sigterm");
     const started = Date.now();
@@ -256,6 +257,21 @@ describe("stop_agent", () => {
     expect(alive(w.invocations()[0].pid)).toBe(false);
     expect(w.logged("sigterm-ignored")).not.toEqual([]);
     expect(Date.now() - started).toBeLessThan(3000);
+  });
+
+  test("sends one SIGTERM and waits the whole kill grace before SIGKILL, even when the exit grace is shorter", async () => {
+    const killGraceMs = 700;
+    const { w, pi, ctx } = setup({
+      script: { default: [{ ignoreSigterm: true }, { mute: true }, { sleep: 30000 }] },
+      settings: { killGraceMs, exitGraceMs: 200 },
+    });
+    const { details } = await pi.call("agent", { description: "stubborn", prompt: "x", run_in_background: true }, ctx);
+    await w.until("ignoring-sigterm");
+    const started = Date.now();
+    await pi.call("stop_agent", { id: details.agentId }, ctx);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(killGraceMs - 50);
+    expect(alive(w.invocations()[0].pid)).toBe(false);
+    expect(w.logged("sigterm-ignored")).toHaveLength(1);
   });
 
   test("a stop returns once the child has exited, without waiting out the kill grace for a group member that ignores SIGTERM", async () => {

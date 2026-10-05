@@ -635,6 +635,21 @@ describe("syncComponent", () => {
     ]);
   });
 
+  test("a stale declaration at the pin blocks every write", () => {
+    const up = tree({ "gone.md": "a\n" });
+    const local = tree({});
+    const forks = new Map([["gone.md", {}]]);
+
+    const blocked = sync({ oldDir: up, newDir: up, localDir: local, forks, atPin: true });
+
+    expect(blocked.stale).toEqual([{ rel: "gone.md", reason: "no longer exists" }]);
+    expect(existsSync(join(local, "gone.md"))).toBe(false);
+
+    sync({ oldDir: up, newDir: up, localDir: local, forks });
+
+    expect(readFileSync(join(local, "gone.md"), "utf8")).toBe("a\n");
+  });
+
   test.each(
     [
       ["text", "a\nb\nc\nd\ne\n", "A\nb\nc\nd\nE\n", "A\nb\nc\nd\ne\n", 0o644],
@@ -1211,9 +1226,10 @@ describe("sync CLI", () => {
     const newSha = commit(newText);
 
     const port = join(root, "port");
-    for (const file of ["sync.mjs", "generate.mjs", "runtimes.mjs", "validate-skills.mjs", "substitutions.json"]) {
+    for (const file of ["sync.mjs", "generate.mjs", "plugin.mjs", "runtimes.mjs", "validate-skills.mjs", "substitutions.json"]) {
       cpSync(join(import.meta.dir, "../tools", file), join(port, "tools", file));
     }
+    symlinkSync(join(import.meta.dir, "../node_modules"), join(port, "node_modules"));
     cpSync(join(import.meta.dir, "../plugins/pstack/models.json"), join(port, "plugins/pstack/models.json"));
     mkdirSync(join(port, "plugins/pstack/skills"));
     writeFileSync(join(port, "plugins/pstack/skills/s.md"), localText);
@@ -1235,14 +1251,15 @@ describe("sync CLI", () => {
     writeFileSync(join(port, "tools/forks.json"), JSON.stringify({ kit: forks }));
     const scratch = join(root, "tmp");
     mkdirSync(scratch);
-    const run = (...flags) =>
-      spawnSync(process.execPath, [join(port, "tools/sync.mjs"), "kit", newSha, ...flags], {
+    const runAt = (sha, ...flags) =>
+      spawnSync(process.execPath, [join(port, "tools/sync.mjs"), "kit", sha, ...flags], {
         encoding: "utf8",
         env: { ...process.env, TMPDIR: scratch },
       });
+    const run = (...flags) => runAt(newSha, ...flags);
     const pin = () => JSON.parse(readFileSync(join(port, "tools/upstream.json"), "utf8")).components.kit.sha;
     const local = () => readFileSync(join(port, "plugins/pstack/skills/s.md"), "utf8");
-    return { oldSha, newSha, scratch, run, pin, local, port };
+    return { oldSha, newSha, scratch, run, runAt, pin, local, port };
   }
 
   test("a denylist failure exits 1 and removes its scratch clone", () => {
@@ -1325,7 +1342,7 @@ describe("sync CLI", () => {
     expect(local()).toBe("port\n");
   });
 
-  test("a declaration whose path is no longer forked warns and passes", () => {
+  test("a declaration whose path is no longer forked warns and passes on a sync to a new SHA", () => {
     const { run } = cli({ oldText: "one\n", newText: "one\n", localText: "one\n", forks: declareS("policy") });
 
     const result = run("--dry-run");
@@ -1334,5 +1351,16 @@ describe("sync CLI", () => {
     expect(result.stderr).toContain(
       "warning: tools/forks.json declares plugins/pstack/skills/s.md under kit, but it is no longer forked (unchanged); delete the entry\n",
     );
+  });
+
+  test("a declaration whose path is not forked at the pinned SHA fails the dry run and the real run", () => {
+    const { runAt, oldSha } = cli({ oldText: "one\n", newText: "one\n", localText: "one\n", forks: declareS("policy") });
+
+    for (const result of [runAt(oldSha, "--dry-run"), runAt(oldSha)]) {
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(
+        "FAIL: tools/forks.json declares paths under kit that are not forked at the pinned SHA; delete each entry, then rerun:\n  plugins/pstack/skills/s.md is no longer forked (unchanged)\n",
+      );
+    }
   });
 });

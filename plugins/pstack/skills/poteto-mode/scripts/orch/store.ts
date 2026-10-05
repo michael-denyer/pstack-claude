@@ -13,6 +13,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
+import { stripVTControlCharacters } from "node:util";
 
 const UNIT_HEADER = "id\ttrack\tstate\tbranch\tpr\tsha\tbrief";
 const LEDGER_HEADER = "pr\tsha\tverdict\tevidence\tverifier\tts";
@@ -1041,12 +1042,6 @@ function parseGtPullRequest({
   );
 }
 
-// A colour setting such as FORCE_COLOR in the user's environment must not
-// break the gt parsers below.
-function withoutColour(raw: string): string {
-  return raw.replace(/\u001b\[[0-9;]*m/g, "");
-}
-
 function parseGtBranches(raw: string): readonly string[] {
   const branches: string[] = [];
   const lines = raw.replace(/\r/g, "").split("\n");
@@ -1088,7 +1083,9 @@ function graphitePullRequest({
 }): GtPullRequest {
   let raw: string;
   try {
-    raw = withoutColour(
+    // A colour setting such as FORCE_COLOR in the user's environment must not
+    // break the gt parsers.
+    raw = stripVTControlCharacters(
       execFileSync(gt, ["--no-interactive", "info", branch], {
         cwd: repo,
         encoding: "utf8",
@@ -1129,7 +1126,7 @@ function graphiteFrontier({
 }): readonly GtFrontierEntry[] {
   let raw: string;
   try {
-    raw = withoutColour(
+    raw = stripVTControlCharacters(
       execFileSync(
         gt,
         ["--no-interactive", "log", "short", "--stack", "--reverse"],
@@ -1164,11 +1161,15 @@ function branchSha({
 }): string {
   let raw: string;
   try {
-    raw = execFileSync("git", ["rev-parse", branch], {
-      cwd: repo,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    raw = execFileSync(
+      "git",
+      ["rev-parse", "--verify", `refs/heads/${branch}^{commit}`],
+      {
+        cwd: repo,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      }
+    );
   } catch (error) {
     throw new UserError(
       `git rev-parse ${branch} failed: ${errorMessage(error)}`

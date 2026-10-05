@@ -238,6 +238,12 @@ describe("lastChats matches a path as JSONL spells it, never a sibling's prefix"
     ["Git's forward-slash spelling of a Windows path", "C:/repo/worktree", String.raw`C:\repo\worktree`],
     ["a file under a Windows worktree", "C:/repo/worktree", String.raw`C:\repo\worktree\src\index.ts`],
     ["a UNC checkout", "//server/share/worktree", String.raw`\\server\share\worktree`],
+    ["a double-quoted path inside a command", "/repo/worktree", 'cd "/repo/worktree" && ls'],
+    ["a single-quoted path inside a command", "/repo/worktree", "cd '/repo/worktree' && ls"],
+    ["a path followed by a space", "/repo/worktree", "cd /repo/worktree && ls"],
+    ["a path followed by a tab", "/repo/worktree", "ls\t/repo/worktree\tsrc"],
+    ["a path followed by a newline", "/repo/worktree", "cd /repo/worktree\nls"],
+    ["a quoted Windows path inside a command", "C:/repo/worktree", String.raw`cd "C:\repo\worktree" && dir`],
   ])("finds %s", (_, path, cwd) => {
     expect(scan(path, cwd)).toBe(true);
   });
@@ -245,6 +251,8 @@ describe("lastChats matches a path as JSONL spells it, never a sibling's prefix"
   test.each([
     ["/repo/worktree", "/repo/worktree-long/file.ts"],
     ["C:/repo/worktree", String.raw`C:\repo\worktree-long\src\file.ts`],
+    ["/repo/worktree", 'cd "/repo/worktree-long" && ls'],
+    ["/repo/worktree", "cd /repo/worktree-long && ls"],
   ])("does not match %s in %s", (path, cwd) => {
     expect(scan(path, cwd)).toBe(false);
   });

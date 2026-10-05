@@ -55,6 +55,7 @@ function findPiUnder(root, env, globalDir) {
 test.each([
   ["BUN_INSTALL", (root) => ({ BUN_INSTALL: join(root, "bun") }), (root) => join(root, "bun", "install", "global", "node_modules")],
   ["BUN_INSTALL_GLOBAL_DIR", (root) => ({ BUN_INSTALL_GLOBAL_DIR: join(root, "gd") }), (root) => join(root, "gd", "node_modules")],
+  ["XDG_CACHE_HOME", (root) => ({ XDG_CACHE_HOME: join(root, "xdg") }), (root) => join(root, "xdg", ".bun", "install", "global", "node_modules")],
 ])("findPiPackage finds a Pi that bun add -g put under %s", (_, env, globalDir) => {
   const root = mkdtempSync(join(tmpdir(), "pstack-pi-package-"));
   try {

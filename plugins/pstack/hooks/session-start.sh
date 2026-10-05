@@ -2,21 +2,32 @@
 set -eu
 
 # Each runtime's hooks file passes its own name.
+# Literal plugin paths, so a static reader of the hooks files can follow them.
 case "${1:-}" in
-  claude) sheet="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md" ;;
-  codex) sheet="${CODEX_HOME:-$HOME/.codex}/pstack-models.md" ;;
-  copilot) sheet="${COPILOT_HOME:-$HOME/.copilot}/pstack-models.md" ;;
+  claude)
+    sheet="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md"
+    reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
+    ;;
+  codex)
+    sheet="${CODEX_HOME:-$HOME/.codex}/pstack-models.md"
+    reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
+    ;;
+  copilot)
+    sheet="${COPILOT_HOME:-$HOME/.copilot}/pstack-models.md"
+    reader="${COPILOT_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
+    ;;
   *)
     echo "session-start.sh: unknown runtime '${1:-}' (expected claude, codex, or copilot)" >&2
     exit 2
     ;;
 esac
 
+# A sheet that cannot be decoded counts as missing, so injection stays on.
 found=0
-normalized=
-if [ -f "$sheet" ] && [ -r "$sheet" ]; then
-  normalized=$(sh "$(dirname "$0")/../skills/setup-pstack/scripts/read-sheet.sh" "$sheet")
+if [ -f "$sheet" ] && [ -r "$sheet" ] && normalized=$(sh "$reader" "$sheet"); then
   found=1
+else
+  normalized=
 fi
 if printf '%s\n' "$normalized" | grep -qx 'session hook: off'; then
   exit 0
@@ -33,5 +44,4 @@ if [ "$1" = copilot ]; then
   exit 0
 fi
 
-# A literal plugin path, so a static reader of hooks.json can follow it.
 cat "${CLAUDE_PLUGIN_ROOT}/hooks/session-start-context.md"

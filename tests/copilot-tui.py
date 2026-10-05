@@ -6,8 +6,9 @@ Usage: copilot-tui.py <workdir> <message> [copilot args...]
 Starts `copilot` in <workdir> on a pty, answers the terminal queries its TUI
 sends, trusts the folder and declines the app install offer if asked, types
 <message> once the prompt is up, and waits until the session's events.jsonl
-records the end of that turn. It accepts a pending ask_user or permission
-prompt with Enter, then stops the CLI. Prints the events.jsonl path.
+records the end of that turn. It accepts a pending ask_user prompt with Enter,
+then stops the CLI. Prints the events.jsonl path. A permission request stops
+the CLI unanswered, and it or a turn that never ends exits 1.
 COPILOT_HOME must be set; the caller isolates it.
 """
 import fcntl
@@ -80,6 +81,8 @@ def main():
     prompt_at = None
     path = None
     answered = set()
+    refused = None
+    ended = False
     prior = 0
     buf = b""
     log = open(os.environ["TUI_LOG"], "ab") if os.environ.get("TUI_LOG") else None
@@ -150,12 +153,20 @@ def main():
             for e in tail:
                 kind = e.get("type", "")
                 key = json.dumps(e.get("data", {}), sort_keys=True)[:200]
-                if kind in ("permission.requested", "user_input.requested", "elicitation.requested") and key not in answered:
+                # Enter would pick allow and run the tool as the user.
+                if kind == "permission.requested":
+                    refused = key
+                    break
+                if kind in ("user_input.requested", "elicitation.requested") and key not in answered:
                     answered.add(key)
                     os.write(fd, b"\r")
+            if refused:
+                debug("permission requested")
+                break
             ends = [e for e in tail if e.get("type") == "assistant.turn_end"]
             starts = [e for e in tail if e.get("type") == "assistant.turn_start"]
             if ends and len(ends) == len(starts) and time.time() - last_output > 4:
+                ended = True
                 debug("turn ended")
                 break
     finally:
@@ -178,6 +189,12 @@ def main():
             pass
     if path is None or not os.path.exists(path):
         sys.stderr.write("no session events found; screen tail: %s\n" % ANSI.sub(b"", buf)[-800:].decode("utf8", "replace"))
+        sys.exit(1)
+    if refused:
+        sys.stderr.write("stopped at a permission request, unanswered: %s (%s)\n" % (refused, path))
+        sys.exit(1)
+    if not ended:
+        sys.stderr.write("the turn did not end (%s)\n" % path)
         sys.exit(1)
     print(path)
 

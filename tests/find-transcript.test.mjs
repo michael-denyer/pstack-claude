@@ -248,7 +248,7 @@ describe("find-transcript", () => {
     expect(await findTranscript(dir, "on Copilot")).toBe(copilot);
   });
 
-  test("the CLI scopes Copilot sessions to the workspace when opening prompts match", () => {
+  test.skipIf(noNode)("the CLI scopes Copilot sessions to the workspace when opening prompts match", () => {
     const dir = tempDir();
     const sessions = join(dir, "session-state");
     const workspace = join(dir, "work");

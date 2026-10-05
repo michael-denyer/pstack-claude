@@ -67,6 +67,10 @@ cleanup() {
   if [ "${KEEP:-0}" = 1 ] || [ "$status" -ne 0 ] || [ "${failures:-0}" -gt 0 ]; then echo "kept: $root" >&2; else rm -rf "$root"; fi
 }
 trap cleanup EXIT
+# bash runs the EXIT trap with status 0 after a fatal signal; exit non-zero instead.
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # A fresh home offers to install the Copilot app before the first interactive
 # prompt; mark the offer as answered.
@@ -122,14 +126,14 @@ full_sheet() {
 # 1. Install from the local checkout; Copilot loads it live, nothing copied.
 skills="$(find "$repo/plugins/pstack/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')"
 copilot plugin marketplace add "$repo" >/dev/null
-install_out="$(copilot plugin install pstack@pstack-claude 2>&1)"
+install_out="$(copilot plugin install pstack@pstack-claude 2>&1)" || true
 if [[ "$install_out" == *"Installed $skills skills"* ]]; then
   pass "install reports all $skills skills"
 else
   fail "install did not report $skills skills: $install_out"
 fi
 version="$(tr -d '[:space:]' <"$repo/VERSION")"
-list_out="$(copilot plugin list 2>&1)"
+list_out="$(copilot plugin list 2>&1)" || true
 if [[ "$list_out" == *"pstack@pstack-claude (v$version) (enabled)"* ]]; then
   pass "plugin list shows pstack@pstack-claude v$version enabled"
 else
@@ -359,7 +363,8 @@ script_run() {
 
 # 8. PreToolUse enforcement.
 full_sheet
-off="$(grep -vxF -e "$model" -e "$gpt" -e "$gemini" <<<"$known" | head -1)"
+off="$(grep -vxF -e "$model" -e "$gpt" -e "$gemini" <<<"$known" | head -1)" || true
+[ -n "$off" ] || fail "copilot help config listed no model outside the sheet; the model check below cannot be probed"
 events="$(probe --allow-all-tools -p "Call the task tool exactly once with agent_type \"pstack:poteto-agent\", model \"$off\", mode \"sync\", name \"probe\", and prompt \"Reply PROBE-OK.\". If the call is denied, do not retry; reply with the denial reason verbatim.")"
 denied="$(jq -r --arg m "$off" 'select(.type == "tool.execution_start" and .data.toolName == "task" and .data.arguments.model == $m) | .data.toolCallId' "$events" | head -1)"
 if [ -n "$denied" ] && jq -e --arg id "$denied" 'select(.type == "tool.execution_complete" and .data.toolCallId == $id and .data.success == false

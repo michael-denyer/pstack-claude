@@ -108,6 +108,13 @@ describe("SessionStart hook", () => {
         expect({ ...r, out: wrap(r.out) }).toEqual({ status: 0, out: expected(false), err: "" });
       });
 
+      // iconv rejects a UTF-16 LE sheet that ends mid-character, so the hook
+      // cannot decode it and must inject as it does for a missing sheet.
+      test("injects the mandate when the sheet cannot be decoded", () => {
+        const r = runHook(runtime, Buffer.from([0xff, 0xfe, 0x73, 0x00, 0x65]));
+        expect({ status: r.status, out: wrap(r.out) }).toEqual({ status: 0, out: expected(false) });
+      });
+
       for (const { name, sheet, off } of sheetCases) {
         test(`${off ? "injects nothing" : "injects the mandate"} when the sheet has ${name}`, () => {
           const r = runHook(runtime, sheet);

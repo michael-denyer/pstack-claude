@@ -97,11 +97,11 @@ function transcriptNeedles(path) {
 export function lastChats(roots, paths) {
   const needles = paths.map((path) => [path, transcriptNeedles(path)]);
   const latest = new Map();
-  for (const file of roots.flatMap((root) => candidates(root, Infinity))) {
-    let text, mtime;
+  for (const { path: file, mtime: mtimeMs } of roots.flatMap((root) => candidates(root, Infinity))) {
+    const mtime = Math.floor(mtimeMs / 1000);
+    let text;
     try {
       text = readFileSync(file);
-      mtime = Math.floor(statSync(file).mtimeMs / 1000);
     } catch (error) {
       rethrowUnlessRemoved(error);
       continue;

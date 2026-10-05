@@ -16,6 +16,7 @@ const fakePiBin = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
 
 const fixtureModels = {
   available: ["opus", "fable", "sonnet", "haiku"],
+  efforts: ["low", "medium", "high", "xhigh", "max"],
   pi: {
     fallback: "anthropic",
     models: {

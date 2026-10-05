@@ -9,6 +9,9 @@ describe("fake pi script", () => {
     ["two keys", { sleep: 1, reply: "x" }, 'a step needs exactly one key, got {"sleep":1,"reply":"x"}'],
     ["an unknown key", { replay: "x" }, 'unknown step key "replay"'],
     ["an unknown spawn kind", { spawn: "toString" }, 'unknown spawn kind "toString"'],
+    ["mute false", { mute: false }, 'step "mute" takes only true, got false'],
+    ["ignoreSigterm false", { ignoreSigterm: false }, 'step "ignoreSigterm" takes only true, got false'],
+    ["askUser false", { askUser: false }, 'step "askUser" takes only true, got false'],
   ]) {
     test(`a step with ${name} ends the fake before it plays anything`, async () => {
       const { w, pi, ctx } = setup({ script: { default: [step] } });

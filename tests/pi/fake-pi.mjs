@@ -15,9 +15,10 @@
 // { touch: "<file>" } writes a file in the working directory, { mute: true }
 // stops answering commands from then on, { askUser: true } sends a notify and
 // a select UI request and waits for a response to either.
-// A step has exactly one key. A step with more, or a step key or spawn kind
-// this file does not know, ends the process with exit code 64, so a misspelled
-// step cannot pass for the behaviour it names.
+// A step has exactly one key. A step with more, a step key or spawn kind this
+// file does not know, or a mute, ignoreSigterm, or askUser step whose value is
+// not true ends the process with exit code 64, so a misspelled step cannot pass
+// for the behaviour it names.
 //
 // A steer command is queued and taken at the next step boundary, where it is
 // emitted as a user message_end and logged as "steered", as pi delivers a steer
@@ -110,11 +111,13 @@ const STEPS = {
   holdSettle: (ms) => (holdSettle = ms),
   awaitMessage: (ms) => waitUntil(ms, () => steerQueue.length > 0),
 };
+const FLAG_STEPS = new Set(["mute", "ignoreSigterm", "askUser"]);
 function stepProblem(step) {
   const keys = Object.keys(step);
   if (keys.length !== 1) return `a step needs exactly one key, got ${JSON.stringify(step)}`;
   if (!Object.hasOwn(STEPS, keys[0])) return `unknown step key "${keys[0]}"`;
   if (keys[0] === "spawn" && !Object.hasOwn(SPAWNS, step.spawn)) return `unknown spawn kind "${step.spawn}"`;
+  if (FLAG_STEPS.has(keys[0]) && step[keys[0]] !== true) return `step "${keys[0]}" takes only true, got ${JSON.stringify(step[keys[0]])}`;
   return null;
 }
 for (const step of [...(script.default ?? []), ...Object.values(script.byPrompt ?? {}).flat()]) {

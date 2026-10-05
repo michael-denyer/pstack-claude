@@ -62,6 +62,7 @@ export class PiChild {
   private readonly pending = new Map<string, (response: Answer | undefined) => void>();
   private nextId = 0;
   private open = true;
+  private closeTimer?: NodeJS.Timeout;
   private settled = false;
   private finalText = "";
   private errorMessage = "";
@@ -145,22 +146,37 @@ export class PiChild {
   // Pi exits on EOF once idle. One that does not is ended, since nothing else
   // would end the agent.
   close(): void {
-    if (!this.open) return;
-    this.open = false;
-    this.proc.stdin.end();
-    setTimeout(() => this.terminate(this.exitGraceMs), this.exitGraceMs).unref();
+    if (!this.endInput()) return;
+    this.closeTimer = setTimeout(() => this.terminate(this.exitGraceMs), this.exitGraceMs).unref();
   }
 
-  // SIGTERM now, SIGKILL if the child is still there after the grace period.
-  terminate(graceMs: number): void {
-    this.signal("SIGTERM");
-    setTimeout(() => this.signal("SIGKILL"), graceMs).unref();
+  // Ends the run now: stdin closes and one SIGTERM-then-SIGKILL ladder starts,
+  // in place of the one close() would have armed.
+  end(graceMs: number): void {
+    this.endInput();
+    clearTimeout(this.closeTimer);
+    this.terminate(graceMs);
+  }
+
+  private endInput(): boolean {
+    if (!this.open) return false;
+    this.open = false;
+    this.proc.stdin.end();
+    return true;
+  }
+
+  private terminate(graceMs: number): void {
+    if (this.pid) terminateGroup(this.pid, () => this.running, graceMs);
   }
 
   // Signals the child's group only while the child itself is alive: once it
   // has exited the group id may belong to a process this runner never spawned.
   signal(signal: NodeJS.Signals): void {
-    if (this.pid && this.proc.exitCode === null && this.proc.signalCode === null) signalGroup(this.pid, signal);
+    if (this.pid && this.running) signalGroup(this.pid, signal);
+  }
+
+  private get running(): boolean {
+    return this.proc.exitCode === null && this.proc.signalCode === null;
   }
 
   private onLine(line: string): void {
@@ -227,4 +243,12 @@ export function signalGroup(pid: number, signal: NodeJS.Signals): void {
   try {
     process.kill(-pid, signal);
   } catch {}
+}
+
+// SIGTERM to the group now, SIGKILL if `ours` still holds after the grace
+// period. `ours` guards both signals, since a reused pid is not ours to signal.
+export function terminateGroup(pid: number, ours: () => boolean, graceMs: number): void {
+  if (!ours()) return;
+  signalGroup(pid, "SIGTERM");
+  setTimeout(() => ours() && signalGroup(pid, "SIGKILL"), graceMs).unref();
 }

@@ -8,7 +8,7 @@ import { Value } from "typebox/value";
 
 import { noticeOf, OUTPUT_CAP_BYTES, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
-import { alive, type ChildExit, PiChild, signalGroup } from "./child.ts";
+import { alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
 import { DEPTH_FLAG, GENERAL_PURPOSE, loadAgentTypes, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
 
@@ -135,10 +135,7 @@ function runsSession(pid: number, sessionId: string): boolean {
 function reapOrphan(record: RunningRecord, killGraceMs: number): void {
   const pid = record.pid;
   if (pid === undefined) return;
-  const ours = () => alive(pid) && runsSession(pid, record.agent.sessionId);
-  if (!ours()) return;
-  signalGroup(pid, "SIGTERM");
-  setTimeout(() => ours() && signalGroup(pid, "SIGKILL"), killGraceMs).unref();
+  terminateGroup(pid, () => alive(pid) && runsSession(pid, record.agent.sessionId), killGraceMs);
 }
 
 const now = () => new Date().toISOString();
@@ -304,8 +301,7 @@ export class AgentRunner {
     const { run } = state;
     if (run.ending !== "teardown") run.ending = ending;
     void run.child.command({ type: "abort" });
-    run.child.close();
-    run.child.terminate(this.settings.killGraceMs);
+    run.child.end(this.settings.killGraceMs);
     return run.done;
   }
 

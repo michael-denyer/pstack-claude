@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 
 import { openingPrompt } from "../../plugins/pstack/skills/reflect/scripts/find-transcript.mjs";
 import { agentBody, alive as pidAlive, gitRepo, pluginRoot, readEntries, sleep } from "./harness.mjs";
-import { agentByDescription, assistantModels, childEntries, descendants, jsonLines, liveModels, MINUTE, PiRpc, processTable, sections, textOf } from "./live-harness.mjs";
+import { agentByDescription, assistantModels, childEntries, descendants, findSessionFile, jsonLines, liveModels, MINUTE, PiRpc, processTable, sections, textOf } from "./live-harness.mjs";
 
 const LIVE = process.env.PSTACK_PI_LIVE === "1";
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -48,10 +48,7 @@ async function withParent(fn) {
 }
 
 function parentSessionFile(sessionId) {
-  const dir = join(agentDir, "sessions");
-  const files = readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(`_${sessionId}.jsonl`));
-  expect(files).toHaveLength(1);
-  return join(dir, files[0]);
+  return findSessionFile(join(agentDir, "sessions"), sessionId);
 }
 
 const suite = LIVE ? describe : describe.skip;
@@ -410,7 +407,10 @@ suite("pstack on live pi", () => {
           encoding: "utf8",
         });
         expect({ cwd, code: run.status, stderr: run.status === 0 ? "" : run.stderr }).toEqual({ cwd, code: 0, stderr: "" });
-        const events = run.stdout.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+        const events = [];
+        const lines = jsonLines((e) => events.push(e));
+        lines.write(run.stdout);
+        lines.end();
         const entries = readEntries(parentSessionFile(events.find((e) => e.type === "session").id));
         const system = entries.find((e) => e.type === "message" && e.message.role === "system").message;
         const declared = system.toolsAdded.map((t) => t.name);
@@ -437,7 +437,7 @@ suite("pstack on live pi", () => {
       );
       const events = [];
       let stderr = "";
-      proc.stdout.on("data", jsonLines((e) => events.push(e)));
+      proc.stdout.on("data", jsonLines((e) => events.push(e)).write);
       proc.stderr.on("data", (d) => (stderr += d));
       const code = await new Promise((r) => proc.on("close", r));
       expect({ code, stderr: code === 0 ? "" : stderr }).toEqual({ code: 0, stderr: "" });

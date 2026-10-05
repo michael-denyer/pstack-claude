@@ -12,7 +12,12 @@ case "${1:-}" in
 esac
 
 bom=$(printf '\357\273\277')
-if [ -f "$sheet" ] && [ -r "$sheet" ] && sed "1s/^$bom//" "$sheet" | tr -d '\r' | grep -qx 'session hook: off'; then
+cr=$(printf '\r')
+# Windows PowerShell 5.1's `>` writes UTF-16 LE with a byte-order mark.
+read_sheet() {
+  if [ "$(od -An -tx1 -N2 "$sheet" | tr -d ' ')" = fffe ]; then iconv -f UTF-16LE -t UTF-8 "$sheet"; else cat "$sheet"; fi
+}
+if [ -f "$sheet" ] && [ -r "$sheet" ] && read_sheet | sed -e "1s/^$bom//" -e "s/$cr\$//" | grep -qx 'session hook: off'; then
   exit 0
 fi
 

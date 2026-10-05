@@ -1,8 +1,11 @@
 // The off-switch grammar every SessionStart implementation must agree on:
-// session-start.sh, session-start.ps1, and Pi's parseSheet. Only an exact
-// `session hook: off` line, with LF or CRLF endings and an optional UTF-8
-// byte-order mark, disables injection. A sheet that cannot be read as a file
-// leaves injection on, as a missing sheet does.
+// session-start.sh, session-start.ps1, and Pi's parseSheet. The sheet is
+// UTF-8, or UTF-16 LE when it starts with that byte-order mark, which is what
+// Windows PowerShell 5.1's `>` writes. A leading byte-order mark is dropped,
+// lines end at LF, and one CR before the LF is dropped; any other CR is part of
+// the line. Only a line that is then exactly `session hook: off` disables
+// injection. A sheet that cannot be read as a file leaves injection on, as a
+// missing sheet does.
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 
 export const UNREADABLE = Symbol("unreadable sheet");
@@ -18,6 +21,10 @@ export const sheetCases = [
   { name: "off without a trailing newline", sheet: "session hook: off", off: true },
   { name: "off with CRLF endings", sheet: "bug-fix: configured-model\r\nsession hook: off\r\n", off: true },
   { name: "off after a byte-order mark", sheet: "﻿session hook: off\n", off: true },
+  { name: "off in UTF-16 LE after a byte-order mark", sheet: Buffer.from("﻿session hook: off\r\n", "utf16le"), off: true },
+  { name: "a CR before the LF and another after off", sheet: "session hook: off\r\r\n", off: false },
+  { name: "lone CRs around off", sheet: "a\rsession hook: off\r", off: false },
+  { name: "a CR inside off", sheet: "session hook: o\rff\n", off: false },
   { name: "capitalised key", sheet: "Session hook: off\n", off: false },
   { name: "uppercase value", sheet: "session hook: OFF\n", off: false },
   { name: "leading space", sheet: " session hook: off\n", off: false },

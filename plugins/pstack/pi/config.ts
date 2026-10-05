@@ -78,15 +78,16 @@ export function parseSheet(text: string): Sheet {
 
 export function readSheet(agentDir: string): Sheet | undefined {
   const file = join(agentDir, "pstack-models.md");
-  let text: string;
+  let bytes: Buffer;
   try {
     if (!statSync(file, { throwIfNoEntry: false })?.isFile()) return undefined;
-    text = readFileSync(file, "utf8");
+    bytes = readFileSync(file);
   } catch {
     // An unreadable sheet leaves the defaults in place, as the session hooks do.
     return undefined;
   }
-  return parseSheet(text);
+  // Windows PowerShell 5.1's `>` writes UTF-16 LE with a byte-order mark.
+  return parseSheet(bytes.toString(bytes[0] === 0xff && bytes[1] === 0xfe ? "utf16le" : "utf8"));
 }
 
 // The parts of models.json the extension reads; the generator checks the rest.

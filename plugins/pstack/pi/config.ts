@@ -11,6 +11,9 @@ const PARENT_MODEL_ALIASES = ["inherit-parent", "auto"];
 
 // A parent passes it to each agent it starts, so the agent knows its depth.
 export const DEPTH_FLAG = "pstack-depth";
+// Under agentDir, holds each session's agent sessions and prompts. The worktree
+// audit scans it by this name, so a rename must reach that script too.
+export const PSTACK_STATE_DIR = "pstack";
 
 export interface Settings {
   pluginRoot: string;

@@ -68,12 +68,8 @@ describe("paths: frontmatter that is not a JSON array of globs", () => {
     }
   };
 
-  test("a comma-separated line throws instead of being split into globs", () => {
-    expect(register("a/**, b/**").error).toBeInstanceOf(Error);
-  });
-
-  test("a JSON value that is not an array of strings throws naming the skill file", () => {
-    for (const line of ['"a/**"', '["a/**", 1]']) {
+  test("a line that is not a JSON array of strings throws naming the skill file", () => {
+    for (const line of ["a/**, b/**", '"a/**"', '["a/**", 1]']) {
       const { file, error } = register(line);
       expect(error?.message).toBe(`${file}: paths must be a JSON array of globs`);
     }

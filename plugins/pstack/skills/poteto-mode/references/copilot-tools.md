@@ -108,7 +108,7 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | Skill | On GitHub Copilot |
 |-------|-------------------|
 | `interrogate` | Each reviewer is a `task` call: `subagent_type` becomes `agent_type`, `readonly: true` becomes a read-only agent type (see Subagent policy), and `model` comes from the sheet. Keep the panel's vendors distinct. |
-| `setup-pstack` | The skill's Other runtimes table names the Copilot sheet path and how it loads. Its [Copilot setup questions](../../setup-pstack/copilot.md) list models from the `task` tool's `model` enum and ask one `ask_user` question per tier and panel slot, grouped by vendor, with no recommended model. The role rows are identical; the `session hook` line also controls the Copilot hook. |
+| `setup-pstack` | The skill's Other runtimes table names the Copilot sheet path and how it loads. Its [Copilot setup questions](../../setup-pstack/copilot.md) list models from the `task` tool's `model` enum and ask one `ask_user` question per tier and panel slot, grouped by vendor, with no recommended model; a first question lets a plan with one model, or anyone who wants no per-role choices, run every role on the session's model. The role rows are identical; the `session hook` line also controls the Copilot hook. |
 | `architect` | The runner panel goes through the **arena** skill: one `task` per runner, each with a model from the sheet's `architect runners` line. |
 | `how` | The explorers and the explainer are `task` calls with the sheet's `how` role models; critics use a read-only agent type (see Subagent policy). |
 | `arena` | Runners and the cross-judge pool come from the sheet's panel lines; pick the cross-judge from a different vendor than the candidate it grades. |

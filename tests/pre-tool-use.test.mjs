@@ -197,6 +197,13 @@ describe("PreToolUse sheet check", () => {
     expect(runWith(null, create(sheet({ panel: "mai-code-1.1-flash, kimi-k3" })))).toEqual(quiet);
   });
 
+  // The session-model answer in setup-pstack/copilot.md writes this shape.
+  test("an all-session-model sheet with three-entry panels needs no vendor opt-out", () => {
+    const text = sheet({ one: "inherit-parent", strong: "inherit-parent", panel: "inherit-parent, inherit-parent, inherit-parent" });
+    expect(text).not.toContain("panel vendors:");
+    expect(runWith(null, create(text))).toEqual(quiet);
+  });
+
   test("effort suffixes and a default effort line are well formed", () => {
     const text = sheet({ strong: "claude-opus-5.5 @xhigh", panel: "claude-sonnet-5 @high, gpt-5.5 @max", extra: "default effort: medium\n" });
     expect(runWith(null, create(text))).toEqual(quiet);

@@ -267,6 +267,21 @@ describe("Copilot setup questions", () => {
     expect(questions).toContain("`inherit-parent (run on the session's model)`");
   });
 
+  // A plan that exposes one model (or only automatic selection) has nothing to
+  // choose, so the first question offers a single answer that writes a sheet the
+  // PreToolUse hook accepts without a vendor opt-out.
+  test("a session-model answer skips the tier questions and needs no vendor opt-out", () => {
+    const first = sequence.indexOf("0. **Session model.**");
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(first).toBeLessThan(sequence.indexOf("**Default model.**"));
+    const question = sequence.slice(first, sequence.indexOf("1. **Default model.**"));
+    expect(question).toContain("`Yes, use the session's model for every role`");
+    expect(question).toContain("Yes skips questions 1 through 6 and the model detection");
+    expect(question).toContain("Ask questions 7 and 8");
+    expect(question).toContain("needs no `panel vendors: any` line");
+    expect(question).not.toContain("(Recommended)");
+  });
+
   test("recommends no model and marks saved values as current", () => {
     expect(questions).toContain("Do not propose, pre-select, or label any model `(Recommended)`");
     expect(questions.match(/\(Recommended\)/g)).toHaveLength(2);

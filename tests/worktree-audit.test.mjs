@@ -5,7 +5,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { defaultSettings, PSTACK_STATE_DIR } from "../plugins/pstack/pi/config.ts";
-import { audit, classify, defaultTranscriptRoots, lastChats } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
+import { audit, classify, defaultTranscriptRoots, duSize, lastChats } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
 import { removeDuring } from "./remove-during.mjs";
 
 const script = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs");
@@ -402,4 +402,12 @@ test("the CLI exits 1 outside a git repo", () => {
   const result = spawnSync("node", [script, outside, outside], { encoding: "utf8" });
   expect(result.status).toBe(1);
   expect(result.stderr).toBe("not in a git repo; pass a repo path\n");
+});
+
+test.each([
+  ["568K\t/x/wt\n", "568K"],
+  ["  0B\t/x/wt\n", "0B"],
+  [" 48M\t/x/wt\n", "48M"],
+])("reads the size from du output %j", (output, expected) => {
+  expect(duSize(output)).toBe(expected);
 });

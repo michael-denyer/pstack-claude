@@ -143,9 +143,13 @@ function remoteState(path, branch, head) {
   return `ahead${git(path, "rev-list", "--count", `origin/${branch}..HEAD`)}`;
 }
 
+export function duSize(output) {
+  return output.trim().split(/\s/)[0];
+}
+
 function size(path) {
   try {
-    return execFileSync("du", ["-sh", path], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).split(/\s/)[0];
+    return duSize(execFileSync("du", ["-sh", path], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }));
   } catch {
     return "?";
   }

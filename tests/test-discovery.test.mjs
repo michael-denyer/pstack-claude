@@ -4,19 +4,20 @@
 // until some earlier run has installed them.
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
-test("a bare bun test at the root loads only the files under tests/", () => {
-  const testFiles = readdirSync(fileURLToPath(new URL(".", import.meta.url)), { recursive: true })
-    .filter((file) => /\.(test|spec)\.|_(test|spec)\./.test(file));
-  const result = spawnSync(process.execPath, ["test", "--test-name-pattern", "^pstack-no-such-test$"], {
+function loadedFiles(...paths) {
+  const result = spawnSync(process.execPath, ["test", "--test-name-pattern", "^pstack-no-such-test$", ...paths], {
     cwd: repoRoot,
     encoding: "utf8",
   });
   const output = result.stdout + result.stderr;
-  expect(output).toContain(`across ${testFiles.length} files`);
-  expect(result.status).toBe(0);
+  expect(result.status, output).toBe(0);
+  return Number(output.match(/across (\d+) files?/)?.[1]);
+}
+
+test("a bare bun test at the root loads the same files as bun test tests/", () => {
+  expect(loadedFiles()).toBe(loadedFiles("tests/"));
 });

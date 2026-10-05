@@ -9,7 +9,8 @@
 // and Pi's <iso>_<id>.jsonl under its per-cwd sessions directory, told apart
 // by Pi's session header line. Each candidate is streamed line by line; a
 // Claude Code transcript is abandoned at its first typed `user` record, while a
-// Pi session is read to its last entry to find the active branch.
+// Pi session is read to its last entry to find the active branch. A Codex
+// rollout is refused by name rather than read as an empty Claude transcript.
 import { createReadStream, readdirSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
@@ -76,6 +77,8 @@ const LOCAL_COMMAND = /^\s*<(?:command-name|local-command-stdout|bash-input)>/u;
 // A Pi session opens with this header line; Claude Code transcripts never do.
 const isPiHeader = (record) =>
   record?.type === "session" && Number.isInteger(record.version) && typeof record.cwd === "string";
+// A Codex rollout opens with its session metadata.
+const isCodexHeader = (record) => record?.type === "session_meta";
 
 async function* parsed(lines) {
   for await (const line of lines) {
@@ -122,13 +125,24 @@ async function piOpening(records) {
   return prompt;
 }
 
+// Readers by opening record. Claude Code writes no header, so its row is last
+// and takes every file the others do not claim.
+const READERS = [
+  [isPiHeader, (head, rest) => piOpening(rest)],
+  [isCodexHeader, (head, rest, path) => {
+    throw new Error(`${path} is a Codex rollout, which find-transcript does not read; pass the session digest instead`);
+  }],
+  [() => true, (head, rest) => claudeOpening(prepend(head, rest))],
+];
+
 export async function openingPrompt(path) {
   const stream = createReadStream(path, { encoding: "utf8" });
   try {
     const records = parsed(jsonlLines(stream));
     const { value: head, done } = await records.next();
     if (done) return null;
-    return await (isPiHeader(head) ? piOpening(records) : claudeOpening(prepend(head, records)));
+    const [, read] = READERS.find(([matches]) => matches(head));
+    return await read(head, records, path);
   } finally {
     stream.destroy();
   }

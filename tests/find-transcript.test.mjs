@@ -224,6 +224,21 @@ describe("find-transcript", () => {
     expect(await findTranscript(dir, "issue 59")).toBe(pi);
   });
 
+  test("a Codex rollout is refused by name instead of read as an empty Claude transcript", async () => {
+    const dir = tempDir();
+    const rollout = transcript(
+      dir,
+      "rollout.jsonl",
+      [
+        JSON.stringify({ type: "session_meta", payload: { id: "r-1", cwd: "/work/repo" } }),
+        JSON.stringify({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "ship the release" }] } }),
+      ],
+      100,
+    );
+    await expect(openingPrompt(rollout)).rejects.toThrow(/Codex rollout/);
+    await expect(findTranscript(dir, "ship the release")).rejects.toThrow(/Codex rollout/);
+  });
+
   test("the CLI prints the path and exits 1 when nothing matches", () => {
     const dir = tempDir();
     const path = transcript(dir, "s/s.jsonl", [meta, user("ship the release")], 100);

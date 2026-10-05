@@ -110,7 +110,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/check-plan.mjs": {
       "kind": "port-feature",
-      "why": "Checks for the port's plan skeleton markers (standing orders, installed-plugin reads, the configured swarm workers model) and tracks code fences by delimiter character and length.",
+      "why": "Checks for the port's plan skeleton markers (standing orders, installed-plugin reads, an hourly cadence, the configured swarm workers model), requires a box under each program task and under Close the program, tracks code fences by delimiter character and length, and strips a leading byte-order mark before parsing.",
       "since": "0.9.19",
       "upstream": "not-proposed"
     },
@@ -122,7 +122,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/orch/store.ts": {
       "kind": "policy",
-      "why": "Adds guards for temp-file cleanup, single-line status table cells, nested-paren gt status rows, leading-dash branch names, and frontier SHAs resolved from exact local branch refs.",
+      "why": "Adds guards for temp-file cleanup, single-line status table cells, nested-paren gt status rows, leading-dash branch names, and frontier SHAs resolved from exact local branch refs, runs gt and git without an env override and strips terminal control sequences from gt output instead of setting NO_COLOR, and takes the gt path as an open option so tests can inject a fake.",
       "since": "0.9.13",
       "upstream": "not-proposed"
     },
@@ -224,7 +224,7 @@
     },
     "plugins/pstack/skills/setup-pstack/SKILL.md": {
       "kind": "port-feature",
-      "why": "Writes the override sheet at the Claude Code or Codex config path and loads it by @-include, since neither runtime has Cursor's always-applied rules or its reasoning-budget step, and lists the Pi sheet path in the runtime table.",
+      "why": "Writes the override sheet at each runtime's own path, loaded by @-include on Claude Code and pasted into AGENTS.md on Codex since neither has Cursor's always-applied rules, replaces Cursor's budget step with a default effort and per-role effort levels, adds the SessionStart hook toggle, and lists every runtime's sheet path in a table.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },

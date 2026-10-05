@@ -211,13 +211,16 @@ else
 fi
 rm "$home/pstack-models.md"
 
-# 5 and 6 run once per setup model; the tally shows how each one did.
+# 5 and 6 run once per setup model; the tally shows how each one did. Writing
+# the sheet is a path permission the user grants, so these probes add
+# $COPILOT_HOME, and the probes that expect no sheet prove the model chose not to
+# write one.
 setup_probes() {
   local setup_model="$1" events order sheet wrong role panel
   rm -f "$home/pstack-models.md"
   # 5. No model sheet: a multi-model skill must run setup-pstack before any fan-out.
   # The task tool is withheld so the probe cannot spend a panel.
-  events="$(PROBE_MODEL=$setup_model probe --allow-all-tools --excluded-tools task -p 'Use the arena skill to decide whether a function that adds two integers should be named add or sum. Keep it brief.')"
+  events="$(PROBE_MODEL=$setup_model probe --allow-all-tools --add-dir "$home" --excluded-tools task -p 'Use the arena skill to decide whether a function that adds two integers should be named add or sum. Keep it brief.')"
   order="$(jq -r 'select(.type == "tool.execution_start" and .data.toolName == "skill") | .data.arguments.skill' "$events" | tr '\n' ' ')"
   local loaded
   loaded="$(jq -r 'select(.type == "tool.execution_start" and .data.toolName == "skill" and (.data.arguments.skill | test("setup-pstack$"))) | .data.toolCallId' "$events" \
@@ -243,7 +246,7 @@ setup_probes() {
   # exactly those IDs. The panel takes the first GPT and Gemini IDs from the CLI's
   # own `model` setting list, next to the probe model.
   rm -f "$home/pstack-models.md"
-  events="$(PROBE_MODEL=$setup_model probe --allow-all-tools -p 'Run the setup-pstack skill now and save the sheet.')"
+  events="$(PROBE_MODEL=$setup_model probe --allow-all-tools --add-dir "$home" -p 'Run the setup-pstack skill now and save the sheet.')"
   if [ -e "$home/pstack-models.md" ]; then
     fail "$setup_model: setup-pstack wrote a sheet with no answers from the user ($events): $(tr '\n' ' ' <"$home/pstack-models.md")"
   else
@@ -253,7 +256,7 @@ setup_probes() {
     fail "$setup_model: the CLI's model list has no GPT or Gemini ID: $known"
   else
     panel="$model, $gpt, $gemini"
-    events="$(PROBE_MODEL=$setup_model probe --allow-all-tools -p "Run the setup-pstack skill now and save the sheet. My answers: default model $model. Strongest model $model. Panel models $panel, in that order, and no more. No role overrides. Session hook on.")"
+    events="$(PROBE_MODEL=$setup_model probe --allow-all-tools --add-dir "$home" -p "Run the setup-pstack skill now and save the sheet. My answers: default model $model. Strongest model $model. Panel models $panel, in that order, and no more. No role overrides. Session hook on.")"
     sheet="$home/pstack-models.md"
     if [ ! -e "$sheet" ]; then
       fail "$setup_model: setup-pstack wrote no sheet from supplied answers ($events)"

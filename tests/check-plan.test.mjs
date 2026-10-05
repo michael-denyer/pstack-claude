@@ -46,6 +46,15 @@ describe("plan checklists", () => {
     expect(run(skeleton.replaceAll("- [ ]", "- [x]")).code).toBe(0);
   });
 
+  test("a plan saved with a UTF-8 byte-order mark passes", () => {
+    for (const plan of ["\uFEFF" + skeleton, "\uFEFF---\ntitle: Plan\n---\n" + skeleton]) {
+      expect(run(plan)).toEqual({
+        code: 0,
+        out: expect.stringContaining("1 PR sections, 0 problems"),
+      });
+    }
+  });
+
   for (const heading of [
     "### Arm the program",
     "### Spawn owners",

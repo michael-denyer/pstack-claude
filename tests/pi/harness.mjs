@@ -16,6 +16,7 @@ const fakePiBin = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
 
 const fixtureModels = {
   available: ["opus", "fable", "sonnet", "haiku"],
+  efforts: ["low", "medium", "high", "xhigh", "max"],
   pi: {
     fallback: "anthropic",
     models: {
@@ -104,13 +105,7 @@ export function world({ script = {}, sheet = null } = {}) {
     pluginRoot,
     modelsFile,
     agentDir,
-    pi: { command: fakePiBin, args: [] },
-    childEnv: {
-      PATH: process.env.PATH,
-      HOME: root,
-      PSTACK_FAKE_PI_SCRIPT: scriptFile,
-      PSTACK_FAKE_PI_LOG: logFile,
-    },
+    pi: { command: fakePiBin, args: [scriptFile, logFile] },
     depth: 0,
     killGraceMs: 300,
     exitGraceMs: 1500,
@@ -205,10 +200,11 @@ export function gitRepo(dir) {
   return run;
 }
 
-export async function waitFor(predicate, timeoutMs = 5000) {
+// The default stays under bun's 5 s test timeout, so this error is the one reported.
+export async function waitFor(predicate, timeoutMs = 4000) {
   const deadline = Date.now() + timeoutMs;
   while (!(await predicate())) {
-    if (Date.now() > deadline) throw new Error("waitFor timed out");
+    if (Date.now() > deadline) throw new Error(`waitFor timed out after ${timeoutMs} ms: ${predicate}`);
     await sleep(20);
   }
 }

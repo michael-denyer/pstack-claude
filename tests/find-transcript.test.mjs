@@ -84,7 +84,7 @@ describe("find-transcript", () => {
     const nested = transcript(dir, "n1/n1.jsonl", [meta], 300);
     const sub = transcript(dir, "n1/subagents/child.jsonl", [meta], 200);
     writeFileSync(join(dir, "notes.txt"), "not a transcript");
-    expect(candidates(dir)).toEqual([nested, sub, flat]);
+    expect(candidates(dir).map(({ path }) => path)).toEqual([nested, sub, flat]);
   });
 
   test("findTranscript returns the newest transcript whose opening prompt carries the fragment", async () => {
@@ -115,7 +115,7 @@ describe("find-transcript", () => {
       const flat = transcript(dir, "flat.jsonl", [meta], 200);
       transcript(dir, "s1/s1.jsonl", [meta], 300);
       const body = `const { candidates } = await import(${JSON.stringify(script)});
-        console.log(JSON.stringify(candidates(${JSON.stringify(dir)})));`;
+        console.log(JSON.stringify(candidates(${JSON.stringify(dir)}).map(({ path }) => path)));`;
       const run = removeDuring("readdirSync", dir, [join(dir, "s1"), flat], body);
       expect(run.stderr).toBe("");
       expect(JSON.parse(run.stdout)).toEqual([kept]);
@@ -222,6 +222,21 @@ describe("find-transcript", () => {
     const pi = transcript(dir, "--work-repo--/s.jsonl", [piHeader, piMessage("u1", null, "user", "review issue 59 on Pi")], 200);
     expect(await findTranscript(dir, "on Pi")).toBe(pi);
     expect(await findTranscript(dir, "issue 59")).toBe(pi);
+  });
+
+  test("a Codex rollout is refused by name instead of read as an empty Claude transcript", async () => {
+    const dir = tempDir();
+    const rollout = transcript(
+      dir,
+      "rollout.jsonl",
+      [
+        JSON.stringify({ type: "session_meta", payload: { id: "r-1", cwd: "/work/repo" } }),
+        JSON.stringify({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "ship the release" }] } }),
+      ],
+      100,
+    );
+    await expect(openingPrompt(rollout)).rejects.toThrow(/Codex rollout/);
+    await expect(findTranscript(dir, "ship the release")).rejects.toThrow(/Codex rollout/);
   });
 
   test("the CLI prints the path and exits 1 when nothing matches", () => {

@@ -3,13 +3,16 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { PARALLEL_CALLS, piToolsNote } from "../../plugins/pstack/pi/prompt.ts";
 import { sheetCases } from "../session-hook-sheets.mjs";
 import { pluginRoot, useWorld } from "./harness.mjs";
 
 const mandate = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
-const tools = piToolsNote(pluginRoot);
-const always = { "pstack-parallel-calls": PARALLEL_CALLS, "pstack-pi-tools": tools };
+const piTools = join(pluginRoot, "skills/poteto-mode/references/pi-tools.md");
+const always = {
+  "pstack-parallel-calls":
+    "If you intend to call multiple tools and there are no dependencies between the calls, make all of the independent calls in the same response, otherwise you MUST wait for previous calls to finish first to determine the dependent values.",
+  "pstack-pi-tools": `pstack skills are written for Claude Code. When one names a Claude Code tool (Agent, Skill, AskUserQuestion, Bash), a bundled skill, or a Claude model, read ${piTools} for the Pi equivalent before following it.`,
+};
 
 const setup = useWorld();
 
@@ -53,9 +56,9 @@ describe("before_agent_start", () => {
     expect(await sectionsAfterStart(pi, ctx)).toEqual({ ...always, "pstack-models": sheet });
   });
 
-  test("the tool mapping pointer names the installed pi-tools.md, which exists", () => {
-    const file = join(pluginRoot, "skills/poteto-mode/references/pi-tools.md");
-    expect(tools).toContain(file);
-    expect(readFileSync(file, "utf8")).toContain("# Pi tool mapping");
+  test("the tool mapping pointer names the installed pi-tools.md, which exists", async () => {
+    const { pi, ctx } = setup();
+    expect((await sectionsAfterStart(pi, ctx))["pstack-pi-tools"]).toContain(piTools);
+    expect(readFileSync(piTools, "utf8")).toContain("# Pi tool mapping");
   });
 });

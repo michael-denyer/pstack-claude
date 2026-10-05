@@ -68,12 +68,54 @@ describe("ask_user_question", () => {
     expect(selects[1].options).toEqual(["Redis - in memory", OTHER, DONE]);
   });
 
-  test("several questions are asked in order, and a dismissal stops the run", async () => {
+  test("a later dismissal preserves completed answers in model-facing content and stops the run", async () => {
     const ui = scriptedUi(["Postgres - relational", undefined]);
     const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
-    const result = await pi.call("ask_user_question", { questions: [q(), q({ question: "Cache?" })] }, ctx);
+    const result = await pi.call("ask_user_question", { questions: [q(), q({ question: "Cache?" }), q({ question: "Queue?" })] }, ctx);
     expect(result.details).toEqual({ answers: [{ question: "Which store?", answer: "Postgres" }], dismissed: true });
+    expect(result.content[0].text).toContain('"Which store?"="Postgres"');
+    expect(result.content[0].text).toContain("The user dismissed the remaining questions without answering.");
+    expect(result.content[0].text).not.toContain('"Cache?"=');
+    expect(result.content[0].text).not.toContain('"Queue?"=');
+    expect(ui.calls.map((c) => c.title)).toEqual(["Store: Which store?", "Store: Cache?"]);
+  });
+
+  test("dismissing the first question still returns only a dismissal", async () => {
+    const ui = scriptedUi([undefined]);
+    const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
+    const result = await pi.call("ask_user_question", { questions: [q(), q({ question: "Cache?" })] }, ctx);
+    expect(result.details).toEqual({ answers: [], dismissed: true });
+    expect(result.content).toEqual([{ type: "text", text: "The user dismissed the question without answering." }]);
+    expect(ui.calls).toHaveLength(1);
+  });
+
+  test("dismissing Other input preserves earlier typed and completed multi-select answers", async () => {
+    const ui = scriptedUi([OTHER, "SQLite", "Postgres - relational", "Redis - in memory", DONE, OTHER, undefined]);
+    const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
+    const result = await pi.call("ask_user_question", {
+      questions: [q(), q({ question: "Caches?", multiSelect: true }), q({ question: "Queue?" })],
+    }, ctx);
+    expect(result.details).toEqual({
+      answers: [{ question: "Which store?", answer: "SQLite" }, { question: "Caches?", answer: "Postgres, Redis" }],
+      dismissed: true,
+    });
+    expect(result.content[0].text).toContain('"Which store?"="SQLite", "Caches?"="Postgres, Redis"');
     expect(result.content[0].text).toContain("dismissed");
+    expect(result.content[0].text).not.toContain('"Queue?"=');
+  });
+
+  test("completing all questions retains the success message and answer order", async () => {
+    const ui = scriptedUi(["Postgres - relational", "Redis - in memory"]);
+    const { pi, ctx } = setup({ ctx: { hasUI: true, ui } });
+    const result = await pi.call("ask_user_question", { questions: [q(), q({ question: "Cache?" })] }, ctx);
+    expect(result.details).toEqual({
+      answers: [{ question: "Which store?", answer: "Postgres" }, { question: "Cache?", answer: "Redis" }],
+      dismissed: false,
+    });
+    expect(result.content).toEqual([{
+      type: "text",
+      text: 'User has answered your questions: "Which store?"="Postgres", "Cache?"="Redis". You can now continue with the user\'s answers in mind.',
+    }]);
   });
 
   test("a child agent refuses ask_user_question even though rpc mode reports a UI", async () => {

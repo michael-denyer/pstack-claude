@@ -67,20 +67,13 @@ export class PiChild {
   private errorMessage = "";
   private stderr = "";
 
-  constructor(command: string, args: string[], opts: { cwd: string; env?: NodeJS.ProcessEnv; exitGraceMs: number }, prompt: string) {
+  constructor(command: string, args: string[], opts: { cwd: string; exitGraceMs: number }, prompt: string) {
     this.exitGraceMs = opts.exitGraceMs;
-    this.proc = spawn(command, args, { cwd: opts.cwd, env: opts.env, detached: true, stdio: ["pipe", "pipe", "pipe"] });
+    this.proc = spawn(command, args, { cwd: opts.cwd, detached: true, stdio: ["pipe", "pipe", "pipe"] });
     this.pid = this.proc.pid;
     this.proc.stdin.on("error", () => {});
-    const decoder = new StringDecoder("utf8");
-    let buffered = "";
-    const feed = (chunk: string) => {
-      buffered += chunk;
-      const lines = buffered.split("\n");
-      buffered = lines.pop() ?? "";
-      for (const line of lines) this.onLine(line);
-    };
-    this.proc.stdout.on("data", (b: Buffer) => feed(decoder.write(b)));
+    const stdout = lineSplitter((line) => this.onLine(line));
+    this.proc.stdout.on("data", stdout.write);
     this.proc.stderr.on("data", (b: Buffer) => {
       this.stderr = (this.stderr + b.toString("utf8")).slice(-STDERR_CAP);
     });
@@ -91,8 +84,7 @@ export class PiChild {
         if (done) return;
         done = true;
         this.open = false;
-        feed(decoder.end());
-        if (buffered) this.onLine(buffered);
+        stdout.end();
         if (spawnError) this.errorMessage = spawnError.message;
         for (const settle of this.pending.values()) settle(undefined);
         this.pending.clear();
@@ -198,6 +190,26 @@ export class PiChild {
       this.proc.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: parsed.id, cancelled: true })}\n`);
     }
   }
+}
+
+// Splits pi's stdout into lines on LF only: a Unicode line separator is valid
+// inside a JSON string.
+export function lineSplitter(onLine: (line: string) => void): { write(chunk: Buffer | string): void; end(): void } {
+  const decoder = new StringDecoder("utf8");
+  let buffered = "";
+  const feed = (text: string) => {
+    buffered += text;
+    const lines = buffered.split("\n");
+    buffered = lines.pop() ?? "";
+    for (const line of lines) onLine(line);
+  };
+  return {
+    write: (chunk) => feed(decoder.write(chunk)),
+    end: () => {
+      feed(decoder.end());
+      if (buffered) onLine(buffered);
+    },
+  };
 }
 
 // A process, or with a negative pid its whole group. EPERM means it exists

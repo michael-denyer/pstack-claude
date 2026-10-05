@@ -289,8 +289,9 @@ const FORK_OUTCOMES = new Set(["forked", "mode-only", "merged", "conflicted"]);
 // `derive(rel, text)` turns substituted upstream text into the port's form;
 // the default is identity. `forks`, from parseForks, adds the registry check:
 // an undeclared fork lands in `undeclared` and blocks every write, and an entry
-// whose path is not forked lands in `stale`. Returns the report and, unless
-// dryRun, applies it.
+// whose path is not forked lands in `stale`. A stale entry blocks every write
+// only when `atPin`: at a new SHA it is a fork upstream just absorbed, so the
+// sync goes ahead. Returns the report and, unless dryRun, applies it.
 export function syncComponent({
   oldDir,
   newDir,
@@ -301,6 +302,7 @@ export function syncComponent({
   carriedElsewhere = [],
   derive = (_, t) => t,
   forks = null,
+  atPin = false,
   dryRun = false,
 }) {
   const report = {
@@ -399,7 +401,7 @@ export function syncComponent({
     }
   }
 
-  if (report.hits.length || report.binaryConflicts.length || report.undeclared.length || dryRun) return report;
+  if (report.hits.length || report.binaryConflicts.length || report.undeclared.length || (atPin && report.stale.length) || dryRun) return report;
   for (const { rel, kind, write } of outcomes) {
     const localFile = join(localDir, rel);
     if (write) {
@@ -463,6 +465,7 @@ function main() {
     };
     const oldDir = co(spec.sha, join(scratch, "old"));
     const newDir = co(newSha, join(scratch, "new"));
+    const atPin = git(["-C", oldDir, "rev-parse", "HEAD"]) === git(["-C", newDir, "rev-parse", "HEAD"]);
 
     const report = syncComponent({
       oldDir,
@@ -474,6 +477,7 @@ function main() {
       carriedElsewhere: pathsOtherComponentsCarry(join(scratch, "clone"), upstream.components, component),
       derive: (rel, text) => deriveSkill(join(spec.localPath, rel), text, models, leads),
       forks,
+      atPin,
       dryRun,
     });
 
@@ -513,14 +517,19 @@ function main() {
       console.error(`\nFAIL: Cursor-isms in synced files; add a substitution or rewrite by hand, then rerun:`);
       for (const h of report.hits) console.error(`  ${spec.localPath}/${h}`);
     }
-    for (const { rel, reason } of report.stale) {
-      console.error(`warning: tools/forks.json declares ${spec.localPath}/${rel} under ${component}, but it ${reason}; delete the entry`);
+    if (atPin && report.stale.length) {
+      console.error(`\nFAIL: tools/forks.json declares paths under ${component} that are not forked at the pinned SHA; delete each entry, then rerun:`);
+      for (const { rel, reason } of report.stale) console.error(`  ${spec.localPath}/${rel} ${reason}`);
+    } else {
+      for (const { rel, reason } of report.stale) {
+        console.error(`warning: tools/forks.json declares ${spec.localPath}/${rel} under ${component}, but it ${reason}; delete the entry`);
+      }
     }
     if (report.undeclared.length) {
       console.error(`\nFAIL: forks with no entry under ${component} in tools/forks.json; declare each or restore upstream's form, then rerun:`);
       for (const rel of report.undeclared) console.error(`  ${spec.localPath}/${rel}`);
     }
-    if (report.binaryConflicts.length || report.hits.length || report.undeclared.length) {
+    if (report.binaryConflicts.length || report.hits.length || report.undeclared.length || (atPin && report.stale.length)) {
       process.exitCode = 1;
       return;
     }

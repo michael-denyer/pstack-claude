@@ -546,7 +546,9 @@ describe("Store", () => {
 
     await withFakeGt({
       directory,
-      output: "\u001b[2m◯ main\u001b[0m\n\u001b[32m◉ stack/open\u001b[39m \u001b[2m(current)\u001b[22m\n",
+      output:
+        "\u001b[2m◯ main\u001b[0m\n" +
+        "\u001b[38:5:2m◉ \u001b]8;;https://example.test/stack\u0007stack/open\u001b]8;;\u0007\u001b[39m \u001b[2m(current)\u001b[22m\n",
       operation: async () => {
         expect(
           (await store.frontier.set({ repo: stack.repo })).prs

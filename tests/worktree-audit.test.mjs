@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { defaultSettings, PSTACK_STATE_DIR } from "../plugins/pstack/pi/config.ts";
 import { audit, classify, defaultTranscriptRoots, lastChats } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
 import { removeDuring } from "./remove-during.mjs";
 
@@ -238,6 +239,12 @@ describe("lastChats matches a path as JSONL spells it, never a sibling's prefix"
     ["Git's forward-slash spelling of a Windows path", "C:/repo/worktree", String.raw`C:\repo\worktree`],
     ["a file under a Windows worktree", "C:/repo/worktree", String.raw`C:\repo\worktree\src\index.ts`],
     ["a UNC checkout", "//server/share/worktree", String.raw`\\server\share\worktree`],
+    ["a double-quoted path inside a command", "/repo/worktree", 'cd "/repo/worktree" && ls'],
+    ["a single-quoted path inside a command", "/repo/worktree", "cd '/repo/worktree' && ls"],
+    ["a path followed by a space", "/repo/worktree", "cd /repo/worktree && ls"],
+    ["a path followed by a tab", "/repo/worktree", "ls\t/repo/worktree\tsrc"],
+    ["a path followed by a newline", "/repo/worktree", "cd /repo/worktree\nls"],
+    ["a quoted Windows path inside a command", "C:/repo/worktree", String.raw`cd "C:\repo\worktree" && dir`],
   ])("finds %s", (_, path, cwd) => {
     expect(scan(path, cwd)).toBe(true);
   });
@@ -245,6 +252,8 @@ describe("lastChats matches a path as JSONL spells it, never a sibling's prefix"
   test.each([
     ["/repo/worktree", "/repo/worktree-long/file.ts"],
     ["C:/repo/worktree", String.raw`C:\repo\worktree-long\src\file.ts`],
+    ["/repo/worktree", 'cd "/repo/worktree-long" && ls'],
+    ["/repo/worktree", "cd /repo/worktree-long && ls"],
   ])("does not match %s in %s", (path, cwd) => {
     expect(scan(path, cwd)).toBe(false);
   });
@@ -280,6 +289,15 @@ describe("default transcripts roots", () => {
 
   test("Claude Code's directory when no runtime directory exists, so the audit warns about it", () => {
     expect(defaultTranscriptRoots({ env: {}, home, exists: () => false })).toEqual([claude]);
+  });
+
+  test.each([
+    ["PI_CODING_AGENT_DIR", { PI_CODING_AGENT_DIR: "/pi" }],
+    ["the default agent directory", {}],
+  ])("the Pi roots are where the extension keeps sessions and agent state under %s", (_, env) => {
+    const { agentDir } = defaultSettings(() => 0, env);
+    const roots = defaultTranscriptRoots({ env, home: homedir(), exists: () => true });
+    expect(roots).toEqual(expect.arrayContaining([join(agentDir, "sessions"), join(agentDir, PSTACK_STATE_DIR)]));
   });
 });
 

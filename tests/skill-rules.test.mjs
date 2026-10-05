@@ -96,6 +96,16 @@ const rules = [
     file: "poteto-mode/playbooks/babysit.md",
     phrase: "confirm that the PR or stack it reports matches the request",
   },
+  {
+    source: "#188 no self-review in place of an independent one",
+    file: "poteto-mode/SKILL.md",
+    phrase: "Never count your own review, passing tests, or CI as the independent verdict.",
+  },
+  {
+    source: "#188 a missing reviewer blocks the gate",
+    file: "poteto-mode/SKILL.md",
+    phrase: "Record `BLOCKED: independent review` in the todolist",
+  },
 ];
 
 describe("port-local skill rules", () => {

@@ -12,12 +12,10 @@ interface PathSkill {
   globs: string[];
 }
 
-function parsePaths(value: string): string[] {
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) return parsed.map(String);
-  } catch {}
-  return value.split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+function parsePaths(file: string, line: string): string[] {
+  const globs: unknown = JSON.parse(line);
+  if (Array.isArray(globs) && globs.every((g): g is string => typeof g === "string")) return globs;
+  throw new Error(`${file}: paths must be a JSON array of globs`);
 }
 
 // Skills whose frontmatter names `paths:` globs, the files that should load them.
@@ -29,7 +27,7 @@ function pathSkills(pluginRoot: string): PathSkill[] {
     const file = join(dir, name, "SKILL.md");
     if (!existsSync(file)) continue;
     const line = frontmatter(readFileSync(file, "utf8")).fields.get("paths");
-    if (line) skills.push({ name, file, globs: parsePaths(line) });
+    if (line) skills.push({ name, file, globs: parsePaths(file, line) });
   }
   return skills;
 }

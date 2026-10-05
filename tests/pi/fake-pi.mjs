@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Stands in for `pi --mode rpc` (the harness points settings.pi at it). It logs
-// its invocation, each reply, steer, and settle to PSTACK_FAKE_PI_LOG, so a
+// its invocation, each reply, steer, and settle to its second argument, so a
 // test can wait for the moment it needs, reads JSON commands from stdin as real pi
-// does, and plays the steps PSTACK_FAKE_PI_SCRIPT names for the prompt it is
+// does, and plays the steps its first argument's script names for the prompt it is
 // given: { "default": [steps], "byPrompt": { "<prompt>": [steps] } }.
 //
 // Steps: { reply } emits an assistant message_end ("${prompt}", "${history}"
@@ -15,8 +15,10 @@
 // { touch: "<file>" } writes a file in the working directory, { mute: true }
 // stops answering commands from then on, { askUser: true } sends a notify and
 // a select UI request and waits for a response to either.
-// A step key or spawn kind this file does not know ends the process with
-// exit code 64, so a misspelled step cannot pass for the behaviour it names.
+// A step has exactly one key. A step with more, a step key or spawn kind this
+// file does not know, or a mute, ignoreSigterm, or askUser step whose value is
+// not true ends the process with exit code 64, so a misspelled step cannot pass
+// for the behaviour it names.
 //
 // A steer command is queued and taken at the next step boundary, where it is
 // emitted as a user message_end and logged as "steered", as pi delivers a steer
@@ -32,7 +34,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 
-const argv = process.argv.slice(2);
+const [scriptPath, logPath, ...argv] = process.argv.slice(2);
 const flag = (name) => {
   const i = argv.indexOf(name);
   return i === -1 ? undefined : argv[i + 1];
@@ -41,9 +43,7 @@ const sessionId = flag("--session-id");
 const sessionDir = flag("--session-dir");
 const systemFile = flag("--append-system-prompt");
 
-const log = (record) => {
-  if (process.env.PSTACK_FAKE_PI_LOG) appendFileSync(process.env.PSTACK_FAKE_PI_LOG, JSON.stringify(record) + "\n");
-};
+const log = (record) => appendFileSync(logPath, JSON.stringify(record) + "\n");
 let held;
 const out = (event) => {
   const line = JSON.stringify(event) + "\n";
@@ -60,12 +60,8 @@ if (sessionFile) {
 }
 const remember = (text) => sessionFile && appendFileSync(sessionFile, JSON.stringify(text) + "\n");
 
-const script = process.env.PSTACK_FAKE_PI_SCRIPT ? JSON.parse(readFileSync(process.env.PSTACK_FAKE_PI_SCRIPT, "utf8")) : {};
+const script = JSON.parse(readFileSync(scriptPath, "utf8"));
 
-const STEP_KEYS = new Set([
-  "reply", "error", "raw", "touch", "stderr", "sleep", "exit", "mute", "ignoreSigterm", "spawn", "askUser",
-  "lingerAfterSettle", "holdSettle", "awaitMessage",
-]);
 const DEAF = ["sh", ["-c", 'trap "" TERM; exec sleep 300']];
 const SPAWNS = {
   // A bash command still running: pi's bash tool detaches it into its own
@@ -81,9 +77,49 @@ const SPAWNS = {
   // The same, holding this process's stdio open.
   "holding-pipes": { command: DEAF, stdio: "inherit" },
 };
+const STEPS = {
+  reply: (text) => {
+    out({ type: "message_end", message: assistant([{ type: "text", text: expand(text) }]) });
+    log({ kind: "reply", pid: process.pid });
+  },
+  error: (message) => out({ type: "message_end", message: assistant([], { stopReason: "error", errorMessage: message }) }),
+  raw: (text) => process.stdout.write(text),
+  touch: (file) => writeFileSync(file, "changed\n"),
+  stderr: (text) => process.stderr.write(text),
+  sleep: (ms) => waitUntil(ms, () => false),
+  exit: (code) => process.exit(code),
+  mute: () => (muted = true),
+  ignoreSigterm: () => {
+    process.removeAllListeners("SIGTERM");
+    process.on("SIGTERM", () => log({ kind: "sigterm-ignored", pid: process.pid }));
+    log({ kind: "ignoring-sigterm", pid: process.pid });
+  },
+  spawn: (kind) => {
+    const { command = ["sleep", ["300"]], detached = false, stdio = "ignore", tracked = false } = SPAWNS[kind];
+    const g = spawn(...command, { stdio, detached });
+    if (tracked) trackedCommands.add(g.pid);
+    log({ kind: "grandchild", as: kind, pid: g.pid });
+  },
+  askUser: async () => {
+    out({ type: "extension_ui_request", id: "u0", method: "notify", message: "fyi", notifyType: "info" });
+    out({ type: "extension_ui_request", id: "u1", method: "select", title: "Which?", options: ["a", "b"] });
+    await new Promise((resolve) => (uiAnswered = resolve));
+  },
+  lingerAfterSettle: (ms) => (linger = ms),
+  holdSettle: (ms) => (holdSettle = ms),
+  awaitMessage: (ms) => waitUntil(ms, () => steerQueue.length > 0),
+};
+const FLAG_STEPS = new Set(["mute", "ignoreSigterm", "askUser"]);
+function stepProblem(step) {
+  const keys = Object.keys(step);
+  if (keys.length !== 1) return `a step needs exactly one key, got ${JSON.stringify(step)}`;
+  if (!Object.hasOwn(STEPS, keys[0])) return `unknown step key "${keys[0]}"`;
+  if (keys[0] === "spawn" && !Object.hasOwn(SPAWNS, step.spawn)) return `unknown spawn kind "${step.spawn}"`;
+  if (FLAG_STEPS.has(keys[0]) && step[keys[0]] !== true) return `step "${keys[0]}" takes only true, got ${JSON.stringify(step[keys[0]])}`;
+  return null;
+}
 for (const step of [...(script.default ?? []), ...Object.values(script.byPrompt ?? {}).flat()]) {
-  const unknown = Object.keys(step).find((key) => !STEP_KEYS.has(key));
-  const problem = unknown ? `unknown step key "${unknown}"` : "spawn" in step && !SPAWNS[step.spawn] && `unknown spawn kind "${step.spawn}"`;
+  const problem = stepProblem(step);
   if (problem) {
     process.stderr.write(`fake-pi: ${problem}\n`);
     process.exit(64);
@@ -178,6 +214,10 @@ const takeSteers = () => {
   }
 };
 const assistant = (content, extra = {}) => ({ role: "assistant", content, stopReason: "stop", timestamp: Date.now(), ...extra });
+const waitUntil = async (ms, done) => {
+  const until = Date.now() + ms;
+  while (!aborted && !done() && Date.now() < until) await pause(until - Date.now());
+};
 // Resolves after ms, or as soon as a steer or abort arrives.
 const pause = (ms) => new Promise((r) => {
   const t = setTimeout(r, ms);
@@ -192,42 +232,8 @@ out({ type: "message_end", message: { role: "user", content: prompt, timestamp: 
 
 for (const step of steps) {
   if (aborted) break;
-  if ("reply" in step) {
-    out({ type: "message_end", message: assistant([{ type: "text", text: expand(step.reply) }]) });
-    log({ kind: "reply", pid: process.pid });
-  }
-  if ("error" in step) out({ type: "message_end", message: assistant([], { stopReason: "error", errorMessage: step.error }) });
-  if ("raw" in step) process.stdout.write(step.raw);
-  if ("touch" in step) writeFileSync(step.touch, "changed\n");
-  if ("stderr" in step) process.stderr.write(step.stderr);
-  if ("sleep" in step) {
-    const until = Date.now() + step.sleep;
-    while (!aborted && Date.now() < until) await pause(until - Date.now());
-  }
-  if ("exit" in step) process.exit(step.exit);
-  if (step.mute) muted = true;
-  if (step.ignoreSigterm) {
-    process.removeAllListeners("SIGTERM");
-    process.on("SIGTERM", () => log({ kind: "sigterm-ignored", pid: process.pid }));
-    log({ kind: "ignoring-sigterm", pid: process.pid });
-  }
-  if ("spawn" in step) {
-    const { command = ["sleep", ["300"]], detached = false, stdio = "ignore", tracked = false } = SPAWNS[step.spawn];
-    const g = spawn(...command, { stdio, detached });
-    if (tracked) trackedCommands.add(g.pid);
-    log({ kind: "grandchild", as: step.spawn, pid: g.pid });
-  }
-  if (step.askUser) {
-    out({ type: "extension_ui_request", id: "u0", method: "notify", message: "fyi", notifyType: "info" });
-    out({ type: "extension_ui_request", id: "u1", method: "select", title: "Which?", options: ["a", "b"] });
-    await new Promise((resolve) => (uiAnswered = resolve));
-  }
-  if ("lingerAfterSettle" in step) linger = step.lingerAfterSettle;
-  if ("holdSettle" in step) holdSettle = step.holdSettle;
-  if ("awaitMessage" in step) {
-    const until = Date.now() + step.awaitMessage;
-    while (!steerQueue.length && !aborted && Date.now() < until) await pause(until - Date.now());
-  }
+  const [[key, value]] = Object.entries(step);
+  await STEPS[key](value);
   takeSteers();
 }
 if (holdSettle) held = [];

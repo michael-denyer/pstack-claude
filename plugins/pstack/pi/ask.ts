@@ -63,18 +63,21 @@ export function registerAsk(pi: ExtensionAPI, oneShot: OneShot): void {
       const answers: { question: string; answer: string }[] = [];
       for (const q of params.questions) {
         const answer = await ask(ctx.ui, q, signal);
-        if (answer === undefined) {
-          return {
-            content: [{ type: "text", text: "The user dismissed the question without answering." }],
-            details: { answers, dismissed: true },
-          };
-        }
+        if (answer === undefined) break;
         answers.push({ question: q.question, answer });
       }
+      const dismissed = answers.length < params.questions.length;
       const text = answers.map((a) => `"${a.question}"="${a.answer}"`).join(", ");
+      // Pi sends content to the model; details alone cannot preserve earlier answers.
+      const answered = answers.length ? `User has answered your questions: ${text}. ` : "";
+      const status = !dismissed
+        ? "You can now continue with the user's answers in mind."
+        : answers.length
+          ? "The user dismissed the remaining questions without answering."
+          : "The user dismissed the question without answering.";
       return {
-        content: [{ type: "text", text: `User has answered your questions: ${text}. You can now continue with the user's answers in mind.` }],
-        details: { answers, dismissed: false },
+        content: [{ type: "text", text: answered + status }],
+        details: { answers, dismissed },
       };
     },
   });

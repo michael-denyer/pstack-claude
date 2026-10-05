@@ -5,6 +5,20 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+// Where `bun add -g` puts node_modules: bun's own order is BUN_INSTALL_GLOBAL_DIR,
+// then $BUN_INSTALL/install/global, then $XDG_CACHE_HOME/.bun/install/global,
+// then ~/.bun/install/global. A bunfig or CLI global directory is not read.
+function bunRoots() {
+  const { BUN_INSTALL_GLOBAL_DIR, BUN_INSTALL, XDG_CACHE_HOME } = process.env;
+  return [
+    BUN_INSTALL_GLOBAL_DIR && join(BUN_INSTALL_GLOBAL_DIR, "node_modules"),
+    BUN_INSTALL && join(BUN_INSTALL, "install/global/node_modules"),
+    XDG_CACHE_HOME && join(XDG_CACHE_HOME, ".bun/install/global/node_modules"),
+    join(homedir(), ".bun/install/global/node_modules"),
+    join(homedir(), ".cache/.bun/install/global/node_modules"),
+  ];
+}
+
 function npmRoot() {
   try {
     return execFileSync("npm", ["root", "-g"], { encoding: "utf8" }).trim();
@@ -15,7 +29,7 @@ function npmRoot() {
 
 export function findPiPackage() {
   if (process.env.PI_PACKAGE_DIR) return process.env.PI_PACKAGE_DIR;
-  const roots = [npmRoot(), join(homedir(), ".bun/install/global/node_modules"), join(homedir(), ".cache/.bun/install/global/node_modules")];
+  const roots = [npmRoot(), ...bunRoots()];
   return roots.filter(Boolean).map((root) => join(root, "@earendil-works/pi-coding-agent")).find((dir) => existsSync(join(dir, "package.json"))) ?? null;
 }
 

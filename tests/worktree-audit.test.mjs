@@ -2,14 +2,21 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { defaultSettings, PSTACK_STATE_DIR } from "../plugins/pstack/pi/config.ts";
 import { audit, classify, defaultTranscriptRoots, duSize, lastChats, pathSpellings } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
 import { removeDuring } from "./remove-during.mjs";
 
 const script = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs");
+// node's ESM loader takes a file URL, not a drive-lettered path.
+const scriptUrl = pathToFileURL(script).href;
 const noNode = spawnSync("node", ["--version"]).status !== 0;
+// Windows ignores chmod, so a directory cannot be made unreadable.
+const noChmod = process.platform === "win32";
+// The audit keys rows by git's spelling, which is forward-slashed on Windows.
+const gitPath = (path) => path.replaceAll(sep, "/");
 // Windows denies symlinkSync without the symlink privilege.
 const noSymlinks = (() => {
   const dir = mkdtempSync(join(tmpdir(), "worktree-audit-symlink-"));
@@ -92,7 +99,8 @@ function commit(worktree, message, content = `${message}\n`) {
 // A seed repo with a bare remote and a clone, so trunk resolution and the fetch run for real.
 function createFixture({ trunk = "main", cloneArgs = [] } = {}) {
   // git reports resolved worktree paths; macOS tmpdir() sits behind the /var symlink.
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-test-")));
+  // Windows git reports long names where realpathSync keeps 8.3 ones like RUNNER~1.
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "worktree-audit-test-")));
   fixtures.push(root);
   const seed = join(root, "seed");
   git("init", `--initial-branch=${trunk}`, seed);
@@ -110,13 +118,14 @@ function createFixture({ trunk = "main", cloneArgs = [] } = {}) {
 function addWorktree(fixture, name, ...args) {
   const path = join(fixture.root, name);
   git("-C", fixture.repo, "worktree", "add", ...(args.length ? args : ["-b", name]), path);
-  return path;
+  return gitPath(path);
 }
 
 function writeTranscript(fixture, rel, worktree, mtimeSeconds) {
   const path = join(fixture.transcripts, rel);
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify({ type: "user", cwd: worktree })}\n`);
+  // A Windows session records its cwd with backslashes while git reports forward slashes.
+  writeFileSync(path, `${JSON.stringify({ type: "user", cwd: worktree.replaceAll("/", sep) })}\n`);
   if (mtimeSeconds) utimesSync(path, mtimeSeconds, mtimeSeconds);
 }
 
@@ -166,7 +175,7 @@ test("audits every worktree of a fixture repo end to end", () => {
   const staleAt = now - 10 * 86400;
   writeTranscript(fixture, "-proj/old.jsonl", stale, staleAt);
   const broken = addWorktree(fixture, "broken");
-  chmodSync(join(fixture.repo, ".git/worktrees/broken/index"), 0o000);
+  writeFileSync(join(fixture.repo, ".git/worktrees/broken/index"), "not an index\n");
   const gone = addWorktree(fixture, "gone");
   rmSync(gone, { recursive: true });
 
@@ -205,7 +214,9 @@ test("a Pi session in a second transcripts root marks the worktree it ran in as 
   const piChatted = addWorktree(fixture, "pi-chatted");
   const quiet = addWorktree(fixture, "quiet");
   const sessions = join(fixture.root, "pi-agent/sessions");
-  const session = join(sessions, `--${piChatted.slice(1).replaceAll("/", "-")}--`, "2026-10-01T00-00-00-000Z_s.jsonl");
+  // Pi names the session directory after the cwd with its leading "/" or "C:/" removed.
+  const cwdSlug = piChatted.replace(/^[^/]*\//, "").replaceAll("/", "-");
+  const session = join(sessions, `--${cwdSlug}--`, "2026-10-01T00-00-00-000Z_s.jsonl");
   mkdirSync(dirname(session), { recursive: true });
   writeFileSync(
     session,
@@ -332,6 +343,19 @@ describe("pathSpellings", () => {
       expect(pathSpellings(join(root, "real/worktree"))).toEqual(before);
     });
 
+    test("a symlink reached through another symlink composes with it", () => {
+      const root = layout();
+      mkdirSync(join(root, "real/deep/worktree"), { recursive: true });
+      symlinkSync(join(root, "real/deep"), join(root, "real/inner"));
+      expect(pathSpellings(join(root, "real/deep/worktree"))).toContain(join(root, "link/inner/worktree"));
+    });
+
+    test("a link back to its own ancestor spells the worktree once through it", () => {
+      const root = layout();
+      symlinkSync(root, join(root, "real/up"));
+      expect(pathSpellings(join(root, "real/worktree"))).toContain(join(root, "real/up/real/worktree"));
+    });
+
     test("the spellings do not match a sibling in the chat scan", () => {
       const root = layout();
       const worktree = join(root, "real/worktree");
@@ -349,35 +373,49 @@ describe("pathSpellings", () => {
       expect(warnings).toEqual([]);
       expect(rowFor(rows, worktree).slice(6, 8)).toEqual([ymd(Math.floor(Date.now() / 1000)), "verify-recent-chat"]);
     });
+
+    test("the audit holds a worktree whose only chat named it through two composed symlinks", () => {
+      const fixture = createFixture();
+      const worktree = addWorktree(fixture, "real/deep/worktree");
+      symlinkSync(join(fixture.root, "real"), join(fixture.root, "link"));
+      symlinkSync(join(fixture.root, "real/deep"), join(fixture.root, "real/inner"));
+      writeTranscript(fixture, "-proj/session.jsonl", join(fixture.root, "link/inner/worktree"));
+      const { rows, warnings } = runAudit(fixture);
+      expect(warnings).toEqual([]);
+      expect(rowFor(rows, worktree).slice(6, 8)).toEqual([ymd(Math.floor(Date.now() / 1000)), "verify-recent-chat"]);
+    });
   });
 });
 
 describe("default transcripts roots", () => {
   const home = "/home/u";
   const claude = "/home/u/.claude/projects";
+  // These paths are POSIX literals, which path.join spells with backslashes on Windows.
+  const roots = ({ exists, ...options }) =>
+    defaultTranscriptRoots({ ...options, home, exists: (path) => exists(gitPath(path)) }).map(gitPath);
 
   test("every runtime directory that exists, Pi's under PI_CODING_AGENT_DIR when set", () => {
     const present = new Set([claude, "/home/u/.codex/sessions", "/pi/sessions", "/pi/pstack", "/home/u/.pi/agent/sessions"]);
     const exists = (path) => present.has(path);
-    expect(defaultTranscriptRoots({ env: { PI_CODING_AGENT_DIR: "/pi" }, home, exists })).toEqual([
+    expect(roots({ env: { PI_CODING_AGENT_DIR: "/pi" }, exists })).toEqual([
       claude,
       "/home/u/.codex/sessions",
       "/pi/sessions",
       "/pi/pstack",
     ]);
-    expect(defaultTranscriptRoots({ env: {}, home, exists })).toEqual([claude, "/home/u/.codex/sessions", "/home/u/.pi/agent/sessions"]);
+    expect(roots({ env: {}, exists })).toEqual([claude, "/home/u/.codex/sessions", "/home/u/.pi/agent/sessions"]);
   });
 
   test("Codex's sessions and archived_sessions, under CODEX_HOME when set", () => {
     const present = new Set(["/home/u/.codex/sessions", "/home/u/.codex/archived_sessions", "/cx/sessions", "/cx/archived_sessions"]);
     const exists = (path) => present.has(path);
-    expect(defaultTranscriptRoots({ env: {}, home, exists })).toEqual(["/home/u/.codex/sessions", "/home/u/.codex/archived_sessions"]);
-    expect(defaultTranscriptRoots({ env: { CODEX_HOME: "/cx" }, home, exists })).toEqual(["/cx/sessions", "/cx/archived_sessions"]);
+    expect(roots({ env: {}, exists })).toEqual(["/home/u/.codex/sessions", "/home/u/.codex/archived_sessions"]);
+    expect(roots({ env: { CODEX_HOME: "/cx" }, exists })).toEqual(["/cx/sessions", "/cx/archived_sessions"]);
   });
 
   test("Claude Code's projects under CLAUDE_CONFIG_DIR when set", () => {
     const exists = (path) => path === claude || path === "/cc/projects";
-    expect(defaultTranscriptRoots({ env: { CLAUDE_CONFIG_DIR: "/cc" }, home, exists })).toEqual(["/cc/projects"]);
+    expect(roots({ env: { CLAUDE_CONFIG_DIR: "/cc" }, exists })).toEqual(["/cc/projects"]);
   });
 
   test("Copilot's session-state, under COPILOT_HOME when set", () => {
@@ -388,7 +426,7 @@ describe("default transcripts roots", () => {
   });
 
   test("Claude Code's directory when no runtime directory exists, so the audit warns about it", () => {
-    expect(defaultTranscriptRoots({ env: {}, home, exists: () => false })).toEqual([claude]);
+    expect(roots({ env: {}, exists: () => false })).toEqual([claude]);
   });
 
   test.each([
@@ -413,7 +451,7 @@ test.skipIf(noNode)("a transcript removed after it was listed drops out of the c
   chat("kept.jsonl", 100);
   const removed = chat("removed.jsonl", 200);
   // Removed once candidates() has stat-ed it, so only lastChats' own read sees it gone.
-  const body = `const { lastChats } = await import(${JSON.stringify(script)});
+  const body = `const { lastChats } = await import(${JSON.stringify(scriptUrl)});
     console.log(JSON.stringify([...lastChats([${JSON.stringify(dir)}], new Map([["/x/wt", ["/x/wt"]]]))]));`;
   const run = removeDuring("statSync", removed, [removed], body);
   expect(run.stderr).toBe("");
@@ -440,7 +478,7 @@ test.skipIf(noNode)("a session resumed during the scan keeps its active worktree
       return result;
     };
     syncBuiltinESMExports();
-    const { audit } = await import(${JSON.stringify(script)});
+    const { audit } = await import(${JSON.stringify(scriptUrl)});
     console.log(audit({ repo: ${JSON.stringify(fixture.repo)}, transcripts: [${JSON.stringify(fixture.transcripts)}], gh: () => "[]" }));
   `;
   const run = spawnSync("node", ["--input-type=module", "-e", body], { encoding: "utf8" });
@@ -459,7 +497,9 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
     ["gh", () => ({ gh: () => { throw new Error("gh: not logged in"); } }), /gh pr list failed.*not logged in/],
     ["gh output that is not JSON", () => ({ gh: () => "rate limited" }), /gh pr list failed/],
     ["gh output that is not a list", () => ({ gh: () => "{}" }), /gh pr list failed/],
-    ["a missing transcripts directory", (fixture) => ({ transcripts: [fixture.transcripts, join(fixture.root, "absent")] }), /^warn: \S+\/absent not found; LAST_CHAT column will be empty$/],
+    ["a missing transcripts directory", (fixture) => ({ transcripts: [fixture.transcripts, join(fixture.root, "absent")] }), /^warn: \S+[\\/]absent not found; LAST_CHAT column will be empty$/],
+  ];
+  const chmodFailures = [
     ["an unreadable transcripts directory", (fixture) => {
       const project = join(fixture.transcripts, "-proj");
       mkdirSync(project);
@@ -482,7 +522,7 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
     }, /^warn: could not resolve the spellings of \S+\/ancestor; LAST_CHAT column will be empty: EACCES/],
   ];
 
-  test.each(failures)("%s", (_, inject, warning) => {
+  const keepsAncestorOutOfSafe = (_, inject, warning) => {
     const fixture = createFixture();
     const ancestor = addWorktree(fixture, "ancestor");
     const { rows, warnings } = runAudit(fixture, inject(fixture));
@@ -491,7 +531,9 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
     expect(row[7]).toBe("review");
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(warning);
-  });
+  };
+  test.each(failures)("%s", keepsAncestorOutOfSafe);
+  test.skipIf(noChmod).each(chmodFailures)("%s", keepsAncestorOutOfSafe);
 
   test("every missing transcripts directory is named", () => {
     const fixture = createFixture();

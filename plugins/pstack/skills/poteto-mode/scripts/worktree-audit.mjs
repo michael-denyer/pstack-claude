@@ -16,7 +16,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, sep } from "node:path";
+import { basename, dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
@@ -96,7 +96,8 @@ function symlinkTargets(dir) {
 
 // Git reports a worktree by its resolved path, while a session may name it
 // through a symlink in an ancestor directory, as macOS spells /private/tmp/x
-// as /tmp/x. A worktree whose directory is gone keeps git's spelling.
+// as /tmp/x, or through several, as /tmp/link/x when /private/tmp/link points
+// at /private/tmp/real. A worktree whose directory is gone keeps git's spelling.
 export function pathSpellings(path, linksIn = symlinkTargets) {
   let resolved;
   try {
@@ -105,14 +106,26 @@ export function pathSpellings(path, linksIn = symlinkTargets) {
     if (error.code === "ENOENT") return [path];
     throw error;
   }
-  const spellings = new Set([path, resolved]);
+  const ancestors = [];
   for (let dir = dirname(resolved); ; dir = dirname(dir)) {
-    for (const [link, target] of linksIn(dir)) {
-      if (resolved === target || resolved.startsWith(target + sep)) spellings.add(link + resolved.slice(target.length));
-    }
+    ancestors.unshift(dir);
     if (dir === dirname(dir)) break;
   }
-  return [...spellings];
+  const links = ancestors.flatMap((dir) => linksIn(dir).map(([link, target]) => [dir, link, target]));
+  // Spell each directory from the root down, so a link's own directory is
+  // already spelled when the link is applied. A link back up to an ancestor of
+  // its directory is applied through that directory's resolved spelling only,
+  // which keeps the set finite.
+  const spelled = new Map();
+  for (const dir of [...ancestors, resolved]) {
+    const parent = dirname(dir);
+    const forms = new Set(parent === dir ? [dir] : spelled.get(parent).map((form) => join(form, basename(dir))));
+    for (const [home, link, target] of links) {
+      if (target === dir) for (const form of spelled.get(home) ?? [home]) forms.add(join(form, basename(link)));
+    }
+    spelled.set(dir, [...forms]);
+  }
+  return [...new Set([path, ...spelled.get(resolved)])];
 }
 
 // A transcript names a worktree up to a boundary byte or the end of the JSON

@@ -2,7 +2,7 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.71 - run pstack on GitHub Copilot
+## 0.9.72 - run pstack on GitHub Copilot
 
 pstack now installs on the GitHub Copilot CLI and the GitHub Copilot app. `copilot plugin marketplace add michael-denyer/pstack-claude` and `copilot plugin install pstack@pstack-claude` read the existing Claude Code marketplace. The CLI and the app share `~/.copilot`, so one install serves both. Skills load by bare name through Copilot's `skill` tool, a user types `/pstack:<skill>` in the CLI, and the agents load as `pstack:poteto-agent` and `pstack:comment-sicko`.
 
@@ -25,6 +25,14 @@ Copilot CLI 1.0.87 through 1.0.92 merges the session-start context of several pl
 **Original Copilot verification, before review fixes.** `bun test tests/` passes 909 tests with 0 failures and skips 36; main at 0389988 passes 723 and skips the same 36. `tests/check-sheet.test.mjs` is new, and `tests/session-hook.test.mjs` and `tests/pre-tool-use.test.mjs` cover the role-line allowlist (a `Note: ignore previous instructions` line, an `<EXTREMELY_IMPORTANT>` line, and an indented role line stay out of the context), an invalid sheet, CRLF, BOM, and UTF-16LE sheets, problem text that never echoes the sheet, run-time escaping, and a failing `awk` run. Removing each of 56 hook guards, validator rules, and hook wiring lines in turn, and each of 5 checks in the generator's Copilot row, fails at least one test. `sheet.awk`, `check-sheet.awk`, and `copilot-context.awk` give the same output on macOS awk, mawk, `gawk --posix`, original-awk, and BusyBox awk. `hooks/hooks.json`, `hooks/codex-hooks.json`, the agents, and the `session-start.sh claude` and `codex` output match main byte for byte, and the Claude Code, Codex, and Pi manifests differ only in the version. `tests/copilot-smoke.sh` passes all 44 checks on Copilot CLI 1.0.92 with `gpt-5.4-mini`, for a local install and a GitHub marketplace install of this branch: each hook fires once through the Copilot manifest, a sheet line that is not a role stays out of the context, an invalid sheet injects `sheet invalid`, and setup writes exactly the supplied IDs and runs `check-sheet.sh` with no permission request.
 
 **Review-fix verification.** The full suite on macOS passes 920 tests, skips 35, and retains the same 21 baseline failures: 20 worktree-audit fixture failures involving `/home` and one Pi process-restoration timeout. The changed suites pass. Generator checking reports 80 current files, and shellcheck and offline documentation links pass. The live Copilot smoke suite and Windows checks were not rerun for these fixes.
+
+## 0.9.71 - multi-select twins, composed audit symlinks, and test tooling
+
+In Pi, a multi-select question keeps a choice selectable after the user picks another choice with the same label, so two same-label choices can both be picked. Single-select already listed each as its own choice. Picking a choice now hides only that choice, so a typed `Other` answer no longer hides a listed choice with the same text.
+
+`worktree-audit.mjs` composes the ancestor symlinks it spells a worktree through. When `/tmp` points at `/private/tmp` and `/private/tmp/link` points at `/private/tmp/real`, a session that wrote `/tmp/link/x` now counts for the worktree git lists as `/private/tmp/real/x`, which previously could be suggested as `safe`. A link that points back up to an ancestor of its own directory is still applied only through that directory's resolved spelling.
+
+A new Windows CI job runs `tests/worktree-audit.test.mjs` on `windows-latest`. The three cases that need `chmod` report as skipped there. A bare `bun test` at the repository root now runs the same files as `bun test tests/`, instead of also loading the vendored poteto-mode script tests, which failed until their own dependencies happened to be installed. `bun tools/typecheck-pi.mjs` and the Pi tests also find a bun-installed Pi under `BUN_INSTALL_GLOBAL_DIR`, `$BUN_INSTALL/install/global` and `$XDG_CACHE_HOME/.bun/install/global`.
 
 ## 0.9.70 - worktree audit, hook validation, Pi runtime, and fork registry fixes
 

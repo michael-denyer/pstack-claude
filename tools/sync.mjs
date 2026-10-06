@@ -45,7 +45,8 @@
 // can with conflicts: the markers are in the tree, and generate.mjs fails on
 // any marker line under plugins/pstack, so CI rejects an unresolved sync.
 // With --dry-run nothing is written and the pin stays; passing the pinned SHA
-// as <new-sha> under --dry-run prints the ownership map.
+// as <new-sha> under --dry-run prints the ownership map. At the pin an upstream
+// file the port lacks fails the run, since a sync to a new SHA would write it back.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import {
@@ -240,6 +241,9 @@ export function isExcluded(rel, exclude) {
   });
 }
 
+// Git records one of two file modes, so only the owner's execute bit counts.
+const gitMode = (mode) => (mode & 0o100 ? 0o755 : 0o644);
+
 const lazyFile = (mode, load) => {
   let loaded;
   return {
@@ -340,7 +344,7 @@ export function syncComponent({
     // Following a link would copy whatever it points at, even outside the
     // clone, into the port.
     if (stat.isSymbolicLink()) return { symlink: true };
-    return lazyFile(stat.mode & 0o777, () => portForm(rel, readFileSync(file)));
+    return lazyFile(gitMode(stat.mode), () => portForm(rel, readFileSync(file)));
   };
   const portCopy = (rel) => {
     // Only a walked entry counts as present. existsSync would also answer for
@@ -351,7 +355,7 @@ export function syncComponent({
     const stat = lstatSync(file);
     // Writing through a link would change, or create, its target.
     if (stat.isSymbolicLink()) return { symlink: true };
-    return lazyFile(stat.mode & 0o777, () => {
+    return lazyFile(gitMode(stat.mode), () => {
       const bytes = readFileSync(file);
       return { bytes, binary: isBinary(rel, bytes) };
     });
@@ -426,7 +430,7 @@ export function syncComponent({
     }
   }
 
-  if (report.hits.length || report.binaryConflicts.length || report.collisions.length || report.undeclared.length || (atPin && report.stale.length) || dryRun) return report;
+  if (report.hits.length || report.binaryConflicts.length || report.collisions.length || report.undeclared.length || (atPin && (report.stale.length || report.written.length)) || dryRun) return report;
   for (const { rel, kind, write } of outcomes) {
     const localFile = join(localDir, rel);
     if (write) {
@@ -554,11 +558,15 @@ function main() {
         console.error(`warning: tools/forks.json declares ${spec.localPath}/${rel} under ${component}, but it ${reason}; delete the entry`);
       }
     }
+    if (atPin && report.written.length) {
+      console.error(`\nFAIL: upstream files the port lacks at the pinned SHA; restore each or add it to exclude in tools/upstream.json, then rerun:`);
+      for (const { rel } of report.written) console.error(`  ${spec.localPath}/${rel}`);
+    }
     if (report.undeclared.length) {
       console.error(`\nFAIL: forks with no entry under ${component} in tools/forks.json; declare each or restore upstream's form, then rerun:`);
       for (const rel of report.undeclared) console.error(`  ${spec.localPath}/${rel}`);
     }
-    if (report.binaryConflicts.length || report.collisions.length || report.hits.length || report.undeclared.length || (atPin && report.stale.length)) {
+    if (report.binaryConflicts.length || report.collisions.length || report.hits.length || report.undeclared.length || (atPin && (report.stale.length || report.written.length))) {
       process.exitCode = 1;
       return;
     }

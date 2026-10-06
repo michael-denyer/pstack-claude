@@ -82,7 +82,7 @@ describe("project playbooks", () => {
     expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
   });
 
-  test.failing("with no argument the root is the git repository the working directory is in", () => {
+  test("with no argument the root is the git repository the working directory is in", () => {
     const result = run(
       { "ship.md": "---\nextends: shipping-v2\nwhen: Use it to ship.\n---\n" },
       { git: true, cwd: "src", args: [] },
@@ -93,19 +93,19 @@ describe("project playbooks", () => {
     });
   });
 
-  test.failing("with no argument outside a git repository the check does not guess a root", () => {
+  test("with no argument outside a git repository the check does not guess a root", () => {
     const result = run({}, { cwd: "src", args: [] });
     expect(result.code).toBe(1);
     expect(result.out).toContain("pass the repository root");
   });
 
-  test.failing("a root that does not exist is an error", () => {
+  test("a root that does not exist is an error", () => {
     const result = run({}, { args: ["nope"] });
     expect(result.code).toBe(1);
     expect(result.out).toContain("nope");
   });
 
-  test.failing("an extends stem that leaves the playbooks directory is not a playbook", () => {
+  test("an extends stem that leaves the playbooks directory is not a playbook", () => {
     const result = run({ "ship.md": "---\nextends: ../SKILL\nwhen: Use it to ship.\n---\n" });
     expect(result).toEqual({
       code: 1,

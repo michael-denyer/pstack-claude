@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -25,7 +26,8 @@ export function checkPlaybooks(root, bundled = BUNDLED) {
       .filter(Boolean)
       .map((stem) => {
         const file = join(bundled, `${stem}.md`);
-        return { stem, text: existsSync(file) ? readFileSync(file, "utf8") : null };
+        const known = !/[\\/]/.test(stem) && existsSync(file);
+        return { stem, text: known ? readFileSync(file, "utf8") : null };
       });
     for (const base of bases) {
       if (base.text === null) problems.push(`${path}: extends \`${base.stem}\`, which this pstack has no playbook for`);
@@ -53,8 +55,21 @@ function invokedDirectly() {
   }
 }
 
+function repositoryRoot(argument) {
+  if (argument) {
+    const root = resolve(argument);
+    if (statSync(root, { throwIfNoEntry: false })?.isDirectory()) return root;
+    console.error(`${root} is not a directory`);
+    process.exit(1);
+  }
+  const git = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" });
+  if (git.status === 0) return git.stdout.trim();
+  console.error("git found no repository here; pass the repository root as the argument");
+  process.exit(1);
+}
+
 if (invokedDirectly()) {
-  const problems = checkPlaybooks(resolve(process.argv[2] ?? "."));
+  const problems = checkPlaybooks(repositoryRoot(process.argv[2]));
   if (problems.length > 0) {
     console.error(problems.join("\n"));
     process.exitCode = 1;

@@ -187,9 +187,7 @@ describe("strayModelSlugs", () => {
     "claude-3.7-sonnet",
     "anthropic/claude-3.5-sonnet",
     "anthropic.claude-3-5-sonnet-20240620-v1:0",
-    "claude-sonnet-4@20250514",
-    "claude-opus4",
-  ])("a claude-* slug that names a listed family after any hyphen is a stray: %s", (id) => {
+  ])("a claude-* ID that puts version numbers before a listed family is a stray: %s", (id) => {
     const file = "plugins/pstack/skills/other/SKILL.md";
     expect(strayModelSlugs(file, `# other\n\nDispatch with \`${id}\`.\n`, models)).toEqual([`${file}:3: Dispatch with \`${id}\`.`]);
   });
@@ -209,8 +207,9 @@ describe("strayModelSlugs", () => {
     "Tracked as claude-issue-42.",
     "Name the worktrees claude-wt-1 and claude-wt-2.",
     "Step claude-1-setup, then claude-2-run.",
-    "Read the claude-sonnets collection.",
-  ])("a claude-* slug that names no listed family is not a stray: %s", (line) => {
+    "Name the worktree claude-wt-opus.",
+    "Run the claude-octopus demo.",
+  ])("a claude-* slug with no listed family after claude- or its version numbers is not a stray: %s", (line) => {
     expect(strayModelSlugs("plugins/pstack/skills/other/SKILL.md", `# other\n\n${line}\n`, models)).toEqual([]);
   });
 });

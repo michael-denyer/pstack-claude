@@ -176,13 +176,13 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.ts": {
       "kind": "policy",
-      "why": "Stops at the review-required and branch-protection merge gates once checks finish, binds readiness to one head and base revision and retries a snapshot that changed while it was read, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks and GitHub has computed mergeability, and honours the shared deadline in the poll loop.",
+      "why": "Stops at the review-required, behind-base, and branch-protection merge gates once checks finish, retries while GitHub has not computed mergeability and requires MERGEABLE before a ready proof, binds readiness to one head and base revision and retries a snapshot that changed while it was read, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks, and honours the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/render.ts": {
       "kind": "policy",
-      "why": "Renders the review-required and merge-blocked states as status cells and as merge-gate blockers with their next action, and shows a PR with no checks configured as a no-checks cell and a checks=none line on its READY verdict.",
+      "why": "Renders the review-required, behind-base, and merge-blocked states as status cells and as merge-gate blockers with their next action, and shows a PR with no checks configured as a no-checks cell and a checks=none line on its READY verdict.",
       "since": "0.9.43",
       "upstream": "not-proposed"
     },
@@ -194,7 +194,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/types.ts": {
       "kind": "policy",
-      "why": "Adds the review-required and merge-blocked gate reasons, the landing revision on open PR facts, in the ready proof, and as a reader method, the head repository of an open PR, deadline, snapshot-changed, and invalid-stack query failures, and the no-checks reading (a none-reported fast path, a no-rollup page, and the ci-none state).",
+      "why": "Adds the review-required, behind-base, and merge-blocked gate reasons, the landing revision on open PR facts, in the ready proof, and as a reader method, the head repository of an open PR, deadline, snapshot-changed, invalid-stack, and mergeability-unknown query failures, and the no-checks reading (a none-reported fast path, a no-rollup page, and the ci-none state).",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },

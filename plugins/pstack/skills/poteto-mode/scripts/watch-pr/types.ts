@@ -208,6 +208,7 @@ export type MergeGateReason =
   | "draft-pr"
   | "changes-requested"
   | "review-required"
+  | "behind-base"
   | "merge-blocked";
 export type MergeBlocker =
   | {
@@ -237,7 +238,10 @@ export type QueryFailure =
       readonly detail: string;
     }
   | {
-      readonly kind: "snapshot-changed" | "invalid-stack";
+      readonly kind:
+        | "snapshot-changed"
+        | "invalid-stack"
+        | "mergeability-unknown";
       readonly retryable: true;
       readonly detail: string;
     }

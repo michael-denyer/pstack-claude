@@ -57,8 +57,7 @@ async function mergeAssessment(
   };
 }
 // Right after a push the head rollup is null until the first check registers.
-// An earlier commit that reported checks, or mergeability GitHub is still
-// computing, means the head has not reported yet.
+// An earlier commit that reported checks means the head has not reported yet.
 async function noChecksCi(
   reader: T.GitHubReader,
   facts: T.PullRequestFacts
@@ -67,10 +66,6 @@ async function noChecksCi(
   if (merge.anyCommitReported || merge.github.kind === "refused")
     throw new ChecksUnavailable(
       `no checks reported on head ${facts.headRefOid}, but a commit on this PR has reported checks`
-    );
-  if (facts.mergeable === "UNKNOWN")
-    throw new ChecksUnavailable(
-      `no checks reported on head ${facts.headRefOid}, and GitHub has not computed mergeability yet`
     );
   return {
     kind: "ci-none",
@@ -154,6 +149,12 @@ export async function readSnapshot(args: {
     return { kind: "merged", context: args.context, facts };
   if (facts.state === "CLOSED")
     return { kind: "closed", context: args.context, facts };
+  if (facts.mergeable === "UNKNOWN" || facts.mergeStateStatus === "UNKNOWN")
+    throw new WatcherQueryError({
+      kind: "mergeability-unknown",
+      retryable: true,
+      detail: `GitHub has not computed mergeability for ${facts.headRefOid} against ${facts.baseRefName} yet`,
+    });
   const [threads, checks] = await Promise.all([
     args.reader.reviewThreads(args.context),
     resolveChecks(args.reader, args.context),
@@ -215,6 +216,7 @@ function gateReason(
   if (row.facts.reviewDecision === "CHANGES_REQUESTED")
     return "changes-requested";
   if (row.facts.reviewDecision === "REVIEW_REQUIRED") return "review-required";
+  if (row.facts.mergeStateStatus === "BEHIND") return "behind-base";
   // BLOCKED with clean CI is some other branch protection rule, such as signed
   // commits or a required check that never reported. GitHub will not merge it.
   return row.facts.mergeStateStatus === "BLOCKED" ? "merge-blocked" : null;
@@ -251,6 +253,7 @@ function readyContribution(
     row.kind !== "open" ||
     (row.ci.kind !== "ci-clean" && row.ci.kind !== "ci-none") ||
     row.threads.length !== 0 ||
+    row.facts.mergeable !== "MERGEABLE" ||
     conflictBlocker(row) !== null ||
     gateReason(row, allowDraft) !== null
   )

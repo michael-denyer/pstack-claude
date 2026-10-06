@@ -211,6 +211,18 @@ describe("agent tool", () => {
     expect(readFileSync(last.outputFile, "utf8")).toBe(big);
   });
 
+  test("a resumed run over 50 KB keeps its full output in its own file, so the file an earlier notice names still holds that run's output", async () => {
+    const { pi, ctx } = setup({ script: { default: [{ reply: `RUN:\${prompt} ${"x".repeat(60 * 1024)}` }] } });
+    await pi.call("agent", { description: "big", prompt: "first", run_in_background: true }, ctx);
+    await waitFor(() => pi.messages.length === 1);
+    await pi.call("send_message", { to: "big", message: "second" }, ctx);
+    await waitFor(() => pi.messages.length === 2);
+    const [first, second] = pi.messages.map((m) => m.message.details.outputFile);
+    expect(second).not.toBe(first);
+    expect(readFileSync(first, "utf8").slice(0, 10)).toBe("RUN:first ");
+    expect(readFileSync(second, "utf8").slice(0, 11)).toBe("RUN:second ");
+  });
+
   test("an agent whose oversized output cannot be saved still ends, reports once, and can be stopped and messaged", async () => {
     const { w, pi, ctx } = setup({ script: { default: [{ sleep: 400 }, { reply: "x".repeat(80 * 1024) }] } });
     const id = (await pi.call("agent", { description: "big", prompt: "x", run_in_background: true }, ctx)).details.agentId;

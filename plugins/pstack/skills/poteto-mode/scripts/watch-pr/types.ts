@@ -160,7 +160,6 @@ export interface CiNone {
   readonly hadPreviousPassingCi: false;
   readonly github: GitHubMergeAllowed;
 }
-/** No check has reported on the head yet; too early to call the repository CI-free. */
 export interface CiUnreported {
   readonly kind: "ci-unreported";
   readonly failed: readonly [];

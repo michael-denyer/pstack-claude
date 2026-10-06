@@ -61,8 +61,7 @@ export type NoChecksConfirmer = (
   head: Pick<OpenFacts, "context" | "headRefOid">
 ) => boolean;
 // GitHub registers a fresh head's check suite seconds after the push, during
-// which every read matches a repository with no CI. The reading is a fact only
-// once the same head still shows no checks a full poll interval later.
+// which every read matches a repository with no CI.
 export function noChecksConfirmer(
   clock: Pick<WatchClock, "now">,
   interval: number
@@ -83,11 +82,11 @@ export function noChecksConfirmer(
     return false;
   };
 }
-// An earlier commit that reported checks means the head has not reported yet.
+const neverConfirms: NoChecksConfirmer = () => false;
 async function noChecksCi(
   reader: T.GitHubReader,
   facts: OpenFacts,
-  confirmNoChecks: NoChecksConfirmer = () => false
+  confirmNoChecks = neverConfirms
 ): Promise<T.CiNone | T.CiUnreported> {
   const merge = await mergeAssessment(reader, facts);
   if (merge.anyCommitReported || merge.github.kind === "refused")
@@ -193,7 +192,6 @@ export async function readSnapshot(args: {
   readonly context: T.PrContext;
   readonly pendingHistory: "include" | "omit";
   readonly allowDraft: boolean;
-  /** Absent, a no-checks reading is always a first sighting. */
   readonly confirmNoChecks?: NoChecksConfirmer;
 }): Promise<T.PrSnapshot> {
   const facts = await args.reader.pullRequest(args.context);
@@ -215,12 +213,8 @@ export async function readSnapshot(args: {
     checks.kind === "no-checks"
       ? await noChecksCi(args.reader, facts, args.confirmNoChecks)
       : await reportedCi(args.reader, facts, checks, args.pendingHistory);
-  // The facts were read before the checks. A gate or review that moved in
-  // between would otherwise become a terminal verdict about a stale PR.
-  const changed = changedFacts(
-    facts,
-    await args.reader.pullRequest(args.context)
-  );
+  const factsAfterChecks = await args.reader.pullRequest(args.context);
+  const changed = changedFacts(facts, factsAfterChecks);
   if (changed.length > 0)
     throw new WatcherQueryError({
       kind: "snapshot-changed",
@@ -284,9 +278,7 @@ function waitReason(row: T.PrSnapshot): T.WaitReason | null {
     return { kind: "pending-checks", pending: row.ci.pending };
   return row.ci.kind === "ci-unreported" ? { kind: "checks-unreported" } : null;
 }
-// Gates that pending or unreported checks can still explain wait for the
-// checks first.
-const DEFERRED_WHILE_PENDING: ReadonlySet<T.MergeGateReason> = new Set([
+const DEFERRED_WHILE_WAITING: ReadonlySet<T.MergeGateReason> = new Set([
   "draft-pr",
   "review-required",
   "merge-blocked",
@@ -297,7 +289,7 @@ function gateBlocker(
 ): T.MergeBlocker | null {
   const reason = gateReason(row, allowDraft);
   return reason === null ||
-    (DEFERRED_WHILE_PENDING.has(reason) && waitReason(row) !== null)
+    (DEFERRED_WHILE_WAITING.has(reason) && waitReason(row) !== null)
     ? null
     : { kind: "merge-gate", pr: row.context, reason };
 }

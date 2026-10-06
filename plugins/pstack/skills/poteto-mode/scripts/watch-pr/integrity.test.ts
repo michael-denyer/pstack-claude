@@ -115,21 +115,21 @@ describe("commit identity", () => {
   });
 
   it("rejects a changed head even when earlier checks and rollups passed", async () => {
-    const reader = fakeReader({ laterFacts: { headRefOid: "replacement" } });
+    const reader = fakeReader({ factsOnReread: { headRefOid: "replacement" } });
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
       "PR changed while collecting head against main: headRefOid head -> replacement"
     );
   });
 
   it("rejects a retarget even when the head and checks remain unchanged", async () => {
-    const reader = fakeReader({ laterFacts: { baseRefName: "release" } });
+    const reader = fakeReader({ factsOnReread: { baseRefName: "release" } });
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
       "PR changed while collecting"
     );
   });
 
   it("rejects base movement with the same head and base branch", async () => {
-    const reader = fakeReader({ laterFacts: { baseRefOid: "advanced" } });
+    const reader = fakeReader({ factsOnReread: { baseRefOid: "advanced" } });
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
       "PR changed while collecting"
     );
@@ -171,7 +171,7 @@ describe("commit identity", () => {
 
   it("retries a changed head and only proves the stable observation", async () => {
     const reader = fakeReader({
-      laterFacts: { headRefOid: "replacement" },
+      factsOnReread: { headRefOid: "replacement" },
       commitRollups: [
         { oid: "head", state: "SUCCESS" },
         { oid: "replacement", state: "SUCCESS" },

@@ -506,7 +506,7 @@ describe("facts that change while the snapshot is read", () => {
     await expect(
       read({
         facts: { mergeStateStatus: "BLOCKED" },
-        laterFacts: { mergeStateStatus: "CLEAN" },
+        factsOnReread: { mergeStateStatus: "CLEAN" },
       }),
     ).rejects.toMatchObject({
       failure: { kind: "snapshot-changed", retryable: true },
@@ -514,12 +514,12 @@ describe("facts that change while the snapshot is read", () => {
   });
 
   it("retries instead of reporting ready when a review lands after the facts read", async () => {
-    for (const laterFacts of [
+    for (const factsOnReread of [
       { reviewDecision: "CHANGES_REQUESTED" },
       { mergeable: "CONFLICTING" },
       { isDraft: true },
     ] as const)
-      await expect(read({ laterFacts })).rejects.toMatchObject({
+      await expect(read({ factsOnReread })).rejects.toMatchObject({
         failure: { kind: "snapshot-changed", retryable: true },
       });
   });

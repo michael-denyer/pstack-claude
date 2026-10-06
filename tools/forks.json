@@ -152,7 +152,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/fakes.test-helper.ts": {
       "kind": "policy",
-      "why": "Extends the fake reader with the base revision, the default branch, and a laterFacts option for every pullRequest read after the first, parses its facts through the real parsePullRequest, and tags each rollup page, repeating the last one across polls, so a test can replay a head commit with no rollup.",
+      "why": "Extends the fake reader with the base revision, the default branch, and a factsOnReread option for every pullRequest read after the first, parses its facts through the real parsePullRequest, and tags each rollup page, repeating the last one across polls, so a test can replay a head commit with no rollup.",
       "since": "0.9.10",
       "upstream": "not-proposed"
     },

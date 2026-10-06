@@ -825,7 +825,7 @@ export async function resolveContext(args: {
 }
 export function orderStack(
   context: T.PrContext,
-  defaultBranch: string,
+  trunk: string,
   open: readonly T.OpenPullRequest[]
 ): T.NonEmpty<T.PrContext> {
   const byNumber = new Map(open.map((pr) => [pr.number, pr]));
@@ -833,10 +833,8 @@ export function orderStack(
     pr.headRepository !== null &&
     pr.headRepository.owner.toLowerCase() === context.owner.toLowerCase() &&
     pr.headRepository.repo.toLowerCase() === context.repo.toLowerCase();
-  // Most PRs target the default branch, so a PR whose head is that branch (a
-  // backport or a release) would pull every one of them into its stack.
   const canHaveChildren = (pr: T.OpenPullRequest): boolean =>
-    localHead(pr) && pr.headRefName !== defaultBranch;
+    localHead(pr) && pr.headRefName !== trunk;
   const byHead = new Map<string, T.OpenPullRequest[]>();
   const invalid = (detail: string): never => {
     throw new WatcherQueryError({

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -35,6 +35,25 @@ const RULES = parseSubstitutions(JSON.parse(readFileSync(join(import.meta.dir, "
 const fixtures = [];
 afterEach(() => {
   for (const dir of fixtures.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+// Every git call the suite spawns runs with an empty config in place of the
+// developer's, so a setting such as merge.conflictStyle or commit.gpgsign
+// cannot change what it measures. Bun's child_process reads the environment
+// at startup unless `env` is passed, so each spawn here passes process.env.
+const gitConfigDir = mkdtempSync(join(tmpdir(), "sync-gitconfig-"));
+const savedGitEnv = { GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM };
+beforeAll(() => {
+  writeFileSync(join(gitConfigDir, "gitconfig"), "");
+  process.env.GIT_CONFIG_GLOBAL = join(gitConfigDir, "gitconfig");
+  process.env.GIT_CONFIG_NOSYSTEM = "1";
+});
+afterAll(() => {
+  for (const [name, value] of Object.entries(savedGitEnv)) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+  rmSync(gitConfigDir, { recursive: true, force: true });
 });
 
 function tree(files) {
@@ -384,6 +403,22 @@ describe("mergeFile", () => {
   test("throws when git fails instead of reporting its exit status as a hunk count", () => {
     const nul = (s) => Buffer.from(`${s}\0\n`);
     expect(() => mergeFile(nul("ours"), nul("base"), nul("theirs"))).toThrow("Command failed");
+  });
+
+  test("a conflict carries git's merge-style markers whatever the user's merge.conflictStyle", () => {
+    const home = tree({ gitconfig: "[merge]\n\tconflictStyle = zdiff3\n" });
+    const sides = [base.replace("l3", "ours"), base, base.replace("l3", "theirs")].map((text) => `Buffer.from(${JSON.stringify(text)})`);
+    const script = [
+      `import { mergeFile } from ${JSON.stringify(join(import.meta.dir, "../tools/sync.mjs"))};`,
+      `process.stdout.write(mergeFile(${sides.join(", ")}).buffer);`,
+    ].join("\n");
+
+    const result = spawnSync(process.execPath, ["-e", script], {
+      encoding: "utf8",
+      env: { ...process.env, GIT_CONFIG_GLOBAL: join(home, "gitconfig") },
+    });
+
+    expect(result.stdout).toBe("l1\nl2\n<<<<<<< local\nours\n=======\ntheirs\n>>>>>>> upstream\nl4\nl5\n");
   });
 });
 
@@ -1214,7 +1249,7 @@ describe("sync CLI", () => {
     const root = tree({});
     const upstream = join(root, "upstream");
     mkdirSync(join(upstream, "skills"), { recursive: true });
-    const git = (...args) => execFileSync("git", ["-C", upstream, ...args], { encoding: "utf8" }).trim();
+    const git = (...args) => execFileSync("git", ["-C", upstream, ...args], { encoding: "utf8", env: process.env }).trim();
     git("init", "-b", "main");
     const commit = (text) => {
       writeFileSync(join(upstream, "skills/s.md"), text);

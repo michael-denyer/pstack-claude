@@ -89,11 +89,11 @@ describe("static plugin invariants", () => {
       mkdirSync(join(r, "skills/good/scripts"), { recursive: true });
       writeFileSync(
         join(r, "skills/good/scripts/run.sh"),
-        "echo\n<<<<<<< local\necho port\n=======\necho upstream\n>>>>>>> upstream\n",
+        "echo\n<<<<<<< local\necho port\n||||||| base\necho\n=======\necho upstream\n>>>>>>> upstream\n",
       );
     });
     expect(() => check(root)).toThrow(
-      /skills\/good\/scripts\/run\.sh:2: <<<<<<< local\n.*run\.sh:4: =======\n.*run\.sh:6: >>>>>>> upstream/,
+      /skills\/good\/scripts\/run\.sh:2: <<<<<<< local\n.*run\.sh:4: \|{7} base\n.*run\.sh:6: =======\n.*run\.sh:8: >>>>>>> upstream/,
     );
   });
 

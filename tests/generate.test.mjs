@@ -262,6 +262,22 @@ describe("assertChangesHeading", () => {
   test("a heading that is not a release may sit below the newest entry", () => {
     expect(() => assertChangesHeading("## 0.9.1 - title\n\n## Upstream review\n\n## 0.9.0 - older\n", "0.9.1")).not.toThrow();
   });
+
+  test.each([
+    ["an older heading quoted in the newest entry", "## 0.9.71 - new\n\n```\n## 0.9.70 - old\n```\n\n## 0.9.70 - old\n"],
+    ["the newest heading quoted in its own entry", "## 0.9.71 - new\n\n```\n## 0.9.71 - new\n```\n\n## 0.9.70 - old\n"],
+    ["a sample heading above the first entry", "```md\n## 1.2.3 - title\n```\n\n## 0.9.71 - new\n\n## 0.9.70 - old\n"],
+    ["a tilde fence", "## 0.9.71 - new\n\n~~~\n## 0.9.70 - old\n~~~\n\n## 0.9.70 - old\n"],
+    ["a longer fence holding a shorter one", "## 0.9.71 - new\n\n````\n```\n## 0.9.70 - old\n```\n````\n\n## 0.9.70 - old\n"],
+  ])("a heading inside a code fence heads no entry: %s", (_, body) => {
+    expect(() => assertChangesHeading(`# Changes\n\n${body}`, "0.9.71")).not.toThrow();
+  });
+
+  test("a VERSION heading that sits only inside a code fence is no heading", () => {
+    expect(() => assertChangesHeading("# Changes\n\n```\n## 0.9.71 - new\n```\n\n## 0.9.70 - old\n", "0.9.71")).toThrow(
+      'no "## 0.9.71 - <title>" heading',
+    );
+  });
 });
 
 describe("slashCommands", () => {

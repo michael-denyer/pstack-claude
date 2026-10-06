@@ -110,10 +110,25 @@ export function stampVersion(text, version, file) {
   return text.replace(/("version"\s*:\s*)"[^"]*"/, `$1"${version}"`);
 }
 
+// The lines outside fenced code blocks. A fence closes at the next line that
+// starts with at least as many of the character that opened it.
+function outsideFences(lines) {
+  let fence = null;
+  return lines.filter((line) => {
+    const mark = line.match(/^(`{3,}|~{3,})/)?.[1];
+    if (fence) {
+      if (mark?.startsWith(fence)) fence = null;
+      return false;
+    }
+    if (mark) fence = mark;
+    return !mark;
+  });
+}
+
 // Plugin auto-update installs by version number (CONTRIBUTING, Releasing), so
 // a CHANGES entry whose VERSION bump was forgotten ships nothing.
 export function assertChangesHeading(changelog, version) {
-  const lines = changelog.split("\n");
+  const lines = outsideFences(changelog.split("\n"));
   const current = lines.find((line) => line.startsWith(`## ${version} `));
   if (!current) throw new Error(`CHANGES.md has no "## ${version} - <title>" heading`);
   // Any "##" line counts, not only a release-shaped one. An entry headed

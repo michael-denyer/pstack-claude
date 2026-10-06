@@ -80,15 +80,18 @@ export function defaultTranscriptRoots({ env = process.env, home = homedir(), ex
   return found.length ? found : [claude];
 }
 
-// A dangling or looping link cannot spell a path that exists. Any other failure
-// propagates so the caller leaves the worktree's chat fact unknown.
+// A dangling or looping link cannot spell a path that exists. Nor can a link
+// whose target this process cannot resolve: EACCES means the user cannot
+// search it, and EPERM is bun's answer for macOS's autofs /home, under which
+// bun resolves nothing. Any other failure propagates so the caller leaves the
+// worktree's chat fact unknown.
 function symlinkTargets(dir) {
   return readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isSymbolicLink()).flatMap((entry) => {
     const link = join(dir, entry.name);
     try {
       return [[link, realpathSync(link)]];
     } catch (error) {
-      if (error.code === "ENOENT" || error.code === "ELOOP") return [];
+      if (["ENOENT", "ELOOP", "EPERM", "EACCES"].includes(error.code)) return [];
       throw error;
     }
   });

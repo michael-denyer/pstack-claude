@@ -107,15 +107,6 @@ export function fakeReader(
         requested
       );
     },
-    async revision(requested) {
-      calls.push("revision");
-      return {
-        context: requested,
-        baseRefOid: options.facts?.baseRefOid ?? "base",
-        headRefOid: options.facts?.headRefOid ?? "head",
-        baseRefName: options.facts?.baseRefName ?? defaults.baseRefName,
-      };
-    },
     async openPullRequests() {
       calls.push("openPullRequests");
       return options.openPullRequests ?? [];

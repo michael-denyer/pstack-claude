@@ -1,4 +1,4 @@
-import { landingRevision, sameLandingRevision } from "./landing.ts";
+import { landingRevision } from "./landing.ts";
 import {
   ChecksUnavailable,
   WatcherQueryError,
@@ -138,6 +138,28 @@ const AUTOMATION_TOKENS = [
   "pr review automation",
   "review automation",
 ] as const;
+const VERDICT_FACTS: Record<
+  Exclude<keyof T.PullRequestFacts, "context">,
+  true
+> = {
+  state: true,
+  mergedAt: true,
+  isDraft: true,
+  mergeable: true,
+  mergeStateStatus: true,
+  reviewDecision: true,
+  headRefOid: true,
+  headRefName: true,
+  baseRefName: true,
+  baseRefOid: true,
+};
+const changedFacts = (
+  before: T.PullRequestFacts,
+  after: T.PullRequestFacts
+): string[] =>
+  (Object.keys(VERDICT_FACTS) as (keyof typeof VERDICT_FACTS)[])
+    .filter((key) => before[key] !== after[key])
+    .map((key) => `${key} ${before[key]} -> ${after[key]}`);
 export async function readSnapshot(args: {
   readonly reader: T.GitHubReader;
   readonly context: T.PrContext;
@@ -163,12 +185,17 @@ export async function readSnapshot(args: {
     checks.kind === "no-checks"
       ? await noChecksCi(args.reader, facts)
       : await reportedCi(args.reader, facts, checks, args.pendingHistory);
-  const revision = await args.reader.revision(args.context);
-  if (!sameLandingRevision(facts, revision))
+  // The facts were read before the checks. A gate or review that moved in
+  // between would otherwise become a terminal verdict about a stale PR.
+  const changed = changedFacts(
+    facts,
+    await args.reader.pullRequest(args.context)
+  );
+  if (changed.length > 0)
     throw new WatcherQueryError({
       kind: "snapshot-changed",
       retryable: true,
-      detail: `PR head or destination changed while collecting ${facts.headRefOid} against ${facts.baseRefName}`,
+      detail: `PR changed while collecting ${facts.headRefOid} against ${facts.baseRefName}: ${changed.join(", ")}`,
     });
   return {
     kind: "open",

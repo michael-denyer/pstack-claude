@@ -115,66 +115,40 @@ describe("commit identity", () => {
   });
 
   it("rejects a changed head even when earlier checks and rollups passed", async () => {
-    const reader = {
-      ...fakeReader(),
-      async revision() {
-        return {
-          context,
-          headRefOid: "replacement",
-          baseRefName: "main",
-          baseRefOid: "base",
-        };
-      },
-    };
+    const reader = fakeReader({ laterFacts: { headRefOid: "replacement" } });
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
-      "PR head or destination changed"
+      "PR changed while collecting head against main: headRefOid head -> replacement"
     );
   });
 
   it("rejects a retarget even when the head and checks remain unchanged", async () => {
-    const reader = {
-      ...fakeReader(),
-      async revision() {
-        return {
-          context,
-          headRefOid: "head",
-          baseRefName: "release",
-          baseRefOid: "base",
-        };
-      },
-    };
+    const reader = fakeReader({ laterFacts: { baseRefName: "release" } });
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
-      "PR head or destination changed"
+      "PR changed while collecting"
     );
   });
 
   it("rejects base movement with the same head and base branch", async () => {
-    const reader = {
-      ...fakeReader(),
-      async revision() {
-        return {
-          context,
-          headRefOid: "head",
-          baseRefName: "main",
-          baseRefOid: "advanced",
-        };
-      },
-    };
+    const reader = fakeReader({ laterFacts: { baseRefOid: "advanced" } });
     await expect(readSnapshot({ ...snapshotArgs, reader })).rejects.toThrow(
-      "PR head or destination changed"
+      "PR changed while collecting"
     );
   });
 
   it("cannot report ready when the destination query is unavailable", async () => {
+    const base = fakeReader();
+    let reads = 0;
     const reader = {
-      ...fakeReader(),
-      async revision() {
-        throw new WatcherQueryError({
-          kind: "command-exit",
-          retryable: true,
-          code: 1,
-          detail: "destination unavailable",
-        });
+      ...base,
+      async pullRequest(requested: typeof context) {
+        if (++reads > 1)
+          throw new WatcherQueryError({
+            kind: "command-exit",
+            retryable: true,
+            code: 1,
+            detail: "destination unavailable",
+          });
+        return base.pullRequest(requested);
       },
     };
     const verdict = await runSimple({
@@ -196,18 +170,13 @@ describe("commit identity", () => {
   });
 
   it("retries a changed head and only proves the stable observation", async () => {
-    let reads = 0;
-    const reader = {
-      ...fakeReader(),
-      async revision() {
-        return {
-          context,
-          baseRefOid: "base",
-          headRefOid: ++reads === 1 ? "replacement" : "head",
-          baseRefName: "main",
-        };
-      },
-    };
+    const reader = fakeReader({
+      laterFacts: { headRefOid: "replacement" },
+      commitRollups: [
+        { oid: "head", state: "SUCCESS" },
+        { oid: "replacement", state: "SUCCESS" },
+      ],
+    });
     const verdict = await runSimple({
       dependencies: {
         reader,
@@ -220,7 +189,9 @@ describe("commit identity", () => {
       statusOnly: false,
       options,
     });
-    expect(reads).toBe(2);
+    expect(reader.calls.filter((call) => call === "pullRequest")).toHaveLength(
+      4
+    );
     expect(verdict).toMatchObject({
       kind: "READY",
       scope: {
@@ -228,7 +199,7 @@ describe("commit identity", () => {
           proof: {
             revision: {
               context,
-              headRefOid: "head",
+              headRefOid: "replacement",
               baseRefName: "main",
               baseRefOid: "base",
             },
@@ -382,7 +353,7 @@ describe("deadline", () => {
       expect(now).toBe(1);
       expect(
         reader.calls.filter((call) => call === "pullRequest")
-      ).toHaveLength(1);
+      ).toHaveLength(2);
     });
   }
 

@@ -1,4 +1,4 @@
-import { parseLandingRevision, type LandingRevision } from "./landing.ts";
+import { parseLandingRevision } from "./landing.ts";
 import { spawn } from "node:child_process";
 import { DeadlineExceeded, type WatchDeadline } from "./deadline.ts";
 import type * as T from "./types.ts";
@@ -550,22 +550,6 @@ export class GhGitHubReader implements T.GitHubReader {
       ]),
       context
     );
-  }
-  async revision(context: T.PrContext): Promise<LandingRevision> {
-    const value = record(
-      await this.runJson([
-        "gh",
-        "pr",
-        "view",
-        String(context.number),
-        "--repo",
-        `${context.owner}/${context.repo}`,
-        "--json",
-        "headRefOid,baseRefName,baseRefOid",
-      ]),
-      "pull request head"
-    );
-    return parseLandingRevision(value, context);
   }
   async openPullRequests(
     repository: T.Repository

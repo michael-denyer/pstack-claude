@@ -152,7 +152,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/fakes.test-helper.ts": {
       "kind": "policy",
-      "why": "Extends the fake reader with the base revision and the revision read the port's watcher makes, parses its facts through the real parsePullRequest, and tags each rollup page so a test can replay a head commit with no rollup.",
+      "why": "Extends the fake reader with the base revision and a laterFacts option for every pullRequest read after the first, parses its facts through the real parsePullRequest, and tags each rollup page so a test can replay a head commit with no rollup.",
       "since": "0.9.10",
       "upstream": "not-proposed"
     },
@@ -164,19 +164,19 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/github.ts": {
       "kind": "policy",
-      "why": "Runs every gh and git call under the shared deadline, reads the base revision and a landing revision, pages through every review thread, fails completed conclusions that gh buckets as pending, refuses a checkout PR paired with a different explicit repository, orders a stack only through branches in the PR's own repository while rejecting duplicate head branches, cycles, and a full open-PR page, and reads a repository with no checks configured as its own result when gh reports none and the head commit has no rollup.",
+      "why": "Runs every gh and git call under the shared deadline, reads the base revision, pages through every review thread, fails completed conclusions that gh buckets as pending, refuses a checkout PR paired with a different explicit repository, orders a stack only through branches in the PR's own repository while rejecting duplicate head branches, cycles, and a full open-PR page, and reads a repository with no checks configured as its own result when gh reports none and the head commit has no rollup.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.test.ts": {
       "kind": "policy",
-      "why": "Covers the review-required and branch-protection merge gates and their wait for pending checks, a PR with no checks configured (ready when mergeable, still stopped by conflicts, threads, and gates, and failing closed while the head may not have reported), the revision read in the snapshot plan, and the shared deadline in the poll loop.",
+      "why": "Covers the review-required, behind-base, and branch-protection merge gates and their wait for pending checks, the retry while GitHub has not computed mergeability, a PR with no checks configured (ready when mergeable, still stopped by conflicts, threads, and gates, and failing closed while the head may not have reported), the second facts read in the snapshot plan and the retry when a gate, review, draft, or conflict state changes between the two reads, and the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.ts": {
       "kind": "policy",
-      "why": "Stops at the review-required, behind-base, and branch-protection merge gates once checks finish, retries while GitHub has not computed mergeability and requires MERGEABLE before a ready proof, binds readiness to one head and base revision and retries a snapshot that changed while it was read, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks, and honours the shared deadline in the poll loop.",
+      "why": "Stops at the review-required, behind-base, and branch-protection merge gates once checks finish, retries while GitHub has not computed mergeability and requires MERGEABLE before a ready proof, re-reads the PR facts after the checks and retries a snapshot whose head, base, mergeability, review, or draft state changed in between, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks, and honours the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
@@ -194,7 +194,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/types.ts": {
       "kind": "policy",
-      "why": "Adds the review-required, behind-base, and merge-blocked gate reasons, the landing revision on open PR facts, in the ready proof, and as a reader method, the head repository of an open PR, deadline, snapshot-changed, invalid-stack, and mergeability-unknown query failures, and the no-checks reading (a none-reported fast path, a no-rollup page, and the ci-none state).",
+      "why": "Adds the review-required, behind-base, and merge-blocked gate reasons, the landing revision on open PR facts and in the ready proof, the head repository of an open PR, deadline, snapshot-changed, invalid-stack, and mergeability-unknown query failures, and the no-checks reading (a none-reported fast path, a no-rollup page, and the ci-none state).",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },

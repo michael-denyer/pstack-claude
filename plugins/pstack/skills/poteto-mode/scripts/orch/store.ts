@@ -19,6 +19,7 @@ const UNIT_HEADER = "id\ttrack\tstate\tbranch\tpr\tsha\tbrief";
 const LEDGER_HEADER = "pr\tsha\tverdict\tevidence\tverifier\tts";
 const LOCK_FILE = ".orch.lock";
 const TAKEOVER_FILE = ".orch.lock.takeover";
+const GT_TIMEOUT_MS = 60_000;
 
 export type Verdict =
   | "live-ui-verified"
@@ -179,6 +180,7 @@ export interface AddStandingParams {
 export interface OpenStoreOptions {
   readonly force?: boolean;
   readonly gt?: string;
+  readonly gtTimeoutMs?: number;
   readonly onLockStolen?: (holder: string) => void;
   readonly onStaleLock?: (holder: string) => void;
 }
@@ -1116,10 +1118,12 @@ function graphitePullRequest({
   branch,
   gt,
   repo,
+  timeout,
 }: {
   branch: string;
   gt: string;
   repo: string;
+  timeout: number;
 }): GtPullRequest {
   let raw: string;
   try {
@@ -1130,6 +1134,7 @@ function graphitePullRequest({
         cwd: repo,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
+        timeout,
       })
     );
   } catch (error) {
@@ -1160,9 +1165,11 @@ function graphitePullRequest({
 function graphiteFrontier({
   gt,
   repo,
+  timeout,
 }: {
   gt: string;
   repo: string;
+  timeout: number;
 }): readonly GtFrontierEntry[] {
   let raw: string;
   try {
@@ -1174,6 +1181,7 @@ function graphiteFrontier({
           cwd: repo,
           encoding: "utf8",
           stdio: ["ignore", "pipe", "pipe"],
+          timeout,
         }
       )
     );
@@ -1184,7 +1192,7 @@ function graphiteFrontier({
   }
   const result = parseGtBranches(raw).map((branch) => ({
     branches: branch,
-    ...graphitePullRequest({ branch, gt, repo }),
+    ...graphitePullRequest({ branch, gt, repo, timeout }),
   }));
   if (new Set(result.map((row) => row.pr)).size !== result.length) {
     throw new UserError("gt info output contains duplicate pull requests");
@@ -1225,11 +1233,13 @@ function branchSha({
 function resolveFrontier({
   gt,
   repo,
+  timeout,
 }: {
   gt: string;
   repo: string;
+  timeout: number;
 }): readonly FrontierPr[] {
-  return graphiteFrontier({ gt, repo }).map((row) => ({
+  return graphiteFrontier({ gt, repo, timeout }).map((row) => ({
     ...row,
     sha: branchSha({ branch: row.branches, repo }),
   }));
@@ -1562,7 +1572,11 @@ export function openStore(
           throw new UserError("--prs must not contain duplicates");
         }
         const old = await readFrontier(store);
-        const prs = resolveFrontier({ gt: options.gt ?? "gt", repo });
+        const prs = resolveFrontier({
+          gt: options.gt ?? "gt",
+          repo,
+          timeout: options.gtTimeoutMs ?? GT_TIMEOUT_MS,
+        });
         if (pin !== undefined) {
           validateFrontierPin({
             actual: prs.map((row) => row.pr),

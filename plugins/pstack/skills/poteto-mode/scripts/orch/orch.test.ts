@@ -848,4 +848,23 @@ fi
       "id\ttrack\tstate\tbranch\tpr\tsha\tbrief\n'-hotfix\tbuild\tin-flight\t'@me/feat\t\t\t''quoted\n"
     );
   });
+
+  it("fails a frontier set when gt hangs past the timeout", async () => {
+    const directory = await makeDirectory();
+    const store = useStore(directory, {
+      gt: fakeGtPath(directory),
+      gtTimeoutMs: 200,
+    });
+    await store.init();
+    const stack = await makeGitStack(directory);
+    await mkdir(join(directory, "bin"));
+    await writeFile(
+      fakeGtPath(directory),
+      "#!/usr/bin/env bash\nexec sleep 10\n",
+      { mode: 0o755 }
+    );
+    await expect(store.frontier.set({ repo: stack.repo })).rejects.toThrow(
+      /^gt log short --stack --reverse failed: .*ETIMEDOUT/
+    );
+  });
 });

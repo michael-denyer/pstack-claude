@@ -35,13 +35,14 @@ const bind = (fact, next) => (fact.known ? next(fact.value) : UNKNOWN);
 
 const DAY = 86400;
 const RECENT_DAYS = 4;
-const HEADER = ["SIZE", "AGE", "MERGED", "DIRTY", "REMOTE", "PR", "LAST_CHAT", "BUCKET", "WORKTREE"];
+const HEADER = ["SIZE", "AGE", "MERGED", "DIRTY", "REMOTE", "PR", "LAST_CHAT", "BUCKET", "LOCKED", "WORKTREE"];
 // Merged and closed PRs drop out of gh's default open-only listing.
 const GH_PR_LIST = ["pr", "list", "--author", "@me", "--state", "all", "--limit", "1000",
   "--json", "number,state,headRefName,headRefOid"];
 
 export function classify(facts) {
-  const { dirty, pr, recent, ancestry, head } = facts;
+  const { locked, dirty, pr, recent, ancestry, head } = facts;
+  if (locked.known && locked.value !== null) return "hold-locked";
   if (dirty.known && dirty.value.wip > 0) return "hold-wip";
   if (dirty.known && dirty.value.untracked > 0) return "hold-untracked";
   if (pr.known && pr.value?.state === "OPEN") return "hold-open-pr";
@@ -61,12 +62,14 @@ const runGh = (args, cwd) =>
   execFileSync("gh", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 
 // `--porcelain -z` output: NUL-separated fields, one record per worktree, the
-// primary worktree first.
+// primary worktree first. A `locked` field carries its reason raw, newlines
+// included, so the reason is flattened to fit one table cell.
 export function parseWorktrees(output) {
   const worktrees = [];
   for (const field of output.split("\0")) {
-    if (field.startsWith("worktree ")) worktrees.push({ path: field.slice("worktree ".length), prunable: false });
+    if (field.startsWith("worktree ")) worktrees.push({ path: field.slice("worktree ".length), prunable: false, locked: null });
     else if (field.startsWith("prunable")) worktrees.at(-1).prunable = true;
+    else if (field.startsWith("locked")) worktrees.at(-1).locked = field.slice("locked ".length).replace(/\s+/g, " ").trim() || "locked";
   }
   return worktrees;
 }
@@ -236,7 +239,7 @@ function dirtyLabel({ wip, untracked }) {
   return untracked > 0 ? `untracked:${untracked}` : "clean";
 }
 
-function auditWorktree(path, { repo, trunk, fetched, prs, chats, now }) {
+function auditWorktree({ path, locked }, { repo, trunk, fetched, prs, chats, now }) {
   const head = probe(() => git(path, "rev-parse", "HEAD"));
   const age = bind(head, () => probe(() => Math.trunc((now - Number(git(path, "log", "-1", "--format=%ct", "HEAD"))) / DAY)));
   const ancestry = bind(head, (sha) => probe(() => isAncestor(repo, sha, trunk)));
@@ -249,7 +252,7 @@ function auditWorktree(path, { repo, trunk, fetched, prs, chats, now }) {
   const pr = bind(prs, (list) => bind(branch, (name) => known(list.find((entry) => name !== null && entry.headRefName === name) ?? null)));
   const lastChat = chats.get(path);
   const recent = bind(lastChat, (ts) => known(ts !== null && Math.trunc((now - ts) / DAY) <= RECENT_DAYS));
-  const bucket = classify({ trunk: fetched, head, age, ancestry, dirty, remote, pr, recent });
+  const bucket = classify({ trunk: fetched, head, age, ancestry, dirty, remote, pr, recent, locked: known(locked) });
   return [
     size(path),
     age.known ? `${age.value}d` : "?",
@@ -259,6 +262,7 @@ function auditWorktree(path, { repo, trunk, fetched, prs, chats, now }) {
     pr.known && pr.value ? `#${pr.value.number}/${pr.value.state}` : "-",
     lastChat.known && lastChat.value !== null ? new Date(lastChat.value * 1000).toISOString().slice(0, 10) : "-",
     bucket,
+    locked ?? "-",
     path,
   ];
 }
@@ -319,8 +323,10 @@ export function audit({
   ]));
 
   const context = { repo, trunk, fetched, prs, chats, now };
-  const rows = worktrees.map(({ path, prunable }) =>
-    prunable ? ["-", "?", "-", "-", "-", "-", "-", "prunable", path] : auditWorktree(path, context),
+  const rows = worktrees.map((worktree) =>
+    worktree.prunable
+      ? ["-", "?", "-", "-", "-", "-", "-", "prunable", worktree.locked ?? "-", worktree.path]
+      : auditWorktree(worktree, context),
   );
   rows.sort((a, b) => sizeKey(b[0]) - sizeKey(a[0]) || (a.join("\t") < b.join("\t") ? 1 : -1));
   return [HEADER, ...rows].map((row) => `${row.join("\t")}\n`).join("");

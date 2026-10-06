@@ -51,7 +51,7 @@ test("40 concurrent writers with 20 KB cells leave every row intact", async () =
 
 // PERL_UNICODE puts a :utf8 layer on perl's standard handles, and syswrite
 // refuses a handle that has one.
-test.failing("a row with non-ASCII cells is appended when PERL_UNICODE is set", () => {
+test("a row with non-ASCII cells is appended when PERL_UNICODE is set", () => {
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
   try {
     const log = join(dir, "log.tsv");
@@ -64,7 +64,7 @@ test.failing("a row with non-ASCII cells is appended when PERL_UNICODE is set", 
   }
 });
 
-test.failing("a row is appended when perl is not installed", () => {
+test("a row is appended when perl is not installed", () => {
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
   try {
     const log = join(dir, "log.tsv");

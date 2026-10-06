@@ -1047,6 +1047,30 @@ describe("syncComponent", () => {
     expect(readdirSync(join(local, "c"))).toEqual(["port.md"]);
   });
 
+  test("an empty port directory where upstream has a file fails the run before any write", () => {
+    const oldUp = tree({ "a.md": "old a\n" });
+    const newUp = tree({ "a.md": "new a\n", c: "a file upstream\n" });
+    const local = tree({ "a.md": "old a\n" });
+    mkdirSync(join(local, "c"));
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.collisions).toEqual([{ rel: "c", reason: "a directory where upstream has a file" }]);
+    expect(readFileSync(join(local, "a.md"), "utf8")).toBe("old a\n");
+  });
+
+  const caseInsensitive = existsSync(gitConfigDir.toUpperCase());
+  test.skipIf(!caseInsensitive)("a port file that an upstream directory matches but for case fails the run before any write", () => {
+    const oldUp = tree({ "a.md": "old a\n" });
+    const newUp = tree({ "a.md": "new a\n", "b/new.md": "n\n" });
+    const local = tree({ "a.md": "old a\n", B: "a file in the port\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.collisions).toEqual([{ rel: "b", reason: "a file where upstream has a directory" }]);
+    expect(readFileSync(join(local, "a.md"), "utf8")).toBe("old a\n");
+  });
+
   test("a binary port copy under an upstream text edit blocks every write", () => {
     const oldUp = tree({ "doc.md": "a\n", "sibling.md": "old\n" });
     const newUp = tree({ "doc.md": "b\n", "sibling.md": "new\n" });

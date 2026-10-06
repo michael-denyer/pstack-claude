@@ -385,13 +385,15 @@ export function syncComponent({
     return outcome ? [{ rel, ...outcome }] : [];
   });
 
-  const localDirs = new Set([...localPaths].flatMap(dirsAbove));
+  // The filesystem answers here, not the walk: the walk lists no empty
+  // directory, and on a case-insensitive filesystem a file B blocks a directory b.
+  const onDisk = (rel) => lstatSync(join(localDir, rel), { throwIfNoEntry: false });
   const collisions = new Map();
   for (const { rel, write } of outcomes) {
     if (!write) continue;
-    const blocker = dirsAbove(rel).find((dir) => localPaths.has(dir));
+    const blocker = dirsAbove(rel).find((dir) => onDisk(dir)?.isFile());
     if (blocker) collisions.set(blocker, "a file where upstream has a directory");
-    else if (localDirs.has(rel)) collisions.set(rel, "a directory where upstream has a file");
+    else if (onDisk(rel)?.isDirectory()) collisions.set(rel, "a directory where upstream has a file");
   }
   const spellings = Map.groupBy(outcomes.filter(({ kind }) => kind !== "excluded"), ({ rel }) => rel.toLowerCase());
   for (const group of spellings.values()) {

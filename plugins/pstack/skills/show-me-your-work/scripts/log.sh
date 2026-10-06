@@ -38,6 +38,10 @@ clean() {
 		*) printf '%s' "$v" ;;
 	esac
 }
-printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-	"$ts" "$(clean "$1")" "$(clean "$2")" "$(clean "$3")" "$(clean "$4")" "$(clean "$5")" \
-	>> "$logfile"
+# One write(2) per row. A shell printf goes through stdio, which hands a row
+# longer than its buffer to the kernel in pieces that parallel writers
+# interleave. macOS has no flock(1), so a single syscall is the portable fix,
+# and the row travels on stdin because Linux caps one argv string at 128 KiB.
+printf -v row '%s\t%s\t%s\t%s\t%s\t%s\n' \
+	"$ts" "$(clean "$1")" "$(clean "$2")" "$(clean "$3")" "$(clean "$4")" "$(clean "$5")"
+printf '%s' "$row" | perl -0777 -ne 'syswrite(STDOUT, $_) == length or die "log.sh: $!\n"' >> "$logfile"

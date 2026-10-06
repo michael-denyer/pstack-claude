@@ -27,7 +27,7 @@ test("cells a spreadsheet or TSV reader would reinterpret are written with a lea
 
 // 20 KB cells make each row longer than any stdio buffer, so a row written in
 // pieces shows up as a malformed row once writers overlap.
-test.failing("40 concurrent writers with 20 KB cells leave every row intact", async () => {
+test("40 concurrent writers with 20 KB cells leave every row intact", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
   try {
     const log = join(dir, "log.tsv");

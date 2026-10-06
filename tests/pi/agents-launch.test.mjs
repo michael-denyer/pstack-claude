@@ -1,11 +1,11 @@
 // What the agent tool registers and the child command a call produces.
 import { describe, expect, test } from "bun:test";
-import { chmodSync, statSync } from "node:fs";
+import { chmodSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
 import { chmodDeniesReads } from "../session-hook-sheets.mjs";
-import { agentBody, fakeCtx, fakePi, flag, useWorld } from "./harness.mjs";
+import { agentBody, fakeCtx, fakePi, flag, useWorld, waitFor } from "./harness.mjs";
 
 const setup = useWorld();
 
@@ -87,6 +87,18 @@ describe("agent tool", () => {
     expect(statSync(flag(effort, "--append-system-prompt")).mode & 0o777).toBe(0o600);
     expect(flag(general, "--thinking")).toBe("medium");
     expect(flag(general, "--append-system-prompt")).toBeNull();
+  });
+
+  test("a resume whose system prompt file is gone writes it again, since pi would append the missing path as the prompt text", async () => {
+    const { w, pi, ctx } = setup();
+    await pi.call("agent", { description: "p", prompt: "first", subagent_type: "pstack:poteto-agent" }, ctx);
+    rmSync(join(w.agentDir, "pstack", "parent-session", "prompts"), { recursive: true });
+    await pi.call("send_message", { to: "p", message: "again" }, ctx);
+    await waitFor(() => pi.messages.length === 1);
+    const [first, second] = w.invocations();
+    expect(second.systemPrompt).toBe(agentBody("agents/poteto-agent.md"));
+    expect(flag(second, "--append-system-prompt")).toBe(flag(first, "--append-system-prompt"));
+    expect(statSync(flag(second, "--append-system-prompt")).mode & 0o777).toBe(0o600);
   });
 });
 

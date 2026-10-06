@@ -182,13 +182,14 @@ export function validatePluginLayout(pluginRoot) {
     throw new Error(`${PLUGIN}/commands/ exists; trampolines belong in ${prompts} (CHANGES 0.9.13)`);
   }
   // #58: a plugin's agents register under the plugin namespace, so a dispatch
-  // of the bare name errors at runtime with "Agent type 'x' not found".
+  // of the bare name errors at runtime with "Agent type 'x' not found". The key
+  // and the value may each be quoted, backticked, or bare, in prose, YAML, or JSON.
   const agents = pluginAgentPaths(pluginRoot).map((p) => basename(p, ".md"));
   const bareDispatches = [];
   for (const file of markdownFiles(join(pluginRoot, "skills"))) {
     readFileSync(file, "utf8").split("\n").forEach((line, i) => {
-      for (const name of agents) {
-        if (line.includes(`subagent_type: "${name}"`)) {
+      for (const [, name] of line.matchAll(/subagent_type["']?\s*:\s*["'`]?([a-z0-9-]+)/g)) {
+        if (agents.includes(name)) {
           bareDispatches.push(`${relative(pluginRoot, file)}:${i + 1}: subagent_type: "${name}" (use "pstack:${name}")`);
         }
       }

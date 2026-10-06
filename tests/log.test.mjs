@@ -25,13 +25,15 @@ test("cells a spreadsheet or TSV reader would reinterpret are written with a lea
   }
 });
 
-test("40 concurrent writers with 20 KB cells leave every row intact", async () => {
+// A shell printf on Linux writes 4 KiB at a time. Before the single write, 20 KB
+// rows interleaved there in 12 of 20 runs and 400 KB rows in 100 of 100.
+test("40 concurrent writers with 400 KB rows leave every row intact", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
   try {
     const log = join(dir, "log.tsv");
-    const longerThanStdioBuffer = "x".repeat(20_000);
+    const manyStdioBuffers = "x".repeat(100_000);
     const writers = Array.from({ length: 40 }, (_, i) =>
-      spawn("bash", [logScript, log, `p${i}`, `decision ${i}`, "why", longerThanStdioBuffer, `result ${i}`], { stdio: "inherit" }),
+      spawn("bash", [logScript, log, `p${i}`, ...Array(4).fill(manyStdioBuffers)], { stdio: "inherit" }),
     );
     const exits = await Promise.all(writers.map((writer) => once(writer, "exit")));
     expect(exits.map(([code]) => code)).toEqual(Array(40).fill(0));
@@ -40,7 +42,7 @@ test("40 concurrent writers with 20 KB cells leave every row intact", async () =
       .split("\n")
       .map((line) => line.split("\t"))
       .filter((row) => row[0] !== "ts");
-    expect(rows.filter((row) => row.length !== 6 || row[4] !== longerThanStdioBuffer).length).toBe(0);
+    expect(rows.filter((row) => row.length !== 6 || row.slice(2).some((cell) => cell !== manyStdioBuffers)).length).toBe(0);
     expect(rows.length).toBe(40);
   } finally {
     rmSync(dir, { recursive: true, force: true });

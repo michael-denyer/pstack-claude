@@ -1144,6 +1144,29 @@ describe("syncComponent", () => {
     expect(readFileSync(join(local, "kit/a.md"), "utf8")).toBe("old a\n");
   });
 
+  for (const [target, linkTo] of [
+    ["a directory", "dir"],
+    ["a file", "file.md"],
+    ["nothing", "missing"],
+  ]) {
+    onAliasingFilesystems(`an upstream directory the filesystem resolves to a port link to ${target} fails the run before any write`, { b: "B" }, (filesystem) => {
+      const outside = tree({ "dir/keep.md": "k\n", "file.md": "f\n" });
+      const oldUp = tree({ "a.md": "old a\n" });
+      const newUp = tree({ "a.md": "new a\n", "b/new.md": "n\n" });
+      const local = tree({ "a.md": "old a\n" });
+      symlinkSync(join(outside, linkTo), join(local, "B"));
+
+      const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, ...filesystem });
+
+      expect(report.collisions).toEqual([{ rel: "B", reason: sameEntry("b") }]);
+      expect(readFileSync(join(local, "a.md"), "utf8")).toBe("old a\n");
+      expect(lstatSync(join(local, "B")).isSymbolicLink()).toBe(true);
+      expect(readdirSync(outside).sort()).toEqual(["dir", "file.md"]);
+      expect(readdirSync(join(outside, "dir"))).toEqual(["keep.md"]);
+      expect(readFileSync(join(outside, "file.md"), "utf8")).toBe("f\n");
+    });
+  }
+
   test("a binary port copy under an upstream text edit blocks every write", () => {
     const oldUp = tree({ "doc.md": "a\n", "sibling.md": "old\n" });
     const newUp = tree({ "doc.md": "b\n", "sibling.md": "new\n" });

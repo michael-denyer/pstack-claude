@@ -440,7 +440,6 @@ describe("/loop", () => {
       const { pi, run } = loop({ mode: "print", ...ctxOpts });
       const exitCode = process.exitCode;
       try {
-        // Not awaited: a /loop still waiting on the settle would hang the test.
         let outcome = "still waiting";
         run(args).then(
           () => (outcome = "returned"),
@@ -459,7 +458,7 @@ describe("/loop", () => {
   }
 
   for (const [what, ctxOpts, args, sent] of [
-    ["on credentials only pi's live check finds", { auth: "resolved" }, "1m tick", "tick"],
+    ["on credentials only pi's live check finds", { auth: "live-check-only" }, "1m tick", "tick"],
     ["a slash prompt that names no extension command, such as a skill", {}, "1m /skill:babysit 42", "/skill:babysit 42"],
   ]) {
     test(`in print mode /loop still runs ${what}`, async () => {

@@ -100,15 +100,12 @@ describe("registry", () => {
     expect(resumed.entries).toEqual([]);
   });
 
-  // A record another pi process left running: its own process is a live pi on
-  // its session. Any live pid stands in for the launching pi, since nothing in
-  // a pi process identifies it as the launcher.
   async function launchedByOtherPi() {
     const { w, pi, ctx } = setup({ script: { default: [{ sleep: 30000 }] } });
     await pi.call("agent", { description: "theirs", prompt: "x", run_in_background: true }, ctx);
     await w.until("invocation");
-    const otherPi = w.spawn("sleep", ["30"], { detached: true });
-    return { w, ctx, otherPi, entries: pi.entries.map((e) => agentEntry(recordWith(e.data, { parentPid: otherPi.pid }))) };
+    const liveParent = w.spawn("sleep", ["30"], { detached: true });
+    return { w, ctx, liveParent, entries: pi.entries.map((e) => agentEntry(recordWith(e.data, { parentPid: liveParent.pid }))) };
   }
 
   test("a restored agent is left running, untouched, while its launching pi process lives and its own process still runs its session", async () => {
@@ -122,7 +119,7 @@ describe("registry", () => {
   });
 
   test("send_message and stop_agent refuse an agent another live pi process is running, naming that process", async () => {
-    const { w, ctx, otherPi, entries } = await launchedByOtherPi();
+    const { w, ctx, liveParent, entries } = await launchedByOtherPi();
     const id = entries[0].data.agent.id;
 
     const resumed = await restore(w, entries);
@@ -130,7 +127,7 @@ describe("registry", () => {
     const stopped = await resumed.call("stop_agent", { id }, ctx).catch((e) => e);
     for (const err of [sent, stopped]) {
       expect(err).toBeInstanceOf(Error);
-      expect(err.message).toContain(String(otherPi.pid));
+      expect(err.message).toContain(String(liveParent.pid));
     }
     expect(w.invocations()).toHaveLength(1);
     expect(alive(w.invocations()[0].pid)).toBe(true);

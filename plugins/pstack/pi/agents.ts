@@ -92,7 +92,6 @@ function outcomeOf(exit: ChildExit, stopped: boolean): { status: EndedStatus; fi
 function saveOutput(identity: AgentIdentity, text: string): Pick<EndedRecord, "finalText" | "outputFile"> {
   const capped = truncateUtf8(text, OUTPUT_CAP_BYTES);
   if (capped === text) return { finalText: text };
-  // One file per run: a resumed run must not overwrite the file an earlier notice names.
   const outputFile = join(identity.sessionDir, `${identity.id}.${Date.now()}.out.md`);
   try {
     writeFileSync(outputFile, text);
@@ -212,7 +211,6 @@ export class AgentRunner {
     return record;
   }
 
-  // Every launch writes the prompt file that is not there, a resume included:
   // Pi appends a path it cannot find as the prompt text itself.
   private ensureSystemPrompt(identity: AgentIdentity): void {
     const file = identity.systemPromptFile;
@@ -338,12 +336,10 @@ export class AgentRunner {
     this.pi.appendEntry(ENTRY_TYPE, record);
   }
 
-  // Folds persisted snapshots. A snapshot still marked running is left to the pi
-  // process that launched it while that process lives and the agent's own
-  // process still runs its session. A live parent pid alone proves nothing: it
-  // has no identity to check, and after a reboot it can belong to an unrelated
-  // process. Any other running snapshot is an orphan: its process, if it
-  // survived, is stopped.
+  // Folds persisted snapshots. A snapshot still marked running is left to the
+  // live pi process that launched it while its own process still runs its
+  // session: a live parent pid alone may be a reused one. Any other running
+  // snapshot is an orphan: its process, if it survived, is stopped.
   restore(entries: readonly SessionEntry[]): void {
     for (const entry of entries) {
       if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE || !Value.Check(recordSchema, entry.data)) continue;

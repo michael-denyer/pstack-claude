@@ -82,8 +82,6 @@ export function fakeCtx({ cwd, entries = [], model = { provider: "anthropic", id
     hasUI,
     ui,
     model,
-    // Pi's credential gate before a run: a provider configured at startup
-    // ("configured"), one only its live check finds ("resolved"), or neither ("none").
     modelRegistry: {
       hasConfiguredAuth: () => auth === "configured",
       getAvailableOfType: async () => (auth === "none" ? [] : [model]),

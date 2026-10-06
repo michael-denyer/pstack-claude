@@ -74,7 +74,6 @@ export class Scheduler {
     this.selfPaced = prompt;
   }
 
-  // A wakeup prompt that would continue a self-paced loop other than the live one.
   staleLoop(wakeupPrompt: string): boolean {
     const m = /^\/loop(\s[\s\S]*)?$/.exec(wakeupPrompt);
     if (!m) return false;

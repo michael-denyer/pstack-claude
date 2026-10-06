@@ -8,7 +8,6 @@ const PENDING_POLL_MS = 50;
 export interface OneShot {
   exits(ctx: Pick<ExtensionContext, "mode">): boolean;
   untilSettled(): Promise<void>;
-  // Rejects, with the process marked failed, when Pi would start no run for the prompt.
   assertStartsRun(prompt: string, ctx: ExtensionContext): Promise<void>;
   dispose(): void;
 }
@@ -17,8 +16,8 @@ export interface OneShot {
 // its prompt() makes first: an extension command runs in place, and a prompt
 // without a model or credentials is refused. No settle follows either, and Pi
 // reports a refusal only to its own error listeners, so a one-shot /loop
-// waiting on the settle would never return. An input handler that consumes the
-// prompt is the one case an extension cannot see.
+// waiting on the settle would never return. It cannot see an input handler
+// that consumes the prompt.
 async function noRunReason(pi: ExtensionAPI, prompt: string, ctx: ExtensionContext): Promise<string | undefined> {
   if (prompt.startsWith("/")) {
     const space = prompt.indexOf(" ");

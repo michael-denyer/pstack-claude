@@ -42,7 +42,8 @@ clean() {
 # longer than its buffer to the kernel in pieces that parallel writers
 # interleave. macOS has no flock(1), so a single syscall is the portable fix,
 # and the row travels on stdin because Linux caps one argv string at 128 KiB.
-# binmode drops the :utf8 layer PERL_UNICODE adds, which syswrite refuses.
+# binmode drops the :utf8 layer PERL_UNICODE adds. syswrite refuses it on
+# STDOUT, and on STDIN it decodes the row, which corrupts non-ASCII bytes.
 # Without perl the row still lands, in pieces as before.
 printf -v row '%s\t%s\t%s\t%s\t%s\t%s\n' \
 	"$ts" "$(clean "$1")" "$(clean "$2")" "$(clean "$3")" "$(clean "$4")" "$(clean "$5")"

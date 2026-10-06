@@ -504,10 +504,10 @@ export function stampLeadLine(text, lead) {
   const heading = lines.findIndex((l, i) => i >= bodyStart && /^#{1,6} /.test(l));
   if (heading === -1) return null;
   const rest = [];
+  // A removed lead takes the blank above it only when a blank or the end
+  // follows, so the paragraphs on either side of it stay apart.
   lines.slice(heading + 1).forEach((line, i, below) => {
     if (!leads.includes(line)) rest.push(line);
-    // A removed lead takes the blank above it only when a blank or the end
-    // follows, so the paragraphs on either side of it stay apart.
     else if (rest.at(-1) === "" && !below[i + 1]) rest.pop();
   });
   if (rest[0]) rest.unshift("");

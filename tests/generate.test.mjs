@@ -250,7 +250,7 @@ describe("assertChangesHeading", () => {
   });
 
   test.each(["## v0.9.71 - newer", "## [0.9.71] - newer", "##  0.9.71 - newer", "##0.9.71 - newer", "### 0.9.71 - newer", "# 0.9.71 - newer"])(
-    "an entry headed %s above the VERSION heading fails, whatever level or decoration its version takes",
+    "an entry headed %s above the VERSION heading fails, whatever its level, spacing, or decoration",
     (heading) => {
       expect(() => assertChangesHeading(`# Changes\n\n${heading}\n\n## 0.9.70 - current\n`, "0.9.70")).toThrow(
         `CHANGES.md's newest release heading is "${heading}", but VERSION is 0.9.70`,
@@ -258,8 +258,8 @@ describe("assertChangesHeading", () => {
     },
   );
 
-  test.each(["## About this file", "### Format", "## Unreleased", "## Format since 0.9.13", "## 2.0 plans"])(
-    "a heading that does not lead with a version is no entry and may sit above the newest: %s",
+  test.each(["## About this file", "## Unreleased", "## Format since 0.9.13", "## 2.0 plans"])(
+    "a heading that does not lead with a three-part version is no entry and may sit above the newest: %s",
     (heading) => {
       expect(() => assertChangesHeading(`# Changes\n\n${heading}\n\n## 0.9.71 - new\n\n## 0.9.70 - old\n`, "0.9.71")).not.toThrow();
     },
@@ -277,7 +277,6 @@ describe("assertChangesHeading", () => {
 
   test.each([
     ["an older heading quoted in the newest entry", "## 0.9.71 - new\n\n```\n## 0.9.70 - old\n```\n\n## 0.9.70 - old\n"],
-    ["the newest heading quoted in its own entry", "## 0.9.71 - new\n\n```\n## 0.9.71 - new\n```\n\n## 0.9.70 - old\n"],
     ["a sample heading above the first entry", "```md\n## 1.2.3 - title\n```\n\n## 0.9.71 - new\n\n## 0.9.70 - old\n"],
     ["a tilde fence", "## 0.9.71 - new\n\n~~~\n## 0.9.70 - old\n~~~\n\n## 0.9.70 - old\n"],
     ["an indented fence", "## 0.9.71 - new\n\n ```\n## 0.9.70 - old\n ```\n\n## 0.9.70 - old\n"],

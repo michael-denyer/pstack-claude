@@ -475,6 +475,11 @@ describe("lead lines", () => {
     expect(stampLeadLine("# X\n\nB.\n\nA.\n\nBody.\n", ["A.", "B."])).toBe(canonical);
   });
 
+  test("removing a lead glued to the text below it keeps the blank line that ended the paragraph above", () => {
+    expect(stampLeadLine("# X\n\nIntro.\n\nA.\n\nB.\nBody.\n", ["A.", "B."])).toBe("# X\n\nA.\n\nB.\n\nIntro.\n\nBody.\n");
+    expect(stampLeadLine("# X\n\nB.\n\nBody one.\n\nA.\nBody two.\n", ["A.", "B."])).toBe("# X\n\nA.\n\nB.\n\nBody one.\n\nBody two.\n");
+  });
+
   test("a lead line that ends the file gains no blank line after it", () => {
     for (const text of ["# X\n\nA.\n", "# X\n\nA."]) expect(stampLeadLine(text, "A.")).toBe(text);
   });

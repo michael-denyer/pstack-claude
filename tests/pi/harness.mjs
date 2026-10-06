@@ -46,6 +46,7 @@ export function fakePi() {
   const api = {
     registerTool: (tool) => tools.set(tool.name, tool),
     registerCommand: (name, options) => commands.set(name, options),
+    getCommands: () => [...commands.keys()].map((name) => ({ name, source: "extension" })),
     on(event, handler) {
       handlers.set(event, [...(handlers.get(event) ?? []), handler]);
       return () => {};
@@ -74,13 +75,20 @@ export function fakePi() {
   };
 }
 
-export function fakeCtx({ cwd, entries = [], model, mode = "tui", hasUI = false, ui, idle = true, pending = () => false } = {}) {
+export function fakeCtx({ cwd, entries = [], model, mode = "tui", hasUI = false, ui, idle = true, pending = () => false, auth = "configured" } = {}) {
+  const current = model === undefined ? { provider: "anthropic", id: "parent-model" } : model;
   return {
     cwd,
     mode,
     hasUI,
     ui,
-    model: model === undefined ? { provider: "anthropic", id: "parent-model" } : model,
+    model: current,
+    // Pi's credential gate before a run: a provider configured at startup
+    // ("configured"), one only its live check finds ("resolved"), or neither ("none").
+    modelRegistry: {
+      hasConfiguredAuth: () => auth === "configured",
+      getAvailableOfType: async () => (auth === "none" ? [] : [current]),
+    },
     isIdle: () => (typeof idle === "function" ? idle() : idle),
     hasPendingMessages: pending,
     sessionManager: { getSessionId: () => "parent-session", getEntries: () => entries },

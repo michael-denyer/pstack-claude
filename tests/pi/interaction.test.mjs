@@ -424,6 +424,37 @@ describe("/loop", () => {
     });
   }
 
+  // Lets a handler reach its first fire or its failure; fake timers rule out sleeping.
+  const drain = async () => {
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+  };
+
+  for (const [why, ctxOpts, args, reason] of [
+    ["no model is selected", { model: null }, "1m tick", "no model is selected"],
+    ["the selected model has no credentials", { auth: "none" }, "1m tick", "no credentials"],
+    ["the prompt is an extension command, which pi runs without starting a run", {}, "1m /loop stop", "/loop is an extension command"],
+  ]) {
+    test(`in print mode /loop fails at once and marks the process failed when ${why}, since no settle would follow`, async () => {
+      const { pi, run } = loop({ mode: "print", ...ctxOpts });
+      const exitCode = process.exitCode;
+      try {
+        // Not awaited: a /loop still waiting on the settle would hang the test.
+        let outcome = "still waiting";
+        run(args).then(
+          () => (outcome = "returned"),
+          (e) => (outcome = e),
+        );
+        await drain();
+        expect(outcome).toBeInstanceOf(Error);
+        expect(outcome.message).toContain(reason);
+        expect(pi.userMessages).toEqual([]);
+        expect(process.exitCode).toBe(1);
+      } finally {
+        process.exitCode = exitCode;
+      }
+    });
+  }
+
   test("/loop stop also cancels a self-paced wakeup", async () => {
     const { pi, ctx, run, ui } = loop();
     await run("watch");

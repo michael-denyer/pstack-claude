@@ -272,8 +272,11 @@ function gateReason(
   if (row.facts.isDraft && !allowDraft) return "draft-pr";
   if (row.facts.reviewDecision === "CHANGES_REQUESTED")
     return "changes-requested";
-  if (row.facts.reviewDecision === "REVIEW_REQUIRED") return "review-required";
+  // BEHIND means the base requires an up-to-date head. Updating the branch
+  // restarts its checks and can dismiss an approval, so this comes before a
+  // required review and does not wait for the current checks.
   if (row.facts.mergeStateStatus === "BEHIND") return "behind-base";
+  if (row.facts.reviewDecision === "REVIEW_REQUIRED") return "review-required";
   // BLOCKED with clean CI is some other branch protection rule, such as signed
   // commits or a required check that never reported. GitHub will not merge it.
   return row.facts.mergeStateStatus === "BLOCKED" ? "merge-blocked" : null;

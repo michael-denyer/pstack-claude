@@ -746,6 +746,40 @@ describe("mergeability", () => {
       blocker: { kind: "merge-gate", pr: context(28), reason: "behind-base" },
     });
   });
+
+  it("stops at once on a branch behind its base, without waiting for checks that are pending or unreported", async () => {
+    for (const checks of [
+      { fastPath: { kind: "checks", checks: [pendingCheck()] } },
+      {
+        fastPath: { kind: "none-reported" },
+        rollupPages: [{ kind: "no-rollup" }],
+        commitRollups: [{ oid: "head", state: null }],
+      },
+    ] as const)
+      expect(
+        classifyPr(
+          await read({ facts: { mergeStateStatus: "BEHIND" }, ...checks }),
+        ),
+      ).toEqual({
+        kind: "blocker",
+        blocker: { kind: "merge-gate", pr: context(27), reason: "behind-base" },
+      });
+  });
+
+  it("reports requested changes before a behind base, and a behind base before a required review", async () => {
+    for (const [reviewDecision, reason] of [
+      ["CHANGES_REQUESTED", "changes-requested"],
+      ["REVIEW_REQUIRED", "behind-base"],
+    ] as const)
+      expect(
+        classifyPr(
+          await read({
+            facts: { mergeStateStatus: "BEHIND", reviewDecision },
+            fastPath: { kind: "checks", checks: [pendingCheck()] },
+          }),
+        ),
+      ).toMatchObject({ kind: "blocker", blocker: { reason } });
+  });
 });
 
 describe("a PR with no checks configured", () => {

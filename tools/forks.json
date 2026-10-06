@@ -56,7 +56,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/babysit.md": {
       "kind": "policy",
-      "why": "Requires confirming that the first status read reports the requested PR or stack, and naming the merge frontier, before acting on it.",
+      "why": "Requires confirming that the first status read reports the requested PR or stack, and naming the merge frontier, before acting on it, and reports the watcher's behind-base gate to the branch owner instead of resolving it, as it does a conflict.",
       "since": "0.9.39",
       "upstream": "not-proposed"
     },
@@ -104,7 +104,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/shipping.md": {
       "kind": "policy",
-      "why": "Lands one PR at a time under the user's landing authority, cancelling pending merges before any chain change, merging only under a service-enforced head condition, arming auto-merge or a queue only behind repository rules that enforce the verdict, and confirming each landing in the destination's history before advancing, with verifiers that drive the real surface through the driver skill in their own worktrees, a matching patch-id that keeps a review only after its applicability to the new base is checked, and the watcher owning blocker classification.",
+      "why": "Lands one PR at a time under the user's landing authority, cancelling pending merges before any chain change, merging only under a service-enforced head condition, arming auto-merge or a queue only behind repository rules that enforce the verdict, and confirming each landing in the destination's history before advancing, with verifiers that drive the real surface through the driver skill in their own worktrees, a matching patch-id that keeps a review only after its applicability to the new base is checked, and the watcher owning blocker classification, with a branch behind its base routed to the topology owner.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
@@ -170,13 +170,13 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.test.ts": {
       "kind": "policy",
-      "why": "Covers the review-required, behind-base, and branch-protection merge gates and their wait for pending checks, the wait while GitHub has not computed mergeability (never ready and never a query error, re-polled at the interval, timing out at the caller's deadline, one status row on a one-shot pass, and blockers that do not depend on it still stopping at once), a PR with no checks configured (waiting in single, stack, and queued mode until the reading has persisted for 60 seconds however short the interval, timing out there under a shorter deadline, ready once it has, still stopped by conflicts, threads, and gates, honouring checks that register on the next poll, and failing closed while the head may not have reported), the second facts read in the snapshot plan and the retry when a gate, review, draft, or conflict state changes between the two reads, except mergeability that the first read had not computed, and the shared deadline in the poll loop.",
+      "why": "Covers the review-required and branch-protection merge gates and their wait for pending checks, the behind-base gate that stops without waiting for pending or unreported checks and outranks a required review but not requested changes, the wait while GitHub has not computed mergeability (never ready and never a query error, re-polled at the interval, timing out at the caller's deadline, one status row on a one-shot pass, and blockers that do not depend on it still stopping at once), a PR with no checks configured (waiting in single, stack, and queued mode until the reading has persisted for 60 seconds however short the interval, timing out there under a shorter deadline, ready once it has, still stopped by conflicts, threads, and gates, honouring checks that register on the next poll, and failing closed while the head may not have reported), the second facts read in the snapshot plan and the retry when a gate, review, draft, or conflict state changes between the two reads, except mergeability that the first read had not computed, and the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.ts": {
       "kind": "policy",
-      "why": "Stops at the review-required, behind-base, and branch-protection merge gates once checks finish, waits at the poll interval while GitHub has not computed mergeability, never as a query error, and builds a ready proof only from a MERGEABLE reading, re-reads the PR facts after the checks and retries a snapshot whose head, base, mergeability, review, or draft state changed in between, leaving mergeability out of that comparison when the first read had not computed it, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks and the same head has shown none for 60 seconds of wall time whatever the poll interval, waiting until then as it waits on pending checks, and honours the shared deadline in the poll loop.",
+      "why": "Stops at the review-required and branch-protection merge gates once checks finish, and at the behind-base gate at once and ahead of a required review, since updating the branch restarts its checks, waits at the poll interval while GitHub has not computed mergeability, never as a query error, and builds a ready proof only from a MERGEABLE reading, re-reads the PR facts after the checks and retries a snapshot whose head, base, mergeability, review, or draft state changed in between, leaving mergeability out of that comparison when the first read had not computed it, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks and the same head has shown none for 60 seconds of wall time whatever the poll interval, waiting until then as it waits on pending checks, and honours the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },

@@ -487,6 +487,38 @@ describe("review gate", () => {
   });
 });
 
+describe("mergeability", () => {
+  it("retries while GitHub is still computing mergeability", async () => {
+    for (const facts of [
+      { mergeable: "UNKNOWN" },
+      { mergeStateStatus: "UNKNOWN" },
+    ] as const)
+      await expect(
+        readSnapshot({
+          reader: fakeReader({ facts }),
+          context: context(27),
+          pendingHistory: "include",
+          allowDraft: false,
+        }),
+      ).rejects.toMatchObject({
+        failure: { kind: "mergeability-unknown", retryable: true },
+      });
+  });
+
+  it("gates a branch that is behind its base instead of reporting it ready", async () => {
+    const snapshot = await readSnapshot({
+      reader: fakeReader({ facts: { mergeStateStatus: "BEHIND" } }),
+      context: context(28),
+      pendingHistory: "include",
+      allowDraft: false,
+    });
+    expect(classifyPr(snapshot)).toEqual({
+      kind: "blocker",
+      blocker: { kind: "merge-gate", pr: context(28), reason: "behind-base" },
+    });
+  });
+});
+
 describe("a PR with no checks configured", () => {
   const noChecks = {
     fastPath: { kind: "none-reported" },
@@ -545,7 +577,6 @@ describe("a PR with no checks configured", () => {
         ],
       },
       { commitRollups: [{ oid: "head", state: "PENDING" }] },
-      { facts: { mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" } },
     ] as const;
     for (const overrides of unsettled)
       await expect(read(overrides)).rejects.toMatchObject({

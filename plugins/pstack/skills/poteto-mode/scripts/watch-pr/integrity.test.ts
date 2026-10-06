@@ -698,6 +698,10 @@ describe("merge gate", () => {
       "merge-blocked",
       "find the branch protection rule holding the merge (mergeStateStatus=BLOCKED with clean CI)",
     ],
+    [
+      "behind-base",
+      "update the branch with its base before waiting for the merge queue (mergeStateStatus=BEHIND)",
+    ],
   ] as const)
     it(`renders the ${reason} action`, () => {
       expect(
@@ -713,6 +717,26 @@ describe("merge gate", () => {
         })
       ).toBe(`BLOCKER: ${reason}\npr=1\naction=${action}\n`);
     });
+
+  it("shows a branch behind its base in the status table", async () => {
+    const row = await readSnapshot({
+      ...snapshotArgs,
+      reader: fakeReader({ facts: { mergeStateStatus: "BEHIND" } }),
+    });
+    expect(
+      renderPretty({
+        schemaVersion: 1,
+        sequence: 1,
+        observedAt: "fixture",
+        mode: "single",
+        kind: "STATUS",
+        terminal: true,
+        exitCode: 0,
+        reason: "status-only",
+        rows: [row],
+      })
+    ).toContain("| ⚠️ behind base |");
+  });
 });
 
 describe("blocker producers", () => {

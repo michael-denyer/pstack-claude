@@ -129,13 +129,16 @@ function runsSession(pid: number, sessionId: string): boolean {
   return args.some((arg, i) => arg === "--session-id" && args[i + 1] === sessionId);
 }
 
+function stillRuns(record: RunningRecord): boolean {
+  const pid = record.pid;
+  return pid !== undefined && alive(pid) && runsSession(pid, record.agent.sessionId);
+}
+
 // Stops the pi process of a record still marked running, by its group so the
 // bash command it has running goes too. Only a pid still running this agent's
 // session is signalled: without that identity check a reused pid would be hit.
 function reapOrphan(record: RunningRecord, killGraceMs: number): void {
-  const pid = record.pid;
-  if (pid === undefined) return;
-  terminateGroup(pid, () => alive(pid) && runsSession(pid, record.agent.sessionId), killGraceMs);
+  if (record.pid !== undefined) terminateGroup(record.pid, () => stillRuns(record), killGraceMs);
 }
 
 const now = () => new Date().toISOString();
@@ -327,9 +330,12 @@ export class AgentRunner {
     this.pi.appendEntry(ENTRY_TYPE, record);
   }
 
-  // Folds persisted snapshots. A snapshot still marked running belongs to the
-  // live pi process that launched it. One whose launching process is gone is an
-  // orphan: its process, if it survived, is stopped.
+  // Folds persisted snapshots. A snapshot still marked running is left to the pi
+  // process that launched it while that process lives and the agent's own
+  // process still runs its session. A live parent pid alone proves nothing: it
+  // has no identity to check, and after a reboot it can belong to an unrelated
+  // process. Any other running snapshot is an orphan: its process, if it
+  // survived, is stopped.
   restore(entries: readonly SessionEntry[]): void {
     for (const entry of entries) {
       if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE || !Value.Check(recordSchema, entry.data)) continue;
@@ -340,7 +346,7 @@ export class AgentRunner {
     for (const [id, state] of this.agents) {
       if (state.kind !== "remote") continue;
       const { record } = state;
-      if (record.parentPid !== process.pid && alive(record.parentPid)) continue;
+      if (record.parentPid !== process.pid && alive(record.parentPid) && stillRuns(record)) continue;
       const stopped: EndedRecord = {
         agent: record.agent,
         status: "stopped",

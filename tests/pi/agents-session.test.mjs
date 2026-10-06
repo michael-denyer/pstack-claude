@@ -100,6 +100,9 @@ describe("registry", () => {
     expect(resumed.entries).toEqual([]);
   });
 
+  // A record another pi process left running: its own process is a live pi on
+  // its session. Any live pid stands in for the launching pi, since nothing in
+  // a pi process identifies it as the launcher.
   async function launchedByOtherPi() {
     const { w, pi, ctx } = setup({ script: { default: [{ sleep: 30000 }] } });
     await pi.call("agent", { description: "theirs", prompt: "x", run_in_background: true }, ctx);
@@ -108,7 +111,7 @@ describe("registry", () => {
     return { w, ctx, otherPi, entries: pi.entries.map((e) => agentEntry(recordWith(e.data, { parentPid: otherPi.pid }))) };
   }
 
-  test("a restored agent whose launching pi process is still alive is left running, untouched", async () => {
+  test("a restored agent is left running, untouched, while its launching pi process lives and its own process still runs its session", async () => {
     const { w, ctx, entries } = await launchedByOtherPi();
 
     const resumed = await restore(w, entries);

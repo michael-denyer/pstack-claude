@@ -826,15 +826,16 @@ export async function resolveContext(args: {
 export function orderStack(
   context: T.PrContext,
   trunk: string,
-  open: readonly T.OpenPullRequest[]
+  everyOpen: readonly T.OpenPullRequest[]
 ): T.NonEmpty<T.PrContext> {
-  const byNumber = new Map(open.map((pr) => [pr.number, pr]));
   const localHead = (pr: T.OpenPullRequest): boolean =>
     pr.headRepository !== null &&
     pr.headRepository.owner.toLowerCase() === context.owner.toLowerCase() &&
     pr.headRepository.repo.toLowerCase() === context.repo.toLowerCase();
-  const canHaveChildren = (pr: T.OpenPullRequest): boolean =>
-    localHead(pr) && pr.headRefName !== trunk;
+  const open = everyOpen.filter(
+    (pr) => !(localHead(pr) && pr.headRefName === trunk)
+  );
+  const byNumber = new Map(open.map((pr) => [pr.number, pr]));
   const byHead = new Map<string, T.OpenPullRequest[]>();
   const invalid = (detail: string): never => {
     throw new WatcherQueryError({
@@ -843,7 +844,7 @@ export function orderStack(
       detail,
     });
   };
-  for (const pr of open.filter(canHaveChildren)) {
+  for (const pr of open.filter(localHead)) {
     byHead.set(pr.headRefName, [...(byHead.get(pr.headRefName) ?? []), pr]);
   }
   const parentFor = (branch: string): T.OpenPullRequest | undefined => {
@@ -877,7 +878,7 @@ export function orderStack(
   ]);
   const up: T.OpenPullRequest[] = [];
   const visit = (parent: T.OpenPullRequest): void => {
-    if (!canHaveChildren(parent)) return;
+    if (!localHead(parent)) return;
     const descendants = children.get(parent.headRefName) ?? [];
     if (descendants.length > 0) parentFor(parent.headRefName);
     for (const child of descendants) {

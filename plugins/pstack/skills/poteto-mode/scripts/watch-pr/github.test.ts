@@ -496,6 +496,51 @@ describe("context and stack discovery", () => {
     ).toEqual([2]);
   });
 
+  it("keeps a PR that brings the default branch into a feature branch out of that feature's stack", () => {
+    const repo = { owner: "owner", repo: "repo" };
+    const sync = parsePrNumber(7);
+    const open = [
+      {
+        number: context.number,
+        headRepository: repo,
+        headRefName: "feature",
+        baseRefName: "main",
+      },
+      {
+        number: sync,
+        headRepository: repo,
+        headRefName: "main",
+        baseRefName: "feature",
+      },
+    ];
+    expect(numbers(orderStack(context, "main", open))).toEqual([42]);
+    expect(
+      numbers(orderStack({ ...context, number: sync }, "main", open))
+    ).toEqual([7]);
+  });
+
+  it("still stacks a fork PR whose head branch has the default branch's name", () => {
+    const fork = parsePrNumber(50);
+    const open = [
+      {
+        number: context.number,
+        headRepository: { owner: "owner", repo: "repo" },
+        headRefName: "feature",
+        baseRefName: "main",
+      },
+      {
+        number: fork,
+        headRepository: { owner: "contributor", repo: "repo" },
+        headRefName: "main",
+        baseRefName: "feature",
+      },
+    ];
+    expect(numbers(orderStack(context, "main", open))).toEqual([42, 50]);
+    expect(
+      numbers(orderStack({ ...context, number: fork }, "main", open))
+    ).toEqual([42, 50]);
+  });
+
   it("stops at the default branch when it is an integration branch with a release PR", () => {
     const repo = { owner: "owner", repo: "repo" };
     const open = [

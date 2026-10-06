@@ -62,14 +62,13 @@ const runGh = (args, cwd) =>
   execFileSync("gh", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 
 // `--porcelain -z` output: NUL-separated fields, one record per worktree, the
-// primary worktree first. A `locked` field carries its reason raw, newlines
-// included, so the reason is flattened to fit one table cell.
+// primary worktree first.
 export function parseWorktrees(output) {
   const worktrees = [];
   for (const field of output.split("\0")) {
     if (field.startsWith("worktree ")) worktrees.push({ path: field.slice("worktree ".length), prunable: false, locked: null });
     else if (field.startsWith("prunable")) worktrees.at(-1).prunable = true;
-    else if (field.startsWith("locked")) worktrees.at(-1).locked = field.slice("locked ".length).replace(/\s+/g, " ").trim() || "locked";
+    else if (field.startsWith("locked")) worktrees.at(-1).locked = field.slice("locked ".length);
   }
   return worktrees;
 }
@@ -241,6 +240,12 @@ function dirtyLabel({ wip, untracked }) {
   return untracked > 0 ? `untracked:${untracked}` : "clean";
 }
 
+// `--porcelain -z` hands over the lock reason raw, newlines included.
+function lockedLabel(locked) {
+  if (locked === null) return "-";
+  return locked.replace(/\s+/g, " ").trim() || "locked";
+}
+
 function auditWorktree({ path, locked }, { repo, trunk, fetched, prs, chats, now }) {
   const head = probe(() => git(path, "rev-parse", "HEAD"));
   const age = bind(head, () => probe(() => Math.trunc((now - Number(git(path, "log", "-1", "--format=%ct", "HEAD"))) / DAY)));
@@ -264,7 +269,7 @@ function auditWorktree({ path, locked }, { repo, trunk, fetched, prs, chats, now
     pr.known && pr.value ? `#${pr.value.number}/${pr.value.state}` : "-",
     lastChat.known && lastChat.value !== null ? new Date(lastChat.value * 1000).toISOString().slice(0, 10) : "-",
     bucket,
-    locked ?? "-",
+    lockedLabel(locked),
     path,
   ];
 }
@@ -327,7 +332,7 @@ export function audit({
   const context = { repo, trunk, fetched, prs, chats, now };
   const rows = worktrees.map((worktree) =>
     worktree.prunable
-      ? ["-", "?", "-", "-", "-", "-", "-", "prunable", worktree.locked ?? "-", worktree.path]
+      ? ["-", "?", "-", "-", "-", "-", "-", "prunable", lockedLabel(worktree.locked), worktree.path]
       : auditWorktree(worktree, context),
   );
   rows.sort((a, b) => sizeKey(b[0]) - sizeKey(a[0]) || (a.join("\t") < b.join("\t") ? 1 : -1));

@@ -110,14 +110,15 @@ export function stampVersion(text, version, file) {
   return text.replace(/("version"\s*:\s*)"[^"]*"/, `$1"${version}"`);
 }
 
-// The lines outside fenced code blocks. A fence closes at the next line that
-// starts with at least as many of the character that opened it.
+// The lines outside fenced code blocks. A fence opens at three or more
+// backticks or tildes indented at most three spaces, and closes at the next
+// line that holds nothing but at least as many of the same character.
 function outsideFences(lines) {
   let fence = null;
   return lines.filter((line) => {
-    const mark = line.match(/^\s*(`{3,}|~{3,})/)?.[1];
+    const [, mark, after] = line.match(/^ {0,3}(`{3,}|~{3,})(.*)/) ?? [];
     if (fence) {
-      if (mark?.startsWith(fence)) fence = null;
+      if (mark?.startsWith(fence) && !after.trim()) fence = null;
       return false;
     }
     if (mark) fence = mark;

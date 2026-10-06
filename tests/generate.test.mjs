@@ -282,13 +282,18 @@ describe("assertChangesHeading", () => {
     ["a tilde fence", "## 0.9.71 - new\n\n~~~\n## 0.9.70 - old\n~~~\n\n## 0.9.70 - old\n"],
     ["an indented fence", "## 0.9.71 - new\n\n ```\n## 0.9.70 - old\n ```\n\n## 0.9.70 - old\n"],
     ["a longer fence holding a shorter one", "## 0.9.71 - new\n\n````\n```\n## 0.9.70 - old\n```\n````\n\n## 0.9.70 - old\n"],
+    ["a tilde line inside a backtick fence", "## 0.9.71 - new\n\n```\n~~~\n## 0.9.70 - old\n~~~\n```\n\n## 0.9.70 - old\n"],
+    ["a longer run closing a shorter fence", "```\n## 1.2.3 - sample\n````\n\n## 0.9.71 - new\n\n## 0.9.70 - old\n"],
+    ["a marker with an info string inside a fence", "```\n```md\n## 1.2.3 - sample\n```\n\n## 0.9.71 - new\n\n## 0.9.70 - old\n"],
   ])("a heading inside a code fence heads no entry: %s", (_, body) => {
     expect(() => assertChangesHeading(`# Changes\n\n${body}`, "0.9.71")).not.toThrow();
   });
 
-  test("three backticks in the middle of a line open no fence", () => {
-    const changelog = "# Changes\n\nQuote a heading in a ``` fence.\n\n## 0.9.71 - new\n\n## 0.9.70 - old\n";
-    expect(() => assertChangesHeading(changelog, "0.9.71")).not.toThrow();
+  test.each([
+    ["in the middle of a line", "Quote a heading in a ``` fence."],
+    ["indented four spaces, which is a code block", "    ```"],
+  ])("three backticks %s open no fence", (_, line) => {
+    expect(() => assertChangesHeading(`# Changes\n\n${line}\n\n## 0.9.71 - new\n\n## 0.9.70 - old\n`, "0.9.71")).not.toThrow();
   });
 
   test("a VERSION heading that sits only inside a code fence is no heading", () => {

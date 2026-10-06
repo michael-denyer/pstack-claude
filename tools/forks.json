@@ -122,13 +122,13 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/orch/orch.test.ts": {
       "kind": "policy",
-      "why": "Covers the guards the port adds to orch/store.ts: nested-paren status rows, leading-dash branch names, single-line table cells, frontier SHAs from exact branch refs, and colour and hyperlink codes in gt output, injecting the fake gt through the store's gt option instead of rewriting PATH and giving the CLI only PATH and ORCH_STORE instead of the whole environment, and races two processes for a stale lock to show only one replaces it.",
+      "why": "Covers the guards the port adds to orch/store.ts: nested-paren status rows, leading-dash branch names, single-line table cells, frontier SHAs from exact branch refs, and colour and hyperlink codes in gt output, injecting the fake gt through the store's gt option instead of rewriting PATH and giving the CLI only PATH and ORCH_STORE instead of the whole environment, races two processes for a stale lock to show only one replaces it, and round-trips cells that start with a formula or quote character.",
       "since": "0.9.47",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/orch/store.ts": {
       "kind": "policy",
-      "why": "Adds guards for temp-file cleanup, single-line status table cells, nested-paren gt status rows, leading-dash branch names, and frontier SHAs resolved from exact local branch refs, runs gt and git without an env override and strips terminal control sequences from gt output instead of setting NO_COLOR, takes the gt path as an open option so tests can inject a fake, and serializes stale-lock takeovers behind a second exclusive file that a forced steal may overwrite.",
+      "why": "Adds guards for temp-file cleanup, single-line status table cells, nested-paren gt status rows, leading-dash branch names, and frontier SHAs resolved from exact local branch refs, runs gt and git without an env override and strips terminal control sequences from gt output instead of setting NO_COLOR, takes the gt path as an open option so tests can inject a fake, serializes stale-lock takeovers behind a second exclusive file that a forced steal may overwrite, and quotes spreadsheet-formula cells only when writing a TSV and strips the quote when reading one so ids and branches round-trip unchanged.",
       "since": "0.9.13",
       "upstream": "not-proposed"
     },

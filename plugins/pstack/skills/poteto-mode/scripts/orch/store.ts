@@ -296,13 +296,19 @@ export function parseVerdict(value: string): Verdict {
   return verdict;
 }
 
+// A spreadsheet reads a leading = + - or @ as a formula and a leading ' as a
+// text marker, so every written cell gets one quote and unquoteCell drops it.
 function cleanCell(value: string): string {
   const cleaned = value.replace(/[\t\n\r]/g, " ");
-  return /^[=+\-@]/.test(cleaned) ? `'${cleaned}` : cleaned;
+  return /^['=+\-@]/.test(cleaned) ? `'${cleaned}` : cleaned;
+}
+
+function unquoteCell(value: string): string {
+  return value.startsWith("'") ? value.slice(1) : value;
 }
 
 function requiredCell(value: string, label: string): string {
-  const cleaned = cleanCell(value);
+  const cleaned = value.replace(/[\t\n\r]/g, " ");
   if (cleaned.trim().length === 0) {
     throw new UserError(`${label} must not be empty`);
   }
@@ -492,7 +498,7 @@ async function readTsv(
       if (cells.length !== width) {
         throw new UserError(`${basename(path)} has a malformed row`);
       }
-      return cells;
+      return cells.map(unquoteCell);
     });
 }
 
@@ -614,7 +620,7 @@ async function readPointers(
       /\r?\n$/,
       ""
     );
-    const row = raw.split("\t");
+    const row = raw.split("\t").map(unquoteCell);
     if (/[\r\n]/.test(raw) || row.length !== 5) {
       throw new UserError(`inbox pointer ${entry.name} is malformed`);
     }

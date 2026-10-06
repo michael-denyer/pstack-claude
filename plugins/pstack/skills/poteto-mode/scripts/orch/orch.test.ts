@@ -219,7 +219,7 @@ describe("Store", () => {
     ).toMatchObject({ id: "u1", state: "pending" });
     expect(
       await store.units.add({ id: "=SUM(A1)", track: "+build" })
-    ).toMatchObject({ id: "'=SUM(A1)", track: "'+build" });
+    ).toMatchObject({ id: "=SUM(A1)", track: "+build" });
 
     const updated = await store.units.set({
       id: "u1",
@@ -831,7 +831,7 @@ fi
   });
 
   it("round-trips cells that start with a spreadsheet formula or quote character", async () => {
-    const { store } = await initializedStore();
+    const { directory, store } = await initializedStore();
     await store.units.add({ id: "-hotfix", track: "build", brief: "'quoted" });
     const set = await store.units.set({
       id: "-hotfix",
@@ -844,5 +844,8 @@ fi
       brief: "'quoted",
     });
     expect(await store.units.get("-hotfix")).toEqual(set);
+    expect(await readFile(join(directory, "units.tsv"), "utf8")).toBe(
+      "id\ttrack\tstate\tbranch\tpr\tsha\tbrief\n'-hotfix\tbuild\tin-flight\t'@me/feat\t\t\t''quoted\n"
+    );
   });
 });

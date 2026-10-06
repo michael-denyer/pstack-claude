@@ -511,6 +511,9 @@ export function resolveModels(models) {
 }
 
 const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
+// The tiers the stamped regions read by name (setup-pstack's Models section,
+// the roles-by-tier table, and each runtime's Model names section).
+const TIERS = ["default", "strongest", "panel"];
 
 // Check models.json's shape and resolve its tiers, throwing with the offending
 // role, tier, or slug named. `skillExists(skill)` reports whether a role's
@@ -533,6 +536,9 @@ export function parseModels(raw, skillExists) {
   }
   const available = new Set(raw.available);
   unique(raw.available, "available");
+  for (const tier of TIERS) {
+    if (!Object.hasOwn(raw.tiers, tier)) fail(`tiers has no "${tier}", which a stamped region renders from`);
+  }
   const tierLists = new Map();
   for (const [tier, value] of Object.entries(raw.tiers)) {
     const slugs = [value].flat();

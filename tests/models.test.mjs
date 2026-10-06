@@ -59,6 +59,16 @@ describe("parseModels", () => {
     expect(parse((p) => delete p.codex)).toThrow('models.json: "codex" must be an object');
   });
 
+  test("a missing default, strongest, or panel tier throws naming it, since stamped regions render from each", () => {
+    expect(
+      parse((p) => {
+        delete p.tiers.strongest;
+        delete p.codex.strongest;
+        p.roles = p.roles.filter((r) => r.models !== "strongest");
+      }),
+    ).toThrow('models.json: tiers has no "strongest"');
+  });
+
   test("a role naming an undefined tier throws naming the role and the tier", () => {
     expect(parse((p) => (role(p, "bug-fix").models = "strongset"))).toThrow(
       'models.json: role "bug-fix" names tier "strongset", which tiers does not define',

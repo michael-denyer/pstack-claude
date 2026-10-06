@@ -114,7 +114,10 @@ describe("static plugin invariants", () => {
     "subagent_type: pstack:poteto-agent",
     "subagent_type: `pstack:poteto-agent`",
     'subagent_type: "poteto-agent-high"',
-  ])("a namespaced or longer dispatch %s passes", (line) => {
+    "subagent_type: poteto-agent_v2",
+    "subagent_type: poteto-agent.local",
+    "my_subagent_type: poteto-agent",
+  ])("a namespaced, longer, or differently keyed dispatch %s passes", (line) => {
     const root = plugin((r) => {
       agent(r, "poteto-agent");
       skill(r, "caller", "", `Spawn with ${line}.\n`);

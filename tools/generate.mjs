@@ -211,7 +211,9 @@ export function validatePluginLayout(pluginRoot) {
     readFileSync(file, "utf8").split("\n").forEach((line, i) => {
       // The key is a whole word, but a letter that a backslash escapes does
       // not extend it: \b would reject the key after the n of a literal "\n".
-      for (const [, name] of line.matchAll(/(?<!(?<!\\)\w)subagent_type[\s\\"'`*]*[:=][\s\\"'`*]*([a-z0-9-]+)(?![\w-]|\.\w)/g)) {
+      // The text before the key is consumed, not asserted, because a leading
+      // lookbehind scanned a long line about nine times slower.
+      for (const [, name] of line.matchAll(/(?:^|\W|\\\w)subagent_type[\s\\"'`*]*[:=][\s\\"'`*]*([a-z0-9-]+)(?![\w-]|\.\w)/g)) {
         if (agents.includes(name)) {
           bareDispatches.push(`${relative(pluginRoot, file)}:${i + 1}: subagent_type: "${name}" (use "pstack:${name}")`);
         }

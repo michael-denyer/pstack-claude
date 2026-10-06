@@ -188,6 +188,16 @@ describe("strayModelSlugs", () => {
     }
     expect(strayModelSlugs(file, "# other\n\nRun it in claude-code and read claude-mem.\n", models)).toEqual([]);
   });
+
+  test.each([
+    "Needs claude-code-2.1.267 or newer.",
+    "Sandbox scratch lives in /tmp/claude-501/.",
+    "Back up to ~/.claude-backup-20261006 first.",
+    "Pin claude-agent-sdk-0.2.x in package.json.",
+    "Tracked as claude-code-issue-12345.",
+  ])("a release, uid, date, or issue number after claude- is not a model ID: %s", (line) => {
+    expect(strayModelSlugs("plugins/pstack/skills/other/SKILL.md", `# other\n\n${line}\n`, models)).toEqual([]);
+  });
 });
 
 describe("stampVersion", () => {

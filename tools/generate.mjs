@@ -756,7 +756,10 @@ export function overrideSheetBlock(models) {
 export function strayModelSlugs(file, text, models) {
   const families = models.available.join("|");
   const familyId = `claude-(?:${families})`;
-  const versionedId = "claude-(?:[a-z]+-)*[0-9]";
+  // A model ID carries a one- or two-digit version after one family word
+  // (claude-mythos-1) or leads with its generation (claude-3-opus-20240229).
+  // A dotted release, a longer number, or a second word names something else.
+  const versionedId = "claude-(?:[a-z]+-[0-9]{1,2}(?![0-9]|\\.[0-9])|[0-9]{1,2}-(?:[0-9]{1,2}-)?[a-z])";
   const SLUG_RE = new RegExp(`(?:${familyId}|${versionedId})[0-9a-z.-]*|\`(?:${families})\``);
   const lines = text.split("\n");
   const owned = regions(models)

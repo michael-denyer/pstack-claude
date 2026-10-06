@@ -85,25 +85,27 @@ export function defaultTranscriptRoots({ env = process.env, home = homedir(), ex
 }
 
 // APFS inode numbers pass 2^53, where two of them read as one number.
-const fileId = (path) => {
-  const { dev, ino } = statSync(path, { bigint: true });
+const fileId = (path, stat) => {
+  const { dev, ino } = stat(path, { bigint: true });
   return `${dev}:${ino}`;
 };
 
-// A dangling or looping link (ENOENT, ELOOP) spells nothing. Any other link
-// `resolve` cannot name is known by the identity stat reports: bun's
-// realpathSync opens the directory a link lands on, which macOS refuses for
-// its autofs /home, while stat still follows the link. When stat fails too,
-// the route is closed to this process and the link could land anywhere, so the
-// error propagates and the caller leaves the worktree's chat fact unknown.
-export function symlinkTargets(dir, resolve = realpathSync) {
+// A link is known by the identity stat reports for what it lands on, and by
+// the name realpathSync gives it when it gives one. The name alone misses
+// links: node resolves `..` in a target before the links in it and keeps a
+// firmlink route as written, and bun opens the target to name it, which macOS
+// refuses for its autofs /home. A dangling or looping link (ENOENT, ELOOP)
+// spells nothing. When stat fails any other way the route is closed to this
+// process and the link could land anywhere, so the error propagates and the
+// caller leaves the worktree's chat fact unknown.
+export function symlinkTargets(dir, stat = statSync) {
   return readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isSymbolicLink()).flatMap((entry) => {
     const link = join(dir, entry.name);
     try {
-      return [[link, resolve(link)]];
+      return [[link, { id: fileId(link, stat), name: probe(() => realpathSync(link)).value }]];
     } catch (error) {
       if (["ENOENT", "ELOOP"].includes(error.code)) return [];
-      return [[link, { id: fileId(link) }]];
+      throw error;
     }
   });
 }
@@ -112,7 +114,7 @@ export function symlinkTargets(dir, resolve = realpathSync) {
 // through a symlink in an ancestor directory, as macOS spells /private/tmp/x
 // as /tmp/x, or through several, as /tmp/link/x when /private/tmp/link points
 // at /private/tmp/real. A worktree whose directory is gone keeps git's spelling.
-export function pathSpellings(path, linksIn = symlinkTargets) {
+export function pathSpellings(path, linksIn = symlinkTargets, stat = statSync) {
   let resolved;
   try {
     resolved = realpathSync(path);
@@ -126,9 +128,9 @@ export function pathSpellings(path, linksIn = symlinkTargets) {
     if (dir === dirname(dir)) break;
   }
   const onPath = [...ancestors, resolved];
-  // A link known only by identity lands on whichever of these directories shares it, if any.
-  const named = (target) => (typeof target === "string" ? target : onPath.find((dir) => fileId(dir) === target.id));
-  const links = ancestors.flatMap((dir) => linksIn(dir).map(([link, target]) => [dir, link, named(target)]));
+  // A link lands on the directory it names and on the one that shares its identity, if any.
+  const landings = ({ id, name }) => [name, onPath.find((dir) => fileId(dir, stat) === id)];
+  const links = ancestors.flatMap((dir) => linksIn(dir).flatMap(([link, target]) => landings(target).map((landing) => [dir, link, landing])));
   // Spell each directory from the root down, so a link's own directory is
   // already spelled when the link is applied. A link back up to an ancestor of
   // its directory is applied through that directory's resolved spelling only,

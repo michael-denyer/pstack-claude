@@ -155,6 +155,15 @@ function runAudit(fixture, { prs = [], gh, transcripts = [fixture.transcripts] }
 
 const rowFor = (rows, worktree) => rows.find((row) => row.at(-1) === worktree);
 const ymd = (seconds) => new Date(seconds * 1000).toISOString().slice(0, 10);
+
+// node works out a link's target from its text where bun asks the kernel, so the two can disagree on a row.
+function rowUnderNode(fixture, worktree) {
+  const body = `const { audit } = await import(${JSON.stringify(scriptUrl)});
+    process.stdout.write(audit({ repo: ${JSON.stringify(fixture.repo)}, transcripts: [${JSON.stringify(fixture.transcripts)}], gh: () => "[]" }));`;
+  const run = spawnSync("node", ["--input-type=module", "-e", body], { encoding: "utf8" });
+  expect(run.stderr).toBe("");
+  return rowFor(run.stdout.trimEnd().split("\n").map((line) => line.split("\t")), worktree);
+}
 const head = (worktree) => git("-C", worktree, "rev-parse", "HEAD");
 
 test("audits every worktree of a fixture repo end to end", () => {
@@ -435,23 +444,15 @@ describe("pathSpellings", () => {
       expect(() => pathSpellings(join(root, "real/worktree"))).toThrow(/EACCES.*alias/);
     });
 
-    // bun answers EPERM for macOS's autofs /home, a link stat can still follow.
-    test("a link the resolver refuses to name is matched by the directory it lands on", () => {
+    // bun opens a link's target to name it, which macOS refuses here as it does for its autofs /home.
+    test.skipIf(noChmod)("a link to a directory this user cannot list is not a failure", () => {
       const root = layout();
-      const worktree = join(root, "real/worktree");
+      const before = pathSpellings(join(root, "real/worktree"));
       mkdirSync(join(root, "elsewhere"));
       symlinkSync(join(root, "elsewhere"), join(root, "other"));
-      const refused = [];
-      // Only the fixture's links, so the machine's own root links resolve as they always do.
-      const refusing = (link) => {
-        if (!link.startsWith(root)) return realpathSync(link);
-        refused.push(link);
-        throw Object.assign(new Error("refused"), { code: "EPERM" });
-      };
-      const spellings = pathSpellings(worktree, (dir) => symlinkTargets(dir, refusing));
-      expect(refused.sort()).toEqual([join(root, "link"), join(root, "other")]);
-      expect(spellings).toContain(join(root, "link/worktree"));
-      expect(spellings).toEqual(pathSpellings(worktree));
+      chmodSync(join(root, "elsewhere"), 0o311);
+      locked.push(join(root, "elsewhere"));
+      expect(pathSpellings(join(root, "real/worktree"))).toEqual(before);
     });
 
     test("a symlink reached through another symlink composes with it", () => {
@@ -494,6 +495,33 @@ describe("pathSpellings", () => {
       const { rows, warnings } = runAudit(fixture);
       expect(warnings).toEqual([]);
       expect(rowFor(rows, worktree).slice(6, 8)).toEqual([ymd(Math.floor(Date.now() / 1000)), "verify-recent-chat"]);
+    });
+
+    const heldUnderBunAndNode = (link) => {
+      const fixture = createFixture();
+      const worktree = addWorktree(fixture, "real/worktree");
+      link(fixture.root);
+      writeTranscript(fixture, "-proj/session.jsonl", join(fixture.root, "alias/worktree"));
+      const held = [ymd(Math.floor(Date.now() / 1000)), "verify-recent-chat"];
+      expect(rowFor(runAudit(fixture).rows, worktree).slice(6, 8)).toEqual(held);
+      expect(rowUnderNode(fixture, worktree).slice(6, 8)).toEqual(held);
+    };
+
+    test.skipIf(noNode)("node holds a worktree whose only chat named it through a symlink, as bun does", () => {
+      heldUnderBunAndNode((root) => symlinkSync(join(root, "real"), join(root, "alias")));
+    });
+
+    // node resolves `..` in a link's target before the links in it. Windows has no such route.
+    test.skipIf(noNode || process.platform === "win32")("node holds a worktree whose only chat named it through a link that climbs out of another link", () => {
+      heldUnderBunAndNode((root) => {
+        symlinkSync(join(root, "real/worktree"), join(root, "hop"));
+        symlinkSync(`${root}/hop/..`, join(root, "alias"));
+      });
+    });
+
+    // node keeps a route through a firmlink as written.
+    test.skipIf(noNode || process.platform !== "darwin")("node holds a worktree whose only chat named it through a link over macOS's data volume", () => {
+      heldUnderBunAndNode((root) => symlinkSync(`/System/Volumes/Data${join(root, "real")}`, join(root, "alias")));
     });
   });
 });

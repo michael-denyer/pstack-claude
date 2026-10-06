@@ -82,7 +82,7 @@ describe("project playbooks", () => {
     expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
   });
 
-  test.failing("with no argument the root is the working directory", () => {
+  test("with no argument the root is the working directory", () => {
     const result = run({ "ship.md": "---\nextends: shipping-v2\nwhen: Use it to ship.\n---\n" }, { args: [] });
     expect(result).toEqual({
       code: 1,
@@ -90,14 +90,14 @@ describe("project playbooks", () => {
     });
   });
 
-  test.failing("a repository with no project playbooks passes and the check says there are none", () => {
+  test("a repository with no project playbooks passes and the check says there are none", () => {
     expect(run(null)).toEqual({
       code: 0,
       out: "No project playbooks to check: <root>/.agents/playbooks does not exist.\n",
     });
   });
 
-  test.failing("from a subdirectory the check names the directory it read and reports no match", () => {
+  test("from a subdirectory the check names the directory it read and reports no match", () => {
     const result = run({ "ship.md": "---\nextends: shipping-v2\nwhen: Use it to ship.\n---\n" }, { cwd: "src", args: [] });
     expect(result).toEqual({
       code: 0,

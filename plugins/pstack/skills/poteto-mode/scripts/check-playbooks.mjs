@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
@@ -55,25 +54,18 @@ function invokedDirectly() {
   }
 }
 
-function repositoryRoot(argument) {
-  if (argument) {
-    const root = resolve(argument);
-    if (statSync(root, { throwIfNoEntry: false })?.isDirectory()) return root;
-    console.error(`${root} is not a directory`);
-    process.exit(1);
-  }
-  const git = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" });
-  if (git.status === 0) return git.stdout.trim();
-  console.error("git found no repository here; pass the repository root as the argument");
-  process.exit(1);
-}
-
 if (invokedDirectly()) {
-  const problems = checkPlaybooks(repositoryRoot(process.argv[2]));
+  const root = resolve(process.argv[2] ?? ".");
+  const directory = join(root, ".agents/playbooks");
+  const problems = statSync(root, { throwIfNoEntry: false })?.isDirectory()
+    ? checkPlaybooks(root)
+    : [`${root} is not a directory`];
   if (problems.length > 0) {
     console.error(problems.join("\n"));
     process.exitCode = 1;
-  } else {
+  } else if (existsSync(directory)) {
     console.log("Every project playbook matches this pstack's playbooks.");
+  } else {
+    console.log(`No project playbooks to check: ${directory} does not exist.`);
   }
 }

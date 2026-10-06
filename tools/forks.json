@@ -170,7 +170,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.test.ts": {
       "kind": "policy",
-      "why": "Covers the review-required, behind-base, and branch-protection merge gates and their wait for pending checks, the retry while GitHub has not computed mergeability, a PR with no checks configured (waiting on the first sighting, ready once the reading persists for an interval, still stopped by conflicts, threads, and gates, honouring checks that register on the next poll, and failing closed while the head may not have reported), the second facts read in the snapshot plan and the retry when a gate, review, draft, or conflict state changes between the two reads, and the shared deadline in the poll loop.",
+      "why": "Covers the review-required, behind-base, and branch-protection merge gates and their wait for pending checks, the retry while GitHub has not computed mergeability, a PR with no checks configured (waiting on the first sighting in single, stack, and queued mode, timing out there under a deadline shorter than the interval, ready once the reading persists for an interval, still stopped by conflicts, threads, and gates, honouring checks that register on the next poll, and failing closed while the head may not have reported), the second facts read in the snapshot plan and the retry when a gate, review, draft, or conflict state changes between the two reads, and the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },

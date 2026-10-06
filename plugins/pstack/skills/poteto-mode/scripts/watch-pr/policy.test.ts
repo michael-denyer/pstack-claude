@@ -574,25 +574,33 @@ describe("a PR with no checks configured", () => {
       allowDraft: false,
       confirmNoChecks,
     });
-  const run = (
+  const dependencies = (
     reader: GitHubReader,
     clock: { now: () => number; sleep: (seconds: number) => Promise<void> },
     emitted: ProgressVerdict[],
-  ) =>
+    timeout = 0,
+  ) => ({
+    reader,
+    emit: (verdict: ProgressVerdict) => {
+      emitted.push(verdict);
+    },
+    clock: { ...clock, observedAt: () => "2026-07-26T00:00:00.000Z" },
+    deadline: new WatchDeadline(timeout, clock.now),
+  });
+  const run = (...args: Parameters<typeof dependencies>) =>
     runSimple({
-      dependencies: {
-        reader,
-        emit: (verdict) => {
-          emitted.push(verdict);
-        },
-        clock: { ...clock, observedAt: () => "2026-07-26T00:00:00.000Z" },
-        deadline: new WatchDeadline(0, clock.now),
-      },
+      dependencies: dependencies(...args),
       contexts: [context(30)],
       mode: "single",
       statusOnly: false,
       options,
     });
+  const kinds = (emitted: readonly ProgressVerdict[]) =>
+    emitted.map((verdict) =>
+      verdict.kind === "WAITING"
+        ? `${verdict.kind}:${verdict.reason.kind}`
+        : verdict.kind,
+    );
 
   it("is ready once the no-checks reading is confirmed and GitHub reports it mergeable", async () => {
     const snapshot = await read({ facts: { reviewDecision: null } });
@@ -714,13 +722,97 @@ describe("a PR with no checks configured", () => {
       emitted,
     );
     await expect(running).rejects.toThrow("stop after two polls");
-    expect(
-      emitted.map((verdict) =>
-        verdict.kind === "WAITING"
-          ? `${verdict.kind}:${verdict.reason.kind}`
-          : verdict.kind,
+    expect(kinds(emitted)).toEqual([
+      "WAITING:checks-unreported",
+      "WAITING:pending-checks",
+    ]);
+  });
+
+  it("times out on a first sighting when the deadline is shorter than the interval", async () => {
+    let now = 0;
+    const emitted: ProgressVerdict[] = [];
+    const verdict = await run(
+      fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
+      {
+        now: () => now,
+        async sleep(seconds) {
+          now += seconds;
+        },
+      },
+      emitted,
+      options.interval / 2,
+    );
+    expect(kinds(emitted)).toEqual(["WAITING:checks-unreported"]);
+    expect(verdict).toMatchObject({
+      kind: "TIMEOUT",
+      exitCode: 5,
+      reason: { kind: "checks-unreported" },
+    });
+  });
+
+  it("confirms each PR of a stack on its own sightings", async () => {
+    let now = 0;
+    const emitted: ProgressVerdict[] = [];
+    const verdict = await runSimple({
+      dependencies: dependencies(
+        fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
+        {
+          now: () => now,
+          async sleep(seconds) {
+            now += seconds;
+          },
+        },
+        emitted,
       ),
-    ).toEqual(["WAITING:checks-unreported", "WAITING:pending-checks"]);
+      contexts: [context(30), context(31)],
+      mode: "stack",
+      statusOnly: false,
+      options,
+    });
+    expect(kinds(emitted)).toEqual([
+      "STATUS",
+      "WAITING:checks-unreported",
+      "STATUS",
+    ]);
+    expect(now).toBe(options.interval);
+    expect(verdict).toMatchObject({
+      kind: "READY",
+      scope: {
+        kind: "stack",
+        prs: [
+          { context: context(30), proof: { ci: { kind: "ci-none" } } },
+          { context: context(31), proof: { ci: { kind: "ci-none" } } },
+        ],
+      },
+    });
+  });
+
+  it("holds a queued frontier on its first sighting before reporting it blocker-free", async () => {
+    let now = 0;
+    let sleeps = 0;
+    const emitted: ProgressVerdict[] = [];
+    const running = runQueued({
+      dependencies: dependencies(
+        fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
+        {
+          now: () => now,
+          async sleep(seconds) {
+            now += seconds;
+            if (++sleeps === 2) throw new Error("stop after two polls");
+          },
+        },
+        emitted,
+      ),
+      contexts: [context(30)],
+      options,
+    });
+    await expect(running).rejects.toThrow("stop after two polls");
+    expect(kinds(emitted)).toEqual([
+      "QUEUE",
+      "STATUS",
+      "WAITING:checks-unreported",
+      "WAITING:merge-queue",
+    ]);
   });
 
   it("still stops on conflicts, review threads, and merge gates", async () => {

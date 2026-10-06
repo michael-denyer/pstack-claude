@@ -204,6 +204,12 @@ describe("assertChangesHeading", () => {
       'read "## <version> - <title>":\n## 0.9.0 — em dash\n## 0.8.9',
     );
   });
+
+  test("a heading newer than VERSION fails naming both, so an entry without a bump cannot ship", () => {
+    expect(() => assertChangesHeading("# Changes\n\n## 0.9.71 - newer\n\n## 0.9.70 - current\n", "0.9.70")).toThrow(
+      'CHANGES.md\'s newest release heading is "## 0.9.71 - newer", but VERSION is 0.9.70',
+    );
+  });
 });
 
 describe("slashCommands", () => {

@@ -1072,7 +1072,13 @@ fi
     expect(await store.units.list()).toMatchObject(units);
   });
 
-  it("fails a frontier set when gt hangs past the timeout", async () => {
+  it.each([
+    ["gt log short --stack --reverse", ""],
+    [
+      "gt info feat",
+      `if [ "$2" = log ]; then printf '◯ main\\n◉ feat\\n'; exit 0; fi\n`,
+    ],
+  ])("fails a frontier set when %s hangs and ignores SIGTERM", async (call, answerLog) => {
     const directory = await makeDirectory();
     const store = useStore(directory, {
       gt: fakeGtPath(directory),
@@ -1082,11 +1088,13 @@ fi
     await mkdir(join(directory, "bin"));
     await writeFile(
       fakeGtPath(directory),
-      "#!/usr/bin/env bash\nexec sleep 10\n",
+      `#!/usr/bin/env bash\n${answerLog}trap '' TERM\nexec sleep 3\n`,
       { mode: 0o755 }
     );
+    const started = Date.now();
     await expect(store.frontier.set({ repo: directory })).rejects.toThrow(
-      /^gt log short --stack --reverse failed: .*ETIMEDOUT/
+      new RegExp(`^${call} failed: .*ETIMEDOUT`)
     );
+    expect(Date.now() - started).toBeLessThan(2000);
   });
 });

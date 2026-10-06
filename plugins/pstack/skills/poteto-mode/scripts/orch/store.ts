@@ -1147,6 +1147,7 @@ function graphitePullRequest({
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
         timeout,
+        killSignal: "SIGKILL",
       })
     );
   } catch (error) {
@@ -1194,6 +1195,7 @@ function graphiteFrontier({
           encoding: "utf8",
           stdio: ["ignore", "pipe", "pipe"],
           timeout,
+          killSignal: "SIGKILL",
         }
       )
     );

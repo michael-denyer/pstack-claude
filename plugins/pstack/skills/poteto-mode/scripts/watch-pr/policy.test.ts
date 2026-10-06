@@ -11,6 +11,7 @@ import {
   queryBackoffSeconds,
   readSnapshot,
   runQueued,
+  runSimple,
   selectTierMajorStackDecision,
 } from "./policy.ts";
 import {
@@ -561,20 +562,150 @@ describe("a PR with no checks configured", () => {
     rollupPages: [{ kind: "no-rollup" }],
     commitRollups: [{ oid: "head", state: null }],
   } as const;
-  const read = (overrides: Parameters<typeof fakeReader>[0] = {}) =>
+  const read = (
+    overrides: Parameters<typeof fakeReader>[0] = {},
+    confirmNoChecks = () => true,
+  ) =>
     readSnapshot({
       reader: fakeReader({ ...noChecks, ...overrides }),
       context: context(30),
       pendingHistory: "omit",
       allowDraft: false,
+      confirmNoChecks,
+    });
+  const run = (
+    reader: GitHubReader,
+    clock: { now: () => number; sleep: (seconds: number) => Promise<void> },
+    emitted: ProgressVerdict[],
+  ) =>
+    runSimple({
+      dependencies: {
+        reader,
+        emit: (verdict) => {
+          emitted.push(verdict);
+        },
+        clock: { ...clock, observedAt: () => "2026-07-26T00:00:00.000Z" },
+        deadline: new WatchDeadline(0, clock.now),
+      },
+      contexts: [context(30)],
+      mode: "single",
+      statusOnly: false,
+      options,
     });
 
-  it("is ready when GitHub reports it mergeable", async () => {
+  it("is ready once the no-checks reading is confirmed and GitHub reports it mergeable", async () => {
     const snapshot = await read({ facts: { reviewDecision: null } });
     expect(classifyPr(snapshot)).toMatchObject({
       kind: "ready",
       pr: { proof: { ci: { kind: "ci-none" } } },
     });
+  });
+
+  it("waits on a first sighting instead of reporting ready or a merge gate", async () => {
+    for (const facts of [
+      { reviewDecision: null },
+      { mergeStateStatus: "BLOCKED" },
+      { reviewDecision: "REVIEW_REQUIRED" },
+    ] as const) {
+      const snapshot = await read({ facts }, () => false);
+      expect(snapshot).toMatchObject({
+        kind: "open",
+        ci: { kind: "ci-unreported" },
+      });
+      expect(classifyPr(snapshot)).toEqual({
+        kind: "waiting",
+        frontier: context(30),
+        reason: { kind: "checks-unreported" },
+      });
+    }
+  });
+
+  it("reports a repository with no CI ready on the second poll one interval later", async () => {
+    let now = 0;
+    const emitted: ProgressVerdict[] = [];
+    const verdict = await run(
+      fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
+      {
+        now: () => now,
+        async sleep(seconds) {
+          now += seconds;
+        },
+      },
+      emitted,
+    );
+    expect(emitted).toMatchObject([
+      { kind: "WAITING", reason: { kind: "checks-unreported" } },
+    ]);
+    expect(now).toBe(options.interval);
+    expect(verdict).toMatchObject({
+      kind: "READY",
+      scope: { pr: { proof: { ci: { kind: "ci-none" } } } },
+    });
+  });
+
+  it("stops at the merge gate once a blocked PR has shown no checks for an interval", async () => {
+    let now = 0;
+    const emitted: ProgressVerdict[] = [];
+    const verdict = await run(
+      fakeReader({
+        ...noChecks,
+        facts: { mergeStateStatus: "BLOCKED", reviewDecision: null },
+      }),
+      {
+        now: () => now,
+        async sleep(seconds) {
+          now += seconds;
+        },
+      },
+      emitted,
+    );
+    expect(emitted).toMatchObject([
+      { kind: "WAITING", reason: { kind: "checks-unreported" } },
+    ]);
+    expect(verdict).toMatchObject({
+      kind: "BLOCKER",
+      exitCode: 6,
+      blocker: { kind: "merge-gate", reason: "merge-blocked" },
+    });
+  });
+
+  it("waits through a first sighting and honours checks that register on the next poll", async () => {
+    const base = fakeReader({
+      ...noChecks,
+      facts: { mergeStateStatus: "BLOCKED", reviewDecision: null },
+    });
+    let polls = 0;
+    const reader = {
+      ...base,
+      async checksFastPath() {
+        polls += 1;
+        return polls === 1
+          ? { kind: "none-reported" as const }
+          : { kind: "checks" as const, checks: [pendingCheck("required-ci")] };
+      },
+    } satisfies GitHubReader;
+    let now = 0;
+    let sleeps = 0;
+    const emitted: ProgressVerdict[] = [];
+    const running = run(
+      reader,
+      {
+        now: () => now,
+        async sleep(seconds) {
+          now += seconds;
+          if (++sleeps === 2) throw new Error("stop after two polls");
+        },
+      },
+      emitted,
+    );
+    await expect(running).rejects.toThrow("stop after two polls");
+    expect(
+      emitted.map((verdict) =>
+        verdict.kind === "WAITING"
+          ? `${verdict.kind}:${verdict.reason.kind}`
+          : verdict.kind,
+      ),
+    ).toEqual(["WAITING:checks-unreported", "WAITING:pending-checks"]);
   });
 
   it("still stops on conflicts, review threads, and merge gates", async () => {

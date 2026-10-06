@@ -79,7 +79,7 @@ console.log(JSON.stringify(value));
     [entry, "--owner", "owner", "--repo", "repo", "--pr", "1", ...extra],
     {
       encoding: "utf8",
-      timeout: 3000,
+      timeout: 6000,
       env: {
         PATH: `${bin}:${process.env.PATH}`,
         WATCH_FIXTURE: scenario,
@@ -134,32 +134,49 @@ it("keeps a fork main branch distinct from destination main during stack discove
 // The no-ci fixtures replay what gh returned for a mergeable PR in a repository
 // with no checks configured: `gh pr checks` exits 1 with "no checks reported"
 // and the head commit's statusCheckRollup is null.
-it("finishes a status-only pass for a clean PR with no checks configured", () => {
+const verdicts = (stdout: string): unknown[] =>
+  stdout
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as unknown);
+
+it("reports a first sighting of no checks on a status-only pass", () => {
   const result = run("no-ci", ["--status-only", "--max-query-errors", "1"]);
   expect(result.status).toBe(0);
   expect(JSON.parse(result.stdout.trim())).toMatchObject({
     kind: "STATUS",
     terminal: true,
-    rows: [{ kind: "open", ci: { kind: "ci-none" } }],
+    rows: [{ kind: "open", ci: { kind: "ci-unreported" } }],
   });
 });
 
-it("reports a clean PR with no checks configured as READY", () => {
-  const result = run("no-ci", ["--max-query-errors", "1"]);
+it("reports a clean PR with no checks configured as READY once the reading persists", () => {
+  const result = run("no-ci", ["--max-query-errors", "1", "--interval", "0.2"]);
   expect(result.status).toBe(0);
-  expect(JSON.parse(result.stdout.trim())).toMatchObject({
-    kind: "READY",
-    scope: { pr: { kind: "ready-pr", proof: { ci: { kind: "ci-none" } } } },
-  });
+  expect(verdicts(result.stdout)).toMatchObject([
+    { kind: "WAITING", reason: { kind: "checks-unreported" } },
+    {
+      kind: "READY",
+      scope: { pr: { kind: "ready-pr", proof: { ci: { kind: "ci-none" } } } },
+    },
+  ]);
 });
 
-it("stops at the merge gate when GitHub blocks a PR that has no checks", () => {
-  const result = run("no-ci-blocked", ["--max-query-errors", "1"]);
+it("stops at the merge gate once a blocked PR has shown no checks for an interval", () => {
+  const result = run("no-ci-blocked", [
+    "--max-query-errors",
+    "1",
+    "--interval",
+    "0.2",
+  ]);
   expect(result.status).toBe(6);
-  expect(JSON.parse(result.stdout.trim())).toMatchObject({
-    kind: "BLOCKER",
-    blocker: { kind: "merge-gate", reason: "merge-blocked" },
-  });
+  expect(verdicts(result.stdout)).toMatchObject([
+    { kind: "WAITING", reason: { kind: "checks-unreported" } },
+    {
+      kind: "BLOCKER",
+      blocker: { kind: "merge-gate", reason: "merge-blocked" },
+    },
+  ]);
 });
 
 it("fails closed when the check queries fail instead of reporting no checks", () => {

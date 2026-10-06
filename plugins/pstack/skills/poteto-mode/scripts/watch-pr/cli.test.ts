@@ -239,13 +239,25 @@ describe("main", () => {
     const status = noChecks();
     expect(await main([...argv, "--status-only"], status.runtime)).toBe(0);
     expect(status.stdout.join("")).toContain(
-      "| [#1](https://github.com/owner/repo/pull/1) | ➖ no checks | ✅ | ✅ |"
+      "| [#1](https://github.com/owner/repo/pull/1) | ⏳ no checks reported yet | ✅ | ✅ |"
     );
     const ready = noChecks();
-    expect(await main(argv, ready.runtime)).toBe(0);
-    expect(ready.stdout.join("")).toBe(
-      "READY: no merge conflicts, no unresolved review threads, no failing or pending checks\nmergeStateStatus=CLEAN\nreviewDecision=null\nisDraft=false\nchecks=none reported on the head commit\n"
-    );
+    let now = 0;
+    const runtime = {
+      ...ready.runtime,
+      clock: {
+        ...ready.runtime.clock,
+        now: () => now,
+        async sleep(seconds: number) {
+          now += seconds;
+        },
+      },
+    };
+    expect(await main(argv, runtime)).toBe(0);
+    expect(ready.stdout).toEqual([
+      "WAITING: frontier=#1; no checks have reported on the head commit yet\n",
+      "READY: no merge conflicts, no unresolved review threads, no failing or pending checks\nmergeStateStatus=CLEAN\nreviewDecision=null\nisDraft=false\nchecks=none reported on the head commit\n",
+    ]);
   });
 
   it("shows help without touching the reader", async () => {

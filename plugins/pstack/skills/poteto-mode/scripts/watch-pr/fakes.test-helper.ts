@@ -15,6 +15,8 @@ import { parsePrNumber } from "./types.ts";
 
 export interface FakeReaderOptions {
   readonly facts?: Partial<Omit<PullRequestFacts, "context">>;
+  /** Facts every pullRequest read after the first returns, over `facts`. */
+  readonly laterFacts?: Partial<Omit<PullRequestFacts, "context">>;
   readonly fastPath?: ChecksFastPath;
   readonly rollupPages?: readonly RollupPage[];
   readonly threads?: readonly ReviewThread[];
@@ -80,6 +82,7 @@ export function fakeReader(
     isDraft: false,
   };
   let page = 0;
+  let reads = 0;
   return {
     calls,
     async originRepo() {
@@ -94,7 +97,15 @@ export function fakeReader(
     },
     async pullRequest(requested) {
       calls.push("pullRequest");
-      return parsePullRequest({ ...defaults, ...options.facts }, requested);
+      reads += 1;
+      return parsePullRequest(
+        {
+          ...defaults,
+          ...options.facts,
+          ...(reads > 1 ? options.laterFacts : {}),
+        },
+        requested
+      );
     },
     async revision(requested) {
       calls.push("revision");

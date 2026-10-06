@@ -487,6 +487,38 @@ describe("review gate", () => {
   });
 });
 
+describe("facts that change while the snapshot is read", () => {
+  const read = (options: Parameters<typeof fakeReader>[0]) =>
+    readSnapshot({
+      reader: fakeReader(options),
+      context: context(29),
+      pendingHistory: "include",
+      allowDraft: false,
+    });
+
+  it("retries instead of reporting a merge gate the checks read has already cleared", async () => {
+    await expect(
+      read({
+        facts: { mergeStateStatus: "BLOCKED" },
+        laterFacts: { mergeStateStatus: "CLEAN" },
+      }),
+    ).rejects.toMatchObject({
+      failure: { kind: "snapshot-changed", retryable: true },
+    });
+  });
+
+  it("retries instead of reporting ready when a review lands after the facts read", async () => {
+    for (const laterFacts of [
+      { reviewDecision: "CHANGES_REQUESTED" },
+      { mergeable: "CONFLICTING" },
+      { isDraft: true },
+    ] as const)
+      await expect(read({ laterFacts })).rejects.toMatchObject({
+        failure: { kind: "snapshot-changed", retryable: true },
+      });
+  });
+});
+
 describe("mergeability", () => {
   it("retries while GitHub is still computing mergeability", async () => {
     for (const facts of [

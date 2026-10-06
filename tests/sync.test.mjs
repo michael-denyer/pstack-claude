@@ -405,7 +405,10 @@ describe("mergeFile", () => {
     expect(() => mergeFile(nul("ours"), nul("base"), nul("theirs"))).toThrow("Command failed");
   });
 
-  test("a conflict carries git's merge-style markers whatever the user's merge.conflictStyle", () => {
+  test.each([
+    ["the repository", undefined],
+    ["outside any repository", tmpdir()],
+  ])("a conflict carries git's merge-style markers whatever the user's merge.conflictStyle, run from %s", (_, cwd) => {
     const home = tree({ gitconfig: "[merge]\n\tconflictStyle = zdiff3\n" });
     const sides = [base.replace("l3", "ours"), base, base.replace("l3", "theirs")].map((text) => `Buffer.from(${JSON.stringify(text)})`);
     const script = [
@@ -414,6 +417,7 @@ describe("mergeFile", () => {
     ].join("\n");
 
     const result = spawnSync(process.execPath, ["-e", script], {
+      cwd,
       encoding: "utf8",
       env: { ...process.env, GIT_CONFIG_GLOBAL: join(home, "gitconfig") },
     });

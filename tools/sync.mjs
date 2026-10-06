@@ -189,17 +189,18 @@ const isBinary = (rel, raw) => BINARY.test(rel) || raw.includes(0) || !Buffer.fr
 // exits with the conflict count, capped at 127, so status 0 is a clean merge and
 // 1-127 is that many hunks. Git's own errors exit above 127 (-1 for "Cannot
 // merge binary files" reads as 255, a usage error as 129); those and a missing
-// git are errors, not conflicts, and rethrow. The conflict style is pinned so
-// a user's diff3 or zdiff3 setting cannot add a `|||||||` base section the
-// generator's marker scan would have to know about.
+// git are errors, not conflicts, and rethrow. `--no-diff3` resets the conflict
+// style after git has read the user's merge.conflictStyle, so a diff3 or zdiff3
+// setting cannot add a `|||||||` base section. `-c merge.conflictStyle=merge`
+// does not hold outside a repository, where git 2.54 still applies the global
+// setting.
 export function mergeFile(ours, base, theirs) {
   const scratch = mkdtempSync(join(tmpdir(), "pstack-merge-"));
   try {
     const paths = { ours, base, theirs };
     for (const [name, buffer] of Object.entries(paths)) writeFileSync(join(scratch, name), buffer);
     const labels = ["-L", "local", "-L", "base", "-L", "upstream"];
-    const files = [join(scratch, "ours"), join(scratch, "base"), join(scratch, "theirs")];
-    const args = ["-c", "merge.conflictStyle=merge", "merge-file", "-p", ...labels, ...files];
+    const args = ["merge-file", "-p", "--no-diff3", ...labels, join(scratch, "ours"), join(scratch, "base"), join(scratch, "theirs")];
     try {
       const merged = execFileSync("git", args, { stdio: ["ignore", "pipe", "inherit"] });
       return { clean: true, buffer: merged };

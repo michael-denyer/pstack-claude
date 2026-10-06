@@ -25,6 +25,19 @@ test("cells a spreadsheet or TSV reader would reinterpret are written with a lea
   }
 });
 
+test("cells holding % and backslash sequences are written as given", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
+  try {
+    const log = join(dir, "log.tsv");
+    const cells = ["100%", "%s %d %n %%", "\\n \\t \\\\ \\0", "why", "result"];
+    execFileSync("bash", [logScript, log, ...cells]);
+    const rows = readFileSync(log, "utf8").trimEnd().split("\n").slice(1).map((line) => line.split("\t"));
+    expect(rows.map((row) => row.slice(1))).toEqual([cells]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // A shell printf on Linux writes 4 KiB at a time. Before the single write, 20 KB
 // rows interleaved there in 12 of 20 runs and 400 KB rows in 100 of 100.
 test("40 concurrent writers with 400 KB rows leave every row intact", async () => {
@@ -95,7 +108,7 @@ for (const [state, shim, env] of [
   ["is a shim that exits 3", "#!/bin/sh\necho 'perl: broken shim' >&2\nexit 3\n", {}],
   ["is a shim that exits 0 and writes nothing", "#!/bin/sh\nwhile read -r _; do :; done\n", {}],
   ["cannot load a module PERL5OPT names", null, { PERL5OPT: "-Mpstack_no_such_module" }],
-]) test(`a row is appended when perl ${state}`, () => {
+]) test(`a row is appended, with nothing on stderr, when perl ${state}`, () => {
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
   try {
     const log = join(dir, "log.tsv");
@@ -103,11 +116,29 @@ for (const [state, shim, env] of [
     mkdirSync(bin);
     if (shim) writeFileSync(join(bin, "perl"), shim, { mode: 0o755 });
     const cells = ["phase", "naïve ✓ 100%s", "why", "日本語", "result"];
-    const { status } = spawnSync("bash", [logScript, log, ...cells], {
+    const { status, stderr } = spawnSync("bash", [logScript, log, ...cells], {
       env: { ...process.env, ...env, PATH: `${bin}:${process.env.PATH}` },
+      encoding: "utf8",
     });
     const rows = readFileSync(log, "utf8").trimEnd().split("\n").slice(1).map((line) => line.split("\t"));
-    expect({ status, rows: rows.map((row) => row.slice(1)) }).toEqual({ status: 0, rows: [cells] });
+    expect({ status, stderr, rows: rows.map((row) => row.slice(1)) }).toEqual({ status: 0, stderr: "", rows: [cells] });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the caller's stdin is left unread when perl is a shim that drains its own", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
+  try {
+    const bin = join(dir, "bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "perl"), "#!/bin/sh\nwhile read -r _; do :; done\n", { mode: 0o755 });
+    const { stdout } = spawnSync(
+      "bash",
+      ["-c", 'bash "$@" && cat', "bash", logScript, join(dir, "log.tsv"), "phase", "decision", "why", "evidence", "result"],
+      { env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, input: "caller stdin\n", encoding: "utf8" },
+    );
+    expect(stdout).toBe("caller stdin\n");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

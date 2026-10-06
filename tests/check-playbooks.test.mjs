@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { checkPlaybooks } from "../plugins/pstack/skills/poteto-mode/scripts/check-playbooks.mjs";
 
 setDefaultTimeout(30_000);
 
@@ -124,5 +125,23 @@ describe("project playbooks", () => {
       code: 1,
       out: ".agents/playbooks/ship.md: extends `../SKILL`, which this pstack has no playbook for\n",
     });
+  });
+
+  test("an extends stem with either path separator is not a playbook, even where that file exists", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      const bundled = join(root, "bundled");
+      mkdirSync(join(bundled, "sub"), { recursive: true });
+      // POSIX makes one file named `sub\x.md`. On Windows both paths are sub/x.md.
+      for (const file of ["sub/x.md", "sub\\x.md"]) writeFileSync(join(bundled, file), "");
+      mkdirSync(join(root, ".agents/playbooks"), { recursive: true });
+      writeFileSync(join(root, ".agents/playbooks/ship.md"), "---\nextends: sub/x, sub\\x\nwhen: Use it to ship.\n---\n");
+      expect(checkPlaybooks(root, bundled)).toEqual([
+        ".agents/playbooks/ship.md: extends `sub/x`, which this pstack has no playbook for",
+        ".agents/playbooks/ship.md: extends `sub\\x`, which this pstack has no playbook for",
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

@@ -80,6 +80,12 @@ for (const [form, text, artifacts, unregistered, names] of [
   assert.ok(rule.startsWith('Link each local file') && storage.includes(rule), result.value.detail);
 }));
 
+test('publishes a note that also links URLs and an anchor', () => fixture(({ run }) => {
+  const text = '[Q](q.md), [site](https://example.com/a), [feed](ws://example.com/b) and [top](#top)\n';
+  const published = publishNote(run, text, ['q.md']);
+  assert.equal(published.status, 0, published.value.detail);
+}));
+
 test('ignores links inside code spans and fenced code blocks', () => fixture(({ run }) => {
   const text = 'Start with [Q](q.md). Quote `[x](missing.md)` literally.\n\n```markdown\n[y](absent.md)\n```\n\n~~~\n[z](gone.md)\n~~~\n';
   const published = publishNote(run, text, ['q.md']);

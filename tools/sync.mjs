@@ -46,7 +46,8 @@
 // any marker line under plugins/pstack, so CI rejects an unresolved sync.
 // With --dry-run nothing is written and the pin stays; passing the pinned SHA
 // as <new-sha> under --dry-run prints the ownership map. At the pin an upstream
-// file the port lacks fails the run, since a sync to a new SHA would write it back.
+// file the port lacks fails the run, since a sync to a new SHA would write it
+// back.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import {
@@ -385,8 +386,8 @@ export function syncComponent({
     return outcome ? [{ rel, ...outcome }] : [];
   });
 
-  // The filesystem answers here, not the walk: the walk lists no empty
-  // directory, and on a case-insensitive filesystem a file B blocks a directory b.
+  // Ask the filesystem, not the walk, which lists no empty directory. On a
+  // case-insensitive filesystem a file B also blocks a directory b.
   const onDisk = (rel) => lstatSync(join(localDir, rel), { throwIfNoEntry: false });
   const collisions = new Map();
   for (const { rel, write } of outcomes) {
@@ -395,9 +396,9 @@ export function syncComponent({
     if (blocker) collisions.set(blocker, "a file where upstream has a directory");
     else if (onDisk(rel)?.isDirectory()) collisions.set(rel, "a directory where upstream has a file");
   }
-  // Every walked path counts, with or without an outcome: a path another
-  // component carries or `exclude` names has none, and a write under another
-  // spelling of it would land on it.
+  // Every walked path counts, since one that another component carries or
+  // `exclude` names has no outcome, and a write under another spelling would
+  // land on it.
   const held = new Set([...localPaths, ...outcomes.filter(({ write }) => write).map(({ rel }) => rel)]);
   for (const group of Map.groupBy(held, (rel) => rel.toLowerCase()).values()) {
     if (group.length < 2) continue;

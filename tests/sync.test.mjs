@@ -406,7 +406,7 @@ describe("mergeFile", () => {
   });
 
   test.each([
-    ["the repository", undefined],
+    ["the repository", join(import.meta.dir, "..")],
     ["outside any repository", tmpdir()],
   ])("a conflict carries git's merge-style markers whatever the user's merge.conflictStyle, run from %s", (_, cwd) => {
     const home = tree({ gitconfig: "[merge]\n\tconflictStyle = zdiff3\n" });

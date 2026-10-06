@@ -822,4 +822,17 @@ describe("plan, changes, apply", () => {
       expect.stringContaining("hooks/gone.sh does not exist"),
     ]);
   });
+
+  test("problems reports a hook path that resolves outside the plugin, through .. or through a symlink", () => {
+    const root = repoCopy();
+    const hooks = "plugins/pstack/hooks/hooks.json";
+    const text = readFileSync(join(root, hooks), "utf8");
+    writeFileSync(join(root, hooks), text.replace("hooks/session-start.sh", "../../tools/generate.mjs"));
+    expect(problems(root)).toEqual([expect.stringContaining("../../tools/generate.mjs does not exist in the plugin")]);
+    const outside = join(scratch("pstack-outside-"), "start.sh");
+    writeFileSync(outside, "#!/bin/sh\n", { mode: 0o755 });
+    symlinkSync(outside, join(root, "plugins/pstack/hooks/linked.sh"));
+    writeFileSync(join(root, hooks), text.replace("hooks/session-start.sh", "hooks/linked.sh"));
+    expect(problems(root)).toEqual([expect.stringContaining("hooks/linked.sh does not exist in the plugin")]);
+  });
 });

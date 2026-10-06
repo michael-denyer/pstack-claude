@@ -822,7 +822,8 @@ function shapeFaults(schema, value, subject) {
 // A hooks file must have the documented shape, every ${<root>}/<path> a
 // command hook names must exist in the plugin, and one the command executes
 // directly must be executable, or the SessionStart hook fails silently for
-// every user.
+// every user. `statOf(rel)` is the stat of the plugin file at rel, or null
+// when there is none, including a path that resolves outside the plugin.
 // The root is the variable the runtime exports with the plugin's directory.
 export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", root = "CLAUDE_PLUGIN_ROOT" }) {
   const raw = JSON.parse(hooksJson);
@@ -850,7 +851,7 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", ro
         const executed = command.replace(/^"/, "").startsWith(`\${${root}}/`);
         refs.forEach((rel, i) => {
           const st = statOf(rel);
-          if (!st) faults.push(`${event}: ${rel} does not exist`);
+          if (!st) faults.push(`${event}: ${rel} does not exist in the plugin`);
           else if (i === 0 && executed && !(st.mode & 0o111)) faults.push(`${event}: ${rel} is not executable`);
         });
       }
@@ -999,7 +1000,12 @@ export function problems(root, models) {
     }),
   ).filter(Boolean);
   models ??= attempt(() => loadModels(root));
-  const statOf = (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null);
+  const realPluginRoot = realpathSync(pluginRoot);
+  const statOf = (rel) => {
+    const full = join(pluginRoot, rel);
+    if (!existsSync(full) || !pathIsInside(realPluginRoot, realpathSync(full))) return null;
+    return statSync(full);
+  };
   if (models) {
     attempt(() => {
       const strays = markdownFiles(skillsDir).flatMap((full) =>

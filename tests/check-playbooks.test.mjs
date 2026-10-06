@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,17 +8,20 @@ setDefaultTimeout(30_000);
 
 const script = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/scripts/check-playbooks.mjs");
 
-function run(playbooks, { throughSymlink = false } = {}) {
+function run(playbooks, { throughSymlink = false, git = false, cwd = ".", args = ["."] } = {}) {
   const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
   try {
     mkdirSync(join(root, ".agents/playbooks"), { recursive: true });
     for (const [name, text] of Object.entries(playbooks)) writeFileSync(join(root, ".agents/playbooks", name), text);
+    if (git) execFileSync("git", ["init", root], { stdio: "pipe" });
+    const workingDirectory = join(root, cwd);
+    mkdirSync(workingDirectory, { recursive: true });
     let entry = script;
     if (throughSymlink) {
       entry = join(root, "check-playbooks.mjs");
       symlinkSync(script, entry);
     }
-    const result = spawnSync("node", [entry, root], { encoding: "utf8" });
+    const result = spawnSync("node", [entry, ...args.map((arg) => join(root, arg))], { encoding: "utf8", cwd: workingDirectory });
     return { code: result.status, out: result.stdout + result.stderr };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -77,5 +80,36 @@ describe("project playbooks", () => {
       "bug-fix.md": '\uFEFF---\r\nextends: bug-fix\r\nwhen: Use it for any bug report.\r\n---\r\n- **In** "Binary-search the cause": compare with main.\r\n',
     });
     expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
+  });
+
+  test.failing("with no argument the root is the git repository the working directory is in", () => {
+    const result = run(
+      { "ship.md": "---\nextends: shipping-v2\nwhen: Use it to ship.\n---\n" },
+      { git: true, cwd: "src", args: [] },
+    );
+    expect(result).toEqual({
+      code: 1,
+      out: ".agents/playbooks/ship.md: extends `shipping-v2`, which this pstack has no playbook for\n",
+    });
+  });
+
+  test.failing("with no argument outside a git repository the check does not guess a root", () => {
+    const result = run({}, { cwd: "src", args: [] });
+    expect(result.code).toBe(1);
+    expect(result.out).toContain("pass the repository root");
+  });
+
+  test.failing("a root that does not exist is an error", () => {
+    const result = run({}, { args: ["nope"] });
+    expect(result.code).toBe(1);
+    expect(result.out).toContain("nope");
+  });
+
+  test.failing("an extends stem that leaves the playbooks directory is not a playbook", () => {
+    const result = run({ "ship.md": "---\nextends: ../SKILL\nwhen: Use it to ship.\n---\n" });
+    expect(result).toEqual({
+      code: 1,
+      out: ".agents/playbooks/ship.md: extends `../SKILL`, which this pstack has no playbook for\n",
+    });
   });
 });

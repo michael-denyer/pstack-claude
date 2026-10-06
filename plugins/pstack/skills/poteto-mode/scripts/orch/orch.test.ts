@@ -516,9 +516,10 @@ await store.close();
     const exited = Bun.spawn(["true"]);
     await exited.exited;
     await writeFile(join(directory, ".orch.lock"), `${exited.pid}\n`);
+    await mkdir(join(directory, ".orch.lock.takeover"));
     await writeFile(
-      join(directory, ".orch.lock.takeover"),
-      `${process.pid}\n`
+      join(directory, ".orch.lock.takeover", String(process.pid)),
+      ""
     );
 
     for (const force of [false, true]) {
@@ -566,6 +567,32 @@ await store.close();
     expect(await readFile(join(directory, "units.tsv"), "utf8")).toBe(
       "id\ttrack\tstate\tbranch\tpr\tsha\tbrief\nA-unit\trace\tpending\t\t\t\t\n"
     );
+    expect(await lockFiles(directory)).toEqual([]);
+  });
+
+  it("replaces a stale lock after a writer was killed while replacing it", async () => {
+    const { directory, store } = await initializedStore();
+    await store.close();
+    await plantStaleLock(directory);
+
+    const killed = spawnWriter({
+      directory,
+      flags: await makeDirectory(),
+      name: "A",
+      atLockUnlink: `process.kill(process.pid, "SIGKILL");`,
+    });
+    await killed.exited;
+    expect(killed.signalCode).toBe("SIGKILL");
+    expect(await lockFiles(directory)).toEqual([
+      ".orch.lock",
+      ".orch.lock.takeover",
+    ]);
+
+    const recovered = useStore(directory);
+    expect(
+      await recovered.units.add({ id: "u1", track: "build" })
+    ).toMatchObject({ id: "u1" });
+    await recovered.close();
     expect(await lockFiles(directory)).toEqual([]);
   });
 

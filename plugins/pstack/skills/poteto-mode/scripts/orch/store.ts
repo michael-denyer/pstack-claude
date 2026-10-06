@@ -18,7 +18,7 @@ import { stripVTControlCharacters } from "node:util";
 const UNIT_HEADER = "id\ttrack\tstate\tbranch\tpr\tsha\tbrief";
 const LEDGER_HEADER = "pr\tsha\tverdict\tevidence\tverifier\tts";
 const LOCK_FILE = ".orch.lock";
-const TAKEOVER_FILE = ".orch.lock.takeover";
+const TAKEOVER_DIR = ".orch.lock.takeover";
 const GT_TIMEOUT_MS = 60_000;
 
 export type Verdict =
@@ -394,7 +394,7 @@ async function acquireLock(
   options: OpenStoreOptions
 ): Promise<() => Promise<void>> {
   const path = join(store, LOCK_FILE);
-  const takeover = join(store, TAKEOVER_FILE);
+  const takeover = join(store, TAKEOVER_DIR);
   const pid = String(process.pid);
   const create = async (): Promise<void> => {
     const handle = await open(path, "wx");
@@ -403,12 +403,27 @@ async function acquireLock(
   };
 
   // POSIX cannot unlink a file only if its content still matches, so the
-  // re-read and replace run behind a second exclusive file.
+  // re-read and replace run behind a claim: a directory that holds one file
+  // named for the claimant's pid. rename refuses a directory that holds a
+  // file, so a claim excludes every other writer, and a dead claimant's file
+  // is removed by name, which cannot remove a live claimant's.
   const takeOver = async (holder: string): Promise<void> => {
+    const staged = `${takeover}.${pid}.${randomUUID()}`;
+    const discard = (): Promise<void> =>
+      rm(staged, { recursive: true, force: true }).catch(() => {});
+    await mkdir(staged);
     try {
-      await writeFile(takeover, `${pid}\n`, { flag: "wx" });
+      await writeFile(join(staged, pid), "");
+      for (const claimant of await readdir(takeover).catch(() => [])) {
+        if (holderIsDead(claimant)) {
+          await rm(join(takeover, claimant), { force: true });
+        }
+      }
+      await rename(staged, takeover);
     } catch (error) {
-      if (errorCode(error) !== "EEXIST") {
+      await discard();
+      const code = errorCode(error);
+      if (code !== "ENOTEMPTY" && code !== "EEXIST") {
         throw error;
       }
       throw new UserError(
@@ -441,7 +456,8 @@ async function acquireLock(
         throw retryError;
       }
     } finally {
-      await rm(takeover, { force: true }).catch(() => {});
+      await rename(takeover, staged).catch(() => {});
+      await discard();
     }
   };
 

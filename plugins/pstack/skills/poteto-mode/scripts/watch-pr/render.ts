@@ -9,6 +9,8 @@ function ciCell(row: T.PrSnapshot): string {
       return "✅";
     case "ci-none":
       return "➖ no checks";
+    case "ci-unreported":
+      return "⏳ no checks reported yet";
     case "ci-pending":
       return `⏳ ${row.ci.pending.length} pending${was}`;
     case "ci-failing":
@@ -155,7 +157,9 @@ export function renderPretty(verdict: T.WatcherVerdict): string {
     case "WAITING":
       return verdict.reason.kind === "pending-checks"
         ? `WAITING: frontier=#${verdict.frontier.number}; ${verdict.reason.pending.length} check${verdict.reason.pending.length === 1 ? "" : "s"} pending\n`
-        : `WAITING: frontier=#${verdict.frontier.number} is blocker-free; waiting for merge queue (${verdict.reason.unmergedCount} PR${verdict.reason.unmergedCount === 1 ? "" : "s"} unmerged)\n`;
+        : verdict.reason.kind === "checks-unreported"
+          ? `WAITING: frontier=#${verdict.frontier.number}; no checks have reported on the head commit yet\n`
+          : `WAITING: frontier=#${verdict.frontier.number} is blocker-free; waiting for merge queue (${verdict.reason.unmergedCount} PR${verdict.reason.unmergedCount === 1 ? "" : "s"} unmerged)\n`;
     case "ADVANCE":
       return `ADVANCE: merged #${verdict.merged.number}; next=#${verdict.frontier.number}; remaining=${verdict.remaining}\n`;
     case "RETRY":
@@ -174,6 +178,8 @@ export function renderPretty(verdict: T.WatcherVerdict): string {
     case "TIMEOUT":
       if (verdict.reason.kind === "pending-checks")
         return "TIMEOUT: checks still pending\n";
+      if (verdict.reason.kind === "checks-unreported")
+        return "TIMEOUT: no checks reported on the head commit yet\n";
       if (verdict.reason.kind === "status-unavailable")
         return "TIMEOUT: GitHub status remained unavailable\n";
       return `TIMEOUT: queued stack still has ${verdict.reason.unmergedCount} PR${verdict.reason.unmergedCount === 1 ? "" : "s"} unmerged; frontier=#${verdict.reason.frontier.number}\n`;

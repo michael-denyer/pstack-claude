@@ -56,24 +56,52 @@ async function mergeAssessment(
     }),
   };
 }
-// Right after a push the head rollup is null until the first check registers.
+type OpenFacts = Extract<T.PullRequestFacts, { readonly state: "OPEN" }>;
+export type NoChecksConfirmer = (
+  head: Pick<OpenFacts, "context" | "headRefOid">
+) => boolean;
+// GitHub registers a fresh head's check suite seconds after the push, during
+// which every read matches a repository with no CI. The reading is a fact only
+// once the same head still shows no checks a full poll interval later.
+export function noChecksConfirmer(
+  clock: Pick<WatchClock, "now">,
+  interval: number
+): NoChecksConfirmer {
+  const firstSeen = new Map<
+    T.PrNumber,
+    { readonly headRefOid: string; readonly at: number }
+  >();
+  return (head) => {
+    const now = clock.now();
+    const prior = firstSeen.get(head.context.number);
+    if (prior?.headRefOid === head.headRefOid)
+      return now - prior.at >= interval;
+    firstSeen.set(head.context.number, {
+      headRefOid: head.headRefOid,
+      at: now,
+    });
+    return false;
+  };
+}
 // An earlier commit that reported checks means the head has not reported yet.
 async function noChecksCi(
   reader: T.GitHubReader,
-  facts: T.PullRequestFacts
-): Promise<T.CiNone> {
+  facts: OpenFacts,
+  confirmNoChecks: NoChecksConfirmer
+): Promise<T.CiNone | T.CiUnreported> {
   const merge = await mergeAssessment(reader, facts);
   if (merge.anyCommitReported || merge.github.kind === "refused")
     throw new ChecksUnavailable(
       `no checks reported on head ${facts.headRefOid}, but a commit on this PR has reported checks`
     );
-  return {
-    kind: "ci-none",
+  const none = {
     failed: [],
     pending: [],
     hadPreviousPassingCi: false,
-    github: merge.github,
-  };
+  } as const;
+  return confirmNoChecks(facts)
+    ? { ...none, kind: "ci-none", github: merge.github }
+    : { ...none, kind: "ci-unreported" };
 }
 async function reportedCi(
   reader: T.GitHubReader,
@@ -165,6 +193,8 @@ export async function readSnapshot(args: {
   readonly context: T.PrContext;
   readonly pendingHistory: "include" | "omit";
   readonly allowDraft: boolean;
+  /** Absent, a no-checks reading is always a first sighting. */
+  readonly confirmNoChecks?: NoChecksConfirmer;
 }): Promise<T.PrSnapshot> {
   const facts = await args.reader.pullRequest(args.context);
   if (facts.state === "MERGED" || facts.mergedAt !== null)
@@ -183,7 +213,11 @@ export async function readSnapshot(args: {
   ]);
   const ci =
     checks.kind === "no-checks"
-      ? await noChecksCi(args.reader, facts)
+      ? await noChecksCi(
+          args.reader,
+          facts,
+          args.confirmNoChecks ?? (() => false)
+        )
       : await reportedCi(args.reader, facts, checks, args.pendingHistory);
   // The facts were read before the checks. A gate or review that moved in
   // between would otherwise become a terminal verdict about a stale PR.
@@ -248,7 +282,16 @@ function gateReason(
   // commits or a required check that never reported. GitHub will not merge it.
   return row.facts.mergeStateStatus === "BLOCKED" ? "merge-blocked" : null;
 }
-// Gates that pending checks can still explain wait for the checks first.
+const waitReason = (row: T.PrSnapshot): T.WaitReason | null =>
+  row.kind !== "open"
+    ? null
+    : row.ci.kind === "ci-pending"
+      ? { kind: "pending-checks", pending: row.ci.pending }
+      : row.ci.kind === "ci-unreported"
+        ? { kind: "checks-unreported" }
+        : null;
+// Gates that pending or unreported checks can still explain wait for the
+// checks first.
 const DEFERRED_WHILE_PENDING: ReadonlySet<T.MergeGateReason> = new Set([
   "draft-pr",
   "review-required",
@@ -260,9 +303,7 @@ function gateBlocker(
 ): T.MergeBlocker | null {
   const reason = gateReason(row, allowDraft);
   return reason === null ||
-    (DEFERRED_WHILE_PENDING.has(reason) &&
-      row.kind === "open" &&
-      row.ci.kind === "ci-pending")
+    (DEFERRED_WHILE_PENDING.has(reason) && waitReason(row) !== null)
     ? null
     : { kind: "merge-gate", pr: row.context, reason };
 }
@@ -318,8 +359,9 @@ export function classifyPr(
     gateBlocker(row, allowDraft),
   ])
     if (blocker !== null) return { kind: "blocker", blocker };
-  if (row.kind === "open" && row.ci.kind === "ci-pending")
-    return { kind: "waiting", frontier: row.context, pending: row.ci.pending };
+  const wait = waitReason(row);
+  if (wait !== null)
+    return { kind: "waiting", frontier: row.context, reason: wait };
   const ready = readyContribution(row, allowDraft);
   if (ready === null) throw new Error("snapshot has no classified decision");
   return ready.kind === "merged-pr"
@@ -339,13 +381,11 @@ export function selectTierMajorStackDecision(
     const blocker = gateBlocker(row, allowDraft);
     if (blocker !== null) return { kind: "blocker", blocker };
   }
-  for (const row of rows)
-    if (row.kind === "open" && row.ci.kind === "ci-pending")
-      return {
-        kind: "waiting",
-        frontier: row.context,
-        pending: row.ci.pending,
-      };
+  for (const row of rows) {
+    const wait = waitReason(row);
+    if (wait !== null)
+      return { kind: "waiting", frontier: row.context, reason: wait };
+  }
   const prs = nonEmpty(
     rows
       .map((row) => readyContribution(row, allowDraft))
@@ -527,6 +567,10 @@ export async function runSimple(args: {
   readonly options: T.PollingOptions;
 }): Promise<T.TerminalVerdict> {
   const stamp = verdictFactory(args.dependencies.clock, args.mode);
+  const confirmNoChecks = noChecksConfirmer(
+    args.dependencies.clock,
+    args.options.interval
+  );
   const step = async (): Promise<StepResult<T.TerminalVerdict>> => {
     const rows: T.PrSnapshot[] = [];
     for (const context of args.contexts)
@@ -536,6 +580,7 @@ export async function runSimple(args: {
           context,
           pendingHistory: "include",
           allowDraft: args.options.allowDraft,
+          confirmNoChecks,
         })
       );
     const complete = nonEmpty(rows);
@@ -600,7 +645,7 @@ export async function runSimple(args: {
         kind: "WAITING",
         terminal: false,
         frontier: decision.frontier,
-        reason: { kind: "pending-checks", pending: decision.pending },
+        reason: decision.reason,
       })
     );
     return {
@@ -611,7 +656,7 @@ export async function runSimple(args: {
           kind: "TIMEOUT",
           terminal: true,
           exitCode: 5,
-          reason: { kind: "pending-checks", pending: decision.pending },
+          reason: decision.reason,
         }),
     };
   };
@@ -731,10 +776,7 @@ export type QueueEvaluation =
       readonly state: QueueState;
       readonly frontier: T.PrContext;
       readonly reason:
-        | {
-            readonly kind: "pending-checks";
-            readonly pending: T.NonEmpty<T.PendingCheck>;
-          }
+        | T.WaitReason
         | { readonly kind: "merge-queue"; readonly unmergedCount: number };
       readonly emit: boolean;
     };
@@ -774,17 +816,16 @@ export function evaluateQueue(
       frontier,
       remaining: active.length,
     };
-  const row = rows[0];
-  const pending =
-    row.kind === "open" && row.ci.kind === "ci-pending" ? row.ci.pending : null;
-  const reason =
-    pending === null
-      ? ({ kind: "merge-queue", unmergedCount: active.length } as const)
-      : ({ kind: "pending-checks", pending } as const);
+  const reason = waitReason(rows[0]) ?? {
+    kind: "merge-queue" as const,
+    unmergedCount: active.length,
+  };
   const key =
     reason.kind === "pending-checks"
       ? `pending:${frontier.number}:${reason.pending.length}`
-      : `queue:${frontier.number}:${reason.unmergedCount}`;
+      : reason.kind === "checks-unreported"
+        ? `unreported:${frontier.number}`
+        : `queue:${frontier.number}:${reason.unmergedCount}`;
   return {
     kind: "waiting",
     state: { ...state, frontier, lastWaitKey: key },
@@ -800,6 +841,10 @@ export async function runQueued(args: {
 }): Promise<T.QueueTerminalVerdict> {
   let state = createQueueState(args.contexts, args.dependencies.clock.now());
   const stamp = verdictFactory(args.dependencies.clock, "queued-stack");
+  const confirmNoChecks = noChecksConfirmer(
+    args.dependencies.clock,
+    args.options.interval
+  );
   args.dependencies.emit(
     stamp({ kind: "QUEUE", terminal: false, queue: args.contexts })
   );
@@ -829,6 +874,7 @@ export async function runQueued(args: {
       context,
       pendingHistory: "omit",
       allowDraft: args.options.allowDraft,
+      confirmNoChecks,
     });
     const applied = applyQueueSnapshot(
       state,

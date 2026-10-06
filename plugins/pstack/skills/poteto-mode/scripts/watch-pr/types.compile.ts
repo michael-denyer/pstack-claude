@@ -88,7 +88,21 @@ const unprovenPr = { kind: "ready-pr", context } as const;
 // @ts-expect-error An open READY row must carry positive readiness proof.
 const readyWithoutProof: ReadyPr = unprovenPr;
 
+const unreportedProof = {
+  ...readyPr.proof,
+  ci: {
+    kind: "ci-unreported",
+    failed: [],
+    pending: [],
+    hadPreviousPassingCi: false,
+  },
+} as const;
+
+// @ts-expect-error A first sighting of no checks is not readiness proof.
+const readyBeforeConfirmation: ReadyPr = { ...readyPr, proof: unreportedProof };
+
 void refusalIsNotAllowed;
 void refusalIsNotClean;
 void readyWithBlockerExit;
 void readyWithoutProof;
+void readyBeforeConfirmation;

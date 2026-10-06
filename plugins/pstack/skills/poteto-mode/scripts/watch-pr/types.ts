@@ -160,12 +160,20 @@ export interface CiNone {
   readonly hadPreviousPassingCi: false;
   readonly github: GitHubMergeAllowed;
 }
+/** No check has reported on the head yet; too early to call the repository CI-free. */
+export interface CiUnreported {
+  readonly kind: "ci-unreported";
+  readonly failed: readonly [];
+  readonly pending: readonly [];
+  readonly hadPreviousPassingCi: false;
+}
 export type CiState =
   | CiFailing
   | CiGithubRejected
   | CiPending
   | CiClean
-  | CiNone;
+  | CiNone
+  | CiUnreported;
 export type PrSnapshot =
   | {
       readonly kind: "merged" | "closed";
@@ -273,9 +281,15 @@ export type QueryFailure =
       readonly detail: string;
       readonly rawValue: string;
     };
+export type WaitReason =
+  | {
+      readonly kind: "pending-checks";
+      readonly pending: NonEmpty<PendingCheck>;
+    }
+  | { readonly kind: "checks-unreported" };
 /**
  * `frontier` names the lowest unmerged PR that is actually waiting, and
- * `pending` is that PR's checks only. Pooling every row's pending under the
+ * `reason` carries that PR's checks only. Pooling every row's pending under the
  * bottom PR's number misattributed upstack waits to the frontier.
  *
  * This decision serves single and `--stack` mode. Queued mode deliberately
@@ -287,7 +301,7 @@ export type QueryFailure =
 export interface WaitingDecision {
   readonly kind: "waiting";
   readonly frontier: PrContext;
-  readonly pending: NonEmpty<PendingCheck>;
+  readonly reason: WaitReason;
 }
 export type PrDecision =
   | { readonly kind: "blocker"; readonly blocker: MergeBlocker }
@@ -329,10 +343,7 @@ export type ProgressVerdict =
   | (Progress<"WAITING"> & {
       readonly frontier: PrContext;
       readonly reason:
-        | {
-            readonly kind: "pending-checks";
-            readonly pending: NonEmpty<PendingCheck>;
-          }
+        | WaitReason
         | { readonly kind: "merge-queue"; readonly unmergedCount: number };
     })
   | (Progress<"ADVANCE", "queued-stack"> & {
@@ -376,10 +387,7 @@ export type BlockerVerdict =
     });
 export type TimeoutVerdict = Terminal<"TIMEOUT", 5> & {
   readonly reason:
-    | {
-        readonly kind: "pending-checks";
-        readonly pending: NonEmpty<PendingCheck>;
-      }
+    | WaitReason
     | { readonly kind: "status-unavailable"; readonly failure: QueryFailure }
     | {
         readonly kind: "queued-stack";

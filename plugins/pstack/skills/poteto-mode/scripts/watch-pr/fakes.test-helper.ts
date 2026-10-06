@@ -117,8 +117,9 @@ export function fakeReader(
     },
     async checkRollupPage(_requested, after) {
       calls.push(`checkRollupPage:${after ?? "null"}`);
+      const pages = options.rollupPages ?? [];
       return (
-        options.rollupPages?.[page++] ?? {
+        pages[Math.min(page++, pages.length - 1)] ?? {
           kind: "contexts",
           checks: [],
           endCursor: null,

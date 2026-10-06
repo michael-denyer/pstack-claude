@@ -7,6 +7,7 @@ import {
   classifyPr,
   createQueueState,
   evaluateQueue,
+  noChecksConfirmer,
   planQueue,
   queryBackoffSeconds,
   readSnapshot,
@@ -196,7 +197,7 @@ it("attributes a stack wait to the PR whose checks are pending, not the bottom",
   expect(decision).toMatchObject({
     kind: "waiting",
     frontier: { number: 21 },
-    pending: [{ name: "upstack-build" }],
+    reason: { kind: "pending-checks", pending: [{ name: "upstack-build" }] },
   });
 });
 
@@ -618,6 +619,20 @@ describe("a PR with no checks configured", () => {
         reason: { kind: "checks-unreported" },
       });
     }
+  });
+
+  it("confirms no checks only when the same head shows none again an interval later", () => {
+    let now = 0;
+    const confirm = noChecksConfirmer({ now: () => now }, 60);
+    const head = { context: context(30), headRefOid: "head" };
+    expect(confirm(head)).toBe(false);
+    now = 5;
+    expect(confirm(head)).toBe(false);
+    now = 60;
+    expect(confirm(head)).toBe(true);
+    expect(confirm({ ...head, headRefOid: "pushed" })).toBe(false);
+    now = 120;
+    expect(confirm({ ...head, headRefOid: "pushed" })).toBe(true);
   });
 
   it("reports a repository with no CI ready on the second poll one interval later", async () => {

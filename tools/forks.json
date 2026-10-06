@@ -140,7 +140,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/cli.test.ts": {
       "kind": "policy",
-      "why": "Supplies the shared deadline and landing revision the port's watcher requires, and checks that a PR with no checks configured gets a no-checks status cell and a READY verdict that names the absence.",
+      "why": "Supplies the shared deadline and landing revision the port's watcher requires, and checks that a PR with no checks configured gets a first-sighting status cell and, after one WAITING poll, a READY verdict that names the absence.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
@@ -152,7 +152,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/fakes.test-helper.ts": {
       "kind": "policy",
-      "why": "Extends the fake reader with the base revision and a laterFacts option for every pullRequest read after the first, parses its facts through the real parsePullRequest, and tags each rollup page so a test can replay a head commit with no rollup.",
+      "why": "Extends the fake reader with the base revision and a laterFacts option for every pullRequest read after the first, parses its facts through the real parsePullRequest, and tags each rollup page, repeating the last one across polls, so a test can replay a head commit with no rollup.",
       "since": "0.9.10",
       "upstream": "not-proposed"
     },
@@ -170,31 +170,31 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.test.ts": {
       "kind": "policy",
-      "why": "Covers the review-required, behind-base, and branch-protection merge gates and their wait for pending checks, the retry while GitHub has not computed mergeability, a PR with no checks configured (ready when mergeable, still stopped by conflicts, threads, and gates, and failing closed while the head may not have reported), the second facts read in the snapshot plan and the retry when a gate, review, draft, or conflict state changes between the two reads, and the shared deadline in the poll loop.",
+      "why": "Covers the review-required, behind-base, and branch-protection merge gates and their wait for pending checks, the retry while GitHub has not computed mergeability, a PR with no checks configured (waiting on the first sighting, ready once the reading persists for an interval, still stopped by conflicts, threads, and gates, honouring checks that register on the next poll, and failing closed while the head may not have reported), the second facts read in the snapshot plan and the retry when a gate, review, draft, or conflict state changes between the two reads, and the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.ts": {
       "kind": "policy",
-      "why": "Stops at the review-required, behind-base, and branch-protection merge gates once checks finish, retries while GitHub has not computed mergeability and requires MERGEABLE before a ready proof, re-reads the PR facts after the checks and retries a snapshot whose head, base, mergeability, review, or draft state changed in between, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks, and honours the shared deadline in the poll loop.",
+      "why": "Stops at the review-required, behind-base, and branch-protection merge gates once checks finish, retries while GitHub has not computed mergeability and requires MERGEABLE before a ready proof, re-reads the PR facts after the checks and retries a snapshot whose head, base, mergeability, review, or draft state changed in between, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks and the same head has shown none across two polls an interval apart, waiting on the first sighting as it waits on pending checks, and honours the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/render.ts": {
       "kind": "policy",
-      "why": "Renders the review-required, behind-base, and merge-blocked states as status cells and as merge-gate blockers with their next action, and shows a PR with no checks configured as a no-checks cell and a checks=none line on its READY verdict.",
+      "why": "Renders the review-required, behind-base, and merge-blocked states as status cells and as merge-gate blockers with their next action, and shows a PR with no checks configured as a no-checks cell and a checks=none line on its READY verdict, with a first sighting as its own cell, WAITING line, and TIMEOUT line.",
       "since": "0.9.43",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/types.compile.ts": {
       "kind": "policy",
-      "why": "Adds the landing revision to the compile-time type fixture.",
+      "why": "Adds the landing revision to the compile-time type fixture and pins that a first sighting of no checks is not readiness proof.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/types.ts": {
       "kind": "policy",
-      "why": "Adds the review-required, behind-base, and merge-blocked gate reasons, the landing revision on open PR facts and in the ready proof, the head repository of an open PR, deadline, snapshot-changed, invalid-stack, and mergeability-unknown query failures, and the no-checks reading (a none-reported fast path, a no-rollup page, and the ci-none state).",
+      "why": "Adds the review-required, behind-base, and merge-blocked gate reasons, the landing revision on open PR facts and in the ready proof, the head repository of an open PR, deadline, snapshot-changed, invalid-stack, and mergeability-unknown query failures, and the no-checks reading (a none-reported fast path, a no-rollup page, the ci-none state, the ci-unreported first sighting, and the checks-unreported wait reason).",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },

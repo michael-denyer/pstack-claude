@@ -51,7 +51,7 @@ function verifyLinks(note, artifacts) {
     .replace(/^ {0,3}((`|~)\2{2,}).*\n[\s\S]*?(?:^ {0,3}\1\2*[ \t]*$|(?![\s\S]))/gm, ' ')
     .replace(/(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g, ' ');
   const links = [...prose.matchAll(/\[[^\]]*\]\((?:<([^<>]+)>|([^)]+))\)/g)]
-    .filter(([, angled, bare]) => !/^(?:[a-z]+:|#)/i.test(angled ?? bare))
+    .filter(([, angled, bare]) => !/^(?:[a-z]{2,}:|#)/i.test(angled ?? bare))
     .map(([link, angled, bare]) => ({ link, path: resolveLink(note, link, angled ?? bare) }));
   for (const artifact of artifacts)
     if (!links.some(({ path }) => path === artifact.path))

@@ -79,7 +79,7 @@ for (const [form, text, artifacts, unregistered, names] of [
   assert.ok(rule.startsWith('Link each local file') && storage.includes(rule), result.value.detail);
 }));
 
-test.failing('a Windows drive-letter path is a local link, not a URL', () => fixture(({ run }) => {
+test('a Windows drive-letter path is a local link, not a URL', () => fixture(({ run }) => {
   const directory = run('begin').value.directory;
   mkdirSync(join(directory, 'C:'));
   for (const name of ['q.md', 'C:/w.md']) writeFileSync(join(directory, name), 'Which question is still open?\n');

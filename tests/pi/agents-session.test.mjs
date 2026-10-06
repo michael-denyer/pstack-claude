@@ -9,6 +9,9 @@ const setup = useWorld();
 
 const exitOf = (proc) => new Promise((r) => proc.on("exit", r));
 
+// A record's pid once another process has it: that one started at another time.
+const reusedBy = (proc) => ({ pid: proc.pid, pidStart: "another time" });
+
 describe("registry", () => {
   test("list_agents survives a reload through the persisted entries", async () => {
     const { w, pi, ctx } = setup();
@@ -35,30 +38,13 @@ describe("registry", () => {
     await pi.call("agent", { description: "orphan", prompt: "x", run_in_background: true }, ctx);
     await w.until("grandchild");
     const stranger = w.spawn("sleep", ["30"], { detached: true });
-    const entries = [...pi.entries, agentEntry(recordWith(pi.entries.at(-1).data, { agent: { id: "astranger" }, pid: stranger.pid }))];
+    const entries = [...pi.entries, agentEntry(recordWith(pi.entries.at(-1).data, { agent: { id: "astranger" }, ...reusedBy(stranger) }))];
 
     const resumed = await restore(w, entries);
     await waitFor(() => w.log().every((r) => !alive(r.pid)));
     expect(alive(stranger.pid)).toBe(true);
     expect((await listAgents(resumed, ctx)).map((a) => a.status)).toEqual(["stopped", "stopped"]);
     expect(resumed.entries.map((e) => e.data.status)).toEqual(["stopped", "stopped"]);
-  });
-
-  test("a restored record whose session id is a word in an unrelated process's arguments, or empty, kills nothing", async () => {
-    const { w, pi, ctx } = setup();
-    await pi.call("agent", { description: "sound", prompt: "x" }, ctx);
-    const stranger = w.spawn("sleep", ["300"], { detached: true });
-    const parent = w.spawn("sleep", ["0.1"]);
-    await exitOf(parent);
-    const base = pi.entries.at(0).data;
-    const entries = ["sleep", "300", ""].map((sessionId, i) =>
-      agentEntry(recordWith(base, { agent: { id: `aword${i}`, sessionId }, status: "running", pid: stranger.pid, parentPid: parent.pid })),
-    );
-
-    const resumed = await restore(w, entries);
-    await sleep(2 * w.settings.killGraceMs);
-    expect(alive(stranger.pid)).toBe(true);
-    expect((await listAgents(resumed, ctx)).map((a) => [a.id, a.status])).toEqual([["aword0", "stopped"], ["aword1", "stopped"]]);
   });
 
   test("a restored record whose pid now leads a dead-leader group of another process is left alone", async () => {
@@ -89,6 +75,7 @@ describe("registry", () => {
       { agent: { id: 7 }, status: "completed" },
       recordWith(pi.entries.at(-1).data, { agent: { id: "abadstatus" }, status: "done" }),
       recordWith(pi.entries.at(-1).data, { agent: { id: "anoexit" }, exitCode: "0" }),
+      recordWith(pi.entries.at(-1).data, { agent: { id: "anosession", sessionId: "" } }),
       // The shape before identity moved under `agent`.
       (({ agent, ...state }) => ({ ...agent, ...state, id: "aflat" }))(pi.entries.at(-1).data),
       "garbage",
@@ -100,26 +87,64 @@ describe("registry", () => {
     expect(resumed.entries).toEqual([]);
   });
 
-  async function launchedByOtherPi() {
+  // The other pi: a second process that starts a background agent and prints
+  // the entries a pi process opening the same session would read.
+  async function otherPi() {
+    const { w, ctx } = setup({ script: { default: [{ spawn: "running" }, { sleep: 30000 }] } });
+    const host = w.spawn(process.execPath, [join(import.meta.dir, "host.mjs"), JSON.stringify(w.settings), "stay"], {
+      stdio: ["ignore", "pipe", "inherit"],
+    });
+    let printed = "";
+    host.stdout.on("data", (d) => (printed += d));
+    await w.until("grandchild");
+    await waitFor(() => printed.includes("\n"));
+    return { w, ctx, host, entries: JSON.parse(printed) };
+  }
+
+  for (const [what, edit, env, status] of [
+    ["is left running, untouched", (data) => data, {}, "running"],
+    ["is left running on a record an earlier version wrote, which has no start time", ({ pidStart, ...data }) => data, {}, "running"],
+    ["is left running when ps cannot be run", (data) => data, { PATH: "/nonexistent" }, "running"],
+    ["is stopped, and that process left alone, when it started at another time than the record's", (data) => ({ ...data, pidStart: "another time" }), {}, "stopped"],
+  ]) {
+    test(`a restored agent whose process is a child of the live pi process that launched it ${what}`, async () => {
+      const { w, ctx, entries } = await otherPi();
+      const path = process.env.PATH;
+      Object.assign(process.env, env);
+      const resumed = await restore(w, entries.map((e) => agentEntry(edit(e.data)))).finally(() => (process.env.PATH = path));
+      await sleep(500);
+      expect(alive(w.invocations()[0].pid)).toBe(true);
+      expect((await listAgents(resumed, ctx))[0].status).toBe(status);
+      expect(resumed.entries.map((e) => e.data.status)).toEqual(status === "running" ? [] : [status]);
+    });
+  }
+
+  test("a restored agent whose launching pi process was killed is stopped, and its process and the command it ran are ended", async () => {
+    const { w, ctx, host, entries } = await otherPi();
+    const exited = exitOf(host);
+    host.kill("SIGKILL");
+    await exited;
+    expect(alive(w.invocations()[0].pid)).toBe(true);
+
+    const resumed = await restore(w, entries);
+    await waitFor(() => w.log().every((r) => !alive(r.pid)));
+    expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
+  });
+
+  test("a restored agent whose recorded launcher pid now belongs to another live process is stopped, and its process is ended", async () => {
     const { w, pi, ctx } = setup({ script: { default: [{ sleep: 30000 }] } });
     await pi.call("agent", { description: "theirs", prompt: "x", run_in_background: true }, ctx);
     await w.until("invocation");
-    const liveParent = w.spawn("sleep", ["30"], { detached: true });
-    return { w, ctx, liveParent, entries: pi.entries.map((e) => agentEntry(recordWith(e.data, { parentPid: liveParent.pid }))) };
-  }
+    const reusedParent = w.spawn("sleep", ["30"], { detached: true });
 
-  test("a restored agent is left running, untouched, while its launching pi process lives and its own process still runs its session", async () => {
-    const { w, ctx, entries } = await launchedByOtherPi();
-
-    const resumed = await restore(w, entries);
-    await sleep(500);
-    expect(alive(w.invocations()[0].pid)).toBe(true);
-    expect((await listAgents(resumed, ctx))[0].status).toBe("running");
-    expect(resumed.entries).toEqual([]);
+    const resumed = await restore(w, pi.entries.map((e) => agentEntry(recordWith(e.data, { parentPid: reusedParent.pid }))));
+    await waitFor(() => !alive(w.invocations()[0].pid));
+    expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
+    expect(alive(reusedParent.pid)).toBe(true);
   });
 
   test("send_message and stop_agent refuse an agent another live pi process is running, naming that process", async () => {
-    const { w, ctx, liveParent, entries } = await launchedByOtherPi();
+    const { w, ctx, host: liveParent, entries } = await otherPi();
     const id = entries[0].data.agent.id;
 
     const resumed = await restore(w, entries);
@@ -140,8 +165,8 @@ describe("registry", () => {
     const stranger = w.spawn("sleep", ["300"], { detached: true });
     const gone = w.spawn("sleep", ["0.1"]);
     await exitOf(gone);
-    const entries = Object.entries({ agone: gone.pid, areused: stranger.pid }).map(([id, pid]) =>
-      agentEntry(recordWith(pi.entries.at(0).data, { agent: { id }, status: "running", pid, parentPid: reusedParent.pid })),
+    const entries = Object.entries({ agone: { pid: gone.pid }, areused: reusedBy(stranger) }).map(([id, process]) =>
+      agentEntry(recordWith(pi.entries.at(0).data, { agent: { id }, status: "running", ...process, parentPid: reusedParent.pid })),
     );
 
     const resumed = await restore(w, entries);

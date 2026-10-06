@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
@@ -29,8 +29,8 @@ const identitySchema = Type.Object({
   model: Type.Optional(Type.String()),
   thinking: Type.Optional(Type.String()),
   readonly: Type.Optional(Type.Literal(true)),
-  // Pi's own rule for a session id (assertValidSessionId): the reaper matches
-  // it against a process's arguments, so an empty or odd value must not load.
+  // Pi's own rule for a session id (assertValidSessionId): a resume passes it
+  // to pi as an argument, so an empty or odd value must not load.
   sessionId: Type.String({ pattern: "^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$" }),
   sessionDir: Type.String(),
   systemPromptFile: Type.Optional(Type.String()),
@@ -42,6 +42,10 @@ const runningSchema = Type.Object({
   agent: identitySchema,
   status: Type.Literal("running"),
   pid: Type.Optional(Type.Number()),
+  // When that pid started, as the system reports it. A pid can be reused; a
+  // pid with its start time names one process. Absent when it could not be
+  // read, and on a record an earlier version wrote.
+  pidStart: Type.Optional(Type.String()),
   // The pi process that launched it. Only that process may reap it.
   parentPid: Type.Number(),
 });
@@ -120,25 +124,50 @@ function childArgs(identity: AgentIdentity, depth: number): string[] {
   return args;
 }
 
-// A persisted pid may have been reused; only a process whose arguments carry
-// `--session-id <this agent's session>` as a pair is ours to kill.
-function runsSession(pid: number, sessionId: string): boolean {
-  const r = spawnSync("ps", ["-o", "args=", "-p", String(pid)], { encoding: "utf8" });
-  if (r.status !== 0) return false;
-  const args = r.stdout.trim().split(/\s+/);
-  return args.some((arg, i) => arg === "--session-id" && args[i + 1] === sessionId);
+// What the system records about a live process, or undefined when it cannot
+// say. Neither value is the process's to change, unlike its arguments: pi sets
+// its title, and ps then shows that in their place. Linux keeps both in /proc,
+// the start as clock ticks since boot. ps works its start time out from the
+// wall clock there, so a clock change moves it, and ps is asked only where
+// /proc is missing, with the locale and time zone pinned so the text is the
+// same on every read.
+function inspect(pid: number): { parentPid: number; start: string } | undefined {
+  let stat = "";
+  try {
+    stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+  } catch {}
+  // State, parent pid, and 17 more fields up to the start time. They follow
+  // the command name, which is in parentheses and may hold any character.
+  const proc = /^ \S (\d+)(?: \S+){17} (\d+) /.exec(stat.slice(stat.lastIndexOf(")") + 1));
+  if (proc) return { parentPid: Number(proc[1]), start: proc[2] };
+  const ps = spawnSync("ps", ["-o", "ppid=", "-o", "lstart=", "-p", String(pid)], { encoding: "utf8", env: { ...process.env, LC_ALL: "C", TZ: "UTC" } });
+  const m = ps.status === 0 ? /^\s*(\d+)\s+(\S.*\S)\s*$/.exec(ps.stdout) : null;
+  return m ? { parentPid: Number(m[1]), start: m[2] } : undefined;
 }
 
-function stillRuns(record: RunningRecord): boolean {
-  const pid = record.pid;
-  return pid !== undefined && alive(pid) && runsSession(pid, record.agent.sessionId);
+// What became of the process a running record names:
+// - kept: it is still a child of the live pi process that launched it;
+// - orphan: it is the process the record was written for, its launcher gone;
+// - unknown: a process is there, and nothing says whether it is the agent's;
+// - gone: no process is there, or another one is.
+type Fate = "kept" | "orphan" | "unknown" | "gone";
+
+function fateOf(record: RunningRecord): Fate {
+  const { pid, pidStart, parentPid } = record;
+  if (pid === undefined || !alive(pid)) return "gone";
+  const info = inspect(pid);
+  if (info && pidStart !== undefined && info.start !== pidStart) return "gone";
+  // With no word from the system, two live pids keep the record: calling a
+  // live agent stopped would let a message start a second process on its session.
+  const launcherHasIt = info ? info.parentPid === parentPid : alive(parentPid);
+  if (parentPid !== process.pid && launcherHasIt) return "kept";
+  return info && info.start === pidStart ? "orphan" : "unknown";
 }
 
-// Stops the pi process of a record still marked running, by its group so the
-// bash command it has running goes too. Only a pid still running this agent's
-// session is signalled: without that identity check a reused pid would be hit.
+// Stops an orphan, by its group so the bash command it has running goes too.
+// No other fate is signalled: a pid that may have been reused is not ours to hit.
 function reapOrphan(record: RunningRecord, killGraceMs: number): void {
-  if (record.pid !== undefined) terminateGroup(record.pid, () => stillRuns(record), killGraceMs);
+  if (record.pid !== undefined) terminateGroup(record.pid, () => fateOf(record) === "orphan", killGraceMs);
 }
 
 const now = () => new Date().toISOString();
@@ -204,7 +233,8 @@ export class AgentRunner {
       { cwd: identity.cwd, exitGraceMs: this.settings.exitGraceMs },
       prompt,
     );
-    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, parentPid: process.pid };
+    const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
+    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
     this.agents.set(identity.id, { kind: "local", record, run });
     this.persist(record);
@@ -337,9 +367,10 @@ export class AgentRunner {
   }
 
   // Folds persisted snapshots. A snapshot still marked running is left to the
-  // live pi process that launched it while its own process still runs its
-  // session: a live parent pid alone may be a reused one. Any other running
-  // snapshot is an orphan: its process, if it survived, is stopped.
+  // live pi process that launched it while its process is still that one's
+  // child: a live parent pid alone may be a reused one. Any other running
+  // snapshot ends here, and its process is stopped when it is known to be the
+  // agent's.
   restore(entries: readonly SessionEntry[]): void {
     for (const entry of entries) {
       if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE || !Value.Check(recordSchema, entry.data)) continue;
@@ -350,7 +381,7 @@ export class AgentRunner {
     for (const [id, state] of this.agents) {
       if (state.kind !== "remote") continue;
       const { record } = state;
-      if (record.parentPid !== process.pid && alive(record.parentPid) && stillRuns(record)) continue;
+      if (fateOf(record) === "kept") continue;
       const stopped: EndedRecord = {
         agent: record.agent,
         status: "stopped",

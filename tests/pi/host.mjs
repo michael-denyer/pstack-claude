@@ -14,6 +14,8 @@ install(pi.api, settings);
 const ctx = fakeCtx({ cwd: join(dirname(log), "work"), mode: "print" });
 await pi.emit("session_start", { reason: "startup" }, ctx);
 await pi.call("agent", { description: "bg", prompt: "x", run_in_background: true }, ctx);
+// What a second pi process opening the same session would read.
+console.log(JSON.stringify(pi.entries));
 
 while (!(existsSync(log) && readFileSync(log, "utf8").includes('"grandchild"'))) await new Promise((r) => setTimeout(r, 20));
 if (how === "exit") process.exit(1);

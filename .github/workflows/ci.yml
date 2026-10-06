@@ -76,14 +76,21 @@ jobs:
         run: bun install --frozen-lockfile
       # A dry-run sync to the SHA already pinned compares the port with
       # upstream as it stands, and fails on a fork tools/forks.json lacks or
-      # an entry whose path is not forked.
+      # an entry whose path is not forked. The component list is captured
+      # before the loop so a jq error or an empty list fails the step instead
+      # of running the loop zero times and passing.
       - name: Check every fork from upstream is declared
         run: |
-          set -o pipefail
+          set -eo pipefail
+          components=$(jq -r '.components | to_entries[] | "\(.key) \(.value.sha)"' tools/upstream.json)
+          if [ -z "$components" ]; then
+            echo "tools/upstream.json lists no components"
+            exit 1
+          fi
           failed=0
           while read -r component sha; do
             bun tools/sync.mjs "$component" "$sha" --dry-run | tee "$RUNNER_TEMP/sync-$component.txt" || failed=1
-          done < <(jq -r '.components | to_entries[] | "\(.key) \(.value.sha)"' tools/upstream.json)
+          done <<< "$components"
           exit "$failed"
       # Annotates rather than fails: generated edits and declared forks are
       # legitimate, but a reviewer should see every upstream skill file a PR

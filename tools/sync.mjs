@@ -438,11 +438,11 @@ function pathsOtherComponentsCarry(clone, components, component) {
 function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
-  const [component, newSha] = args.filter((a) => a !== "--dry-run");
+  const [component, newSha, ...stray] = args.filter((a) => a !== "--dry-run");
   const upstreamPath = join(repo, "tools/upstream.json");
   const upstream = JSON.parse(readFileSync(upstreamPath, "utf8"));
   const spec = upstream.components[component];
-  if (!spec || !newSha?.match(/^[0-9a-f]{7,40}$/)) {
+  if (stray.length || !spec || !newSha?.match(/^[0-9a-f]{7,40}$/)) {
     console.error(`usage: bun tools/sync.mjs <${Object.keys(upstream.components).join("|")}> <new-sha> [--dry-run]`);
     process.exit(2);
   }

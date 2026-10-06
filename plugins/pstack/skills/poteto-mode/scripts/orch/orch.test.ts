@@ -356,10 +356,15 @@ describe("Store", () => {
     await writeFile(join(directory, ".orch.lock"), `${exited.pid}\n`);
     const flags = await makeDirectory();
 
-    // Both writers wait inside onStaleLock until each has seen the dead
-    // holder; B also waits until A's pid is in the lock, and A keeps its lock
-    // until B has either written or been refused.
-    const worker = (name: string, other: string) => `
+    const worker = ({
+      name,
+      beforeTakeover,
+      beforeClose,
+    }: {
+      name: string;
+      beforeTakeover: string;
+      beforeClose: string;
+    }) => `
 const { openStore } = await import(${JSON.stringify(join(import.meta.dir, "store.ts"))});
 const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
 const flag = (suffix) => ${JSON.stringify(`${flags}/`)} + suffix;
@@ -379,8 +384,7 @@ const lockHolds = (pid) => {
 const store = openStore(${JSON.stringify(directory)}, {
   onStaleLock: () => {
     writeFileSync(flag("${name}.saw-stale"), "");
-    spin(() => existsSync(flag("${other}.saw-stale")));
-    ${name === "B" ? `spin(() => lockHolds(readFileSync(flag("A.pid"), "utf8")));` : ""}
+    ${beforeTakeover}
   },
 });
 writeFileSync(flag("${name}.pid"), String(process.pid));
@@ -390,16 +394,26 @@ try {
 } catch (error) {
   writeFileSync(flag("${name}.refused"), error.message);
 }
-${name === "A" ? `spin(() => existsSync(flag("B.held")) || existsSync(flag("B.refused")));` : ""}
+${beforeClose}
 await store.close();
 `;
-    const run = (name: string, other: string) =>
-      Bun.spawn([process.execPath, "-e", worker(name, other)], {
-        stderr: "pipe",
-        stdout: "pipe",
-      });
-    const a = run("A", "B");
-    const b = run("B", "A");
+    const run = (script: string) =>
+      Bun.spawn([process.execPath, "-e", script], { stderr: "pipe" });
+    const a = run(
+      worker({
+        name: "A",
+        beforeTakeover: `spin(() => existsSync(flag("B.saw-stale")));`,
+        beforeClose: `spin(() => existsSync(flag("B.held")) || existsSync(flag("B.refused")));`,
+      })
+    );
+    const b = run(
+      worker({
+        name: "B",
+        beforeTakeover: `spin(() => existsSync(flag("A.saw-stale")));
+    spin(() => lockHolds(readFileSync(flag("A.pid"), "utf8")));`,
+        beforeClose: "",
+      })
+    );
     expect(await Promise.all([a.exited, b.exited])).toEqual([0, 0]);
     expect(await new Response(a.stderr).text()).toBe("");
     expect(await new Response(b.stderr).text()).toBe("");
@@ -414,7 +428,41 @@ await store.close();
     expect(await readFile(join(directory, "units.tsv"), "utf8")).toBe(
       "id\ttrack\tstate\tbranch\tpr\tsha\tbrief\nA-unit\trace\tpending\t\t\t\t\n"
     );
-    expect(await readdir(directory)).not.toContain(".orch.lock");
+    expect(
+      (await readdir(directory)).filter((name) =>
+        name.startsWith(".orch.lock")
+      )
+    ).toEqual([]);
+  });
+
+  it("refuses a stale lock another writer is replacing unless forced", async () => {
+    const { directory, store } = await initializedStore();
+    await store.close();
+    const exited = Bun.spawn(["true"]);
+    await exited.exited;
+    await writeFile(join(directory, ".orch.lock"), `${exited.pid}\n`);
+    await writeFile(
+      join(directory, ".orch.lock.takeover"),
+      `${process.pid}\n`
+    );
+
+    const refused = useStore(directory);
+    await expect(
+      refused.units.add({ id: "u1", track: "build" })
+    ).rejects.toThrow(
+      `store lock held by pid ${exited.pid} is being replaced by another writer`
+    );
+
+    const forced = useStore(directory, { force: true });
+    expect(
+      await forced.units.add({ id: "u1", track: "build" })
+    ).toMatchObject({ id: "u1" });
+    await forced.close();
+    expect(
+      (await readdir(directory)).filter((name) =>
+        name.startsWith(".orch.lock")
+      )
+    ).toEqual([]);
   });
 
   it("blocks a writer and steals the pid lock only with force", async () => {
@@ -856,14 +904,13 @@ fi
       gtTimeoutMs: 200,
     });
     await store.init();
-    const stack = await makeGitStack(directory);
     await mkdir(join(directory, "bin"));
     await writeFile(
       fakeGtPath(directory),
       "#!/usr/bin/env bash\nexec sleep 10\n",
       { mode: 0o755 }
     );
-    await expect(store.frontier.set({ repo: stack.repo })).rejects.toThrow(
+    await expect(store.frontier.set({ repo: directory })).rejects.toThrow(
       /^gt log short --stack --reverse failed: .*ETIMEDOUT/
     );
   });

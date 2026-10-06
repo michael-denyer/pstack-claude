@@ -299,7 +299,7 @@ export function parseVerdict(value: string): Verdict {
 }
 
 // A spreadsheet reads a leading = + - or @ as a formula and a leading ' as a
-// text marker, so every written cell gets one quote and unquoteCell drops it.
+// text marker. Such a cell is written with one more ' and unquoteCell strips it.
 function cleanCell(value: string): string {
   const cleaned = value.replace(/[\t\n\r]/g, " ");
   return /^['=+\-@]/.test(cleaned) ? `'${cleaned}` : cleaned;
@@ -402,14 +402,13 @@ async function acquireLock(
     await handle.close();
   };
 
-  // Two writers that both saw the same dead holder must not both replace it,
-  // so the re-read and replace run behind a second exclusive file. A forced
-  // steal overwrites that file too, which also clears one a hard kill left.
+  // POSIX cannot unlink a file only if its content still matches, so the
+  // re-read and replace run behind a second exclusive file.
   const takeOver = async (holder: string): Promise<void> => {
     try {
-      const guard = await open(takeover, options.force ? "w" : "wx");
-      await guard.writeFile(`${pid}\n`);
-      await guard.close();
+      await writeFile(takeover, `${pid}\n`, {
+        flag: options.force ? "w" : "wx",
+      });
     } catch (error) {
       if (errorCode(error) !== "EEXIST") {
         throw error;
@@ -427,10 +426,10 @@ async function acquireLock(
           throw error;
         }
       }
-      if (current !== null && current !== holder) {
-        throw new UserError(`store lock held by pid ${current}`);
-      }
       if (current !== null) {
+        if (current !== holder) {
+          throw new UserError(`store lock held by pid ${current}`);
+        }
         await unlink(path);
       }
       try {

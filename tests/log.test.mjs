@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,6 +44,37 @@ test("40 concurrent writers with 20 KB cells leave every row intact", async () =
       .filter((row) => row[0] !== "ts");
     expect(rows.filter((row) => row.length !== 6 || row[4] !== evidence).length).toBe(0);
     expect(rows.length).toBe(40);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// PERL_UNICODE puts a :utf8 layer on perl's standard handles, and syswrite
+// refuses a handle that has one.
+test.failing("a row with non-ASCII cells is appended when PERL_UNICODE is set", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
+  try {
+    const log = join(dir, "log.tsv");
+    const cells = ["phase", "naïve ✓", "why", "日本語", "result"];
+    execFileSync("bash", [logScript, log, ...cells], { env: { ...process.env, PERL_UNICODE: "SDA" } });
+    const rows = readFileSync(log, "utf8").trimEnd().split("\n").slice(1).map((line) => line.split("\t"));
+    expect(rows.map((row) => row.slice(1))).toEqual([cells]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test.failing("a row is appended when perl is not installed", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
+  try {
+    const log = join(dir, "log.tsv");
+    const bin = join(dir, "bin");
+    mkdirSync(bin);
+    for (const tool of ["dirname", "date", "tr"]) symlinkSync(Bun.which(tool), join(bin, tool));
+    const cells = ["phase", "decision", "why", "evidence", "result"];
+    execFileSync(Bun.which("bash"), [logScript, log, ...cells], { env: { PATH: bin } });
+    const rows = readFileSync(log, "utf8").trimEnd().split("\n").slice(1).map((line) => line.split("\t"));
+    expect(rows.map((row) => row.slice(1))).toEqual([cells]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

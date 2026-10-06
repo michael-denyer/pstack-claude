@@ -732,6 +732,7 @@ export async function resolveChecks(
   if (direct !== null)
     return { kind: "reported", source: "gh-pr-checks", checks: direct };
   const checks: T.Check[] = [];
+  const cursors = new Set<string>();
   let after: string | null = null;
   let headHasRollup = true;
   do {
@@ -742,6 +743,11 @@ export async function resolveChecks(
     }
     checks.push(...page.checks);
     after = page.endCursor;
+    if (after !== null) {
+      if (cursors.has(after))
+        missing("contexts.pageInfo.endCursor must advance", after);
+      cursors.add(after);
+    }
   } while (after !== null);
   const fallback = nonEmpty(checks);
   if (fallback !== null)

@@ -178,8 +178,6 @@ test("audits every worktree of a fixture repo end to end", () => {
   writeFileSync(join(untracked, "notes.txt"), "untracked\n");
   mkdirSync(join(untracked, "src/feature"), { recursive: true });
   for (const name of ["a.ts", "b.ts"]) writeFileSync(join(untracked, "src/feature", name), "export {};\n");
-  // A user config that hides untracked files from plain status must not hide them from the audit.
-  git("-C", fixture.repo, "config", "status.showUntrackedFiles", "no");
   const inUse = addWorktree(fixture, "in-use");
   git("-C", fixture.repo, "worktree", "lock", "--reason", "in use by agent 42\nuntil its PR lands", inUse);
   const lockedSilently = addWorktree(fixture, "locked-silently");
@@ -225,6 +223,16 @@ test("audits every worktree of a fixture repo end to end", () => {
   expect(columns(broken)).toEqual(["0d", "YES", "unknown", "no-remote", "-", "-", "review", "-", broken]);
   expect(rowFor(rows, gone)).toEqual(["-", "?", "-", "-", "-", "-", "-", "prunable", "-", gone]);
   expect(rows).toHaveLength(15);
+});
+
+test("a status.showUntrackedFiles=no config does not hide untracked files from the audit", () => {
+  const fixture = createFixture();
+  const hidden = addWorktree(fixture, "hidden");
+  writeFileSync(join(hidden, "notes.txt"), "untracked\n");
+  git("-C", fixture.repo, "config", "status.showUntrackedFiles", "no");
+  expect(git("-C", hidden, "status", "--porcelain")).toBe("");
+  const row = rowFor(runAudit(fixture).rows, hidden);
+  expect([row[3], row[7]]).toEqual(["untracked:1", "hold-untracked"]);
 });
 
 test("a Pi session in a second transcripts root marks the worktree it ran in as a recent chat", () => {
@@ -304,6 +312,7 @@ describe("lastChats matches a path as JSONL spells it, never a sibling's prefix"
     ["a path closing a shell default", "/repo/worktree", "${WT:-/repo/worktree}"],
     ["a path ending a question", "/repo/worktree", "still using /repo/worktree?"],
     ["a path ending an exclamation", "/repo/worktree", "done with /repo/worktree!"],
+    ["a path before a URL query", "/repo/worktree", "open vscode://file/repo/worktree?windowId=1"],
   ])("finds %s", (_, path, cwd) => {
     expect(scan(path, cwd)).toBe(true);
   });

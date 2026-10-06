@@ -87,7 +87,7 @@ export function noChecksConfirmer(
 async function noChecksCi(
   reader: T.GitHubReader,
   facts: OpenFacts,
-  confirmNoChecks: NoChecksConfirmer
+  confirmNoChecks: NoChecksConfirmer = () => false
 ): Promise<T.CiNone | T.CiUnreported> {
   const merge = await mergeAssessment(reader, facts);
   if (merge.anyCommitReported || merge.github.kind === "refused")
@@ -213,11 +213,7 @@ export async function readSnapshot(args: {
   ]);
   const ci =
     checks.kind === "no-checks"
-      ? await noChecksCi(
-          args.reader,
-          facts,
-          args.confirmNoChecks ?? (() => false)
-        )
+      ? await noChecksCi(args.reader, facts, args.confirmNoChecks)
       : await reportedCi(args.reader, facts, checks, args.pendingHistory);
   // The facts were read before the checks. A gate or review that moved in
   // between would otherwise become a terminal verdict about a stale PR.
@@ -282,14 +278,12 @@ function gateReason(
   // commits or a required check that never reported. GitHub will not merge it.
   return row.facts.mergeStateStatus === "BLOCKED" ? "merge-blocked" : null;
 }
-const waitReason = (row: T.PrSnapshot): T.WaitReason | null =>
-  row.kind !== "open"
-    ? null
-    : row.ci.kind === "ci-pending"
-      ? { kind: "pending-checks", pending: row.ci.pending }
-      : row.ci.kind === "ci-unreported"
-        ? { kind: "checks-unreported" }
-        : null;
+function waitReason(row: T.PrSnapshot): T.WaitReason | null {
+  if (row.kind !== "open") return null;
+  if (row.ci.kind === "ci-pending")
+    return { kind: "pending-checks", pending: row.ci.pending };
+  return row.ci.kind === "ci-unreported" ? { kind: "checks-unreported" } : null;
+}
 // Gates that pending or unreported checks can still explain wait for the
 // checks first.
 const DEFERRED_WHILE_PENDING: ReadonlySet<T.MergeGateReason> = new Set([

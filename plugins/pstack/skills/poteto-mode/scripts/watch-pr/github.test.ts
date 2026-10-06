@@ -444,30 +444,26 @@ describe("context and stack discovery", () => {
   });
 
   it("orders the connected stack bottom-to-top", () => {
-    const ordered = orderStack(
-      context,
-      [
-        {
-          number: parsePrNumber(41),
-          headRepository: { owner: "owner", repo: "repo" },
-          headRefName: "base-feature",
-          baseRefName: "main",
-        },
-        {
-          number: context.number,
-          headRepository: { owner: "owner", repo: "repo" },
-          headRefName: "feature",
-          baseRefName: "base-feature",
-        },
-        {
-          number: parsePrNumber(43),
-          headRepository: { owner: "owner", repo: "repo" },
-          headRefName: "upstack",
-          baseRefName: "feature",
-        },
-      ],
-      "main"
-    );
+    const ordered = orderStack(context, "main", [
+      {
+        number: parsePrNumber(41),
+        headRepository: { owner: "owner", repo: "repo" },
+        headRefName: "base-feature",
+        baseRefName: "main",
+      },
+      {
+        number: context.number,
+        headRepository: { owner: "owner", repo: "repo" },
+        headRefName: "feature",
+        baseRefName: "base-feature",
+      },
+      {
+        number: parsePrNumber(43),
+        headRepository: { owner: "owner", repo: "repo" },
+        headRefName: "upstack",
+        baseRefName: "feature",
+      },
+    ]);
     expect(ordered.map((item) => Number(item.number))).toEqual([41, 42, 43]);
   });
 
@@ -494,9 +490,9 @@ describe("context and stack discovery", () => {
         baseRefName: "feature",
       },
     ];
-    expect(numbers(orderStack(context, open, "main"))).toEqual([42, 43]);
+    expect(numbers(orderStack(context, "main", open))).toEqual([42, 43]);
     expect(
-      numbers(orderStack({ ...context, number: backport }, open, "main"))
+      numbers(orderStack({ ...context, number: backport }, "main", open))
     ).toEqual([2]);
   });
 
@@ -524,12 +520,12 @@ describe("context and stack discovery", () => {
     ];
     expect(
       numbers(
-        orderStack({ ...repo, number: parsePrNumber(612) }, open, "develop")
+        orderStack({ ...repo, number: parsePrNumber(612) }, "develop", open)
       )
     ).toEqual([612]);
     expect(
       numbers(
-        orderStack({ ...repo, number: parsePrNumber(500) }, open, "develop")
+        orderStack({ ...repo, number: parsePrNumber(500) }, "develop", open)
       )
     ).toEqual([500]);
   });

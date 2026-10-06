@@ -46,10 +46,10 @@ function mergeCell(row: T.PrSnapshot): string {
     row.facts.mergeStateStatus === "DIRTY" ||
     row.facts.mergeStateStatus === "CONFLICTING"
     ? "⚠️ conflict"
-    : row.facts.mergeStateStatus === "BEHIND"
-      ? "⚠️ behind base"
-      : row.facts.mergeStateStatus === "BLOCKED"
-        ? "⛔ blocked"
+    : row.facts.mergeStateStatus === "BLOCKED"
+      ? "⛔ blocked"
+      : row.facts.mergeStateStatus === "BEHIND"
+        ? "⚠️ behind base"
         : "✅";
 }
 export function renderStatusTable(rows: T.NonEmpty<T.PrSnapshot>): string {
@@ -122,12 +122,12 @@ function renderBlocker(blocker: T.MergeBlocker | StatusQueryBlocker): string {
             ? "mark the PR ready for review before waiting for the merge queue"
             : blocker.reason === "review-required"
               ? "get the required approving review"
-              : blocker.reason === "behind-base"
-                ? "update the branch with its base before waiting for the merge queue (mergeStateStatus=BEHIND)"
-                : blocker.reason === "merge-blocked"
-                  ? "find the branch protection rule holding the merge (mergeStateStatus=BLOCKED with clean CI)"
-                  : blocker.reason === "changes-requested"
-                    ? "resolve the changes-requested review before waiting for the merge queue"
+              : blocker.reason === "merge-blocked"
+                ? "find the branch protection rule holding the merge (mergeStateStatus=BLOCKED with clean CI)"
+                : blocker.reason === "changes-requested"
+                  ? "resolve the changes-requested review before waiting for the merge queue"
+                  : blocker.reason === "behind-base"
+                    ? "update the branch with its base before waiting for the merge queue (mergeStateStatus=BEHIND)"
                     : (blocker.reason satisfies never);
       return [
         `BLOCKER: ${blocker.reason}`,
@@ -155,11 +155,11 @@ export function renderPretty(verdict: T.WatcherVerdict): string {
     case "STATUS":
       return renderStatusTable(verdict.rows);
     case "WAITING":
+      if (verdict.reason.kind === "checks-unreported")
+        return `WAITING: frontier=#${verdict.frontier.number}; no checks have reported on the head commit yet\n`;
       return verdict.reason.kind === "pending-checks"
         ? `WAITING: frontier=#${verdict.frontier.number}; ${verdict.reason.pending.length} check${verdict.reason.pending.length === 1 ? "" : "s"} pending\n`
-        : verdict.reason.kind === "checks-unreported"
-          ? `WAITING: frontier=#${verdict.frontier.number}; no checks have reported on the head commit yet\n`
-          : `WAITING: frontier=#${verdict.frontier.number} is blocker-free; waiting for merge queue (${verdict.reason.unmergedCount} PR${verdict.reason.unmergedCount === 1 ? "" : "s"} unmerged)\n`;
+        : `WAITING: frontier=#${verdict.frontier.number} is blocker-free; waiting for merge queue (${verdict.reason.unmergedCount} PR${verdict.reason.unmergedCount === 1 ? "" : "s"} unmerged)\n`;
     case "ADVANCE":
       return `ADVANCE: merged #${verdict.merged.number}; next=#${verdict.frontier.number}; remaining=${verdict.remaining}\n`;
     case "RETRY":

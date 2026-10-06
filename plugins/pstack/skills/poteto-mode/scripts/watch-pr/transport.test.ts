@@ -133,15 +133,15 @@ it("keeps a fork main branch distinct from destination main during stack discove
   });
 });
 
-// The no-ci fixtures replay what gh returned for a mergeable PR in a repository
-// with no checks configured: `gh pr checks` exits 1 with "no checks reported"
-// and the head commit's statusCheckRollup is null.
 const verdicts = (stdout: string): unknown[] =>
   stdout
     .trim()
     .split("\n")
     .map((line) => JSON.parse(line) as unknown);
 
+// The no-ci fixtures replay what gh returned for a mergeable PR in a repository
+// with no checks configured: `gh pr checks` exits 1 with "no checks reported"
+// and the head commit's statusCheckRollup is null.
 it("reports a first sighting of no checks on a status-only pass", () => {
   const result = run("no-ci", ["--status-only", "--max-query-errors", "1"]);
   expect(result.status).toBe(0);

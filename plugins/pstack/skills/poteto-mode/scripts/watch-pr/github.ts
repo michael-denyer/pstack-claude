@@ -825,8 +825,8 @@ export async function resolveContext(args: {
 }
 export function orderStack(
   context: T.PrContext,
-  open: readonly T.OpenPullRequest[],
-  defaultBranch: string
+  defaultBranch: string,
+  open: readonly T.OpenPullRequest[]
 ): T.NonEmpty<T.PrContext> {
   const byNumber = new Map(open.map((pr) => [pr.number, pr]));
   const localHead = (pr: T.OpenPullRequest): boolean =>
@@ -912,5 +912,5 @@ export async function discoverStack(
       retryable: true,
       detail: `open PR list reached the ${OPEN_PR_LIMIT}-PR limit, so the stack may be incomplete`,
     });
-  return orderStack(context, open, await reader.defaultBranch(context));
+  return orderStack(context, await reader.defaultBranch(context), open);
 }

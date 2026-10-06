@@ -574,6 +574,16 @@ describe("a PR with no checks configured", () => {
       allowDraft: false,
       confirmNoChecks,
     });
+  const ticking = (onSleep = () => {}) => {
+    let now = 0;
+    return {
+      now: () => now,
+      async sleep(seconds: number) {
+        now += seconds;
+        onSleep();
+      },
+    };
+  };
   const dependencies = (
     reader: GitHubReader,
     clock: { now: () => number; sleep: (seconds: number) => Promise<void> },
@@ -644,22 +654,17 @@ describe("a PR with no checks configured", () => {
   });
 
   it("reports a repository with no CI ready on the second poll one interval later", async () => {
-    let now = 0;
+    const clock = ticking();
     const emitted: ProgressVerdict[] = [];
     const verdict = await run(
       fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
-      {
-        now: () => now,
-        async sleep(seconds) {
-          now += seconds;
-        },
-      },
+      clock,
       emitted,
     );
     expect(emitted).toMatchObject([
       { kind: "WAITING", reason: { kind: "checks-unreported" } },
     ]);
-    expect(now).toBe(options.interval);
+    expect(clock.now()).toBe(options.interval);
     expect(verdict).toMatchObject({
       kind: "READY",
       scope: { pr: { proof: { ci: { kind: "ci-none" } } } },
@@ -667,19 +672,13 @@ describe("a PR with no checks configured", () => {
   });
 
   it("stops at the merge gate once a blocked PR has shown no checks for an interval", async () => {
-    let now = 0;
     const emitted: ProgressVerdict[] = [];
     const verdict = await run(
       fakeReader({
         ...noChecks,
         facts: { mergeStateStatus: "BLOCKED", reviewDecision: null },
       }),
-      {
-        now: () => now,
-        async sleep(seconds) {
-          now += seconds;
-        },
-      },
+      ticking(),
       emitted,
     );
     expect(emitted).toMatchObject([
@@ -707,18 +706,13 @@ describe("a PR with no checks configured", () => {
           : { kind: "checks" as const, checks: [pendingCheck("required-ci")] };
       },
     } satisfies GitHubReader;
-    let now = 0;
     let sleeps = 0;
     const emitted: ProgressVerdict[] = [];
     const running = run(
       reader,
-      {
-        now: () => now,
-        async sleep(seconds) {
-          now += seconds;
-          if (++sleeps === 2) throw new Error("stop after two polls");
-        },
-      },
+      ticking(() => {
+        if (++sleeps === 2) throw new Error("stop after two polls");
+      }),
       emitted,
     );
     await expect(running).rejects.toThrow("stop after two polls");
@@ -729,16 +723,10 @@ describe("a PR with no checks configured", () => {
   });
 
   it("times out on a first sighting when the deadline is shorter than the interval", async () => {
-    let now = 0;
     const emitted: ProgressVerdict[] = [];
     const verdict = await run(
       fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
-      {
-        now: () => now,
-        async sleep(seconds) {
-          now += seconds;
-        },
-      },
+      ticking(),
       emitted,
       options.interval / 2,
     );
@@ -751,17 +739,12 @@ describe("a PR with no checks configured", () => {
   });
 
   it("confirms each PR of a stack on its own sightings", async () => {
-    let now = 0;
+    const clock = ticking();
     const emitted: ProgressVerdict[] = [];
     const verdict = await runSimple({
       dependencies: dependencies(
         fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
-        {
-          now: () => now,
-          async sleep(seconds) {
-            now += seconds;
-          },
-        },
+        clock,
         emitted,
       ),
       contexts: [context(30), context(31)],
@@ -774,7 +757,7 @@ describe("a PR with no checks configured", () => {
       "WAITING:checks-unreported",
       "STATUS",
     ]);
-    expect(now).toBe(options.interval);
+    expect(clock.now()).toBe(options.interval);
     expect(verdict).toMatchObject({
       kind: "READY",
       scope: {
@@ -788,19 +771,14 @@ describe("a PR with no checks configured", () => {
   });
 
   it("holds a queued frontier on its first sighting before reporting it blocker-free", async () => {
-    let now = 0;
     let sleeps = 0;
     const emitted: ProgressVerdict[] = [];
     const running = runQueued({
       dependencies: dependencies(
         fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
-        {
-          now: () => now,
-          async sleep(seconds) {
-            now += seconds;
-            if (++sleeps === 2) throw new Error("stop after two polls");
-          },
-        },
+        ticking(() => {
+          if (++sleeps === 2) throw new Error("stop after two polls");
+        }),
         emitted,
       ),
       contexts: [context(30)],

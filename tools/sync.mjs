@@ -507,6 +507,7 @@ function main() {
   const upstream = JSON.parse(readFileSync(upstreamPath, "utf8"));
   const spec = upstream.components[component];
   if (stray.length || !spec || !newSha?.match(/^[0-9a-f]{7,40}$/)) {
+    for (const arg of stray) console.error(`unexpected argument: ${JSON.stringify(arg)}`);
     console.error(`usage: bun tools/sync.mjs <${Object.keys(upstream.components).join("|")}> <new-sha> [--dry-run]`);
     process.exit(2);
   }
@@ -578,7 +579,7 @@ function main() {
       for (const rel of report.binaryConflicts) console.error(`  ${spec.localPath}/${rel}`);
     }
     if (report.collisions.length) {
-      console.error(`\nFAIL: paths the port tree cannot hold next to upstream's; restructure the port, then rerun:`);
+      console.error(`\nFAIL: port paths the tree cannot hold next to upstream's; rename or delete each, then rerun:`);
       for (const { rel, reason } of report.collisions) console.error(`  ${spec.localPath}/${rel} (${reason})`);
     }
     if (report.hits.length) {

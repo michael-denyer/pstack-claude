@@ -1595,7 +1595,7 @@ describe("sync CLI", () => {
     mkdirSync(skill);
     writeFileSync(join(skill, "inner.md"), "the port's own\n");
     const failure =
-      "FAIL: paths the port tree cannot hold next to upstream's; restructure the port, then rerun:\n" +
+      "FAIL: port paths the tree cannot hold next to upstream's; rename or delete each, then rerun:\n" +
       "  plugins/pstack/skills/s.md (a directory where upstream has a file)\n";
 
     for (const result of [run("--dry-run"), run()]) {
@@ -1606,17 +1606,22 @@ describe("sync CLI", () => {
     expect(readdirSync(skill)).toEqual(["inner.md"]);
   });
 
-  test("a stray argument fails with the usage line, and nothing is written or pinned", () => {
+  test("a stray argument fails naming it above the usage line, and nothing is written or pinned", () => {
     const { run, pin, local, oldSha } = cli({ oldText: "one\n", newText: "two\n", localText: "one\n" });
+    const usage = "usage: bun tools/sync.mjs <kit> <new-sha> [--dry-run]\n";
 
-    const results = [["--dry"], ["--dry-run=1"], ["--dry-run", "extra"]].map((flags) => run(...flags));
+    for (const [flags, named] of [
+      [["--dry"], 'unexpected argument: "--dry"\n'],
+      [["--dry-run=1"], 'unexpected argument: "--dry-run=1"\n'],
+      [["--dry-run", "extra", ""], 'unexpected argument: "extra"\nunexpected argument: ""\n'],
+    ]) {
+      const result = run(...flags);
 
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain(named + usage);
+    }
     expect(pin()).toBe(oldSha);
     expect(local()).toBe("one\n");
-    for (const result of results) {
-      expect(result.status).toBe(2);
-      expect(result.stderr).toContain("usage: bun tools/sync.mjs <kit> <new-sha> [--dry-run]");
-    }
   });
 
   test("a declaration whose path is no longer forked warns and passes on a sync to a new SHA", () => {

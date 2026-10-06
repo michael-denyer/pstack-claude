@@ -92,7 +92,8 @@ function outcomeOf(exit: ChildExit, stopped: boolean): { status: EndedStatus; fi
 function saveOutput(identity: AgentIdentity, text: string): Pick<EndedRecord, "finalText" | "outputFile"> {
   const capped = truncateUtf8(text, OUTPUT_CAP_BYTES);
   if (capped === text) return { finalText: text };
-  const outputFile = join(identity.sessionDir, `${identity.id}.out.md`);
+  // One file per run: a resumed run must not overwrite the file an earlier notice names.
+  const outputFile = join(identity.sessionDir, `${identity.id}.${Date.now()}.out.md`);
   try {
     writeFileSync(outputFile, text);
     return { finalText: capped, outputFile };

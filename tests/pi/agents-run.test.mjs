@@ -2,7 +2,7 @@
 // its lifecycle, how its end is classified, its output, and stopping it.
 import { describe, expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import { alive, flag, listAgents, resultText, sleep, useWorld, waitFor } from "./harness.mjs";
 
@@ -193,7 +193,8 @@ describe("agent tool", () => {
     await pi.call("agent", { description: "big", prompt: "x", run_in_background: true }, ctx);
     await waitFor(() => pi.messages.length === 1);
     const { content, details } = pi.messages[0].message;
-    expect(details.outputFile).toBe(join(w.agentDir, "pstack", "parent-session", "agents", `${details.agentId}.out.md`));
+    expect(dirname(details.outputFile)).toBe(join(w.agentDir, "pstack", "parent-session", "agents"));
+    expect(basename(details.outputFile)).toMatch(new RegExp(`^${details.agentId}\\.\\d+\\.out\\.md$`));
     expect(content).toContain(`full output: ${details.outputFile}`);
     expect(Buffer.byteLength(content)).toBeLessThan(51 * 1024);
     expect(content).not.toContain("�");

@@ -1047,6 +1047,26 @@ fi
     );
   });
 
+  it("round-trips inbox pointers that start with a spreadsheet formula or quote character", async () => {
+    const { directory, store } = await initializedStore();
+    const { filename, pointer } = await store.inbox.push({
+      agent: "@bot",
+      unit: "-hotfix",
+      status: "=done",
+      report: "'quoted",
+    });
+    expect(pointer).toMatchObject({
+      agent: "@bot",
+      unit: "-hotfix",
+      status: "=done",
+      report: "'quoted",
+    });
+    expect(await store.inbox.peek()).toEqual([pointer]);
+    expect(await readFile(join(directory, "inbox", filename), "utf8")).toBe(
+      `${pointer.ts}\t'@bot\t'-hotfix\t'=done\t''quoted\n`
+    );
+  });
+
   it("keeps a leading quote in rows written before cells were unquoted on read", async () => {
     const { directory, store } = await initializedStore();
     await writeFile(

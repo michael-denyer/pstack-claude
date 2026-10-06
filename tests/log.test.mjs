@@ -111,7 +111,7 @@ for (const [state, shim, env] of [
   }
 });
 
-test.failing("a short write fails and says how many bytes of the row were appended", () => {
+test("a short write fails and says how many bytes of the row were appended", () => {
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
   try {
     const log = join(dir, "log.tsv");

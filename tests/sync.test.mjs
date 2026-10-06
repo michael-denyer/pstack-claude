@@ -68,6 +68,15 @@ function sync(overrides) {
   return syncComponent({ rules: RULES.substitutions, denylist: RULES.denylist, ...overrides });
 }
 
+function underUmask(mask, body) {
+  const saved = process.umask(mask);
+  try {
+    return body();
+  } finally {
+    process.umask(saved);
+  }
+}
+
 describe("applySubstitutions", () => {
   test("rewrites Cursor primitives and counts per rule", () => {
     const { text, counts } = applySubstitutions(
@@ -1191,7 +1200,7 @@ describe("syncComponent", () => {
     expect(readFileSync(join(local, "sibling.md"), "utf8")).toBe("old\n");
   });
 
-  test("a written file takes upstream's mode, and a mode-only upstream change is written", () => {
+  test("a written file takes upstream's mode, and a mode-only upstream change is written", () => underUmask(0o022, () => {
     const oldUp = tree({ "same.sh": "echo\n", "forked.sh": "echo\n" });
     const newUp = tree({ "same.sh": "echo\n", "forked.sh": "echo\n", "added.sh": "echo\n" });
     const local = tree({ "same.sh": "echo\n", "forked.sh": "echo port\n" });
@@ -1207,7 +1216,7 @@ describe("syncComponent", () => {
     ]);
     for (const rel of scripts) expect(statSync(join(local, rel)).mode & 0o777).toBe(0o755);
     expect(readFileSync(join(local, "forked.sh"), "utf8")).toBe("echo port\n");
-  });
+  }));
 
   test("a file upstream never touched is forked, not conflicted", () => {
     const body = "shared line\n";
@@ -1360,6 +1369,24 @@ describe("syncComponent", () => {
     expect(statSync(join(local, "updated.md")).mode & 0o777).toBe(0o600);
     expect(readFileSync(join(local, "updated.md"), "utf8")).toBe(edited);
   });
+
+  test.each([
+    ["a new executable file", null, 0o700],
+    ["an update that sets the executable bit", 0o600, 0o700],
+    ["an update that clears the executable bit", 0o700, 0o600],
+  ])("under a strict umask a write grants no permission the clone's copy lacks: %s", (_, oldMode, newMode) => underUmask(0o077, () => {
+    const held = oldMode === null ? {} : { "run.sh": "old\n" };
+    const oldUp = tree(held);
+    const newUp = tree({ "run.sh": "new\n" });
+    const local = tree(held);
+    chmodSync(join(newUp, "run.sh"), newMode);
+    if (oldMode !== null) for (const dir of [oldUp, local]) chmodSync(join(dir, "run.sh"), oldMode);
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.written).toEqual([{ kind: oldMode === null ? "added" : "updated", rel: "run.sh" }]);
+    expect(statSync(join(local, "run.sh")).mode & 0o777).toBe(newMode);
+  }));
 
   test("forks are reported largest first by changed lines, and a mode-only fork is marked", () => {
     const body = { "a.md": "one\n", "b.md": "one\ntwo\nthree\n", "run.sh": "echo\n" };

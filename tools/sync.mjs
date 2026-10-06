@@ -36,8 +36,10 @@
 //
 // Modes compare as git records them, executable or not. A written file takes
 // the new upstream file's mode, except that a merged or conflicted file keeps
-// the port's when upstream left it alone. A write changes a file's mode only
-// when that bit has to change, so a port file's other permission bits stay.
+// the port's when upstream left it alone. A write grants no permission that
+// the file's own bits or the umask withhold. A new file is created through the
+// umask. An existing file changes only its execute bits, and only when git's
+// mode has to change. They are set where the file is readable, or all cleared.
 //
 // Every effective text file, a conflict's marked bytes included, is
 // denylist-scanned; a hit fails the run with file, line, and the hint for that
@@ -467,10 +469,12 @@ export function syncComponent({
     const localFile = join(localDir, rel);
     if (write) {
       mkdirSync(dirname(localFile), { recursive: true });
-      writeFileSync(localFile, write.bytes);
-      // Git records only whether a file is executable, so a write leaves the
-      // file's other permission bits as the port has them.
-      if (gitMode(lstatSync(localFile).mode) !== write.mode) chmodSync(localFile, write.mode);
+      const held = lstatSync(localFile, { throwIfNoEntry: false });
+      writeFileSync(localFile, write.bytes, { mode: write.mode });
+      if (held && gitMode(held.mode) !== write.mode) {
+        const bits = held.mode & 0o777;
+        chmodSync(localFile, write.mode === 0o755 ? bits | ((bits & 0o444) >> 2) : bits & ~0o111);
+      }
     } else if (kind === "deleted") {
       unlinkSync(localFile);
     }

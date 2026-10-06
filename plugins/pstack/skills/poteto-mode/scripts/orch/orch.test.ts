@@ -1047,6 +1047,31 @@ fi
     );
   });
 
+  it("keeps a leading quote in rows written before cells were unquoted on read", async () => {
+    const { directory, store } = await initializedStore();
+    await writeFile(
+      join(directory, "units.tsv"),
+      "id\ttrack\tstate\tbranch\tpr\tsha\tbrief\n'=x\tt\tpending\t\t\t\t'quoted brief\n'foo\tt\tpending\t\t\t\t\nfoo\tt\tpending\t\t\t\t\n"
+    );
+    await writeFile(
+      join(directory, "ledger.tsv"),
+      "pr\tsha\tverdict\tevidence\tverifier\tts\n7\tabc\tunit-test-verified\t'bun test' passed\t\t2026-01-01T00:00:00.000Z\n"
+    );
+
+    const units = [
+      { id: "=x", brief: "'quoted brief" },
+      { id: "'foo", brief: "" },
+      { id: "foo", brief: "" },
+    ];
+    expect(await store.units.list()).toMatchObject(units);
+    expect(await store.ledger.check({ pr: 7, sha: "abc" })).toMatchObject({
+      evidence: "'bun test' passed",
+    });
+
+    await store.units.set({ id: "'foo", state: "done" });
+    expect(await store.units.list()).toMatchObject(units);
+  });
+
   it("fails a frontier set when gt hangs past the timeout", async () => {
     const directory = await makeDirectory();
     const store = useStore(directory, {

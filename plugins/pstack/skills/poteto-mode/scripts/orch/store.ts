@@ -305,8 +305,10 @@ function cleanCell(value: string): string {
   return /^['=+\-@]/.test(cleaned) ? `'${cleaned}` : cleaned;
 }
 
+// A row written before cells were unquoted on read can start with a ' that is
+// data, so only a ' that cleanCell would have added is stripped.
 function unquoteCell(value: string): string {
-  return value.startsWith("'") ? value.slice(1) : value;
+  return /^'['=+\-@]/.test(value) ? value.slice(1) : value;
 }
 
 function requiredCell(value: string, label: string): string {

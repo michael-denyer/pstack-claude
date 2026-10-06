@@ -343,6 +343,16 @@ describe("pathSpellings", () => {
       expect(pathSpellings(join(root, "real/worktree"))).toEqual(before);
     });
 
+    test.skipIf(noChmod)("a link into a directory this user cannot search is not a spelling and not a failure", () => {
+      const root = layout();
+      const before = pathSpellings(join(root, "real/worktree"));
+      mkdirSync(join(root, "sealed/inner"), { recursive: true });
+      symlinkSync(join(root, "sealed/inner"), join(root, "denied"));
+      chmodSync(join(root, "sealed"), 0o000);
+      locked.push(join(root, "sealed"));
+      expect(pathSpellings(join(root, "real/worktree"))).toEqual(before);
+    });
+
     test("a symlink reached through another symlink composes with it", () => {
       const root = layout();
       mkdirSync(join(root, "real/deep/worktree"), { recursive: true });

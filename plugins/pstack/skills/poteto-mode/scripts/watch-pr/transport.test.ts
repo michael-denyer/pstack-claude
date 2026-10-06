@@ -152,33 +152,32 @@ it("reports a first sighting of no checks on a status-only pass", () => {
   });
 });
 
-it("reports a clean PR with no checks configured as READY once the reading persists", () => {
-  const result = run("no-ci", ["--max-query-errors", "1", "--interval", "0.2"]);
-  expect(result.status).toBe(0);
-  expect(verdicts(result.stdout)).toMatchObject([
-    { kind: "WAITING", reason: { kind: "checks-unreported" } },
-    {
-      kind: "READY",
-      scope: { pr: { kind: "ready-pr", proof: { ci: { kind: "ci-none" } } } },
-    },
-  ]);
-});
-
-it("stops at the merge gate once a blocked PR has shown no checks for an interval", () => {
-  const result = run("no-ci-blocked", [
-    "--max-query-errors",
-    "1",
-    "--interval",
-    "0.2",
-  ]);
-  expect(result.status).toBe(6);
-  expect(verdicts(result.stdout)).toMatchObject([
-    { kind: "WAITING", reason: { kind: "checks-unreported" } },
-    {
-      kind: "BLOCKER",
-      blocker: { kind: "merge-gate", reason: "merge-blocked" },
-    },
-  ]);
+// Confirming no checks takes 60 seconds of wall time, so a test on the real
+// clock can only show the wait.
+it("keeps a PR with no checks waiting through repeated short-interval polls", () => {
+  for (const scenario of ["no-ci", "no-ci-blocked"]) {
+    const result = run(scenario, [
+      "--max-query-errors",
+      "1",
+      "--interval",
+      "0.05",
+      "--timeout",
+      "2",
+    ]);
+    expect(result.status).toBe(5);
+    const emitted = verdicts(result.stdout);
+    const waits = emitted.slice(0, -1);
+    expect(waits.length).toBeGreaterThanOrEqual(2);
+    for (const wait of waits)
+      expect(wait).toMatchObject({
+        kind: "WAITING",
+        reason: { kind: "checks-unreported" },
+      });
+    expect(emitted.at(-1)).toMatchObject({
+      kind: "TIMEOUT",
+      reason: { kind: "checks-unreported" },
+    });
+  }
 });
 
 it("fails closed when the check queries fail instead of reporting no checks", () => {

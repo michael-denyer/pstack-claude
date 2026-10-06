@@ -611,6 +611,9 @@ describe("a PR with no checks configured", () => {
         ? `${verdict.kind}:${verdict.reason.kind}`
         : verdict.kind,
     );
+  // The suite polls every 10 seconds, so the 60 second floor is six polls.
+  const sixPolls = (...perPoll: string[]) =>
+    Array.from({ length: 6 }, () => perPoll).flat();
 
   it("is ready once the no-checks reading is confirmed and GitHub reports it mergeable", async () => {
     const snapshot = await read({ facts: { reviewDecision: null } });
@@ -639,21 +642,23 @@ describe("a PR with no checks configured", () => {
     }
   });
 
-  it("confirms no checks only when the same head shows none again an interval later", () => {
+  it("confirms no checks only once the same head has shown none for 60 seconds", () => {
     let now = 0;
-    const confirm = noChecksConfirmer({ now: () => now }, 60);
+    const confirm = noChecksConfirmer({ now: () => now });
     const head = { context: context(30), headRefOid: "head" };
     expect(confirm(head)).toBe(false);
-    now = 5;
+    now = 59;
     expect(confirm(head)).toBe(false);
     now = 60;
     expect(confirm(head)).toBe(true);
+    expect(confirm({ ...head, headRefOid: "pushed" })).toBe(false);
+    now = 119;
     expect(confirm({ ...head, headRefOid: "pushed" })).toBe(false);
     now = 120;
     expect(confirm({ ...head, headRefOid: "pushed" })).toBe(true);
   });
 
-  it("reports a repository with no CI ready on the second poll one interval later", async () => {
+  it("reports a repository with no CI ready 60 seconds after the first sighting, however short the interval", async () => {
     const clock = ticking();
     const emitted: ProgressVerdict[] = [];
     const verdict = await run(
@@ -661,29 +666,27 @@ describe("a PR with no checks configured", () => {
       clock,
       emitted,
     );
-    expect(emitted).toMatchObject([
-      { kind: "WAITING", reason: { kind: "checks-unreported" } },
-    ]);
-    expect(clock.now()).toBe(options.interval);
+    expect(kinds(emitted)).toEqual(sixPolls("WAITING:checks-unreported"));
+    expect(clock.now()).toBe(60);
     expect(verdict).toMatchObject({
       kind: "READY",
       scope: { pr: { proof: { ci: { kind: "ci-none" } } } },
     });
   });
 
-  it("stops at the merge gate once a blocked PR has shown no checks for an interval", async () => {
+  it("stops at the merge gate only once a blocked PR has shown no checks for 60 seconds", async () => {
+    const clock = ticking();
     const emitted: ProgressVerdict[] = [];
     const verdict = await run(
       fakeReader({
         ...noChecks,
         facts: { mergeStateStatus: "BLOCKED", reviewDecision: null },
       }),
-      ticking(),
+      clock,
       emitted,
     );
-    expect(emitted).toMatchObject([
-      { kind: "WAITING", reason: { kind: "checks-unreported" } },
-    ]);
+    expect(kinds(emitted)).toEqual(sixPolls("WAITING:checks-unreported"));
+    expect(clock.now()).toBe(60);
     expect(verdict).toMatchObject({
       kind: "BLOCKER",
       exitCode: 6,
@@ -722,20 +725,27 @@ describe("a PR with no checks configured", () => {
     ]);
   });
 
-  it("times out on a first sighting when the deadline is shorter than the interval", async () => {
-    const emitted: ProgressVerdict[] = [];
-    const verdict = await run(
-      fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
-      ticking(),
-      emitted,
-      options.interval / 2,
-    );
-    expect(kinds(emitted)).toEqual(["WAITING:checks-unreported"]);
-    expect(verdict).toMatchObject({
-      kind: "TIMEOUT",
-      exitCode: 5,
-      reason: { kind: "checks-unreported" },
-    });
+  it("times out unconfirmed when the deadline is shorter than the interval or than the 60 seconds", async () => {
+    for (const [timeout, polls] of [
+      [options.interval / 2, 1],
+      [30, 3],
+    ] as const) {
+      const emitted: ProgressVerdict[] = [];
+      const verdict = await run(
+        fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
+        ticking(),
+        emitted,
+        timeout,
+      );
+      expect(kinds(emitted)).toEqual(
+        Array.from({ length: polls }, () => "WAITING:checks-unreported"),
+      );
+      expect(verdict).toMatchObject({
+        kind: "TIMEOUT",
+        exitCode: 5,
+        reason: { kind: "checks-unreported" },
+      });
+    }
   });
 
   it("confirms each PR of a stack on its own sightings", async () => {
@@ -753,11 +763,10 @@ describe("a PR with no checks configured", () => {
       options,
     });
     expect(kinds(emitted)).toEqual([
-      "STATUS",
-      "WAITING:checks-unreported",
+      ...sixPolls("STATUS", "WAITING:checks-unreported"),
       "STATUS",
     ]);
-    expect(clock.now()).toBe(options.interval);
+    expect(clock.now()).toBe(60);
     expect(verdict).toMatchObject({
       kind: "READY",
       scope: {
@@ -770,27 +779,36 @@ describe("a PR with no checks configured", () => {
     });
   });
 
-  it("holds a queued frontier on its first sighting before reporting it blocker-free", async () => {
-    let sleeps = 0;
+  it("holds a queued frontier for the 60 seconds before reporting it blocker-free", async () => {
     const emitted: ProgressVerdict[] = [];
+    const emittedAt: number[] = [];
+    const clock = ticking(() => {
+      if (clock.now() > 60) throw new Error("stop after the confirmation");
+    });
+    const queued = dependencies(
+      fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
+      clock,
+      emitted,
+    );
     const running = runQueued({
-      dependencies: dependencies(
-        fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
-        ticking(() => {
-          if (++sleeps === 2) throw new Error("stop after two polls");
-        }),
-        emitted,
-      ),
+      dependencies: {
+        ...queued,
+        emit(verdict) {
+          emittedAt.push(clock.now());
+          queued.emit(verdict);
+        },
+      },
       contexts: [context(30)],
       options,
     });
-    await expect(running).rejects.toThrow("stop after two polls");
+    await expect(running).rejects.toThrow("stop after the confirmation");
     expect(kinds(emitted)).toEqual([
       "QUEUE",
       "STATUS",
       "WAITING:checks-unreported",
       "WAITING:merge-queue",
     ]);
+    expect(emittedAt).toEqual([0, 0, 0, 60]);
   });
 
   it("still stops on conflicts, review threads, and merge gates", async () => {

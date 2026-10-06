@@ -170,13 +170,13 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.test.ts": {
       "kind": "policy",
-      "why": "Covers the review-required, behind-base, and branch-protection merge gates and their wait for pending checks, the retry while GitHub has not computed mergeability, a PR with no checks configured (waiting on the first sighting in single, stack, and queued mode, timing out there under a deadline shorter than the interval, ready once the reading persists for an interval, still stopped by conflicts, threads, and gates, honouring checks that register on the next poll, and failing closed while the head may not have reported), the second facts read in the snapshot plan and the retry when a gate, review, draft, or conflict state changes between the two reads, and the shared deadline in the poll loop.",
+      "why": "Covers the review-required, behind-base, and branch-protection merge gates and their wait for pending checks, the retry while GitHub has not computed mergeability, a PR with no checks configured (waiting in single, stack, and queued mode until the reading has persisted for 60 seconds however short the interval, timing out there under a shorter deadline, ready once it has, still stopped by conflicts, threads, and gates, honouring checks that register on the next poll, and failing closed while the head may not have reported), the second facts read in the snapshot plan and the retry when a gate, review, draft, or conflict state changes between the two reads, and the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.ts": {
       "kind": "policy",
-      "why": "Stops at the review-required, behind-base, and branch-protection merge gates once checks finish, retries while GitHub has not computed mergeability and requires MERGEABLE before a ready proof, re-reads the PR facts after the checks and retries a snapshot whose head, base, mergeability, review, or draft state changed in between, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks and the same head has shown none across two polls an interval apart, waiting on the first sighting as it waits on pending checks, and honours the shared deadline in the poll loop.",
+      "why": "Stops at the review-required, behind-base, and branch-protection merge gates once checks finish, retries while GitHub has not computed mergeability and requires MERGEABLE before a ready proof, re-reads the PR facts after the checks and retries a snapshot whose head, base, mergeability, review, or draft state changed in between, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks and the same head has shown none for 60 seconds of wall time whatever the poll interval, waiting until then as it waits on pending checks, and honours the shared deadline in the poll loop.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },

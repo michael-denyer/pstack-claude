@@ -43,6 +43,7 @@ const GH_PR_LIST = ["pr", "list", "--author", "@me", "--state", "all", "--limit"
 export function classify(facts) {
   const { dirty, pr, recent, ancestry, head } = facts;
   if (dirty.known && dirty.value.wip > 0) return "hold-wip";
+  if (dirty.known && dirty.value.untracked > 0) return "hold-untracked";
   if (pr.known && pr.value?.state === "OPEN") return "hold-open-pr";
   if (recent.known && recent.value) return "verify-recent-chat";
   if (Object.values(facts).some((fact) => !fact.known)) return "review";
@@ -196,10 +197,12 @@ function isAncestor(repo, head, trunk) {
   }
 }
 
+// `--untracked-files=all` lists every untracked file, where plain status folds a
+// directory into one line and honours a status.showUntrackedFiles=no config.
 function dirtyState(path) {
-  const lines = git(path, "status", "--porcelain").split("\n").filter(Boolean);
-  const scratch = lines.filter((line) => line.startsWith("??")).length;
-  return { wip: lines.length - scratch, scratch };
+  const lines = git(path, "status", "--porcelain", "--untracked-files=all").split("\n").filter(Boolean);
+  const untracked = lines.filter((line) => line.startsWith("??")).length;
+  return { wip: lines.length - untracked, untracked };
 }
 
 function remoteState(path, branch, head) {
@@ -228,9 +231,9 @@ function sizeKey(label) {
   return Number(match[1]) * 1024 ** (match[2] ? "KMGTPE".indexOf(match[2]) + 1 : 0);
 }
 
-function dirtyLabel({ wip, scratch }) {
+function dirtyLabel({ wip, untracked }) {
   if (wip > 0) return `wip:${wip}`;
-  return scratch > 0 ? `scratch:${scratch}` : "clean";
+  return untracked > 0 ? `untracked:${untracked}` : "clean";
 }
 
 function auditWorktree(path, { repo, trunk, fetched, prs, chats, now }) {

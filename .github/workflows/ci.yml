@@ -244,8 +244,8 @@ jobs:
             --offline --no-progress --include-fragments \
             --exclude-path node_modules --exclude-path .git '**/*.md'
 
-  # BSD du pads its sizes and bun cannot resolve macOS's autofs /home link.
-  # ubuntu has neither, so only a macOS runner catches a regression in either.
+  # macOS differs from ubuntu where the audit looks: BSD du pads its sizes and
+  # the temp directory sits behind the /var link.
   macos-worktree-audit:
     name: macOS worktree audit
     runs-on: macos-latest
@@ -258,21 +258,5 @@ jobs:
           bun-version: "1.3.14"
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Report how this runner resolves the links in its root directory
-        run: |
-          sw_vers
-          mount
-          ls -la /home || true
-          ls /home/ || true
-          for runtime in node bun; do
-            "$runtime" -e '
-              const fs = require("fs");
-              const code = (read) => { try { read(); return "ok"; } catch (error) { return error.code; } };
-              for (const entry of fs.readdirSync("/", { withFileTypes: true })) {
-                if (!entry.isSymbolicLink()) continue;
-                const link = "/" + entry.name;
-                console.log(process.versions.bun ? "bun" : "node", link, "realpath=" + code(() => fs.realpathSync(link)), "stat=" + code(() => fs.statSync(link)), "readdir=" + code(() => fs.readdirSync(link)));
-              }'
-          done
       - name: Test the worktree audit
         run: bun test --timeout 30000 tests/worktree-audit.test.mjs

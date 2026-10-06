@@ -84,18 +84,18 @@ export function defaultTranscriptRoots({ env = process.env, home = homedir(), ex
   return found.length ? found : [claude];
 }
 
+// APFS inode numbers pass 2^53, where two of them read as one number.
 const fileId = (path) => {
   const { dev, ino } = statSync(path, { bigint: true });
   return `${dev}:${ino}`;
 };
 
-// Pairs each link with the path it resolves to. A dangling or looping link
-// (ENOENT, ELOOP) spells nothing. A link `resolve` cannot name for any other
-// reason is paired with the identity stat reports instead: bun's realpathSync
-// opens the directory a link lands on, and macOS refuses that for its autofs
-// /home, which stat still follows. When stat fails too, the link's route is
-// closed to this process and it could land anywhere, so the failure propagates
-// and the caller leaves the worktree's chat fact unknown.
+// A dangling or looping link (ENOENT, ELOOP) spells nothing. Any other link
+// `resolve` cannot name is known by the identity stat reports: bun's
+// realpathSync opens the directory a link lands on, which macOS refuses for
+// its autofs /home, while stat still follows the link. When stat fails too,
+// the route is closed to this process and the link could land anywhere, so the
+// error propagates and the caller leaves the worktree's chat fact unknown.
 export function symlinkTargets(dir, resolve = realpathSync) {
   return readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isSymbolicLink()).flatMap((entry) => {
     const link = join(dir, entry.name);
@@ -243,8 +243,8 @@ function sizeKey(label) {
   return Number(match[1]) * 1024 ** (match[2] ? "KMGTPE".indexOf(match[2]) + 1 : 0);
 }
 
-function dirtyLabel(counts) {
-  return ["wip", "untracked"].filter((kind) => counts[kind] > 0).map((kind) => `${kind}:${counts[kind]}`).join(",") || "clean";
+function dirtyLabel({ wip, untracked }) {
+  return [wip > 0 && `wip:${wip}`, untracked > 0 && `untracked:${untracked}`].filter(Boolean).join(",") || "clean";
 }
 
 // `--porcelain -z` hands over the lock reason raw, newlines included.
@@ -339,7 +339,7 @@ export function audit({
   const context = { repo, trunk, fetched, prs, chats, now };
   const rows = worktrees.map((worktree) =>
     worktree.prunable
-      ? ["-", "?", "-", "-", "-", "-", "-", "prunable", lockedLabel(worktree.locked), worktree.path]
+      ? ["-", "?", "-", "-", "-", "-", "-", "prunable", "-", worktree.path]
       : auditWorktree(worktree, context),
   );
   rows.sort((a, b) => sizeKey(b[0]) - sizeKey(a[0]) || (a.join("\t") < b.join("\t") ? 1 : -1));

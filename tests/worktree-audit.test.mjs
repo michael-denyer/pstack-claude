@@ -182,9 +182,13 @@ test("audits every worktree of a fixture repo end to end", () => {
   writeFileSync(join(mixed, "base.txt"), "changed\n");
   for (const name of ["a.ts", "b.ts"]) writeFileSync(join(mixed, name), "export {};\n");
   const inUse = addWorktree(fixture, "in-use");
-  git("-C", fixture.repo, "worktree", "lock", "--reason", "in use by agent 42\nuntil its PR lands", inUse);
+  // git trims spaces, tabs and newlines from a reason, and leaves a form feed.
+  git("-C", fixture.repo, "worktree", "lock", "--reason", "in use by agent 42\nuntil its\tPR lands\f", inUse);
   const lockedSilently = addWorktree(fixture, "locked-silently");
   git("-C", fixture.repo, "worktree", "lock", lockedSilently);
+  const lockedAway = addWorktree(fixture, "locked-away");
+  git("-C", fixture.repo, "worktree", "lock", "--reason", "on a removable drive", lockedAway);
+  rmSync(lockedAway, { recursive: true });
   const chatted = addWorktree(fixture, "chatted-long");
   const prefix = addWorktree(fixture, "chatted");
   writeTranscript(fixture, "-proj/session/subagents/workflows/wf_1/agent-a.jsonl", chatted);
@@ -221,12 +225,14 @@ test("audits every worktree of a fixture repo end to end", () => {
   expect(columns(mixed)).toEqual(["0d", "YES", "wip:1,untracked:2", "no-remote", "-", "-", "hold-wip", "-", mixed]);
   expect(columns(inUse)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "hold-locked", "in use by agent 42 until its PR lands", inUse]);
   expect(columns(lockedSilently)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "hold-locked", "locked", lockedSilently]);
+  // git never calls a locked worktree prunable, so its lock outlives its directory.
+  expect(columns(lockedAway)).toEqual(["?", "?", "unknown", "unknown", "-", "-", "hold-locked", "on a removable drive", lockedAway]);
   expect(columns(chatted)).toEqual(["0d", "YES", "clean", "no-remote", "-", today, "verify-recent-chat", "-", chatted]);
   expect(columns(prefix)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", "-", prefix]);
   expect(columns(stale)).toEqual(["0d", "YES", "clean", "no-remote", "-", ymd(staleAt), "safe", "-", stale]);
   expect(columns(broken)).toEqual(["0d", "YES", "unknown", "no-remote", "-", "-", "review", "-", broken]);
   expect(rowFor(rows, gone)).toEqual(["-", "?", "-", "-", "-", "-", "-", "prunable", "-", gone]);
-  expect(rows).toHaveLength(16);
+  expect(rows).toHaveLength(17);
 });
 
 test("a status.showUntrackedFiles=no config does not hide untracked files from the audit", () => {
@@ -260,7 +266,7 @@ test("a diff.ignoreSubmodules=all config does not hide submodule work from the a
   // git refuses to clone a submodule from a local path without this.
   const submodule = (worktree, ...args) => git("-C", worktree, "-c", "protocol.file.allow=always", "submodule", ...args);
   submodule(fixture.repo, "add", lib, "sub");
-  git("-C", fixture.repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "add submodule");
+  commit(fixture.repo, "add submodule");
   git("-C", fixture.repo, "push", "origin", "main");
   const checkout = (name) => {
     const worktree = addWorktree(fixture, name);
@@ -435,11 +441,15 @@ describe("pathSpellings", () => {
       const worktree = join(root, "real/worktree");
       mkdirSync(join(root, "elsewhere"));
       symlinkSync(join(root, "elsewhere"), join(root, "other"));
+      const refused = [];
+      // Only the fixture's links, so the machine's own root links resolve as they always do.
       const refusing = (link) => {
-        realpathSync(link);
-        throw Object.assign(new Error(`EPERM: operation not permitted, lstat '${link}'`), { code: "EPERM" });
+        if (!link.startsWith(root)) return realpathSync(link);
+        refused.push(link);
+        throw Object.assign(new Error("refused"), { code: "EPERM" });
       };
       const spellings = pathSpellings(worktree, (dir) => symlinkTargets(dir, refusing));
+      expect(refused.sort()).toEqual([join(root, "link"), join(root, "other")]);
       expect(spellings).toContain(join(root, "link/worktree"));
       expect(spellings).toEqual(pathSpellings(worktree));
     });
@@ -621,11 +631,9 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
       locked.push(fixture.root);
       return {};
     }, /^warn: could not resolve the spellings of \S+\/ancestor; LAST_CHAT column will be empty: EACCES/],
-    // The session that named the worktree through the link could still search its route.
     ["a link to the worktree whose route can no longer be searched", (fixture) => {
       mkdirSync(join(fixture.root, "sealed"));
       symlinkSync(`${fixture.root}/sealed/../ancestor`, join(fixture.root, "alias"));
-      writeTranscript(fixture, "-proj/session.jsonl", join(fixture.root, "alias"));
       chmodSync(join(fixture.root, "sealed"), 0o000);
       locked.push(join(fixture.root, "sealed"));
       return {};

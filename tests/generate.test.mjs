@@ -400,6 +400,13 @@ describe("lead lines", () => {
     expect(stampLeadLine("no heading\n", "Lead.")).toBeNull();
   });
 
+  test("stamping converges a duplicated lead line, one that lost its blank separator, and one out of order", () => {
+    const canonical = "# X\n\nA.\n\nB.\n\nBody.\n";
+    expect(stampLeadLine("# X\n\nA.\nA.\n\nB.\n\nBody.\n", ["A.", "B."])).toBe(canonical);
+    expect(stampLeadLine("# X\nA.\n\nB.\n\nBody.\n", ["A.", "B."])).toBe(canonical);
+    expect(stampLeadLine("# X\n\nB.\n\nA.\n\nBody.\n", ["A.", "B."])).toBe(canonical);
+  });
+
   test("Codex and Copilot stamp a preamble on their noted skills and Pi stamps none", () => {
     expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi", "GitHub Copilot"]);
     expect(codex.preamble).toBe(
@@ -695,6 +702,17 @@ describe("plan, changes, apply", () => {
     }
     const { files } = plan(root);
     for (const [file] of leadFiles) expect(files[file]).toBe(readFileSync(join(repoRoot, file), "utf8"));
+  });
+
+  test("plan converges a duplicated lead line, so --check flags the file as stale", () => {
+    const root = repoCopy();
+    const file = "plugins/pstack/skills/how/SKILL.md";
+    const original = readFileSync(join(root, file), "utf8");
+    expect(original).toContain(`\n\n${codex.preamble}\n`);
+    writeFileSync(join(root, file), original.replace(`\n\n${codex.preamble}\n`, `\n\n${codex.preamble}\n${codex.preamble}\n`));
+    const intended = plan(root);
+    expect(intended.files[file]).toBe(original);
+    expect(changes(root, intended)).toEqual([{ kind: "write", path: file }]);
   });
 
   test("two producers on one path compose", () => {

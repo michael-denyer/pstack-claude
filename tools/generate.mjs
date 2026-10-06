@@ -467,19 +467,21 @@ export function loadLeadLines(root = repo) {
 }
 
 // Put each lead line in its own paragraph under the first heading after the
-// frontmatter, in order, keeping one already there. Null when there is no
-// heading.
+// frontmatter, in order. Every copy already in the file goes first, with the
+// blank line that paired with it, so a duplicate, a lost separator, or a
+// reordering converges to the same text. Null when there is no heading.
 export function stampLeadLine(text, lead) {
+  const leads = [lead].flat();
   const lines = text.split("\n");
   const bodyStart = lines[0] === "---" ? lines.indexOf("---", 1) + 1 : 0;
   const heading = lines.findIndex((l, i) => i >= bodyStart && /^#{1,6} /.test(l));
   if (heading === -1) return null;
-  let at = heading + 1;
-  for (const line of [lead].flat()) {
-    if (!(lines[at] === "" && lines[at + 1] === line)) lines.splice(at, 0, "", line);
-    at += 2;
+  const rest = [];
+  for (const line of lines.slice(heading + 1)) {
+    if (!leads.includes(line)) rest.push(line);
+    else if (rest.at(-1) === "") rest.pop();
   }
-  return lines.join("\n");
+  return [...lines.slice(0, heading + 1), ...leads.flatMap((line) => ["", line]), ...rest].join("\n");
 }
 
 // Stamp every region the generator owns in `file` (repo-relative). A missing

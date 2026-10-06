@@ -165,6 +165,81 @@ function runCli(
   };
 }
 
+async function plantStaleLock(directory: string): Promise<number> {
+  const exited = Bun.spawn(["true"]);
+  await exited.exited;
+  await writeFile(join(directory, ".orch.lock"), `${exited.pid}\n`);
+  return exited.pid;
+}
+
+function spawnWriter({
+  directory,
+  flags,
+  name,
+  force = false,
+  before = "",
+  atLockUnlink = "",
+}: {
+  directory: string;
+  flags: string;
+  name: string;
+  force?: boolean;
+  before?: string;
+  atLockUnlink?: string;
+}) {
+  const script = `
+const { existsSync, rmSync, writeFileSync } = require("node:fs");
+const promises = require("node:fs/promises");
+const flag = (suffix) => ${JSON.stringify(`${flags}/${name}.`)} + suffix;
+const peer = (suffix) => existsSync(${JSON.stringify(`${flags}/`)} + suffix);
+const lock = ${JSON.stringify(join(directory, ".orch.lock"))};
+const spin = (ready) => {
+  const deadline = Date.now() + 4000;
+  while (!ready()) {
+    if (Date.now() > deadline) throw new Error("barrier timeout");
+  }
+};
+const unlink = promises.unlink;
+let reached = false;
+promises.unlink = async (path) => {
+  if (!reached && path === lock) {
+    reached = true;
+    ${atLockUnlink}
+  }
+  return unlink(path);
+};
+const { openStore } = await import(${JSON.stringify(join(import.meta.dir, "store.ts"))});
+const store = openStore(${JSON.stringify(directory)}, { force: ${force} });
+${before}
+try {
+  await store.units.add({ id: "${name}-unit", track: "race" });
+  writeFileSync(flag("held"), "");
+} catch (error) {
+  writeFileSync(flag("refused"), error.message);
+}
+await store.close();
+`;
+  return Bun.spawn([process.execPath, "-e", script], { stderr: "pipe" });
+}
+
+async function readFlags(
+  flags: string
+): Promise<Readonly<Record<string, string>>> {
+  const entries = await Promise.all(
+    (await readdir(flags)).map(async (name) => [
+      name,
+      await readFile(join(flags, name), "utf8"),
+    ])
+  );
+  return Object.fromEntries(entries);
+}
+
+async function lockFiles(directory: string): Promise<readonly string[]> {
+  return (await readdir(directory))
+    .filter((name) => name.startsWith(".orch.lock"))
+    .sort();
+}
+
 afterEach(async () => {
   for (const store of handles.splice(0).reverse()) {
     await store.close();
@@ -435,7 +510,7 @@ await store.close();
     ).toEqual([]);
   });
 
-  it("refuses a stale lock another writer is replacing unless forced", async () => {
+  it("refuses a stale lock another writer is replacing, forced or not", async () => {
     const { directory, store } = await initializedStore();
     await store.close();
     const exited = Bun.spawn(["true"]);
@@ -446,23 +521,52 @@ await store.close();
       `${process.pid}\n`
     );
 
-    const refused = useStore(directory);
-    await expect(
-      refused.units.add({ id: "u1", track: "build" })
-    ).rejects.toThrow(
-      `store lock held by pid ${exited.pid} is being replaced by another writer`
-    );
+    for (const force of [false, true]) {
+      await expect(
+        useStore(directory, { force }).units.add({ id: "u1", track: "build" })
+      ).rejects.toThrow(
+        `store lock held by pid ${exited.pid} is being replaced by another writer; retry`
+      );
+    }
+    expect(await lockFiles(directory)).toEqual([
+      ".orch.lock",
+      ".orch.lock.takeover",
+    ]);
+  });
 
-    const forced = useStore(directory, { force: true });
-    expect(
-      await forced.units.add({ id: "u1", track: "build" })
-    ).toMatchObject({ id: "u1" });
-    await forced.close();
-    expect(
-      (await readdir(directory)).filter((name) =>
-        name.startsWith(".orch.lock")
-      )
-    ).toEqual([]);
+  it("refuses a forced writer that arrives while another writer is replacing a stale lock", async () => {
+    const { directory, store } = await initializedStore();
+    await store.close();
+    const stale = await plantStaleLock(directory);
+    const flags = await makeDirectory();
+
+    const a = spawnWriter({
+      directory,
+      flags,
+      name: "A",
+      atLockUnlink: `writeFileSync(flag("replacing"), "");
+    spin(() => peer("F.held") || peer("F.refused"));`,
+    });
+    const f = spawnWriter({
+      directory,
+      flags,
+      name: "F",
+      force: true,
+      before: `spin(() => peer("A.replacing"));`,
+    });
+    expect(await Promise.all([a.exited, f.exited])).toEqual([0, 0]);
+    expect(await new Response(a.stderr).text()).toBe("");
+    expect(await new Response(f.stderr).text()).toBe("");
+
+    expect(await readFlags(flags)).toEqual({
+      "A.replacing": "",
+      "A.held": "",
+      "F.refused": `store lock held by pid ${stale} is being replaced by another writer; retry`,
+    });
+    expect(await readFile(join(directory, "units.tsv"), "utf8")).toBe(
+      "id\ttrack\tstate\tbranch\tpr\tsha\tbrief\nA-unit\trace\tpending\t\t\t\t\n"
+    );
+    expect(await lockFiles(directory)).toEqual([]);
   });
 
   it("blocks a writer and steals the pid lock only with force", async () => {

@@ -406,15 +406,13 @@ async function acquireLock(
   // re-read and replace run behind a second exclusive file.
   const takeOver = async (holder: string): Promise<void> => {
     try {
-      await writeFile(takeover, `${pid}\n`, {
-        flag: options.force ? "w" : "wx",
-      });
+      await writeFile(takeover, `${pid}\n`, { flag: "wx" });
     } catch (error) {
       if (errorCode(error) !== "EEXIST") {
         throw error;
       }
       throw new UserError(
-        `store lock held by pid ${holder} is being replaced by another writer`
+        `store lock held by pid ${holder} is being replaced by another writer; retry`
       );
     }
     try {

@@ -1131,6 +1131,19 @@ describe("syncComponent", () => {
     expect(readFileSync(join(local, "B"), "utf8")).toBe("a file in the port\n");
   });
 
+  onAliasingFilesystems("an upstream directory the filesystem resolves to a port directory spelled another way fails the run before any write", { scripts: "Scripts" }, (filesystem) => {
+    const oldUp = tree({ "kit/a.md": "old a\n" });
+    const newUp = tree({ "kit/a.md": "new a\n", "kit/scripts/y.sh": "upstream y\n", "kit/scripts/deep/z.sh": "upstream z\n" });
+    const local = tree({ "kit/a.md": "old a\n", "kit/Scripts/x.sh": "port x\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, ...filesystem });
+
+    expect(report.collisions).toEqual([{ rel: "kit/Scripts", reason: sameEntry("kit/scripts") }]);
+    expect(readdirSync(join(local, "kit")).sort()).toEqual(["Scripts", "a.md"]);
+    expect(readdirSync(join(local, "kit/Scripts"))).toEqual(["x.sh"]);
+    expect(readFileSync(join(local, "kit/a.md"), "utf8")).toBe("old a\n");
+  });
+
   test("a binary port copy under an upstream text edit blocks every write", () => {
     const oldUp = tree({ "doc.md": "a\n", "sibling.md": "old\n" });
     const newUp = tree({ "doc.md": "b\n", "sibling.md": "new\n" });

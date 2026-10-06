@@ -213,7 +213,7 @@ export function validatePluginLayout(pluginRoot) {
       // not extend it: \b would reject the key after the n of a literal "\n".
       // The text before the key is consumed, not asserted, because a leading
       // lookbehind scanned a long line about nine times slower.
-      for (const [, name] of line.matchAll(/(?:^|\W|\\\w)subagent_type[\s\\"'`*]*[:=][\s\\"'`*]*([a-z0-9-]+)(?![\w-]|\.\w)/g)) {
+      for (const [, name] of line.matchAll(/(?:^|\W|\\[a-z])subagent_type[\s\\"'`*]*[:=][\s\\"'`*]*([a-z0-9-]+)(?![\w-]|\.\w)/g)) {
         if (agents.includes(name)) {
           bareDispatches.push(`${relative(pluginRoot, file)}:${i + 1}: subagent_type: "${name}" (use "pstack:${name}")`);
         }

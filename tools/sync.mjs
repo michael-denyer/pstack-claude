@@ -26,6 +26,10 @@
 //     had edited (kept, and printed as now port-only once the pin moves)
 //   - a binary upstream or port copy differs all three ways -> the run fails
 //     naming it, since a binary cannot carry markers
+//   - a port file where upstream has a directory, a port directory where
+//     upstream has a file, or two paths that differ only in case -> the run
+//     fails naming each, since no tree holds a file and a directory at one
+//     path and a case-insensitive checkout holds one spelling of a pair
 //   - upstream deleted it and local matches the derived OLD text and mode ->
 //     deleted
 //
@@ -46,7 +50,6 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
-  existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -315,6 +318,7 @@ export function syncComponent({
     portOnly: [],
     conflicts: [],
     binaryConflicts: [],
+    collisions: [],
     undeclared: [],
     stale: [],
     unchanged: 0,
@@ -339,9 +343,11 @@ export function syncComponent({
     return lazyFile(stat.mode & 0o777, () => portForm(rel, readFileSync(file)));
   };
   const portCopy = (rel) => {
+    // Only a walked entry counts as present. existsSync would also answer for
+    // Foo.md when asked about foo.md on a case-insensitive filesystem, and for
+    // a directory when asked about a file.
+    if (!localPaths.has(rel)) return null;
     const file = join(localDir, rel);
-    // existsSync follows links, so only the walk sees a dangling one.
-    if (!localPaths.has(rel) && !existsSync(file)) return null;
     const stat = lstatSync(file);
     // Writing through a link would change, or create, its target.
     if (stat.isSymbolicLink()) return { symlink: true };
@@ -374,6 +380,22 @@ export function syncComponent({
     return outcome ? [{ rel, ...outcome }] : [];
   });
 
+  const localDirs = new Set([...localPaths].flatMap(dirsAbove));
+  const collisions = new Map();
+  for (const { rel, write } of outcomes) {
+    if (!write) continue;
+    const blocker = dirsAbove(rel).find((dir) => localPaths.has(dir));
+    if (blocker) collisions.set(blocker, "a file where upstream has a directory");
+    else if (localDirs.has(rel)) collisions.set(rel, "a directory where upstream has a file");
+  }
+  const spellings = Map.groupBy(outcomes.filter(({ kind }) => kind !== "excluded"), ({ rel }) => rel.toLowerCase());
+  for (const group of spellings.values()) {
+    if (group.length < 2) continue;
+    const [first, ...rest] = group.map(({ rel }) => rel).sort();
+    collisions.set(first, `differs only in case from ${rest.join(", ")}`);
+  }
+  report.collisions = [...collisions].map(([rel, reason]) => ({ rel, reason })).sort((a, b) => a.rel.localeCompare(b.rel));
+
   for (const { rel, kind, write, kept, counts, changed, hunks } of outcomes) {
     const scanned = write?.bytes ?? kept;
     if (scanned && !isBinary(rel, scanned)) report.hits.push(...denylistHits(rel, scanned.toString("utf8"), denylist));
@@ -404,7 +426,7 @@ export function syncComponent({
     }
   }
 
-  if (report.hits.length || report.binaryConflicts.length || report.undeclared.length || (atPin && report.stale.length) || dryRun) return report;
+  if (report.hits.length || report.binaryConflicts.length || report.collisions.length || report.undeclared.length || (atPin && report.stale.length) || dryRun) return report;
   for (const { rel, kind, write } of outcomes) {
     const localFile = join(localDir, rel);
     if (write) {
@@ -516,6 +538,10 @@ function main() {
       console.error(`replace each with upstream's version or add it to exclude in tools/upstream.json, then rerun:`);
       for (const rel of report.binaryConflicts) console.error(`  ${spec.localPath}/${rel}`);
     }
+    if (report.collisions.length) {
+      console.error(`\nFAIL: paths the port tree cannot hold next to upstream's; restructure the port, then rerun:`);
+      for (const { rel, reason } of report.collisions) console.error(`  ${spec.localPath}/${rel} (${reason})`);
+    }
     if (report.hits.length) {
       console.error(`\nFAIL: Cursor-isms in synced files; add a substitution or rewrite by hand, then rerun:`);
       for (const h of report.hits) console.error(`  ${spec.localPath}/${h}`);
@@ -532,7 +558,7 @@ function main() {
       console.error(`\nFAIL: forks with no entry under ${component} in tools/forks.json; declare each or restore upstream's form, then rerun:`);
       for (const rel of report.undeclared) console.error(`  ${spec.localPath}/${rel}`);
     }
-    if (report.binaryConflicts.length || report.hits.length || report.undeclared.length || (atPin && report.stale.length)) {
+    if (report.binaryConflicts.length || report.collisions.length || report.hits.length || report.undeclared.length || (atPin && report.stale.length)) {
       process.exitCode = 1;
       return;
     }

@@ -1342,6 +1342,19 @@ describe("sync CLI", () => {
     expect(local()).toBe("port\n");
   });
 
+  test("a stray argument fails with the usage line, and nothing is written or pinned", () => {
+    const { run, pin, local, oldSha } = cli({ oldText: "one\n", newText: "two\n", localText: "one\n" });
+
+    const results = [["--dry"], ["--dry-run=1"], ["--dry-run", "extra"]].map((flags) => run(...flags));
+
+    expect(pin()).toBe(oldSha);
+    expect(local()).toBe("one\n");
+    for (const result of results) {
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain("usage: bun tools/sync.mjs <kit> <new-sha> [--dry-run]");
+    }
+  });
+
   test("a declaration whose path is no longer forked warns and passes on a sync to a new SHA", () => {
     const { run } = cli({ oldText: "one\n", newText: "one\n", localText: "one\n", forks: declareS("policy") });
 

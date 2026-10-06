@@ -100,6 +100,9 @@ describe("static plugin invariants", () => {
     'Agent(subagent_type="NAME", prompt=...)',
     "**subagent_type**: NAME",
     '{\\"subagent_type\\": \\"NAME\\"}',
+    "'subagent_type': 'NAME'",
+    '"subagent_type" : "NAME"',
+    "subagent_type: **NAME**",
     'Use\\nsubagent_type: "NAME"',
     '"prompt": "Dispatch:\\nsubagent_type: \\"NAME\\""',
   ])("a bare dispatch spelled %s fails for every shipped agent", (spelling) => {
@@ -118,6 +121,8 @@ describe("static plugin invariants", () => {
     'subagent_type: "poteto-agent-high"',
     "subagent_type: poteto-agent_v2",
     "subagent_type: poteto-agent.local",
+    "subagent_type: poteto-agentX",
+    "subagent_type: poteto-agent.2",
     "subagent_type: poteto-agent-high_v2",
     "subagent_type: poteto-agent-high.local",
     "my_subagent_type: poteto-agent",

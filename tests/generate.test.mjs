@@ -243,6 +243,12 @@ describe("assertChangesHeading", () => {
     );
   });
 
+  test("a newer version that only extends VERSION fails like any other", () => {
+    expect(() => assertChangesHeading("# Changes\n\n## 0.9.70 - newer\n\n## 0.9.7 - current\n", "0.9.7")).toThrow(
+      'CHANGES.md\'s newest release heading is "## 0.9.70 - newer", but VERSION is 0.9.7',
+    );
+  });
+
   test.each(["## v0.9.71 - newer", "## [0.9.71] - newer", "##  0.9.71 - newer", "##0.9.71 - newer", "### 0.9.71 - newer", "# 0.9.71 - newer"])(
     "an entry headed %s above the VERSION heading fails, whatever level or decoration its version takes",
     (heading) => {
@@ -252,7 +258,7 @@ describe("assertChangesHeading", () => {
     },
   );
 
-  test.each(["## About this file", "### Format", "## Unreleased", "## Format since 0.9.13"])(
+  test.each(["## About this file", "### Format", "## Unreleased", "## Format since 0.9.13", "## 2.0 plans"])(
     "a heading that does not lead with a version is no entry and may sit above the newest: %s",
     (heading) => {
       expect(() => assertChangesHeading(`# Changes\n\n${heading}\n\n## 0.9.71 - new\n\n## 0.9.70 - old\n`, "0.9.71")).not.toThrow();
@@ -278,6 +284,11 @@ describe("assertChangesHeading", () => {
     ["a longer fence holding a shorter one", "## 0.9.71 - new\n\n````\n```\n## 0.9.70 - old\n```\n````\n\n## 0.9.70 - old\n"],
   ])("a heading inside a code fence heads no entry: %s", (_, body) => {
     expect(() => assertChangesHeading(`# Changes\n\n${body}`, "0.9.71")).not.toThrow();
+  });
+
+  test("three backticks in the middle of a line open no fence", () => {
+    const changelog = "# Changes\n\nQuote a heading in a ``` fence.\n\n## 0.9.71 - new\n\n## 0.9.70 - old\n";
+    expect(() => assertChangesHeading(changelog, "0.9.71")).not.toThrow();
   });
 
   test("a VERSION heading that sits only inside a code fence is no heading", () => {
@@ -472,6 +483,7 @@ describe("lead lines", () => {
     expect(stampLeadLine("# X\n\nA.\nA.\n\nB.\n\nBody.\n", ["A.", "B."])).toBe(canonical);
     expect(stampLeadLine("# X\nA.\n\nB.\n\nBody.\n", ["A.", "B."])).toBe(canonical);
     expect(stampLeadLine("# X\n\nA.\n\nB.\nBody.\n", ["A.", "B."])).toBe(canonical);
+    expect(stampLeadLine("# X\nA.\nB.\nBody.\n", ["A.", "B."])).toBe(canonical);
     expect(stampLeadLine("# X\n\nB.\n\nA.\n\nBody.\n", ["A.", "B."])).toBe(canonical);
   });
 

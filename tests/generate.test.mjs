@@ -180,6 +180,14 @@ describe("strayModelSlugs", () => {
       "plugins/pstack/skills/other/SKILL.md:3: Delegate to `fable` for this.",
     ]);
   });
+
+  test("a full claude-* ID is a stray whatever family or date it carries, and a product name is not", () => {
+    const file = "plugins/pstack/skills/other/SKILL.md";
+    for (const id of ["claude-3-5-haiku-20241022", "claude-3-opus-20240229", "claude-mythos-1"]) {
+      expect(strayModelSlugs(file, `# other\n\nDispatch with \`${id}\`.\n`, models)).toEqual([`${file}:3: Dispatch with \`${id}\`.`]);
+    }
+    expect(strayModelSlugs(file, "# other\n\nRun it in claude-code and read claude-mem.\n", models)).toEqual([]);
+  });
 });
 
 describe("stampVersion", () => {

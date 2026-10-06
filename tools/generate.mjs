@@ -748,10 +748,11 @@ export function overrideSheetBlock(models) {
 
 // After stamping, skill prose outside the regions the generator owns may name
 // no model: a full claude-* ID is rejected by the Agent tool, and a backticked
-// family name hard-codes a default that belongs in models.json.
+// family name hard-codes a default that belongs in models.json. A model ID
+// carries a version digit after some dash; product names (claude-code) do not.
 export function strayModelSlugs(file, text, models) {
   const families = models.available.join("|");
-  const SLUG_RE = new RegExp(`claude-(?:${families})[0-9a-z.-]*|\`(?:${families})\``);
+  const SLUG_RE = new RegExp(`claude-(?:(?:${families})|(?:[a-z]+-)*[0-9])[0-9a-z.-]*|\`(?:${families})\``);
   const lines = text.split("\n");
   const owned = regions(models)
     .filter((r) => r.file === file)

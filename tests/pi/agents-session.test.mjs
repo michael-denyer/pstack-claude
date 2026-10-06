@@ -133,6 +133,25 @@ describe("registry", () => {
     expect(alive(w.invocations()[0].pid)).toBe(true);
   });
 
+  test("a restored record whose own process is gone, or whose pid now belongs to another process, is stopped though the pid recorded as its launching pi is alive", async () => {
+    const { w, pi, ctx } = setup();
+    await pi.call("agent", { description: "sound", prompt: "x" }, ctx);
+    const reusedParent = w.spawn("sleep", ["300"], { detached: true });
+    const stranger = w.spawn("sleep", ["300"], { detached: true });
+    const gone = w.spawn("sleep", ["0.1"]);
+    await exitOf(gone);
+    const entries = Object.entries({ agone: gone.pid, areused: stranger.pid }).map(([id, pid]) =>
+      agentEntry(recordWith(pi.entries.at(0).data, { agent: { id }, status: "running", pid, parentPid: reusedParent.pid })),
+    );
+
+    const resumed = await restore(w, entries);
+    expect((await listAgents(resumed, ctx)).map((a) => [a.id, a.status])).toEqual([["agone", "stopped"], ["areused", "stopped"]]);
+    expect(resumed.entries.map((e) => e.data.status)).toEqual(["stopped", "stopped"]);
+    expect((await resumed.call("stop_agent", { id: "agone" }, ctx)).details).toEqual({ agentId: "agone", status: "stopped" });
+    await sleep(2 * w.settings.killGraceMs);
+    expect([reusedParent.pid, stranger.pid].map(alive)).toEqual([true, true]);
+  });
+
   test("session_shutdown stops every running agent without a notice, and a second shutdown is a no-op", async () => {
     const { w, pi, ctx } = setup({ script: { default: [{ spawn: "running" }, { sleep: 30000 }] } });
     await pi.call("agent", { description: "one", prompt: "x", run_in_background: true }, ctx);

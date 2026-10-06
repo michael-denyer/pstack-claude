@@ -516,10 +516,9 @@ describe("classify", () => {
 });
 
 describe("syncComponent", () => {
-  test("installed plugin text passes sync validation without changes", () => {
+  test("installed plugin text is free of the denylist", () => {
     const plugin = join(import.meta.dir, "../plugins/pstack");
     const report = sync({ oldDir: plugin, newDir: plugin, localDir: plugin, dryRun: true });
-    expect(report.written).toEqual([]);
     expect(report.hits).toEqual([]);
   });
 
@@ -683,6 +682,20 @@ describe("syncComponent", () => {
     sync({ oldDir: up, newDir: up, localDir: local, forks });
 
     expect(readFileSync(join(local, "gone.md"), "utf8")).toBe("a\n");
+  });
+
+  test("an upstream file the port deleted without excluding it fails a run at the pin instead of coming back", () => {
+    const up = tree({ "keep.md": "k\n", "gone.md": "g\n" });
+    const local = tree({ "keep.md": "k\n" });
+
+    const atPin = sync({ oldDir: up, newDir: up, localDir: local, atPin: true });
+
+    expect(atPin.written).toEqual([{ kind: "added", rel: "gone.md" }]);
+    expect(existsSync(join(local, "gone.md"))).toBe(false);
+
+    sync({ oldDir: up, newDir: up, localDir: local });
+
+    expect(readFileSync(join(local, "gone.md"), "utf8")).toBe("g\n");
   });
 
   test.each(
@@ -1155,6 +1168,19 @@ describe("syncComponent", () => {
     expect(statSync(join(local, "run.sh")).mode & 0o777).toBe(0o755);
   });
 
+  test("a mode that differs only in bits git does not record is unchanged, not a mode fork", () => {
+    const up = tree({ "s.md": "same\n" });
+    const local = tree({ "s.md": "same\n" });
+    chmodSync(join(up, "s.md"), 0o644);
+    chmodSync(join(local, "s.md"), 0o664);
+
+    const report = sync({ oldDir: up, newDir: up, localDir: local, forks: new Map(), atPin: true, dryRun: true });
+
+    expect(report.forked).toEqual([]);
+    expect(report.undeclared).toEqual([]);
+    expect(report.unchanged).toBe(1);
+  });
+
   test("a merge keeps a mode the port changed when upstream left the mode alone", () => {
     const oldUp = tree({ "run.sh": "echo\n" });
     const newUp = tree({ "run.sh": "echo upstream\n" });
@@ -1461,6 +1487,21 @@ describe("sync CLI", () => {
         "FAIL: tools/forks.json declares paths under kit that are not forked at the pinned SHA; delete each entry, then rerun:\n  plugins/pstack/skills/s.md is no longer forked (unchanged)\n",
       );
     }
+  });
+
+  test("an upstream file the port lacks fails a run at the pinned SHA naming it, and nothing is written", () => {
+    const { runAt, oldSha, port } = cli({ oldText: "one\n", newText: "one\n", localText: "one\n" });
+    const skill = join(port, "plugins/pstack/skills/s.md");
+    rmSync(skill);
+    const failure =
+      "FAIL: upstream files the port lacks at the pinned SHA; restore each or add it to exclude in tools/upstream.json, then rerun:\n" +
+      "  plugins/pstack/skills/s.md\n";
+
+    for (const result of [runAt(oldSha, "--dry-run"), runAt(oldSha)]) {
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(failure);
+    }
+    expect(existsSync(skill)).toBe(false);
   });
 
   test.each([

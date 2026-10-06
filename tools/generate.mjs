@@ -110,16 +110,15 @@ export function stampVersion(text, version, file) {
   return text.replace(/("version"\s*:\s*)"[^"]*"/, `$1"${version}"`);
 }
 
-// Every release heading reads "## <version> - <title>", and the newest one
-// names the current version. A bump without an entry ships a release nobody
-// can read about; an entry without a bump ships one auto-update never installs.
+// Plugin auto-update installs by version number (CONTRIBUTING, Releasing), so
+// a CHANGES entry whose VERSION bump was forgotten ships nothing.
 export function assertChangesHeading(changelog, version) {
   const lines = changelog.split("\n");
   const current = lines.find((line) => line.startsWith(`## ${version} `));
   if (!current) throw new Error(`CHANGES.md has no "## ${version} - <title>" heading`);
-  const newest = lines.find((line) => /^## \d+\.\d+\.\d+/.test(line));
-  if (newest !== current) throw new Error(`CHANGES.md's newest release heading is "${newest}", but VERSION is ${version}`);
-  const malformed = lines.filter((line) => /^## \d+\.\d+\.\d+/.test(line) && !/^## \d+\.\d+\.\d+ - \S/.test(line));
+  const headings = lines.filter((line) => /^## \d+\.\d+\.\d+/.test(line));
+  if (headings[0] !== current) throw new Error(`CHANGES.md's newest release heading is "${headings[0]}", but VERSION is ${version}`);
+  const malformed = headings.filter((line) => !/^## \d+\.\d+\.\d+ - \S/.test(line));
   if (malformed.length) {
     throw new Error(`CHANGES.md release headings read "## <version> - <title>":\n${malformed.join("\n")}`);
   }
@@ -182,8 +181,7 @@ export function validatePluginLayout(pluginRoot) {
     throw new Error(`${PLUGIN}/commands/ exists; trampolines belong in ${prompts} (CHANGES 0.9.13)`);
   }
   // #58: a plugin's agents register under the plugin namespace, so a dispatch
-  // of the bare name errors at runtime with "Agent type 'x' not found". The key
-  // and the value may each be quoted, backticked, or bare, in prose, YAML, or JSON.
+  // of the bare name errors at runtime with "Agent type 'x' not found".
   const agents = pluginAgentPaths(pluginRoot).map((p) => basename(p, ".md"));
   const bareDispatches = [];
   for (const file of markdownFiles(join(pluginRoot, "skills"))) {
@@ -467,9 +465,7 @@ export function loadLeadLines(root = repo) {
 }
 
 // Put each lead line in its own paragraph under the first heading after the
-// frontmatter, in order. Every copy already in the file goes first, with the
-// blank line that paired with it, so a duplicate, a lost separator, or a
-// reordering converges to the same text. Null when there is no heading.
+// frontmatter, in order. Null when there is no heading.
 export function stampLeadLine(text, lead) {
   const leads = [lead].flat();
   const lines = text.split("\n");
@@ -513,8 +509,6 @@ export function resolveModels(models) {
 }
 
 const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
-// The tiers the stamped regions read by name (setup-pstack's Models section,
-// the roles-by-tier table, and each runtime's Model names section).
 const TIERS = ["default", "strongest", "panel"];
 
 // Check models.json's shape and resolve its tiers, throwing with the offending
@@ -706,9 +700,7 @@ export function pluginAgentPaths(pluginRoot) {
 }
 
 // Claude Code's loader tolerates frontmatter that strict YAML rejects, so an
-// agent file can load locally and still be unreadable to another parser. The
-// name must be the file name, which is what plugin.json's agents list and the
-// bare-dispatch check key off.
+// agent file can load locally and still be unreadable to another parser.
 export function validateAgentFrontmatter(pluginRoot) {
   const failures = pluginAgentPaths(pluginRoot).flatMap((path) => {
     try {
@@ -760,11 +752,12 @@ export function overrideSheetBlock(models) {
 
 // After stamping, skill prose outside the regions the generator owns may name
 // no model: a full claude-* ID is rejected by the Agent tool, and a backticked
-// family name hard-codes a default that belongs in models.json. A model ID
-// carries a version digit after some dash; product names (claude-code) do not.
+// family name hard-codes a default that belongs in models.json.
 export function strayModelSlugs(file, text, models) {
   const families = models.available.join("|");
-  const SLUG_RE = new RegExp(`claude-(?:(?:${families})|(?:[a-z]+-)*[0-9])[0-9a-z.-]*|\`(?:${families})\``);
+  const familyId = `claude-(?:${families})`;
+  const versionedId = "claude-(?:[a-z]+-)*[0-9]";
+  const SLUG_RE = new RegExp(`(?:${familyId}|${versionedId})[0-9a-z.-]*|\`(?:${families})\``);
   const lines = text.split("\n");
   const owned = regions(models)
     .filter((r) => r.file === file)
@@ -834,8 +827,7 @@ function shapeFaults(schema, value, subject) {
 // A hooks file must have the documented shape, every ${<root>}/<path> a
 // command hook names must exist in the plugin, and one the command executes
 // directly must be executable, or the SessionStart hook fails silently for
-// every user. `statOf(rel)` is the stat of the plugin file at rel, or null
-// when there is none, including a path that resolves outside the plugin.
+// every user.
 // The root is the variable the runtime exports with the plugin's directory.
 export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", root = "CLAUDE_PLUGIN_ROOT" }) {
   const raw = JSON.parse(hooksJson);

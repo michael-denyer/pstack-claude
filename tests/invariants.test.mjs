@@ -76,46 +76,31 @@ describe("static plugin invariants", () => {
     );
   });
 
-  test("every spelling of a bare dispatch fails: unquoted, single-quoted, backticked, unspaced, and JSON", () => {
-    const failure = (root) => {
-      try {
-        check(root);
-        return null;
-      } catch (err) {
-        return err.message;
-      }
-    };
-    for (const line of [
-      "subagent_type: poteto-agent",
-      "subagent_type: 'poteto-agent'",
-      "subagent_type: `poteto-agent`",
-      'subagent_type:"poteto-agent"',
-      '"subagent_type": "poteto-agent"',
-    ]) {
-      const root = plugin((r) => {
-        agent(r, "poteto-agent");
-        skill(r, "caller", "", `Spawn with ${line}.\n`);
-      });
-      expect([line, failure(root)]).toEqual([
-        line,
-        expect.stringContaining('skills/caller/SKILL.md:6: subagent_type: "poteto-agent" (use "pstack:poteto-agent")'),
-      ]);
-    }
+  test.each([
+    "subagent_type: poteto-agent",
+    "subagent_type: 'poteto-agent'",
+    "subagent_type: `poteto-agent`",
+    'subagent_type:"poteto-agent"',
+    '"subagent_type": "poteto-agent"',
+  ])("a bare dispatch spelled %s fails and names the site", (line) => {
+    const root = plugin((r) => {
+      agent(r, "poteto-agent");
+      skill(r, "caller", "", `Spawn with ${line}.\n`);
+    });
+    expect(() => check(root)).toThrow('skills/caller/SKILL.md:6: subagent_type: "poteto-agent" (use "pstack:poteto-agent")');
   });
 
-  test("a skill dispatching a plugin agent by its namespaced name passes, as does a longer name", () => {
-    for (const line of [
-      'subagent_type: "pstack:poteto-agent"',
-      "subagent_type: pstack:poteto-agent",
-      "subagent_type: `pstack:poteto-agent`",
-      'subagent_type: "poteto-agent-high"',
-    ]) {
-      const root = plugin((r) => {
-        agent(r, "poteto-agent");
-        skill(r, "caller", "", `Spawn with ${line}.\n`);
-      });
-      expect(() => check(root)).not.toThrow();
-    }
+  test.each([
+    'subagent_type: "pstack:poteto-agent"',
+    "subagent_type: pstack:poteto-agent",
+    "subagent_type: `pstack:poteto-agent`",
+    'subagent_type: "poteto-agent-high"',
+  ])("a namespaced or longer dispatch %s passes", (line) => {
+    const root = plugin((r) => {
+      agent(r, "poteto-agent");
+      skill(r, "caller", "", `Spawn with ${line}.\n`);
+    });
+    expect(() => check(root)).not.toThrow();
   });
 
   test("an unresolved sync conflict in any plugin file fails and names each marker line", () => {

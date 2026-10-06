@@ -101,7 +101,7 @@ describe("static plugin invariants", () => {
     "**subagent_type**: NAME",
     '{\\"subagent_type\\": \\"NAME\\"}',
   ])("a bare dispatch spelled %s fails for every shipped agent", (spelling) => {
-    expect(shippedAgents).toContain("poteto-agent");
+    expect(shippedAgents.length).toBeGreaterThan(0);
     const root = plugin((r) => shippedAgents.forEach((name) => agent(r, name)));
     for (const name of shippedAgents) {
       skill(root, "caller", "", `${spelling.replace("NAME", name)}\n`);

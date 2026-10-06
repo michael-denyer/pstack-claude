@@ -116,6 +116,8 @@ export function assertChangesHeading(changelog, version) {
   const lines = changelog.split("\n");
   const current = lines.find((line) => line.startsWith(`## ${version} `));
   if (!current) throw new Error(`CHANGES.md has no "## ${version} - <title>" heading`);
+  // Any "##" line counts, not only a release-shaped one. An entry headed
+  // "## Unreleased" or "## v1.2.3" above the VERSION heading ships nothing either.
   const newest = lines.find((line) => line.startsWith("##"));
   if (newest !== current) throw new Error(`CHANGES.md's newest release heading is "${newest}", but VERSION is ${version}`);
   const headings = lines.filter((line) => /^## \d+\.\d+\.\d+/.test(line));
@@ -481,7 +483,7 @@ export function stampLeadLine(text, lead) {
     if (!leads.includes(line)) rest.push(line);
     else if (rest.at(-1) === "") rest.pop();
   }
-  if (rest.length && rest[0] !== "") rest.unshift("");
+  if (rest[0]) rest.unshift("");
   return [...lines.slice(0, heading + 1), ...leads.flatMap((line) => ["", line]), ...rest].join("\n");
 }
 

@@ -129,7 +129,10 @@ export function piModelNamesSection(models) {
     "\n\nPi warns that Anthropic bills Claude used through Pi per token, as extra usage, even on a Claude subscription. " +
     "Pi shows that warning only in interactive mode, never for the `pi --mode rpc` children the `agent` tool runs.\n\n" +
     "A `pi models: opus=<provider/id>, sonnet=<provider/id>` line in the Pi override sheet points each alias " +
-    "it names at another Pi model, whatever the session's provider. The `agent` tool also takes a full " +
+    "it names at another Pi model, whatever the session's provider. Add one when the session's provider has no " +
+    `column above and Pi has no credentials for ${code(fallback)}, because each alias then resolves to an ${code(`${fallback}/*`)} ` +
+    `ID and the ${code("agent")} call fails with ${code(`No API key found for ${fallback}`)}. ` +
+    "The `agent` tool also takes a full " +
     "`provider/id`, passed through unchanged, and `inherit-parent`, `auto`, or no `model` runs the child on the " +
     "parent's current model. Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`) " +
     "stay diverse only while their aliases resolve to distinct models. If one model family is all you can reach, " +

@@ -1180,23 +1180,29 @@ fi
       "gt info feat",
       `if [ "$2" = log ]; then printf '◯ main\\n◉ feat\\n'; exit 0; fi\n`,
     ],
-  ])("fails a frontier set when %s hangs and ignores SIGTERM", async (call, answerLog) => {
-    const directory = await makeDirectory();
-    const store = useStore(directory, {
-      gt: fakeGtPath(directory),
-      gtTimeoutMs: 200,
-    });
-    await store.init();
-    await mkdir(join(directory, "bin"));
-    await writeFile(
-      fakeGtPath(directory),
-      `#!/usr/bin/env bash\n${answerLog}trap '' TERM\nexec sleep 3\n`,
-      { mode: 0o755 }
-    );
-    const started = Date.now();
-    await expect(store.frontier.set({ repo: directory })).rejects.toThrow(
-      new RegExp(`^${call} failed: .*ETIMEDOUT`)
-    );
-    expect(Date.now() - started).toBeLessThan(2000);
-  });
+  ])(
+    "fails a frontier set when %s hangs and ignores SIGTERM",
+    async (call, answerLog) => {
+      const directory = await makeDirectory();
+      // On a saturated machine one start of the fake gt has taken over a
+      // second, and the gt log call before a hung gt info must fit the budget.
+      const store = useStore(directory, {
+        gt: fakeGtPath(directory),
+        gtTimeoutMs: 2000,
+      });
+      await store.init();
+      await mkdir(join(directory, "bin"));
+      await writeFile(
+        fakeGtPath(directory),
+        `#!/usr/bin/env bash\n${answerLog}trap '' TERM\nexec sleep 20\n`,
+        { mode: 0o755 }
+      );
+      const started = Date.now();
+      await expect(store.frontier.set({ repo: directory })).rejects.toThrow(
+        new RegExp(`^${call} failed: .*ETIMEDOUT`)
+      );
+      expect(Date.now() - started).toBeLessThan(10_000);
+    },
+    30_000
+  );
 });

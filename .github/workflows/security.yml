@@ -28,10 +28,9 @@ jobs:
       # Pinned to the image rather than google/osv-scanner-action, whose own
       # README warns its behavior can change in a patch release.
       #
-      # --include-git-root is required: the scanner skips the git root by
-      # default, and the only lockfile lives inside this repo. A scan that
-      # finds no lockfile exits 128 (v2.5.1 cmd/osv-scanner/internal/cmd/run.go),
-      # so it fails the step as a vulnerability's exit 1 does.
+      # Do not add --include-git-root. With it the checkout's .git counts as a
+      # package, so a scan that finds no lockfile exits 0. Without it that scan
+      # exits 128 and fails the step, and both bun.lock files are still scanned.
       #
       # The v2.5.1 tag is mutable, so the digest is what actually pins this.
       # Resolved with: docker buildx imagetools inspect ghcr.io/google/osv-scanner:v2.5.1
@@ -39,7 +38,7 @@ jobs:
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE:/src" \
             ghcr.io/google/osv-scanner:v2.5.1@sha256:8108ae94eadea5a02c9bec6e646909d5b790b44bd62d7f5b7f0b1d6d0ffc7734 \
-            scan source --recursive --include-git-root /src
+            scan source --recursive /src
 
   zizmor:
     name: Workflow static analysis

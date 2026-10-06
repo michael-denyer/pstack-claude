@@ -389,9 +389,9 @@ export function syncComponent({
   // Ask the filesystem, not the walk, which lists no empty directory. On a
   // case-insensitive filesystem a file B also blocks a directory b.
   const onDisk = (rel) => lstatSync(join(localDir, rel), { throwIfNoEntry: false });
+  const writes = outcomes.filter(({ write }) => write).map(({ rel }) => rel);
   const collisions = new Map();
-  for (const { rel, write } of outcomes) {
-    if (!write) continue;
+  for (const rel of writes) {
     const blocker = dirsAbove(rel).find((dir) => onDisk(dir)?.isFile());
     if (blocker) collisions.set(blocker, "a file where upstream has a directory");
     else if (onDisk(rel)?.isDirectory()) collisions.set(rel, "a directory where upstream has a file");
@@ -399,7 +399,7 @@ export function syncComponent({
   // Every walked path counts, since one that another component carries or
   // `exclude` names has no outcome, and a write under another spelling would
   // land on it.
-  const held = new Set([...localPaths, ...outcomes.filter(({ write }) => write).map(({ rel }) => rel)]);
+  const held = new Set([...localPaths, ...writes]);
   for (const group of Map.groupBy(held, (rel) => rel.toLowerCase()).values()) {
     if (group.length < 2) continue;
     const [first, ...rest] = group.sort();

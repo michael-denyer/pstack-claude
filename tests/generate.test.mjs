@@ -274,6 +274,7 @@ describe("assertChangesHeading", () => {
     ["the newest heading quoted in its own entry", "## 0.9.71 - new\n\n```\n## 0.9.71 - new\n```\n\n## 0.9.70 - old\n"],
     ["a sample heading above the first entry", "```md\n## 1.2.3 - title\n```\n\n## 0.9.71 - new\n\n## 0.9.70 - old\n"],
     ["a tilde fence", "## 0.9.71 - new\n\n~~~\n## 0.9.70 - old\n~~~\n\n## 0.9.70 - old\n"],
+    ["an indented fence", "## 0.9.71 - new\n\n ```\n## 0.9.70 - old\n ```\n\n## 0.9.70 - old\n"],
     ["a longer fence holding a shorter one", "## 0.9.71 - new\n\n````\n```\n## 0.9.70 - old\n```\n````\n\n## 0.9.70 - old\n"],
   ])("a heading inside a code fence heads no entry: %s", (_, body) => {
     expect(() => assertChangesHeading(`# Changes\n\n${body}`, "0.9.71")).not.toThrow();

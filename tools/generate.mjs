@@ -115,7 +115,7 @@ export function stampVersion(text, version, file) {
 function outsideFences(lines) {
   let fence = null;
   return lines.filter((line) => {
-    const mark = line.match(/^(`{3,}|~{3,})/)?.[1];
+    const mark = line.match(/^\s*(`{3,}|~{3,})/)?.[1];
     if (fence) {
       if (mark?.startsWith(fence)) fence = null;
       return false;

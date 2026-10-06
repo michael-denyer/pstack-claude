@@ -1,7 +1,7 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -77,6 +77,17 @@ for (const [form, text, artifacts, unregistered, names] of [
   assert.ok(result.value.detail.includes(names), result.value.detail);
   const rule = result.value.detail.slice(result.value.detail.indexOf('Link each local file'));
   assert.ok(rule.startsWith('Link each local file') && storage.includes(rule), result.value.detail);
+}));
+
+test.failing('a Windows drive-letter path is a local link, not a URL', () => fixture(({ run }) => {
+  const directory = run('begin').value.directory;
+  mkdirSync(join(directory, 'C:'));
+  for (const name of ['q.md', 'C:/w.md']) writeFileSync(join(directory, name), 'Which question is still open?\n');
+  const resume = join(directory, 'resume.md');
+  writeFileSync(resume, '[Q](q.md) and [W](C:/w.md)\n');
+  const result = run('publish', '--note', resume, '--artifact', join(directory, 'q.md'));
+  assert.equal(result.status, 1);
+  assert.match(result.value.detail, /register every local note link with --artifact: \[W\]\(C:\/w\.md\)/);
 }));
 
 test('ignores links inside code spans and fenced code blocks', () => fixture(({ run }) => {

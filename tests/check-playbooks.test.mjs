@@ -12,8 +12,10 @@ function run(playbooks, { throughSymlink = false, cwd = ".", args = ["."] } = {}
   // The script reports the resolved working directory; macOS tmpdir() sits behind the /var symlink.
   const root = realpathSync(mkdtempSync(join(tmpdir(), "pstack-check-playbooks-")));
   try {
-    if (playbooks) mkdirSync(join(root, ".agents/playbooks"), { recursive: true });
-    for (const [name, text] of Object.entries(playbooks ?? {})) writeFileSync(join(root, ".agents/playbooks", name), text);
+    if (playbooks) {
+      mkdirSync(join(root, ".agents/playbooks"), { recursive: true });
+      for (const [name, text] of Object.entries(playbooks)) writeFileSync(join(root, ".agents/playbooks", name), text);
+    }
     const workingDirectory = join(root, cwd);
     mkdirSync(workingDirectory, { recursive: true });
     let entry = script;
@@ -90,14 +92,14 @@ describe("project playbooks", () => {
     });
   });
 
-  test("a repository with no project playbooks passes and the check says there are none", () => {
+  test("a root with no .agents/playbooks directory passes and the check says so", () => {
     expect(run(null)).toEqual({
       code: 0,
       out: "No project playbooks to check: <root>/.agents/playbooks does not exist.\n",
     });
   });
 
-  test("from a subdirectory the check names the directory it read and reports no match", () => {
+  test("from a subdirectory the check names the directory it looked for and does not report a match", () => {
     const result = run({ "ship.md": "---\nextends: shipping-v2\nwhen: Use it to ship.\n---\n" }, { cwd: "src", args: [] });
     expect(result).toEqual({
       code: 0,
@@ -107,6 +109,13 @@ describe("project playbooks", () => {
 
   test("a root that does not exist is an error", () => {
     expect(run(null, { args: ["nope"] })).toEqual({ code: 1, out: "<root>/nope is not a directory\n" });
+  });
+
+  test("a root that is a file is an error", () => {
+    expect(run({ "ship.md": "" }, { args: [".agents/playbooks/ship.md"] })).toEqual({
+      code: 1,
+      out: "<root>/.agents/playbooks/ship.md is not a directory\n",
+    });
   });
 
   test("an extends stem that leaves the playbooks directory is not a playbook", () => {

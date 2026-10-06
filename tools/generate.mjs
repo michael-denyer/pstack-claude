@@ -481,6 +481,7 @@ export function stampLeadLine(text, lead) {
     if (!leads.includes(line)) rest.push(line);
     else if (rest.at(-1) === "") rest.pop();
   }
+  if (rest.length && rest[0] !== "") rest.unshift("");
   return [...lines.slice(0, heading + 1), ...leads.flatMap((line) => ["", line]), ...rest].join("\n");
 }
 

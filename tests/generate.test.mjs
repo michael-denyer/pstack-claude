@@ -429,11 +429,16 @@ describe("lead lines", () => {
     expect(stampLeadLine("no heading\n", "Lead.")).toBeNull();
   });
 
-  test("stamping converges a duplicated lead line, one that lost its blank separator, and one out of order", () => {
+  test("stamping converges a duplicated lead line, one that lost a blank separator on either side, and one out of order", () => {
     const canonical = "# X\n\nA.\n\nB.\n\nBody.\n";
     expect(stampLeadLine("# X\n\nA.\nA.\n\nB.\n\nBody.\n", ["A.", "B."])).toBe(canonical);
     expect(stampLeadLine("# X\nA.\n\nB.\n\nBody.\n", ["A.", "B."])).toBe(canonical);
+    expect(stampLeadLine("# X\n\nA.\n\nB.\nBody.\n", ["A.", "B."])).toBe(canonical);
     expect(stampLeadLine("# X\n\nB.\n\nA.\n\nBody.\n", ["A.", "B."])).toBe(canonical);
+  });
+
+  test("a lead line that ends the file gains no blank line after it", () => {
+    for (const text of ["# X\n\nA.\n", "# X\n\nA."]) expect(stampLeadLine(text, "A.")).toBe(text);
   });
 
   test("Codex and Copilot stamp a preamble on their noted skills and Pi stamps none", () => {

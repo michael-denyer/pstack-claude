@@ -891,4 +891,8 @@ describe("plan, changes, apply", () => {
     writeFileSync(join(root, hooks), text.replace("hooks/session-start.sh", "hooks/linked.sh"));
     expect(problems(root)).toEqual([expect.stringContaining("hooks/linked.sh does not exist in the plugin")]);
   });
+
+  test("problems reports a root with no plugin directory, down to the last check, and does not throw", () => {
+    expect(problems(scratch("pstack-empty-"))).toContainEqual(expect.stringContaining("plugins/pstack/hooks/hooks.json"));
+  });
 });

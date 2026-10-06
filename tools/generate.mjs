@@ -1011,10 +1011,9 @@ export function problems(root, models) {
     }),
   ).filter(Boolean);
   models ??= attempt(() => loadModels(root));
-  const realPluginRoot = realpathSync(pluginRoot);
   const statOf = (rel) => {
     const full = join(pluginRoot, rel);
-    if (!existsSync(full) || !pathIsInside(realPluginRoot, realpathSync(full))) return null;
+    if (!existsSync(full) || !pathIsInside(realpathSync(pluginRoot), realpathSync(full))) return null;
     return statSync(full);
   };
   if (models) {

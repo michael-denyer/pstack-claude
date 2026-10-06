@@ -5,9 +5,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { agentSkills, validatePluginLayout } from "../tools/generate.mjs";
+import { agentSkills, pluginAgentPaths, validatePluginLayout } from "../tools/generate.mjs";
+
+const shippedAgents = pluginAgentPaths(fileURLToPath(new URL("../plugins/pstack", import.meta.url))).map((p) =>
+  basename(p, ".md"),
+);
 
 function skill(root, name, front, body = "body\n") {
   mkdirSync(join(root, "skills", name), { recursive: true });
@@ -88,6 +93,20 @@ describe("static plugin invariants", () => {
       skill(r, "caller", "", `Spawn with ${line}.\n`);
     });
     expect(() => check(root)).toThrow('skills/caller/SKILL.md:6: subagent_type: "poteto-agent" (use "pstack:poteto-agent")');
+  });
+
+  test.each([
+    "- `subagent_type`: `NAME`",
+    'Agent(subagent_type="NAME", prompt=...)',
+    "**subagent_type**: NAME",
+    '{\\"subagent_type\\": \\"NAME\\"}',
+  ])("a bare dispatch spelled %s fails for every shipped agent", (spelling) => {
+    expect(shippedAgents).toContain("poteto-agent");
+    const root = plugin((r) => shippedAgents.forEach((name) => agent(r, name)));
+    for (const name of shippedAgents) {
+      skill(root, "caller", "", `${spelling.replace("NAME", name)}\n`);
+      expect(() => check(root)).toThrow(`skills/caller/SKILL.md:6: subagent_type: "${name}" (use "pstack:${name}")`);
+    }
   });
 
   test.each([

@@ -614,6 +614,52 @@ await store.close();
     expect(await lockFiles(directory)).toEqual([]);
   });
 
+  it("leaves a live claim alone when a writer that saw only a dead claimant resumes", async () => {
+    const { directory, store } = await initializedStore();
+    await store.close();
+    const stale = await plantStaleLock(directory);
+    await mkdir(join(directory, ".orch.lock.takeover"));
+    await writeFile(join(directory, ".orch.lock.takeover", String(stale)), "");
+    const flags = await makeDirectory();
+
+    const b = spawnWriter({
+      directory,
+      flags,
+      name: "B",
+      patch: `const { readdir } = promises;
+promises.readdir = async (path) => {
+  const claimants = await readdir(path);
+  if (path === lock + ".takeover") {
+    writeFileSync(flag("saw-dead-claimant"), "");
+    spin(() => peer("C.replacing"));
+  }
+  return claimants;
+};`,
+    });
+    const c = spawnWriter({
+      directory,
+      flags,
+      name: "C",
+      before: `spin(() => peer("B.saw-dead-claimant"));`,
+      atLockUnlink: `writeFileSync(flag("replacing"), "");
+    spin(() => peer("B.held") || peer("B.refused"));`,
+    });
+    expect(await Promise.all([b.exited, c.exited])).toEqual([0, 0]);
+    expect(await new Response(b.stderr).text()).toBe("");
+    expect(await new Response(c.stderr).text()).toBe("");
+
+    expect(await readFlags(flags)).toEqual({
+      "B.saw-dead-claimant": "",
+      "B.refused": `store lock held by pid ${stale} is being replaced by another writer; retry`,
+      "C.replacing": "",
+      "C.held": "",
+    });
+    expect(await readFile(join(directory, "units.tsv"), "utf8")).toBe(
+      "id\ttrack\tstate\tbranch\tpr\tsha\tbrief\nC-unit\trace\tpending\t\t\t\t\n"
+    );
+    expect(await lockFiles(directory)).toEqual([]);
+  });
+
   it("replaces a stale lock that disappears before it is removed", async () => {
     const { directory, store } = await initializedStore();
     await store.close();

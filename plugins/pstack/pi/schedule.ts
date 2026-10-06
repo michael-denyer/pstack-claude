@@ -17,11 +17,16 @@ const wakeupParams = Type.Object({
   stop: Type.Optional(Type.Boolean({ description: "Cancel the pending wakeup; no other field is needed" })),
 });
 
-// One pending wakeup and one fixed-interval loop per session. A fire delivers
-// the prompt as a follow-up user message, which runs at once when the agent is idle.
+// One pending wakeup, one fixed-interval loop, and one live self-paced loop per
+// session. A fire delivers the prompt as a follow-up user message, which runs at
+// once when the agent is idle.
 export class Scheduler {
   private wakeup?: NodeJS.Timeout;
   private loop?: NodeJS.Timeout;
+  // The prompt of the live self-paced loop. An iteration re-arms the loop
+  // through schedule_wakeup only once it finishes, by which time /loop stop or
+  // a new /loop may have run, so a re-arm is checked against this.
+  private selfPaced?: string;
 
   constructor(private readonly pi: ExtensionAPI) {}
 
@@ -65,9 +70,23 @@ export class Scheduler {
     return had;
   }
 
+  startSelfPaced(prompt: string): void {
+    this.selfPaced = prompt;
+  }
+
+  // A wakeup prompt that would continue a self-paced loop other than the live one.
+  staleLoop(wakeupPrompt: string): boolean {
+    const m = /^\/loop(\s[\s\S]*)?$/.exec(wakeupPrompt);
+    if (!m) return false;
+    const cmd = parseLoop(m[1] ?? "");
+    return cmd.kind === "dynamic" && cmd.prompt !== this.selfPaced;
+  }
+
   stopAll(): boolean {
     const wakeup = this.cancelWakeup();
-    return this.stopLoop() || wakeup;
+    const selfPaced = this.selfPaced !== undefined;
+    this.selfPaced = undefined;
+    return this.stopLoop() || wakeup || selfPaced;
   }
 }
 
@@ -123,6 +142,12 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
       if (params.delaySeconds === undefined || !params.prompt) {
         throw new Error("schedule_wakeup needs delaySeconds and prompt unless stop is true.");
       }
+      if (scheduler.staleLoop(params.prompt)) {
+        return {
+          content: [{ type: "text", text: "The loop this wakeup would continue was stopped or replaced; nothing was scheduled." }],
+          details: { stale: true },
+        };
+      }
       if (oneShot.exits(ctx)) {
         throw new Error(`schedule_wakeup cannot fire in a ${ctx.mode} run: pi exits when this run ends. Finish the work in this run instead.`);
       }
@@ -165,6 +190,7 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
         }
         case "dynamic":
           scheduler.stopAll();
+          scheduler.startSelfPaced(cmd.prompt);
           await fire(dynamicPrompt(cmd.prompt));
       }
     },

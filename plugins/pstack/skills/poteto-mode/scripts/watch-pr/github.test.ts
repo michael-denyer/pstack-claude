@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { WatchDeadline } from "./deadline.ts";
 import {
   ChecksUnavailable,
   WatcherQueryError,
@@ -10,6 +11,7 @@ import {
   parseReviewThreads,
   resolveChecks,
   resolveContext,
+  runJson,
 } from "./github.ts";
 import {
   fakeReader,
@@ -17,7 +19,7 @@ import {
   passingCheck,
   pendingCheck,
 } from "./fakes.test-helper.ts";
-import type { CheckRead, ReportedChecks } from "./types.ts";
+import type { CheckRead, PrContext, ReportedChecks } from "./types.ts";
 import { parsePrNumber } from "./types.ts";
 
 const context = {
@@ -31,6 +33,9 @@ function reported(read: CheckRead): ReportedChecks {
     throw new Error(`expected checks: ${read.kind}`);
   return read;
 }
+
+const numbers = (stack: readonly PrContext[]): number[] =>
+  stack.map((pr) => Number(pr.number));
 
 describe("checks fallback chain", () => {
   it("uses a non-empty fast-path result without a rollup query", async () => {
@@ -126,6 +131,30 @@ describe("checks fallback chain", () => {
       ).rejects.toBeInstanceOf(ChecksUnavailable);
   });
 
+  it("rejects a rollup cursor that does not advance instead of paging on", async () => {
+    const stuck = { kind: "contexts", checks: [], endCursor: "same" } as const;
+    const reader = fakeReader({
+      fastPath: { kind: "checks", checks: [] },
+      rollupPages: [
+        stuck,
+        stuck,
+        { kind: "contexts", checks: [], endCursor: null },
+      ],
+    });
+    await expect(resolveChecks(reader, context)).rejects.toMatchObject({
+      failure: {
+        kind: "missing-key",
+        retryable: true,
+        detail: expect.stringContaining("must advance"),
+      },
+    });
+    expect(reader.calls).toEqual([
+      "checksFastPath",
+      "checkRollupPage:null",
+      "checkRollupPage:same",
+    ]);
+  });
+
   it("propagates a failed rollup query instead of reading it as no checks", async () => {
     const reader = fakeReader({ fastPath: { kind: "none-reported" } });
     const failure = new WatcherQueryError({
@@ -138,6 +167,21 @@ describe("checks fallback chain", () => {
       throw failure;
     };
     await expect(resolveChecks(reader, context)).rejects.toBe(failure);
+  });
+});
+
+it("reports a binary that cannot be spawned as a query failure that does not retry", async () => {
+  await expect(
+    runJson(
+      ["/nonexistent/watch-pr-missing-gh", "pr", "view"],
+      new WatchDeadline(0, () => 0)
+    )
+  ).rejects.toMatchObject({
+    failure: {
+      kind: "spawn-failed",
+      retryable: false,
+      detail: expect.stringContaining("ENOENT"),
+    },
   });
 });
 
@@ -400,27 +444,100 @@ describe("context and stack discovery", () => {
   });
 
   it("orders the connected stack bottom-to-top", () => {
-    const ordered = orderStack(context, [
+    const ordered = orderStack(
+      context,
+      [
+        {
+          number: parsePrNumber(41),
+          headRepository: { owner: "owner", repo: "repo" },
+          headRefName: "base-feature",
+          baseRefName: "main",
+        },
+        {
+          number: context.number,
+          headRepository: { owner: "owner", repo: "repo" },
+          headRefName: "feature",
+          baseRefName: "base-feature",
+        },
+        {
+          number: parsePrNumber(43),
+          headRepository: { owner: "owner", repo: "repo" },
+          headRefName: "upstack",
+          baseRefName: "feature",
+        },
+      ],
+      "main"
+    );
+    expect(ordered.map((item) => Number(item.number))).toEqual([41, 42, 43]);
+  });
+
+  it("keeps a PR whose head is the default branch out of every stack", () => {
+    const repo = { owner: "owner", repo: "repo" };
+    const backport = parsePrNumber(2);
+    const open = [
       {
-        number: parsePrNumber(41),
-        headRepository: { owner: "owner", repo: "repo" },
-        headRefName: "base-feature",
-        baseRefName: "main",
+        number: backport,
+        headRepository: repo,
+        headRefName: "main",
+        baseRefName: "release",
       },
       {
         number: context.number,
-        headRepository: { owner: "owner", repo: "repo" },
+        headRepository: repo,
         headRefName: "feature",
-        baseRefName: "base-feature",
+        baseRefName: "main",
       },
       {
         number: parsePrNumber(43),
-        headRepository: { owner: "owner", repo: "repo" },
+        headRepository: repo,
         headRefName: "upstack",
         baseRefName: "feature",
       },
-    ]);
-    expect(ordered.map((item) => Number(item.number))).toEqual([41, 42, 43]);
+    ];
+    expect(numbers(orderStack(context, open, "main"))).toEqual([42, 43]);
+    expect(
+      numbers(orderStack({ ...context, number: backport }, open, "main"))
+    ).toEqual([2]);
+  });
+
+  it("stops at the default branch when it is an integration branch with a release PR", () => {
+    const repo = { owner: "owner", repo: "repo" };
+    const open = [
+      {
+        number: parsePrNumber(500),
+        headRepository: repo,
+        headRefName: "develop",
+        baseRefName: "main",
+      },
+      {
+        number: parsePrNumber(612),
+        headRepository: repo,
+        headRefName: "feature/login",
+        baseRefName: "develop",
+      },
+      {
+        number: parsePrNumber(613),
+        headRepository: repo,
+        headRefName: "fix/typo",
+        baseRefName: "develop",
+      },
+    ];
+    expect(
+      numbers(
+        orderStack({ ...repo, number: parsePrNumber(612) }, open, "develop")
+      )
+    ).toEqual([612]);
+    expect(
+      numbers(
+        orderStack({ ...repo, number: parsePrNumber(500) }, open, "develop")
+      )
+    ).toEqual([500]);
+  });
+
+  it("reads the default branch once while discovering a stack", async () => {
+    const reader = fakeReader({ defaultBranch: "trunk" });
+    expect(await discoverStack(reader, context)).toEqual([context]);
+    expect(reader.calls).toEqual(["openPullRequests", "defaultBranch"]);
   });
 
   it("refuses a full open-PR page, which may have cut the stack", async () => {

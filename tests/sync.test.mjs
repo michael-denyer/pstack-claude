@@ -997,6 +997,39 @@ describe("syncComponent", () => {
     for (const rel of ["d", "f"]) expect(lstatSync(join(local, rel)).isSymbolicLink()).toBe(true);
   });
 
+  test("paths that differ only in case fail the run before any write, since a case-insensitive tree holds one of them", () => {
+    const oldUp = tree({ "Foo.md": "body\n", "sibling.md": "old\n" });
+    const newUp = tree({ "foo.md": "body\n", "sibling.md": "new\n" });
+    const local = tree({ "Foo.md": "body\n", "sibling.md": "old\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.collisions).toEqual([{ rel: "Foo.md", reason: "differs only in case from foo.md" }]);
+    expect(readdirSync(local).sort()).toEqual(["Foo.md", "sibling.md"]);
+    expect(readFileSync(join(local, "sibling.md"), "utf8")).toBe("old\n");
+  });
+
+  test("a port file where upstream has a directory, or a port directory where upstream has a file, fails the run before any write", () => {
+    const oldUp = tree({ "a.md": "old a\n" });
+    const newUp = tree({ "a.md": "new a\n", "b/new.md": "n\n", c: "a file upstream\n" });
+    const local = tree({ "a.md": "old a\n", b: "a file in the port\n", "c/port.md": "p\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.collisions).toEqual([
+      { rel: "b", reason: "a file where upstream has a directory" },
+      { rel: "c", reason: "a directory where upstream has a file" },
+    ]);
+    expect(report.written).toEqual([
+      { kind: "updated", rel: "a.md" },
+      { kind: "added", rel: "b/new.md" },
+      { kind: "added", rel: "c" },
+    ]);
+    expect(readFileSync(join(local, "a.md"), "utf8")).toBe("old a\n");
+    expect(readFileSync(join(local, "b"), "utf8")).toBe("a file in the port\n");
+    expect(readdirSync(join(local, "c"))).toEqual(["port.md"]);
+  });
+
   test("a binary port copy under an upstream text edit blocks every write", () => {
     const oldUp = tree({ "doc.md": "a\n", "sibling.md": "old\n" });
     const newUp = tree({ "doc.md": "b\n", "sibling.md": "new\n" });
@@ -1375,6 +1408,24 @@ describe("sync CLI", () => {
     }
     expect(pin()).toBe(oldSha);
     expect(local()).toBe("port\n");
+  });
+
+  test("a path collision fails the dry run and the real run naming its path, and nothing is written", () => {
+    const { run, pin, oldSha, port } = cli({ oldText: "one\n", newText: "two\n", localText: "one\n" });
+    const skill = join(port, "plugins/pstack/skills/s.md");
+    rmSync(skill);
+    mkdirSync(skill);
+    writeFileSync(join(skill, "inner.md"), "the port's own\n");
+    const failure =
+      "FAIL: paths the port tree cannot hold next to upstream's; restructure the port, then rerun:\n" +
+      "  plugins/pstack/skills/s.md (a directory where upstream has a file)\n";
+
+    for (const result of [run("--dry-run"), run()]) {
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(failure);
+    }
+    expect(pin()).toBe(oldSha);
+    expect(readdirSync(skill)).toEqual(["inner.md"]);
   });
 
   test("a stray argument fails with the usage line, and nothing is written or pinned", () => {

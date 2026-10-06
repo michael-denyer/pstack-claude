@@ -80,7 +80,7 @@ function threadLine(thread: T.ReviewThread): string {
 type StatusQueryBlocker = {
   readonly kind: "status-query";
   readonly failures: number;
-  readonly failure: { readonly detail: string };
+  readonly failure: Pick<T.QueryFailure, "kind" | "detail">;
 };
 function renderBlocker(blocker: T.MergeBlocker | StatusQueryBlocker): string {
   switch (blocker.kind) {
@@ -143,7 +143,9 @@ function renderBlocker(blocker: T.MergeBlocker | StatusQueryBlocker): string {
         "BLOCKER: status-query",
         `failures=${blocker.failures}`,
         `detail=${blocker.failure.detail}`,
-        "action=verify current PR context, GitHub authentication, and API availability, then rearm",
+        blocker.failure.kind === "spawn-failed"
+          ? "action=install the command that could not run, or put it on PATH, then rearm"
+          : "action=verify current PR context, GitHub authentication, and API availability, then rearm",
       ].join("\n");
     default: {
       const exhaustive: never = blocker;
@@ -168,7 +170,7 @@ export function renderPretty(verdict: T.WatcherVerdict): string {
     case "ADVANCE":
       return `ADVANCE: merged #${verdict.merged.number}; next=#${verdict.frontier.number}; remaining=${verdict.remaining}\n`;
     case "RETRY":
-      return `RETRY: GitHub status query failed; retrying in ${verdict.retryInSeconds}s\ndetail=${verdict.failure.detail}\n`;
+      return `RETRY: ${verdict.failure.kind === "snapshot-changed" ? "the PR changed while its status was being read" : "GitHub status query failed"}; retrying in ${verdict.retryInSeconds}s\ndetail=${verdict.failure.detail}\n`;
     case "BLOCKER":
       return `${renderBlocker(verdict.blocker)}\n`;
     case "READY": {

@@ -140,13 +140,13 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/cli.test.ts": {
       "kind": "policy",
-      "why": "Supplies the shared deadline and landing revision the port's watcher requires, and checks that a PR with no checks configured gets a first-sighting status cell and, after one WAITING poll, a READY verdict that names the absence, and that mergeability GitHub has not computed is named in the status table, the WAITING line, and the TIMEOUT line.",
+      "why": "Supplies the shared deadline and landing revision the port's watcher requires, and checks that a PR with no checks configured gets a first-sighting status cell and, after one WAITING poll, a READY verdict that names the absence, and that mergeability GitHub has not computed is named in the status table, the WAITING line, and the TIMEOUT line, that a retry after a mid-read change is not called a failed query, that a command that could not run gets an install action, and the two help lines the port rewrote.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/cli.ts": {
       "kind": "policy",
-      "why": "Threads one WatchDeadline through discovery, commands, and polling, and reports a deadline verdict instead of throwing.",
+      "why": "Threads one WatchDeadline through discovery, commands, and polling, reports a deadline verdict instead of throwing, and says in its help that --interval does not shorten the 60 second no-checks confirmation and that exit 0 from --status-only does not mean ready.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
@@ -182,7 +182,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/render.ts": {
       "kind": "policy",
-      "why": "Renders the review-required, behind-base, and merge-blocked states as status cells and as merge-gate blockers with their next action, and shows a PR with no checks configured as a no-checks cell and a checks=none line on its READY verdict, with a first sighting as its own cell, WAITING line, and TIMEOUT line, and mergeability GitHub has not computed as its own Merge cell, WAITING line, and TIMEOUT line.",
+      "why": "Renders the review-required, behind-base, and merge-blocked states as status cells and as merge-gate blockers with their next action, and shows a PR with no checks configured as a no-checks cell and a checks=none line on its READY verdict, with a first sighting as its own cell, WAITING line, and TIMEOUT line, and mergeability GitHub has not computed as its own Merge cell, WAITING line, and TIMEOUT line, words a retry after the PR changed mid-read as that and not as a failed query, and tells a caller whose command could not run to install it.",
       "since": "0.9.43",
       "upstream": "not-proposed"
     },

@@ -13,6 +13,7 @@ import {
   resolveContext,
 } from "./github.ts";
 import {
+  NO_CHECKS_CONFIRM_SECONDS,
   runQueued,
   deadlineVerdict,
   runSimple,
@@ -109,7 +110,12 @@ export function parseArgs(
       "frozen bottom-to-top queue (queued mode only)",
       stackPrList
     )
-    .option("--interval <seconds>", "poll interval", positiveNumber, 60)
+    .option(
+      "--interval <seconds>",
+      `poll interval; a PR with no checks takes ${NO_CHECKS_CONFIRM_SECONDS} seconds to confirm whatever this is`,
+      positiveNumber,
+      60
+    )
     .option(
       "--sweep-interval <seconds>",
       "whole-stack sweep interval",
@@ -128,7 +134,11 @@ export function parseArgs(
       positiveInteger,
       5
     )
-    .option("--status-only", "print one status table and exit 0", false)
+    .option(
+      "--status-only",
+      "print one status table and exit; exit 0 means the table was read, not that the PR is ready",
+      false
+    )
     .option("--allow-draft", "do not treat a draft as a merge gate", false)
     .option("--pretty", "render human text instead of JSON", false);
   program.parse(argv, { from: "user" });

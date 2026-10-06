@@ -3,7 +3,7 @@ import { type CliRuntime, main, parseArgs } from "./cli.ts";
 import { WatchDeadline } from "./deadline.ts";
 import { fakeReader, passingCheck } from "./fakes.test-helper.ts";
 import { renderJson, renderPretty } from "./render.ts";
-import type { GitHubReader, WatcherVerdict } from "./types.ts";
+import type { GitHubReader, QueryFailure, WatcherVerdict } from "./types.ts";
 import { parsePrNumber } from "./types.ts";
 
 const silentIo = { stdout: () => {}, stderr: () => {} };
@@ -152,6 +152,57 @@ describe("rendering", () => {
     expect(rendered).toContain("| PR | CI | Review | Merge |");
     expect(rendered).toContain(
       "| [#1](https://github.com/owner/repo/pull/1) | \u2014 | \u2014 | ✅ merged |"
+    );
+  });
+
+  const envelope = {
+    schemaVersion: 1,
+    sequence: 1,
+    observedAt: "2026-07-26T00:00:00.000Z",
+    mode: "single",
+  } as const;
+
+  it("does not call a PR that changed mid-read a failed query", () => {
+    const retry = (failure: QueryFailure) =>
+      renderPretty({
+        ...envelope,
+        kind: "RETRY",
+        terminal: false,
+        failure,
+        consecutiveFailures: 1,
+        retryInSeconds: 60,
+      });
+    expect(
+      retry({ kind: "snapshot-changed", retryable: true, detail: "moved" })
+    ).toBe(
+      "RETRY: the PR changed while its status was being read; retrying in 60s\ndetail=moved\n"
+    );
+    expect(
+      retry({ kind: "command-exit", retryable: true, detail: "502", code: 1 })
+    ).toBe("RETRY: GitHub status query failed; retrying in 60s\ndetail=502\n");
+  });
+
+  it("tells a caller whose command could not run to install it, not to check authentication", () => {
+    const action = (failure: QueryFailure) =>
+      renderPretty({
+        ...envelope,
+        kind: "BLOCKER",
+        terminal: true,
+        exitCode: 7,
+        blocker: { kind: "status-query", failures: 1, failure },
+      })
+        .trimEnd()
+        .split("\n")
+        .at(-1);
+    expect(
+      action({ kind: "spawn-failed", retryable: false, detail: "no gh" })
+    ).toBe(
+      "action=install the command that could not run, or put it on PATH, then rearm"
+    );
+    expect(
+      action({ kind: "command-exit", retryable: true, detail: "401", code: 1 })
+    ).toBe(
+      "action=verify current PR context, GitHub authentication, and API availability, then rearm"
     );
   });
 });
@@ -306,7 +357,14 @@ describe("main", () => {
     const reader = fakeReader();
     const harness = testRuntime(reader);
     expect(await main(["--help"], harness.runtime)).toBe(0);
-    expect(harness.stdout.join("")).toContain("JSON (NDJSON while polling)");
+    const help = harness.stdout.join("").replace(/\s+/g, " ");
+    expect(help).toContain("JSON (NDJSON while polling)");
+    expect(help).toContain(
+      "print one status table and exit; exit 0 means the table was read, not that the PR is ready"
+    );
+    expect(help).toContain(
+      "poll interval; a PR with no checks takes 60 seconds to confirm whatever this is"
+    );
     expect(reader.calls).toEqual([]);
   });
 });

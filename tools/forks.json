@@ -110,7 +110,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/worktree-cleanup.md": {
       "kind": "policy",
-      "why": "Holds a worktree with untracked files or a git lock instead of calling untracked files safe to drop, names the untracked count and the lock reason the audit prints, and forbids rm -rf around a locked tree.",
+      "why": "Holds a worktree with untracked files or a git lock instead of calling untracked files safe to drop, names the untracked count and the lock reason the audit prints, says that a worktree with both tracked edits and untracked files prints both counts and that the diff leaves the untracked files out, and forbids rm -rf around a locked tree.",
       "since": "0.9.74",
       "upstream": "not-proposed"
     },

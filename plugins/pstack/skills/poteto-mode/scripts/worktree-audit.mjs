@@ -242,9 +242,8 @@ function sizeKey(label) {
   return Number(match[1]) * 1024 ** (match[2] ? "KMGTPE".indexOf(match[2]) + 1 : 0);
 }
 
-function dirtyLabel({ wip, untracked }) {
-  if (wip > 0) return `wip:${wip}`;
-  return untracked > 0 ? `untracked:${untracked}` : "clean";
+function dirtyLabel(counts) {
+  return ["wip", "untracked"].filter((kind) => counts[kind] > 0).map((kind) => `${kind}:${counts[kind]}`).join(",") || "clean";
 }
 
 // `--porcelain -z` hands over the lock reason raw, newlines included.

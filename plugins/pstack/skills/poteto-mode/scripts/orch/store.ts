@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
 import {
   access,
+  link,
   mkdir,
-  open,
   readFile,
   readdir,
   rename,
@@ -398,10 +398,24 @@ async function acquireLock(
   const path = join(store, LOCK_FILE);
   const takeover = join(store, TAKEOVER_DIR);
   const pid = String(process.pid);
+
+  // A writer killed between an exclusive open and its write leaves an empty
+  // lock, which names no pid to judge dead. The pid goes into a private file
+  // that is hard-linked into place, so the lock appears with its pid in it.
+  // A filesystem without hard links gets the exclusive open.
   const create = async (): Promise<void> => {
-    const handle = await open(path, "wx");
-    await handle.writeFile(`${pid}\n`);
-    await handle.close();
+    const pidFile = `${path}.${pid}.${randomUUID()}`;
+    await writeFile(pidFile, `${pid}\n`, { flag: "wx" });
+    try {
+      await link(pidFile, path);
+    } catch (error) {
+      if (errorCode(error) === "EEXIST") {
+        throw error;
+      }
+      await writeFile(path, `${pid}\n`, { flag: "wx" });
+    } finally {
+      await unlink(pidFile).catch(() => {});
+    }
   };
 
   // POSIX cannot unlink a file only if its content still matches, so the

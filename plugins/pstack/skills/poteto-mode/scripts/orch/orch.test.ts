@@ -179,6 +179,8 @@ function spawnWriter({
   force = false,
   before = "",
   atLockUnlink = "",
+  patch = "",
+  killAfterLockCall = 0,
 }: {
   directory: string;
   flags: string;
@@ -186,6 +188,8 @@ function spawnWriter({
   force?: boolean;
   before?: string;
   atLockUnlink?: string;
+  patch?: string;
+  killAfterLockCall?: number;
 }) {
   const script = `
 const { existsSync, rmSync, writeFileSync } = require("node:fs");
@@ -208,6 +212,21 @@ promises.unlink = async (path) => {
   }
   return unlink(path);
 };
+${patch}
+let lockCalls = 0;
+for (const [call, run] of Object.entries(promises)) {
+  if (typeof run !== "function") continue;
+  promises[call] = async (...args) => {
+    try {
+      return await run(...args);
+    } finally {
+      if (args.slice(0, 2).some((path) => String(path).startsWith(lock))) {
+        lockCalls += 1;
+        if (lockCalls === ${killAfterLockCall}) process.kill(process.pid, "SIGKILL");
+      }
+    }
+  };
+}
 const { openStore } = await import(${JSON.stringify(join(import.meta.dir, "store.ts"))});
 const store = openStore(${JSON.stringify(directory)}, { force: ${force} });
 ${before}
@@ -610,6 +629,71 @@ await store.close();
     expect(await writer.exited).toBe(0);
     expect(await new Response(writer.stderr).text()).toBe("");
     expect(await readFlags(flags)).toEqual({ "A.held": "", "A.lock-gone": "" });
+    expect(await lockFiles(directory)).toEqual([]);
+  });
+
+  it.each([
+    ["no lock", false],
+    ["a stale lock", true],
+  ])(
+    "lets the next writer in after a writer that found %s is killed at any step of taking or releasing it",
+    async (_found, stale) => {
+      const { directory, store } = await initializedStore();
+      await store.close();
+      const flags = await makeDirectory();
+
+      let kills = 0;
+      for (;;) {
+        if (stale) {
+          await plantStaleLock(directory);
+        }
+        const writer = spawnWriter({
+          directory,
+          flags,
+          name: `w${kills}`,
+          killAfterLockCall: kills + 1,
+        });
+        await writer.exited;
+        if (writer.signalCode !== "SIGKILL") {
+          expect(await new Response(writer.stderr).text()).toBe("");
+          expect(writer.exitCode).toBe(0);
+          break;
+        }
+        kills += 1;
+        const id = `after-kill-${kills}`;
+        const next = useStore(directory);
+        expect(await next.units.add({ id, track: "build" })).toMatchObject({
+          id,
+        });
+        await next.close();
+      }
+      expect(kills).toBeGreaterThan(2);
+    },
+    60_000
+  );
+
+  it("takes the lock with an exclusive open where hard links are unsupported", async () => {
+    const { directory, store } = await initializedStore();
+    await store.close();
+    const flags = await makeDirectory();
+    const lock = join(directory, ".orch.lock");
+    const patch = `promises.link = async () => {
+  throw Object.assign(new Error("no hard links"), { code: "ENOTSUP" });
+};`;
+
+    await writeFile(lock, `${process.pid}\n`);
+    const blocked = spawnWriter({ directory, flags, name: "B", patch });
+    expect(await blocked.exited).toBe(0);
+    expect(await readFlags(flags)).toEqual({
+      "B.refused": `store lock held by pid ${process.pid}`,
+    });
+    expect(await readFile(lock, "utf8")).toBe(`${process.pid}\n`);
+
+    await rm(lock);
+    const writer = spawnWriter({ directory, flags, name: "A", patch });
+    expect(await writer.exited).toBe(0);
+    expect(await new Response(writer.stderr).text()).toBe("");
+    expect(await readFlags(flags)).toMatchObject({ "A.held": "" });
     expect(await lockFiles(directory)).toEqual([]);
   });
 

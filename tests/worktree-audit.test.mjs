@@ -45,6 +45,7 @@ describe("classify", () => {
     remote: known("pushed"),
     pr: known(null),
     recent: known(false),
+    locked: known(null),
   };
   const mergedPr = { ...ancestor, ancestry: known(false), pr: known({ number: 8, state: "MERGED", headRefOid: HEAD }) };
   const allUnknown = Object.fromEntries(Object.keys(ancestor).map((name) => [name, unknown]));
@@ -63,11 +64,14 @@ describe("classify", () => {
     ["tracked uncommitted work", { ...ancestor, dirty: wip }, "hold-wip"],
     ["an open PR", { ...ancestor, pr: openPr }, "hold-open-pr"],
     ["a chat within four days", { ...ancestor, recent: known(true) }, "verify-recent-chat"],
+    ["a locked worktree", { ...ancestor, locked: known("in use by agent 42") }, "hold-locked"],
+    ["a locked worktree with tracked work and an open PR", { ...ancestor, locked: known("locked"), dirty: wip, pr: openPr }, "hold-locked"],
     ["tracked work with an open PR and a recent chat", { ...ancestor, dirty: wip, pr: openPr, recent: known(true) }, "hold-wip"],
     ["untracked files with an open PR and a recent chat", { ...ancestor, dirty: untracked, pr: openPr, recent: known(true) }, "hold-untracked"],
     ["an open PR with a recent chat", { ...ancestor, pr: openPr, recent: known(true) }, "hold-open-pr"],
     ["tracked work while every other fact is unknown", { ...allUnknown, dirty: wip }, "hold-wip"],
     ["untracked files while every other fact is unknown", { ...allUnknown, dirty: untracked }, "hold-untracked"],
+    ["a locked worktree while every other fact is unknown", { ...allUnknown, locked: known("locked") }, "hold-locked"],
     ["an open PR while every other fact is unknown", { ...allUnknown, pr: openPr }, "hold-open-pr"],
     ["a recent chat while every other fact is unknown", { ...allUnknown, recent: known(true) }, "verify-recent-chat"],
   ])("%s -> %s", (_, facts, bucket) => {
@@ -176,6 +180,10 @@ test("audits every worktree of a fixture repo end to end", () => {
   for (const name of ["a.ts", "b.ts"]) writeFileSync(join(untracked, "src/feature", name), "export {};\n");
   // A user config that hides untracked files from plain status must not hide them from the audit.
   git("-C", fixture.repo, "config", "status.showUntrackedFiles", "no");
+  const inUse = addWorktree(fixture, "in-use");
+  git("-C", fixture.repo, "worktree", "lock", "--reason", "in use by agent 42\nuntil its PR lands", inUse);
+  const lockedSilently = addWorktree(fixture, "locked-silently");
+  git("-C", fixture.repo, "worktree", "lock", lockedSilently);
   const chatted = addWorktree(fixture, "chatted-long");
   const prefix = addWorktree(fixture, "chatted");
   writeTranscript(fixture, "-proj/session/subagents/workflows/wf_1/agent-a.jsonl", chatted);
@@ -194,27 +202,29 @@ test("audits every worktree of a fixture repo end to end", () => {
     ],
   });
 
-  expect(header).toBe("SIZE\tAGE\tMERGED\tDIRTY\tREMOTE\tPR\tLAST_CHAT\tBUCKET\tWORKTREE");
+  expect(header).toBe("SIZE\tAGE\tMERGED\tDIRTY\tREMOTE\tPR\tLAST_CHAT\tBUCKET\tLOCKED\tWORKTREE");
   expect(warnings).toEqual([]);
   expect(calls).toHaveLength(1);
   expect(calls[0].args.join(" ")).toContain("--state all");
   expect(rows[0].at(-1)).toBe(merged);
   const today = ymd(now);
   const columns = (worktree) => rowFor(rows, worktree).slice(1);
-  expect(columns(ancestor)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", ancestor]);
-  expect(columns(spaced)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", spaced]);
-  expect(columns(detached)).toEqual(["0d", "YES", "clean", "detached", "-", "-", "safe", detached]);
-  expect(columns(landed)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", landed]);
-  expect(columns(merged)).toEqual(["0d", "no", "clean", "pushed", "#8/MERGED", "-", "safe", merged]);
-  expect(columns(open)).toEqual(["0d", "YES", "clean", "no-remote", "#7/OPEN", "-", "hold-open-pr", open]);
-  expect(columns(dirty)).toEqual(["0d", "no", "wip:1", "no-remote", "-", "-", "hold-wip", dirty]);
-  expect(columns(untracked)).toEqual(["0d", "YES", "untracked:3", "no-remote", "-", "-", "hold-untracked", untracked]);
-  expect(columns(chatted)).toEqual(["0d", "YES", "clean", "no-remote", "-", today, "verify-recent-chat", chatted]);
-  expect(columns(prefix)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", prefix]);
-  expect(columns(stale)).toEqual(["0d", "YES", "clean", "no-remote", "-", ymd(staleAt), "safe", stale]);
-  expect(columns(broken)).toEqual(["0d", "YES", "unknown", "no-remote", "-", "-", "review", broken]);
-  expect(rowFor(rows, gone)).toEqual(["-", "?", "-", "-", "-", "-", "-", "prunable", gone]);
-  expect(rows).toHaveLength(13);
+  expect(columns(ancestor)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", "-", ancestor]);
+  expect(columns(spaced)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", "-", spaced]);
+  expect(columns(detached)).toEqual(["0d", "YES", "clean", "detached", "-", "-", "safe", "-", detached]);
+  expect(columns(landed)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", "-", landed]);
+  expect(columns(merged)).toEqual(["0d", "no", "clean", "pushed", "#8/MERGED", "-", "safe", "-", merged]);
+  expect(columns(open)).toEqual(["0d", "YES", "clean", "no-remote", "#7/OPEN", "-", "hold-open-pr", "-", open]);
+  expect(columns(dirty)).toEqual(["0d", "no", "wip:1", "no-remote", "-", "-", "hold-wip", "-", dirty]);
+  expect(columns(untracked)).toEqual(["0d", "YES", "untracked:3", "no-remote", "-", "-", "hold-untracked", "-", untracked]);
+  expect(columns(inUse)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "hold-locked", "in use by agent 42 until its PR lands", inUse]);
+  expect(columns(lockedSilently)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "hold-locked", "locked", lockedSilently]);
+  expect(columns(chatted)).toEqual(["0d", "YES", "clean", "no-remote", "-", today, "verify-recent-chat", "-", chatted]);
+  expect(columns(prefix)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", "-", prefix]);
+  expect(columns(stale)).toEqual(["0d", "YES", "clean", "no-remote", "-", ymd(staleAt), "safe", "-", stale]);
+  expect(columns(broken)).toEqual(["0d", "YES", "unknown", "no-remote", "-", "-", "review", "-", broken]);
+  expect(rowFor(rows, gone)).toEqual(["-", "?", "-", "-", "-", "-", "-", "prunable", "-", gone]);
+  expect(rows).toHaveLength(15);
 });
 
 test("a Pi session in a second transcripts root marks the worktree it ran in as a recent chat", () => {

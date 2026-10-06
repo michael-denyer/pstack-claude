@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -84,6 +84,28 @@ test("a row is appended when perl is not installed", () => {
     execFileSync(Bun.which("bash"), [logScript, log, ...cells], { env: { PATH: bin } });
     const rows = readFileSync(log, "utf8").trimEnd().split("\n").slice(1).map((line) => line.split("\t"));
     expect(rows.map((row) => row.slice(1))).toEqual([cells]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+for (const [state, shim, env] of [
+  ["is a shim that exits 3", "#!/bin/sh\necho 'perl: broken shim' >&2\nexit 3\n", {}],
+  ["is a shim that exits 0 and writes nothing", "#!/bin/sh\nwhile read -r _; do :; done\n", {}],
+  ["cannot load a module PERL5OPT names", null, { PERL5OPT: "-Mpstack_no_such_module" }],
+]) test.failing(`a row is appended when perl ${state}`, () => {
+  const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
+  try {
+    const log = join(dir, "log.tsv");
+    const bin = join(dir, "bin");
+    mkdirSync(bin);
+    if (shim) writeFileSync(join(bin, "perl"), shim, { mode: 0o755 });
+    const cells = ["phase", "naïve ✓ 100%s", "why", "日本語", "result"];
+    const { status } = spawnSync("bash", [logScript, log, ...cells], {
+      env: { ...process.env, ...env, PATH: `${bin}:${process.env.PATH}` },
+    });
+    const rows = readFileSync(log, "utf8").trimEnd().split("\n").slice(1).map((line) => line.split("\t"));
+    expect({ status, rows: rows.map((row) => row.slice(1)) }).toEqual({ status: 0, rows: [cells] });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

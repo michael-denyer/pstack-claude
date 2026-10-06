@@ -440,6 +440,7 @@ export interface GitHubReader {
   currentPr(pr: PrNumber | null): Promise<PrContext>;
   pullRequest(context: PrContext): Promise<PullRequestFacts>;
   openPullRequests(repository: Repository): Promise<readonly OpenPullRequest[]>;
+  defaultBranch(repository: Repository): Promise<string>;
   checksFastPath(context: PrContext): Promise<ChecksFastPath>;
   checkRollupPage(
     context: PrContext,

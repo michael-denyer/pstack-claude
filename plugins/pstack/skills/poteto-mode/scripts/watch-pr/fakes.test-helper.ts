@@ -22,6 +22,7 @@ export interface FakeReaderOptions {
   readonly threads?: readonly ReviewThread[];
   readonly commitRollups?: readonly CommitRollup[];
   readonly openPullRequests?: readonly OpenPullRequest[];
+  readonly defaultBranch?: string;
   readonly origin?: Repository | null;
   readonly current?: PrContext;
 }
@@ -110,6 +111,10 @@ export function fakeReader(
     async openPullRequests() {
       calls.push("openPullRequests");
       return options.openPullRequests ?? [];
+    },
+    async defaultBranch() {
+      calls.push("defaultBranch");
+      return options.defaultBranch ?? "main";
     },
     async checksFastPath() {
       calls.push("checksFastPath");

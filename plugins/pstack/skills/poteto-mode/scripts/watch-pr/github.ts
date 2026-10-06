@@ -603,6 +603,20 @@ export class GhGitHubReader implements T.GitHubReader {
       };
     });
   }
+  async defaultBranch(repository: T.Repository): Promise<string> {
+    const value = await this.runJson([
+      "gh",
+      "repo",
+      "view",
+      `${repository.owner}/${repository.repo}`,
+      "--json",
+      "defaultBranchRef",
+    ]);
+    return string(
+      at(value, ["defaultBranchRef", "name"]),
+      "defaultBranchRef.name"
+    );
+  }
   async checksFastPath(context: T.PrContext): Promise<T.ChecksFastPath> {
     const result = await this.run([
       "gh",
@@ -811,13 +825,18 @@ export async function resolveContext(args: {
 }
 export function orderStack(
   context: T.PrContext,
-  open: readonly T.OpenPullRequest[]
+  open: readonly T.OpenPullRequest[],
+  defaultBranch: string
 ): T.NonEmpty<T.PrContext> {
   const byNumber = new Map(open.map((pr) => [pr.number, pr]));
   const localHead = (pr: T.OpenPullRequest): boolean =>
     pr.headRepository !== null &&
     pr.headRepository.owner.toLowerCase() === context.owner.toLowerCase() &&
     pr.headRepository.repo.toLowerCase() === context.repo.toLowerCase();
+  // Most PRs target the default branch, so a PR whose head is that branch (a
+  // backport or a release) would pull every one of them into its stack.
+  const canHaveChildren = (pr: T.OpenPullRequest): boolean =>
+    localHead(pr) && pr.headRefName !== defaultBranch;
   const byHead = new Map<string, T.OpenPullRequest[]>();
   const invalid = (detail: string): never => {
     throw new WatcherQueryError({
@@ -826,7 +845,7 @@ export function orderStack(
       detail,
     });
   };
-  for (const pr of open.filter(localHead)) {
+  for (const pr of open.filter(canHaveChildren)) {
     byHead.set(pr.headRefName, [...(byHead.get(pr.headRefName) ?? []), pr]);
   }
   const parentFor = (branch: string): T.OpenPullRequest | undefined => {
@@ -860,7 +879,7 @@ export function orderStack(
   ]);
   const up: T.OpenPullRequest[] = [];
   const visit = (parent: T.OpenPullRequest): void => {
-    if (!localHead(parent)) return;
+    if (!canHaveChildren(parent)) return;
     const descendants = children.get(parent.headRefName) ?? [];
     if (descendants.length > 0) parentFor(parent.headRefName);
     for (const child of descendants) {
@@ -893,5 +912,5 @@ export async function discoverStack(
       retryable: true,
       detail: `open PR list reached the ${OPEN_PR_LIMIT}-PR limit, so the stack may be incomplete`,
     });
-  return orderStack(context, open);
+  return orderStack(context, open, await reader.defaultBranch(context));
 }

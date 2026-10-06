@@ -219,12 +219,16 @@ describe("stack branch ambiguity", () => {
   });
 
   it("ignores duplicate heads outside the requested stack", () => {
-    const result = orderStack(context, [
-      pr(1, "feature", "main"),
-      pr(2, "hotfix", "main"),
-      pr(3, "hotfix", "release"),
-      pr(4, "child", "feature"),
-    ]);
+    const result = orderStack(
+      context,
+      [
+        pr(1, "feature", "main"),
+        pr(2, "hotfix", "main"),
+        pr(3, "hotfix", "release"),
+        pr(4, "child", "feature"),
+      ],
+      "main"
+    );
     expect(result.map((row) => row.number)).toEqual([
       parsePrNumber(1),
       parsePrNumber(4),
@@ -233,66 +237,86 @@ describe("stack branch ambiguity", () => {
 
   it("keeps a missing seed independent of unrelated duplicate heads", () => {
     expect(
-      orderStack(context, [pr(2, "hotfix", "main"), pr(3, "hotfix", "release")])
+      orderStack(
+        context,
+        [pr(2, "hotfix", "main"), pr(3, "hotfix", "release")],
+        "main"
+      )
     ).toEqual([context]);
   });
 
   it("rejects an ambiguous downstack parent", () => {
     expect(() =>
-      orderStack(context, [
-        pr(1, "feature", "hotfix"),
-        pr(2, "hotfix", "main"),
-        pr(3, "hotfix", "release"),
-      ])
+      orderStack(
+        context,
+        [
+          pr(1, "feature", "hotfix"),
+          pr(2, "hotfix", "main"),
+          pr(3, "hotfix", "release"),
+        ],
+        "main"
+      )
     ).toThrow("multiple PRs have the same repository branch: hotfix");
   });
 
   it("rejects an ambiguous parent when traversing descendants", () => {
     expect(() =>
-      orderStack(context, [
-        pr(1, "feature", "main"),
-        pr(2, "hotfix", "feature"),
-        pr(3, "hotfix", "release"),
-        pr(4, "child", "hotfix"),
-      ])
+      orderStack(
+        context,
+        [
+          pr(1, "feature", "main"),
+          pr(2, "hotfix", "feature"),
+          pr(3, "hotfix", "release"),
+          pr(4, "child", "hotfix"),
+        ],
+        "main"
+      )
     ).toThrow("multiple PRs have the same repository branch: hotfix");
   });
 });
 
 it("rejects a repository-local cycle without walking forever", () => {
   expect(() =>
-    orderStack(context, [
-      {
-        number: context.number,
-        headRepository: context,
-        headRefName: "a",
-        baseRefName: "b",
-      },
-      {
-        number: parsePrNumber(2),
-        headRepository: context,
-        headRefName: "b",
-        baseRefName: "a",
-      },
-    ])
+    orderStack(
+      context,
+      [
+        {
+          number: context.number,
+          headRepository: context,
+          headRefName: "a",
+          baseRefName: "b",
+        },
+        {
+          number: parsePrNumber(2),
+          headRepository: context,
+          headRefName: "b",
+          baseRefName: "a",
+        },
+      ],
+      "main"
+    )
   ).toThrow("cycle in PR stack");
 });
 
 it("includes a fork PR whose base genuinely depends on a local parent", () => {
-  const result = orderStack(context, [
-    {
-      number: context.number,
-      headRepository: context,
-      headRefName: "base",
-      baseRefName: "main",
-    },
-    {
-      number: parsePrNumber(2),
-      headRepository: { owner: "fork", repo: "repo" },
-      headRefName: "foreign",
-      baseRefName: "base",
-    },
-  ]);
+  const result = orderStack(
+    context,
+    [
+      {
+        number: context.number,
+        headRepository: context,
+        headRefName: "base",
+        baseRefName: "main",
+      },
+      {
+        number: parsePrNumber(2),
+        headRepository: { owner: "fork", repo: "repo" },
+        headRefName: "foreign",
+        baseRefName: "base",
+      },
+    ],
+    "main"
+  );
   expect(result.map((pr) => pr.number)).toEqual([
     context.number,
     parsePrNumber(2),
@@ -300,20 +324,24 @@ it("includes a fork PR whose base genuinely depends on a local parent", () => {
 });
 
 it("does not attach children to a same-named branch in a fork", () => {
-  const result = orderStack(context, [
-    {
-      number: context.number,
-      headRepository: { owner: "fork", repo: "repo" },
-      headRefName: "feature",
-      baseRefName: "main",
-    },
-    {
-      number: parsePrNumber(2),
-      headRepository: context,
-      headRefName: "child",
-      baseRefName: "feature",
-    },
-  ]);
+  const result = orderStack(
+    context,
+    [
+      {
+        number: context.number,
+        headRepository: { owner: "fork", repo: "repo" },
+        headRefName: "feature",
+        baseRefName: "main",
+      },
+      {
+        number: parsePrNumber(2),
+        headRepository: context,
+        headRefName: "child",
+        baseRefName: "feature",
+      },
+    ],
+    "main"
+  );
   expect(result).toEqual([context]);
 });
 

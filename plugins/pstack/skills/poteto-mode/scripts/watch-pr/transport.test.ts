@@ -50,6 +50,8 @@ if (args[0] === 'pr' && args[1] === 'view') {
   value = { data: { repository: { pullRequest: { commits: { nodes: [{ commit: { oid: 'head', statusCheckRollup: null } }] } } } } };
 } else if (args[0] === 'pr' && args[1] === 'list') {
   value = [{ number: 1, headRefName: 'main', baseRefName: 'main', headRepository: { name: 'repo', nameWithOwner: 'fork/repo' }, headRepositoryOwner: { login: 'fork' } }];
+} else if (args[0] === 'repo' && args[1] === 'view') {
+  value = { defaultBranchRef: { name: 'main' } };
 } else if (args.some(a => a.includes('query ReviewThreads'))) {
   const after = args.find(a => a.startsWith('after='));
   const thread = (n, resolved) => ({ id: 't' + n, isResolved: resolved, comments: { nodes: [] } });

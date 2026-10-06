@@ -41,19 +41,21 @@ describe("classify", () => {
     head: known(HEAD),
     age: known(3),
     ancestry: known(true),
-    dirty: known({ wip: 0, scratch: 0 }),
+    dirty: known({ wip: 0, untracked: 0 }),
     remote: known("pushed"),
     pr: known(null),
     recent: known(false),
   };
   const mergedPr = { ...ancestor, ancestry: known(false), pr: known({ number: 8, state: "MERGED", headRefOid: HEAD }) };
   const allUnknown = Object.fromEntries(Object.keys(ancestor).map((name) => [name, unknown]));
-  const wip = known({ wip: 1, scratch: 0 });
+  const wip = known({ wip: 1, untracked: 0 });
+  const untracked = known({ wip: 0, untracked: 2 });
   const openPr = known({ number: 7, state: "OPEN", headRefOid: HEAD });
 
   test.each([
     ["an ancestor of the trunk", ancestor, "safe"],
-    ["an ancestor with only untracked scratch", { ...ancestor, dirty: known({ wip: 0, scratch: 2 }) }, "safe"],
+    ["untracked files only", { ...ancestor, dirty: untracked }, "hold-untracked"],
+    ["tracked and untracked work", { ...ancestor, dirty: known({ wip: 1, untracked: 2 }) }, "hold-wip"],
     ["a merged PR whose head is the worktree HEAD", mergedPr, "safe"],
     ["commits beyond a merged PR head", { ...mergedPr, head: known("b".repeat(40)) }, "review"],
     ["a closed PR whose head is the worktree HEAD", { ...mergedPr, pr: known({ number: 9, state: "CLOSED", headRefOid: HEAD }) }, "review"],
@@ -62,8 +64,10 @@ describe("classify", () => {
     ["an open PR", { ...ancestor, pr: openPr }, "hold-open-pr"],
     ["a chat within four days", { ...ancestor, recent: known(true) }, "verify-recent-chat"],
     ["tracked work with an open PR and a recent chat", { ...ancestor, dirty: wip, pr: openPr, recent: known(true) }, "hold-wip"],
+    ["untracked files with an open PR and a recent chat", { ...ancestor, dirty: untracked, pr: openPr, recent: known(true) }, "hold-untracked"],
     ["an open PR with a recent chat", { ...ancestor, pr: openPr, recent: known(true) }, "hold-open-pr"],
     ["tracked work while every other fact is unknown", { ...allUnknown, dirty: wip }, "hold-wip"],
+    ["untracked files while every other fact is unknown", { ...allUnknown, dirty: untracked }, "hold-untracked"],
     ["an open PR while every other fact is unknown", { ...allUnknown, pr: openPr }, "hold-open-pr"],
     ["a recent chat while every other fact is unknown", { ...allUnknown, recent: known(true) }, "verify-recent-chat"],
   ])("%s -> %s", (_, facts, bucket) => {
@@ -166,8 +170,12 @@ test("audits every worktree of a fixture repo end to end", () => {
   const dirty = addWorktree(fixture, "dirty");
   commit(dirty, "tracked");
   writeFileSync(join(dirty, "tracked.txt"), "changed\n");
-  const scratch = addWorktree(fixture, "scratch");
-  writeFileSync(join(scratch, "notes.txt"), "scratch\n");
+  const untracked = addWorktree(fixture, "untracked");
+  writeFileSync(join(untracked, "notes.txt"), "untracked\n");
+  mkdirSync(join(untracked, "src/feature"), { recursive: true });
+  for (const name of ["a.ts", "b.ts"]) writeFileSync(join(untracked, "src/feature", name), "export {};\n");
+  // A user config that hides untracked files from plain status must not hide them from the audit.
+  git("-C", fixture.repo, "config", "status.showUntrackedFiles", "no");
   const chatted = addWorktree(fixture, "chatted-long");
   const prefix = addWorktree(fixture, "chatted");
   writeTranscript(fixture, "-proj/session/subagents/workflows/wf_1/agent-a.jsonl", chatted);
@@ -200,7 +208,7 @@ test("audits every worktree of a fixture repo end to end", () => {
   expect(columns(merged)).toEqual(["0d", "no", "clean", "pushed", "#8/MERGED", "-", "safe", merged]);
   expect(columns(open)).toEqual(["0d", "YES", "clean", "no-remote", "#7/OPEN", "-", "hold-open-pr", open]);
   expect(columns(dirty)).toEqual(["0d", "no", "wip:1", "no-remote", "-", "-", "hold-wip", dirty]);
-  expect(columns(scratch)).toEqual(["0d", "YES", "scratch:1", "no-remote", "-", "-", "safe", scratch]);
+  expect(columns(untracked)).toEqual(["0d", "YES", "untracked:3", "no-remote", "-", "-", "hold-untracked", untracked]);
   expect(columns(chatted)).toEqual(["0d", "YES", "clean", "no-remote", "-", today, "verify-recent-chat", chatted]);
   expect(columns(prefix)).toEqual(["0d", "YES", "clean", "no-remote", "-", "-", "safe", prefix]);
   expect(columns(stale)).toEqual(["0d", "YES", "clean", "no-remote", "-", ymd(staleAt), "safe", stale]);

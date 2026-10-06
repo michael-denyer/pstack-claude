@@ -83,18 +83,26 @@ export function defaultTranscriptRoots({ env = process.env, home = homedir(), ex
   return found.length ? found : [claude];
 }
 
-// A link that fails to resolve spells nothing this process can reach: ENOENT
-// and ELOOP are dangling or looping, EACCES is a target the user cannot
-// search, and EPERM is bun's answer for macOS's autofs /home. Any other
-// failure propagates so the caller leaves the worktree's chat fact unknown.
-function symlinkTargets(dir) {
+const fileId = (path) => {
+  const { dev, ino } = statSync(path, { bigint: true });
+  return `${dev}:${ino}`;
+};
+
+// Pairs each link with the path it resolves to. A dangling or looping link
+// (ENOENT, ELOOP) spells nothing. A link `resolve` cannot name for any other
+// reason is paired with the identity stat reports instead: bun's realpathSync
+// opens the directory a link lands on, and macOS refuses that for its autofs
+// /home, which stat still follows. When stat fails too, the link's route is
+// closed to this process and it could land anywhere, so the failure propagates
+// and the caller leaves the worktree's chat fact unknown.
+export function symlinkTargets(dir, resolve = realpathSync) {
   return readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isSymbolicLink()).flatMap((entry) => {
     const link = join(dir, entry.name);
     try {
-      return [[link, realpathSync(link)]];
+      return [[link, resolve(link)]];
     } catch (error) {
-      if (["ENOENT", "ELOOP", "EPERM", "EACCES"].includes(error.code)) return [];
-      throw error;
+      if (["ENOENT", "ELOOP"].includes(error.code)) return [];
+      return [[link, { id: fileId(link) }]];
     }
   });
 }
@@ -116,13 +124,16 @@ export function pathSpellings(path, linksIn = symlinkTargets) {
     ancestors.unshift(dir);
     if (dir === dirname(dir)) break;
   }
-  const links = ancestors.flatMap((dir) => linksIn(dir).map(([link, target]) => [dir, link, target]));
+  const onPath = [...ancestors, resolved];
+  // A link known only by identity lands on whichever of these directories shares it, if any.
+  const named = (target) => (typeof target === "string" ? target : onPath.find((dir) => fileId(dir) === target.id));
+  const links = ancestors.flatMap((dir) => linksIn(dir).map(([link, target]) => [dir, link, named(target)]));
   // Spell each directory from the root down, so a link's own directory is
   // already spelled when the link is applied. A link back up to an ancestor of
   // its directory is applied through that directory's resolved spelling only,
   // which keeps the set finite.
   const spelled = new Map();
-  for (const dir of [...ancestors, resolved]) {
+  for (const dir of onPath) {
     const parent = dirname(dir);
     const forms = new Set(parent === dir ? [dir] : spelled.get(parent).map((form) => join(form, basename(dir))));
     for (const [home, link, target] of links) {

@@ -6,7 +6,7 @@ import { dirname, join, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { defaultSettings, PSTACK_STATE_DIR } from "../plugins/pstack/pi/config.ts";
-import { audit, classify, defaultTranscriptRoots, duSize, lastChats, pathSpellings } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
+import { audit, classify, defaultTranscriptRoots, duSize, lastChats, pathSpellings, symlinkTargets } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
 import { removeDuring } from "./remove-during.mjs";
 
 const script = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs");
@@ -372,14 +372,28 @@ describe("pathSpellings", () => {
       expect(pathSpellings(join(root, "real/worktree"))).toEqual(before);
     });
 
-    test.skipIf(noChmod)("a link into a directory this user cannot search is not a spelling and not a failure", () => {
+    test.skipIf(noChmod)("a link whose route this user cannot search is a failure, because it may land on the worktree", () => {
       const root = layout();
-      const before = pathSpellings(join(root, "real/worktree"));
-      mkdirSync(join(root, "sealed/inner"), { recursive: true });
-      symlinkSync(join(root, "sealed/inner"), join(root, "denied"));
+      mkdirSync(join(root, "sealed"));
+      symlinkSync(`${root}/sealed/../real`, join(root, "alias"));
       chmodSync(join(root, "sealed"), 0o000);
       locked.push(join(root, "sealed"));
-      expect(pathSpellings(join(root, "real/worktree"))).toEqual(before);
+      expect(() => pathSpellings(join(root, "real/worktree"))).toThrow(/EACCES.*alias/);
+    });
+
+    // bun answers EPERM for macOS's autofs /home, a link stat can still follow.
+    test("a link the resolver refuses to name is matched by the directory it lands on", () => {
+      const root = layout();
+      const worktree = join(root, "real/worktree");
+      mkdirSync(join(root, "elsewhere"));
+      symlinkSync(join(root, "elsewhere"), join(root, "other"));
+      const refusing = (link) => {
+        realpathSync(link);
+        throw Object.assign(new Error(`EPERM: operation not permitted, lstat '${link}'`), { code: "EPERM" });
+      };
+      const spellings = pathSpellings(worktree, (dir) => symlinkTargets(dir, refusing));
+      expect(spellings).toContain(join(root, "link/worktree"));
+      expect(spellings).toEqual(pathSpellings(worktree));
     });
 
     test("a symlink reached through another symlink composes with it", () => {
@@ -559,6 +573,15 @@ describe("a discovery failure keeps an ancestor out of safe", () => {
       locked.push(fixture.root);
       return {};
     }, /^warn: could not resolve the spellings of \S+\/ancestor; LAST_CHAT column will be empty: EACCES/],
+    // The session that named the worktree through the link could still search its route.
+    ["a link to the worktree whose route can no longer be searched", (fixture) => {
+      mkdirSync(join(fixture.root, "sealed"));
+      symlinkSync(`${fixture.root}/sealed/../ancestor`, join(fixture.root, "alias"));
+      writeTranscript(fixture, "-proj/session.jsonl", join(fixture.root, "alias"));
+      chmodSync(join(fixture.root, "sealed"), 0o000);
+      locked.push(join(fixture.root, "sealed"));
+      return {};
+    }, /^warn: could not resolve the spellings of \S+\/ancestor; LAST_CHAT column will be empty: EACCES.*alias/],
   ];
 
   const keepsAncestorOutOfSafe = (_, inject, warning) => {

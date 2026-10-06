@@ -203,7 +203,7 @@ export function validatePluginLayout(pluginRoot) {
     const raw = readFileSync(file);
     if (raw.includes(0)) continue;
     raw.toString("utf8").split("\n").forEach((line, i) => {
-      if (/^(<{7}|={7}|>{7})( |$)/.test(line)) markers.push(`${relative(pluginRoot, file)}:${i + 1}: ${line}`);
+      if (/^(<{7}|\|{7}|={7}|>{7})( |$)/.test(line)) markers.push(`${relative(pluginRoot, file)}:${i + 1}: ${line}`);
     });
   }
   if (markers.length) {

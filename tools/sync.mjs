@@ -395,10 +395,13 @@ export function syncComponent({
     if (blocker) collisions.set(blocker, "a file where upstream has a directory");
     else if (onDisk(rel)?.isDirectory()) collisions.set(rel, "a directory where upstream has a file");
   }
-  const spellings = Map.groupBy(outcomes.filter(({ kind }) => kind !== "excluded"), ({ rel }) => rel.toLowerCase());
-  for (const group of spellings.values()) {
+  // Every walked path counts, with or without an outcome: a path another
+  // component carries or `exclude` names has none, and a write under another
+  // spelling of it would land on it.
+  const held = new Set([...localPaths, ...outcomes.filter(({ write }) => write).map(({ rel }) => rel)]);
+  for (const group of Map.groupBy(held, (rel) => rel.toLowerCase()).values()) {
     if (group.length < 2) continue;
-    const [first, ...rest] = group.map(({ rel }) => rel).sort();
+    const [first, ...rest] = group.sort();
     collisions.set(first, `differs only in case from ${rest.join(", ")}`);
   }
   report.collisions = [...collisions].map(([rel, reason]) => ({ rel, reason })).sort((a, b) => a.rel.localeCompare(b.rel));

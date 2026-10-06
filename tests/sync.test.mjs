@@ -1026,6 +1026,22 @@ describe("syncComponent", () => {
     expect(readFileSync(join(local, "sibling.md"), "utf8")).toBe("old\n");
   });
 
+  test("a new upstream file that differs only in case from a port path with no outcome fails the run before any write", () => {
+    const oldUp = tree({ "a.md": "old a\n" });
+    const newUp = tree({ "a.md": "new a\n", "kit.md": "upstream\n", "notes.md": "upstream\n" });
+    const local = tree({ "a.md": "old a\n", "Kit.md": "another component's\n", "NOTES.md": "the port's own\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, carriedElsewhere: ["Kit.md"], exclude: ["NOTES.md"] });
+
+    expect(report.collisions).toEqual([
+      { rel: "Kit.md", reason: "differs only in case from kit.md" },
+      { rel: "NOTES.md", reason: "differs only in case from notes.md" },
+    ]);
+    expect(readFileSync(join(local, "a.md"), "utf8")).toBe("old a\n");
+    expect(readFileSync(join(local, "Kit.md"), "utf8")).toBe("another component's\n");
+    expect(readFileSync(join(local, "NOTES.md"), "utf8")).toBe("the port's own\n");
+  });
+
   test("a port file where upstream has a directory, or a port directory where upstream has a file, fails the run before any write", () => {
     const oldUp = tree({ "a.md": "old a\n" });
     const newUp = tree({ "a.md": "new a\n", "b/new.md": "n\n", c: "a file upstream\n" });

@@ -704,12 +704,16 @@ export function pluginAgentPaths(pluginRoot) {
 }
 
 // Claude Code's loader tolerates frontmatter that strict YAML rejects, so an
-// agent file can load locally and still be unreadable to another parser.
+// agent file can load locally and still be unreadable to another parser. The
+// name must be the file name, which is what plugin.json's agents list and the
+// bare-dispatch check key off.
 export function validateAgentFrontmatter(pluginRoot) {
   const failures = pluginAgentPaths(pluginRoot).flatMap((path) => {
     try {
       const { data } = parseFrontmatter(readFileSync(join(pluginRoot, path), "utf8"));
-      return data?.name && data?.description ? [] : [`${path}: frontmatter needs a name and a description`];
+      if (!data?.name || !data?.description) return [`${path}: frontmatter needs a name and a description`];
+      const file = basename(path, ".md");
+      return data.name === file ? [] : [`${path}: frontmatter name "${data.name}" != file name "${file}"`];
     } catch (err) {
       return [`${path}: ${err.message}`];
     }

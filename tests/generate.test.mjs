@@ -796,6 +796,15 @@ describe("plan, changes, apply", () => {
     ]);
   });
 
+  test("problems reports an agent whose frontmatter name is not its file name", () => {
+    const root = repoCopy();
+    const agent = "plugins/pstack/agents/comment-sicko.md";
+    writeFileSync(join(root, agent), readFileSync(join(root, agent), "utf8").replace(/^name: .*$/m, "name: sicko"));
+    expect(problems(root)).toEqual([
+      expect.stringContaining('./agents/comment-sicko.md: frontmatter name "sicko" != file name "comment-sicko"'),
+    ]);
+  });
+
   test("problems reports a malformed Codex manifest as one failure and still runs the other checks", () => {
     const root = repoCopy();
     const manifest = "plugins/pstack/.codex-plugin/plugin.json";

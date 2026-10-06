@@ -403,8 +403,8 @@ export function syncComponent({
   // same run could then remove. So each part of a written path must be absent,
   // or listed under exactly that spelling with the type the write needs. How a
   // filesystem folds is its own business, so it is asked and never modelled. A
-  // deleted path needs no check: it comes from the walk, so every part of it
-  // is a listed name.
+  // deleted path needs no check, since it comes from the walk and every part
+  // of it is a listed name.
   const blockerOf = (rel) => {
     const parts = rel.split("/");
     let dir = localDir;
@@ -469,8 +469,8 @@ export function syncComponent({
     if (write) {
       mkdirSync(dirname(localFile), { recursive: true });
       writeFileSync(localFile, write.bytes);
-      // Git records only whether a file is executable, so that is all a write
-      // changes. A port file's other permission bits stay as they are.
+      // Git records only whether a file is executable, so a write leaves the
+      // file's other permission bits as the port has them.
       if (gitMode(lstatSync(localFile).mode) !== write.mode) chmodSync(localFile, write.mode);
     } else if (kind === "deleted") {
       unlinkSync(localFile);

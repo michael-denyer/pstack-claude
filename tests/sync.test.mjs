@@ -1024,13 +1024,13 @@ describe("syncComponent", () => {
     test.skipIf(!here)(`${title} (this filesystem)`, () => body({}));
   };
 
-  const NFC = "café.md";
-  const NFD = "café.md";
+  const NFC = "caf\u00e9.md";
+  const NFD = "cafe\u0301.md";
   for (const [difference, held, asked] of [
     ["case", "Foo.md", "foo.md"],
     ["Unicode normalisation", NFD, NFC],
-    ["a sharp s", "strasse.md", "straße.md"],
-    ["a ligature", "file.md", "ﬁle.md"],
+    ["a sharp s", "strasse.md", "stra\u00dfe.md"],
+    ["a ligature", "file.md", "\ufb01le.md"],
   ]) {
     onAliasingFilesystems(`an upstream edit to a path the filesystem resolves to a port file whose name differs by ${difference} fails the run before any write`, { [asked]: held }, (filesystem) => {
       const base = "l1\nl2\nl3\nl4\nl5\nl6\nl7\n";
@@ -1142,6 +1142,18 @@ describe("syncComponent", () => {
     expect(readdirSync(join(local, "kit")).sort()).toEqual(["Scripts", "a.md"]);
     expect(readdirSync(join(local, "kit/Scripts"))).toEqual(["x.sh"]);
     expect(readFileSync(join(local, "kit/a.md"), "utf8")).toBe("old a\n");
+  });
+
+  test("an entry the filesystem finds and the listing cannot identify still fails the run before any write", () => {
+    const oldUp = tree({ "a.md": "old a\n" });
+    const newUp = tree({ "a.md": "new a\n", "new.md": "n\n" });
+    const local = tree({ "a.md": "old a\n" });
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, lookUp: () => ({ ino: -1 }) });
+
+    expect(report.collisions).toEqual([{ rel: "new.md", reason: sameEntry("new.md") }]);
+    expect(readdirSync(local)).toEqual(["a.md"]);
+    expect(readFileSync(join(local, "a.md"), "utf8")).toBe("old a\n");
   });
 
   for (const [target, linkTo] of [

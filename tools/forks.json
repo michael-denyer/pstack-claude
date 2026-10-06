@@ -110,7 +110,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/worktree-cleanup.md": {
       "kind": "policy",
-      "why": "Holds a worktree with untracked files or a git lock instead of calling untracked files safe to drop, names the untracked count and the lock reason the audit prints, says that a worktree with both tracked edits and untracked files prints both counts and that the diff leaves the untracked files out, and forbids rm -rf around a locked tree.",
+      "why": "Holds a worktree with untracked files or a git lock instead of calling untracked files safe to drop, names the untracked count and the lock reason the audit prints, says that a worktree with both tracked edits and untracked files prints both counts, names the status call the audit counts from and a diff command that covers submodules, says that an empty diff never means nothing is at stake because a diff leaves untracked files out and a plain one can leave a submodule out, says that a wip line can stand for work inside a submodule, limits the prune step's kept-commits claim to commits on the worktree's branch and says a submodule's commits go with the worktree, and forbids rm -rf around a locked tree.",
       "since": "0.9.74",
       "upstream": "not-proposed"
     },

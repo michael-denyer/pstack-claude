@@ -83,11 +83,10 @@ export function defaultTranscriptRoots({ env = process.env, home = homedir(), ex
   return found.length ? found : [claude];
 }
 
-// A dangling or looping link cannot spell a path that exists. Nor can a link
-// whose target this process cannot resolve: EACCES means the user cannot
-// search it, and EPERM is bun's answer for macOS's autofs /home, under which
-// bun resolves nothing. Any other failure propagates so the caller leaves the
-// worktree's chat fact unknown.
+// A link that fails to resolve spells nothing this process can reach: ENOENT
+// and ELOOP are dangling or looping, EACCES is a target the user cannot
+// search, and EPERM is bun's answer for macOS's autofs /home. Any other
+// failure propagates so the caller leaves the worktree's chat fact unknown.
 function symlinkTargets(dir) {
   return readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isSymbolicLink()).flatMap((entry) => {
     const link = join(dir, entry.name);
@@ -140,9 +139,8 @@ export function pathSpellings(path, linksIn = symlinkTargets) {
 // JSON-escaped and a `\` after it opens the escape of a quote, backslash, or
 // control byte. `.` counts only before another boundary (a sentence-final
 // path), because `/x/candidate.bak` is a plausible sibling. `*`, `$`, and `{`
-// stay out: they extend a path by glob or expansion. `?` can glob one byte
-// too, but far more often ends a question about the path, and a wrong match
-// there costs a hold rather than a deletion.
+// stay out: they extend a path by glob or expansion. `?` globs too, but it
+// also ends a question or a URL's path, and a false match costs only a hold.
 const BOUNDARY = new Set(Buffer.from("/\\\"' `:;),|&<>]}?!"));
 const DOT = ".".charCodeAt(0);
 const bounded = (text, at) => at === text.length || BOUNDARY.has(text[at]);
@@ -201,8 +199,6 @@ function isAncestor(repo, head, trunk) {
   }
 }
 
-// `--untracked-files=all` lists every untracked file, where plain status folds a
-// directory into one line and honours a status.showUntrackedFiles=no config.
 function dirtyState(path) {
   const lines = git(path, "status", "--porcelain", "--untracked-files=all").split("\n").filter(Boolean);
   const untracked = lines.filter((line) => line.startsWith("??")).length;

@@ -93,7 +93,7 @@ for (const [state, shim, env] of [
   ["is a shim that exits 3", "#!/bin/sh\necho 'perl: broken shim' >&2\nexit 3\n", {}],
   ["is a shim that exits 0 and writes nothing", "#!/bin/sh\nwhile read -r _; do :; done\n", {}],
   ["cannot load a module PERL5OPT names", null, { PERL5OPT: "-Mpstack_no_such_module" }],
-]) test.failing(`a row is appended when perl ${state}`, () => {
+]) test(`a row is appended when perl ${state}`, () => {
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
   try {
     const log = join(dir, "log.tsv");

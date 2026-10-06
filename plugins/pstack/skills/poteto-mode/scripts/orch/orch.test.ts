@@ -596,6 +596,25 @@ await store.close();
     expect(await lockFiles(directory)).toEqual([]);
   });
 
+  it("replaces a stale lock that disappears before it is removed", async () => {
+    const { directory, store } = await initializedStore();
+    await store.close();
+    await plantStaleLock(directory);
+    const flags = await makeDirectory();
+
+    const writer = spawnWriter({
+      directory,
+      flags,
+      name: "A",
+      atLockUnlink: `rmSync(lock);
+    writeFileSync(flag("lock-gone"), "");`,
+    });
+    expect(await writer.exited).toBe(0);
+    expect(await new Response(writer.stderr).text()).toBe("");
+    expect(await readFlags(flags)).toEqual({ "A.held": "", "A.lock-gone": "" });
+    expect(await lockFiles(directory)).toEqual([]);
+  });
+
   it("blocks a writer and steals the pid lock only with force", async () => {
     const { directory, store } = await initializedStore();
     await store.close();

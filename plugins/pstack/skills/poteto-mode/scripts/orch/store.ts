@@ -431,19 +431,16 @@ async function acquireLock(
       );
     }
     try {
-      let current: string | null = null;
       try {
-        current = (await readFile(path, "utf8")).trim() || "unknown";
-      } catch (error) {
-        if (errorCode(error) !== "ENOENT") {
-          throw error;
-        }
-      }
-      if (current !== null) {
+        const current = (await readFile(path, "utf8")).trim() || "unknown";
         if (current !== holder) {
           throw new UserError(`store lock held by pid ${current}`);
         }
         await unlink(path);
+      } catch (error) {
+        if (errorCode(error) !== "ENOENT") {
+          throw error;
+        }
       }
       try {
         await create();

@@ -110,3 +110,21 @@ for (const [state, shim, env] of [
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test.failing("a short write fails and says how many bytes of the row were appended", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
+  try {
+    const log = join(dir, "log.tsv");
+    execFileSync("bash", [logScript, log, "phase", "decision", "why", "evidence", "result"]);
+    const pastTheCap = "y".repeat(3000);
+    const { status, stderr } = spawnSync(
+      "bash",
+      ["-c", 'ulimit -f 1 && exec bash "$@"', "bash", logScript, log, "phase", "decision", "why", pastTheCap, "result"],
+      { encoding: "utf8" },
+    );
+    expect(stderr).toMatch(/^log\.sh: short write, appended \d+ of 30\d\d bytes of the row\n$/);
+    expect(status).not.toBe(0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

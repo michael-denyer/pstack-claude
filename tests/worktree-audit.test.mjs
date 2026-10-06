@@ -239,6 +239,19 @@ test("a status.showUntrackedFiles=no config does not hide untracked files from t
   expect([row[3], row[7]]).toEqual(["untracked:1", "hold-untracked"]);
 });
 
+// Windows caps a path near 260 bytes, so a mebibyte of status output would take thousands of files there.
+test.skipIf(process.platform === "win32")("untracked files are counted when git status prints more than a mebibyte", () => {
+  const fixture = createFixture();
+  const big = addWorktree(fixture, "big");
+  const deep = join(big, ...Array(3).fill("d".repeat(200)));
+  mkdirSync(deep, { recursive: true });
+  for (let index = 0; index < 1800; index += 1) writeFileSync(join(deep, `${index}.txt`), "");
+  const status = spawnSync("git", ["-C", big, "status", "--porcelain", "--untracked-files=all"], { maxBuffer: Infinity });
+  expect(status.stdout.length).toBeGreaterThan(1024 * 1024);
+  const row = rowFor(runAudit(fixture).rows, big);
+  expect([row[3], row[7]]).toEqual(["untracked:1800", "hold-untracked"]);
+});
+
 test("a diff.ignoreSubmodules=all config does not hide submodule work from the audit", () => {
   const fixture = createFixture();
   const lib = join(fixture.root, "lib");

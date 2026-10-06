@@ -53,8 +53,9 @@ export function classify(facts) {
   return "review";
 }
 
+// The default 1 MiB buffer fails a status that lists several thousand untracked files.
 function git(cwd, ...args) {
-  return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+  return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: Infinity })
     .replace(/\n+$/, "");
 }
 

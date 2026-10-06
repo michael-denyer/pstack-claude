@@ -75,19 +75,18 @@ export function fakePi() {
   };
 }
 
-export function fakeCtx({ cwd, entries = [], model, mode = "tui", hasUI = false, ui, idle = true, pending = () => false, auth = "configured" } = {}) {
-  const current = model === undefined ? { provider: "anthropic", id: "parent-model" } : model;
+export function fakeCtx({ cwd, entries = [], model = { provider: "anthropic", id: "parent-model" }, mode = "tui", hasUI = false, ui, idle = true, pending = () => false, auth = "configured" } = {}) {
   return {
     cwd,
     mode,
     hasUI,
     ui,
-    model: current,
+    model,
     // Pi's credential gate before a run: a provider configured at startup
     // ("configured"), one only its live check finds ("resolved"), or neither ("none").
     modelRegistry: {
       hasConfiguredAuth: () => auth === "configured",
-      getAvailableOfType: async () => (auth === "none" ? [] : [current]),
+      getAvailableOfType: async () => (auth === "none" ? [] : [model]),
     },
     isIdle: () => (typeof idle === "function" ? idle() : idle),
     hasPendingMessages: pending,

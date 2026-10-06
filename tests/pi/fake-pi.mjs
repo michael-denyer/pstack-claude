@@ -200,7 +200,7 @@ log({
   pid: process.pid,
   depth: flag("--pstack-depth") ?? null,
   // As pi: a value that names no file is appended as the prompt text itself.
-  systemPrompt: systemFile === undefined ? null : existsSync(systemFile) ? readFileSync(systemFile, "utf8") : systemFile,
+  systemPrompt: systemFile && existsSync(systemFile) ? readFileSync(systemFile, "utf8") : (systemFile ?? null),
 });
 const steps = script.byPrompt?.[prompt] ?? script.default ?? [{ reply: "ok" }];
 

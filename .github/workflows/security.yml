@@ -29,10 +29,9 @@ jobs:
       # README warns its behavior can change in a patch release.
       #
       # --include-git-root is required: the scanner skips the git root by
-      # default, and the only lockfile lives inside this repo. Without it the
-      # scan finds nothing, prints "No package sources found" on stderr, and
-      # exits 128 (v2.5.1 cmd/osv-scanner/internal/cmd/run.go), which fails
-      # the step as a vulnerability's exit 1 does.
+      # default, and the only lockfile lives inside this repo. A scan that
+      # finds no lockfile exits 128 (v2.5.1 cmd/osv-scanner/internal/cmd/run.go),
+      # so it fails the step as a vulnerability's exit 1 does.
       #
       # The v2.5.1 tag is mutable, so the digest is what actually pins this.
       # Resolved with: docker buildx imagetools inspect ghcr.io/google/osv-scanner:v2.5.1

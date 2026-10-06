@@ -76,9 +76,9 @@ jobs:
         run: bun install --frozen-lockfile
       # A dry-run sync to the SHA already pinned compares the port with
       # upstream as it stands, and fails on a fork tools/forks.json lacks or
-      # an entry whose path is not forked. The component list is captured
-      # before the loop so a jq error or an empty list fails the step instead
-      # of running the loop zero times and passing.
+      # an entry whose path is not forked. bash ignores the exit status of a
+      # process substitution, so jq fills a variable first. Fed straight to
+      # the loop, a jq error runs it zero times and the step passes.
       - name: Check every fork from upstream is declared
         run: |
           set -eo pipefail

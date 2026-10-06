@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
 import { chmodDeniesReads } from "../session-hook-sheets.mjs";
-import { agentBody, fakeCtx, fakePi, flag, useWorld, waitFor } from "./harness.mjs";
+import { agentBody, agentEntry, fakeCtx, fakePi, flag, listAgents, recordWith, restore, useWorld, waitFor } from "./harness.mjs";
 
 const setup = useWorld();
 
@@ -99,6 +99,20 @@ describe("agent tool", () => {
     expect(second.systemPrompt).toBe(agentBody("agents/poteto-agent.md"));
     expect(flag(second, "--append-system-prompt")).toBe(flag(first, "--append-system-prompt"));
     expect(statSync(flag(second, "--append-system-prompt")).mode & 0o777).toBe(0o600);
+  });
+
+  test("a resume whose system prompt file is gone and whose type no longer has one fails, and no child starts", async () => {
+    const { w, pi, ctx } = setup();
+    await pi.call("agent", { description: "p", prompt: "first", subagent_type: "pstack:poteto-agent" }, ctx);
+    rmSync(join(w.agentDir, "pstack", "parent-session", "prompts"), { recursive: true });
+    const removedType = recordWith(pi.entries.at(-1).data, { agent: { subagentType: "pstack:removed" } });
+
+    const resumed = await restore(w, [agentEntry(removedType)]);
+    const err = await resumed.call("send_message", { to: "p", message: "again" }, ctx).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toContain('its type "pstack:removed" no longer provides one');
+    expect(w.invocations()).toHaveLength(1);
+    expect((await listAgents(resumed, ctx)).map((a) => a.status)).toEqual(["failed"]);
   });
 });
 

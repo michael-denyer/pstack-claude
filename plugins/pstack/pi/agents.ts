@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
 import { Value } from "typebox/value";
@@ -167,12 +167,7 @@ export class AgentRunner {
     const state = join(this.settings.agentDir, PSTACK_STATE_DIR, ctx.sessionManager.getSessionId());
     const sessionDir = join(state, "agents");
     mkdirSync(sessionDir, { recursive: true });
-    let systemPromptFile: string | undefined;
-    if (def.body) {
-      mkdirSync(join(state, "prompts"), { recursive: true });
-      systemPromptFile = join(state, "prompts", `${id}.md`);
-      writeFileSync(systemPromptFile, def.body, { mode: 0o600 });
-    }
+    const systemPromptFile = def.body ? join(state, "prompts", `${id}.md`) : undefined;
     const worktree = params.isolation === "worktree" ? planWorktree(ctx.cwd, id) : undefined;
     const identity: AgentIdentity = {
       id,
@@ -196,6 +191,7 @@ export class AgentRunner {
     if (this.closed) throw new Error("This session is shutting down; no agent can start.");
     try {
       if (identity.worktree) ensureWorktree(identity.worktree);
+      this.ensureSystemPrompt(identity);
     } catch (e) {
       const failed: EndedRecord = { agent: identity, status: "failed", exitCode: null, endedAt: now(), finalText: (e as Error).message };
       this.agents.set(identity.id, { kind: "ended", record: failed });
@@ -214,6 +210,17 @@ export class AgentRunner {
     this.agents.set(identity.id, { kind: "local", record, run });
     this.persist(record);
     return record;
+  }
+
+  // Every launch writes the prompt file that is not there, a resume included:
+  // Pi appends a path it cannot find as the prompt text itself.
+  private ensureSystemPrompt(identity: AgentIdentity): void {
+    const file = identity.systemPromptFile;
+    if (!file || existsSync(file)) return;
+    const body = loadAgentTypes(this.settings).get(identity.subagentType)?.body;
+    if (!body) throw new Error(`Agent ${identity.id} has lost its system prompt file, and its type "${identity.subagentType}" no longer provides one.`);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, body, { mode: 0o600 });
   }
 
   private finish(identity: AgentIdentity, run: Run, exit: ChildExit): EndedRecord {

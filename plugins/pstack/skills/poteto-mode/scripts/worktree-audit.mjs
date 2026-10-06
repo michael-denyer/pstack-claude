@@ -211,7 +211,7 @@ function isAncestor(repo, head, trunk) {
 }
 
 function dirtyState(path) {
-  const lines = git(path, "status", "--porcelain", "--untracked-files=all").split("\n").filter(Boolean);
+  const lines = git(path, "status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none").split("\n").filter(Boolean);
   const untracked = lines.filter((line) => line.startsWith("??")).length;
   return { wip: lines.length - untracked, untracked };
 }

@@ -235,6 +235,37 @@ test("a status.showUntrackedFiles=no config does not hide untracked files from t
   expect([row[3], row[7]]).toEqual(["untracked:1", "hold-untracked"]);
 });
 
+test("a diff.ignoreSubmodules=all config does not hide submodule work from the audit", () => {
+  const fixture = createFixture();
+  const lib = join(fixture.root, "lib");
+  git("init", "--initial-branch=main", lib);
+  commit(lib, "lib");
+  // git refuses to clone a submodule from a local path without this.
+  const submodule = (worktree, ...args) => git("-C", worktree, "-c", "protocol.file.allow=always", "submodule", ...args);
+  submodule(fixture.repo, "add", lib, "sub");
+  git("-C", fixture.repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "add submodule");
+  git("-C", fixture.repo, "push", "origin", "main");
+  const checkout = (name) => {
+    const worktree = addWorktree(fixture, name);
+    submodule(worktree, "update", "--init");
+    return worktree;
+  };
+  const edited = checkout("sub-edited");
+  writeFileSync(join(edited, "sub/lib.txt"), "edited\n");
+  const added = checkout("sub-added");
+  writeFileSync(join(added, "sub/new.txt"), "never added\n");
+  const committed = checkout("sub-committed");
+  commit(join(committed, "sub"), "local only");
+  git("-C", fixture.repo, "config", "diff.ignoreSubmodules", "all");
+
+  const { rows } = runAudit(fixture);
+  for (const worktree of [edited, added, committed]) {
+    expect(git("-C", worktree, "status", "--porcelain")).toBe("");
+    const row = rowFor(rows, worktree);
+    expect([row[2], row[3], row[7]]).toEqual(["YES", "wip:1", "hold-wip"]);
+  }
+});
+
 test("a Pi session in a second transcripts root marks the worktree it ran in as a recent chat", () => {
   const fixture = createFixture();
   const piChatted = addWorktree(fixture, "pi-chatted");

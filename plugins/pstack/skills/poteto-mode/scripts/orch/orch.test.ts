@@ -344,6 +344,75 @@ describe("Store", () => {
     expect(await readdir(directory)).not.toContain(".orch.lock");
   });
 
+  it("lets only one of two writers racing for a stale lock replace it", async () => {
+    const { directory, store } = await initializedStore();
+    await store.close();
+    const exited = Bun.spawn(["true"]);
+    await exited.exited;
+    await writeFile(join(directory, ".orch.lock"), `${exited.pid}\n`);
+    const flags = await makeDirectory();
+
+    // Both writers wait inside onStaleLock until each has seen the dead
+    // holder; B also waits until A's pid is in the lock, and A keeps its lock
+    // until B has either written or been refused.
+    const worker = (name: string, other: string) => `
+const { openStore } = await import(${JSON.stringify(join(import.meta.dir, "store.ts"))});
+const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
+const flag = (suffix) => ${JSON.stringify(`${flags}/`)} + suffix;
+const spin = (ready) => {
+  const deadline = Date.now() + 5000;
+  while (!ready()) {
+    if (Date.now() > deadline) throw new Error("barrier timeout");
+  }
+};
+const lockHolds = (pid) => {
+  try {
+    return readFileSync(${JSON.stringify(join(directory, ".orch.lock"))}, "utf8").trim() === pid;
+  } catch {
+    return false;
+  }
+};
+const store = openStore(${JSON.stringify(directory)}, {
+  onStaleLock: () => {
+    writeFileSync(flag("${name}.saw-stale"), "");
+    spin(() => existsSync(flag("${other}.saw-stale")));
+    ${name === "B" ? `spin(() => lockHolds(readFileSync(flag("A.pid"), "utf8")));` : ""}
+  },
+});
+writeFileSync(flag("${name}.pid"), String(process.pid));
+try {
+  await store.units.add({ id: "${name}-unit", track: "race" });
+  writeFileSync(flag("${name}.held"), "");
+} catch (error) {
+  writeFileSync(flag("${name}.refused"), error.message);
+}
+${name === "A" ? `spin(() => existsSync(flag("B.held")) || existsSync(flag("B.refused")));` : ""}
+await store.close();
+`;
+    const run = (name: string, other: string) =>
+      Bun.spawn([process.execPath, "-e", worker(name, other)], {
+        stderr: "pipe",
+        stdout: "pipe",
+      });
+    const a = run("A", "B");
+    const b = run("B", "A");
+    expect(await Promise.all([a.exited, b.exited])).toEqual([0, 0]);
+    expect(await new Response(a.stderr).text()).toBe("");
+    expect(await new Response(b.stderr).text()).toBe("");
+
+    const outcomes = (await readdir(flags))
+      .filter((name) => /\.(held|refused)$/.test(name))
+      .sort();
+    expect(outcomes).toEqual(["A.held", "B.refused"]);
+    expect(await readFile(join(flags, "B.refused"), "utf8")).toMatch(
+      /^store lock held by pid /
+    );
+    expect(await readFile(join(directory, "units.tsv"), "utf8")).toBe(
+      "id\ttrack\tstate\tbranch\tpr\tsha\tbrief\nA-unit\trace\tpending\t\t\t\t\n"
+    );
+    expect(await readdir(directory)).not.toContain(".orch.lock");
+  });
+
   it("blocks a writer and steals the pid lock only with force", async () => {
     const { directory, store } = await initializedStore();
     await store.close();
@@ -755,5 +824,21 @@ fi
     await store.status.render();
     const status = await readFile(join(directory, "status.md"), "utf8");
     expect(status).toContain("| a b\\|c | 7 | cafe f00d | OPEN |");
+  });
+
+  it("round-trips cells that start with a spreadsheet formula or quote character", async () => {
+    const { store } = await initializedStore();
+    await store.units.add({ id: "-hotfix", track: "build", brief: "'quoted" });
+    const set = await store.units.set({
+      id: "-hotfix",
+      state: "in-flight",
+      branch: "@me/feat",
+    });
+    expect(set).toMatchObject({
+      id: "-hotfix",
+      branch: "@me/feat",
+      brief: "'quoted",
+    });
+    expect(await store.units.get("-hotfix")).toEqual(set);
   });
 });

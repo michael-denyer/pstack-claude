@@ -181,21 +181,36 @@ describe("strayModelSlugs", () => {
     ]);
   });
 
-  test("a full claude-* ID is a stray whatever family or date it carries, and a product name is not", () => {
+  test.each([
+    "claude-3-opus-20240229",
+    "claude-3-5-haiku-20241022",
+    "claude-3.7-sonnet",
+    "anthropic/claude-3.5-sonnet",
+    "anthropic.claude-3-5-sonnet-20240620-v1:0",
+    "claude-sonnet-4@20250514",
+    "claude-opus4",
+  ])("a claude-* slug that names a listed family after any hyphen is a stray: %s", (id) => {
     const file = "plugins/pstack/skills/other/SKILL.md";
-    for (const id of ["claude-3-5-haiku-20241022", "claude-3-opus-20240229", "claude-mythos-1"]) {
-      expect(strayModelSlugs(file, `# other\n\nDispatch with \`${id}\`.\n`, models)).toEqual([`${file}:3: Dispatch with \`${id}\`.`]);
-    }
-    expect(strayModelSlugs(file, "# other\n\nRun it in claude-code and read claude-mem.\n", models)).toEqual([]);
+    expect(strayModelSlugs(file, `# other\n\nDispatch with \`${id}\`.\n`, models)).toEqual([`${file}:3: Dispatch with \`${id}\`.`]);
   });
 
   test.each([
+    "Run it in claude-code and read claude-mem.",
     "Needs claude-code-2.1.267 or newer.",
-    "Sandbox scratch lives in /tmp/claude-501/.",
-    "Back up to ~/.claude-backup-20261006 first.",
+    "Needs claude-code-2.x or newer.",
+    "Needs claude-code-2 or newer.",
     "Pin claude-agent-sdk-0.2.x in package.json.",
+    "Pin claude-sdk-1.x in package.json.",
+    "Sandbox scratch lives in /tmp/claude-501/.",
+    "Sandbox scratch lives in /tmp/claude-99-cwd/.",
+    "Back up to ~/.claude-backup-20261006 first.",
+    "Back up to ~/.claude-backup-06-10 first.",
     "Tracked as claude-code-issue-12345.",
-  ])("a release, uid, date, or issue number after claude- is not a model ID: %s", (line) => {
+    "Tracked as claude-issue-42.",
+    "Name the worktrees claude-wt-1 and claude-wt-2.",
+    "Step claude-1-setup, then claude-2-run.",
+    "Read the claude-sonnets collection.",
+  ])("a claude-* slug that names no listed family is not a stray: %s", (line) => {
     expect(strayModelSlugs("plugins/pstack/skills/other/SKILL.md", `# other\n\n${line}\n`, models)).toEqual([]);
   });
 });

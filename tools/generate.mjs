@@ -762,12 +762,14 @@ export function overrideSheetBlock(models) {
 // family name hard-codes a default that belongs in models.json.
 export function strayModelSlugs(file, text, models) {
   const families = models.available.join("|");
-  const familyId = `claude-(?:${families})`;
-  // A model ID carries a one- or two-digit version after one family word
-  // (claude-mythos-1) or leads with its generation (claude-3-opus-20240229).
-  // A dotted release, a longer number, or a second word names something else.
-  const versionedId = "claude-(?:[a-z]+-[0-9]{1,2}(?![0-9]|\\.[0-9])|[0-9]{1,2}-(?:[0-9]{1,2}-)?[a-z])";
-  const SLUG_RE = new RegExp(`(?:${familyId}|${versionedId})[0-9a-z.-]*|\`(?:${families})\``);
+  // A claude-* slug names a model when a listed family follows one of its
+  // hyphens as a whole word (claude-opus-5-5, claude-3.7-sonnet). An unlisted
+  // family is not guessed at: claude-mythos-1 has the shape of claude-wt-1.
+  // Each slug is matched once, whole, so a line of repeated claude- stays linear.
+  const FAMILY_RE = new RegExp(`-(?:${families})(?![a-z])`);
+  const BACKTICKED_RE = new RegExp(`\`(?:${families})\``);
+  const namesModel = (line) =>
+    BACKTICKED_RE.test(line) || (line.match(/claude-[0-9a-z.-]*/g) ?? []).some((slug) => FAMILY_RE.test(slug));
   const lines = text.split("\n");
   const owned = regions(models)
     .filter((r) => r.file === file)
@@ -775,7 +777,7 @@ export function strayModelSlugs(file, text, models) {
     .filter(Boolean);
   const strays = [];
   lines.forEach((line, i) => {
-    if (!SLUG_RE.test(line)) return;
+    if (!namesModel(line)) return;
     if (owned.some(([s, e]) => i >= s && i < e)) return;
     strays.push(`${file}:${i + 1}: ${line.trim()}`);
   });

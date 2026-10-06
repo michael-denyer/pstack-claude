@@ -27,9 +27,10 @@
 //   - a binary upstream or port copy differs all three ways -> the run fails
 //     naming it, since a binary cannot carry markers
 //   - a port file where upstream has a directory, a port directory where
-//     upstream has a file, or two paths that differ only in case -> the run
-//     fails naming each, since no tree holds a file and a directory at one
-//     path and a case-insensitive checkout holds one spelling of a pair
+//     upstream has a file, or a port entry spelled another way that this
+//     filesystem finds for upstream's path, because it folds case or
+//     normalises Unicode -> the run fails naming each port path, since the
+//     write would land on that entry
 //   - upstream deleted it and local matches the derived OLD text and mode ->
 //     deleted
 //
@@ -55,6 +56,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   unlinkSync,
@@ -296,13 +298,20 @@ export function classify({ old = null, new: next = null, local = null }) {
 // Outcomes that leave port edits on top of upstream's text or mode.
 const FORK_OUTCOMES = new Set(["forked", "mode-only", "merged", "conflicted"]);
 
+// What the filesystem finds at `name` in `dir`, a link itself and never its
+// target. Where the filesystem folds case or normalises Unicode, that can be
+// an entry `dir` lists under another spelling.
+const lstatIn = (dir, name) => lstatSync(join(dir, name), { throwIfNoEntry: false });
+
 // Compare old-upstream vs new-upstream vs local for one component tree.
 // `derive(rel, text)` turns substituted upstream text into the port's form;
 // the default is identity. `forks`, from parseForks, adds the registry check:
 // an undeclared fork lands in `undeclared` and blocks every write, and an entry
 // whose path is not forked lands in `stale`. A stale entry blocks every write
 // only when `atPin`: at a new SHA it is a fork upstream just absorbed, so the
-// sync goes ahead. Returns the report and, unless dryRun, applies it.
+// sync goes ahead. `lookUp` is the one question whose answer depends on how
+// the filesystem folds names, so a test can stand in for a filesystem that
+// folds. Returns the report and, unless dryRun, applies it.
 export function syncComponent({
   oldDir,
   newDir,
@@ -315,6 +324,7 @@ export function syncComponent({
   forks = null,
   atPin = false,
   dryRun = false,
+  lookUp = lstatIn,
 }) {
   const report = {
     written: [],
@@ -385,20 +395,39 @@ export function syncComponent({
     return outcome ? [{ rel, ...outcome }] : [];
   });
 
-  // Ask the filesystem, not the walk, which lists no empty directory. On a
-  // case-insensitive filesystem a file B also blocks a directory b.
-  const onDisk = (rel) => lstatSync(join(localDir, rel), { throwIfNoEntry: false });
-  const writes = outcomes.filter(({ write }) => write).map(({ rel }) => rel);
+  // A write reaches the tree by upstream's spelling, and the filesystem picks
+  // the entry. Where it folds case or normalises Unicode that can be one
+  // spelled another way, which the write would overwrite and a delete in the
+  // same run could then remove. So each part of a written path must be absent,
+  // or listed under exactly that spelling with the type the write needs. How a
+  // filesystem folds is its own business, so it is asked and never modelled. A
+  // deleted path needs no check: it comes from the walk, so every part of it
+  // is a listed name.
+  const blockerOf = (rel) => {
+    const parts = rel.split("/");
+    let dir = localDir;
+    for (const [i, part] of parts.entries()) {
+      const pathTo = (name) => [...parts.slice(0, i), name].join("/");
+      const entries = readdirSync(dir, { withFileTypes: true });
+      const entry = entries.find(({ name }) => name === part);
+      if (!entry) {
+        const found = lookUp(dir, part);
+        if (!found) return null;
+        const twin = entries.find(({ name }) => lstatSync(join(dir, name)).ino === found.ino);
+        return [pathTo(twin?.name ?? part), `the same entry as upstream's ${pathTo(part)} on this filesystem`];
+      }
+      const last = i === parts.length - 1;
+      if (last === entry.isDirectory()) {
+        return [pathTo(part), last ? "a directory where upstream has a file" : "a file where upstream has a directory"];
+      }
+      dir = join(dir, part);
+    }
+    return null;
+  };
   const collisions = new Map();
-  for (const rel of writes) {
-    const blocker = dirsAbove(rel).find((dir) => onDisk(dir)?.isFile());
-    if (blocker) collisions.set(blocker, "a file where upstream has a directory");
-    else if (onDisk(rel)?.isDirectory()) collisions.set(rel, "a directory where upstream has a file");
-  }
-  for (const group of Map.groupBy(new Set([...localPaths, ...writes]), (rel) => rel.toLowerCase()).values()) {
-    if (group.length < 2) continue;
-    const [first, ...rest] = group.sort();
-    collisions.set(first, `differs only in case from ${rest.join(", ")}`);
+  for (const { rel, write } of outcomes) {
+    const blocker = write && blockerOf(rel);
+    if (blocker) collisions.set(...blocker);
   }
   report.collisions = [...collisions].map(([rel, reason]) => ({ rel, reason })).sort((a, b) => a.rel.localeCompare(b.rel));
 

@@ -1012,28 +1012,74 @@ describe("syncComponent", () => {
     for (const rel of ["d", "f"]) expect(lstatSync(join(local, rel)).isSymbolicLink()).toBe(true);
   });
 
-  test("paths that differ only in case fail the run before any write, since a case-insensitive tree holds one of them", () => {
-    const oldUp = tree({ "Foo.md": "body\n", "sibling.md": "old\n" });
-    const newUp = tree({ "foo.md": "body\n", "sibling.md": "new\n" });
-    const local = tree({ "Foo.md": "body\n", "sibling.md": "old\n" });
+  // A filesystem that resolves each key to the entry spelled as its value, the
+  // way one that folds case or normalises Unicode does. It sits on the real
+  // one, so the rule runs wherever the suite does.
+  const aliasing = (heldAs) => (dir, name) => lstatSync(join(dir, heldAs[name] ?? name), { throwIfNoEntry: false });
+  const aliasesHere = (held, asked) => existsSync(join(tree({ [held]: "" }), asked));
+  const sameEntry = (asked) => `the same entry as upstream's ${asked} on this filesystem`;
+  const onAliasingFilesystems = (title, heldAs, body) => {
+    test(`${title} (a stand-in filesystem)`, () => body({ lookUp: aliasing(heldAs) }));
+    const here = Object.entries(heldAs).every(([asked, held]) => aliasesHere(held, asked));
+    test.skipIf(!here)(`${title} (this filesystem)`, () => body({}));
+  };
+
+  const NFC = "café.md";
+  const NFD = "café.md";
+  for (const [difference, held, asked] of [
+    ["case", "Foo.md", "foo.md"],
+    ["Unicode normalisation", NFD, NFC],
+    ["a sharp s", "strasse.md", "straße.md"],
+    ["a ligature", "file.md", "ﬁle.md"],
+  ]) {
+    onAliasingFilesystems(`an upstream edit to a path the filesystem resolves to a port file whose name differs by ${difference} fails the run before any write`, { [asked]: held }, (filesystem) => {
+      const base = "l1\nl2\nl3\nl4\nl5\nl6\nl7\n";
+      const oldUp = tree({ [asked]: base, "sibling.md": "old\n" });
+      const newUp = tree({ [asked]: base.replace("l7", "l7 upstream"), "sibling.md": "new\n" });
+      const local = tree({ [held]: base.replace("l1", "l1 the port"), "sibling.md": "old\n" });
+
+      const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, ...filesystem });
+
+      expect(report.collisions).toEqual([{ rel: held, reason: sameEntry(asked) }]);
+      expect(readdirSync(local).sort()).toEqual([held, "sibling.md"].sort());
+      expect(readFileSync(join(local, held), "utf8")).toBe(base.replace("l1", "l1 the port"));
+      expect(readFileSync(join(local, "sibling.md"), "utf8")).toBe("old\n");
+    });
+
+    onAliasingFilesystems(`an upstream rename to a name the filesystem resolves to the old entry, differing by ${difference}, deletes nothing`, { [asked]: held }, (filesystem) => {
+      const oldUp = tree({ [held]: "body\n", "sibling.md": "old\n" });
+      const newUp = tree({ [asked]: "body\n", "sibling.md": "new\n" });
+      const local = tree({ [held]: "body\n", "sibling.md": "old\n" });
+
+      const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, ...filesystem });
+
+      expect(report.collisions).toEqual([{ rel: held, reason: sameEntry(asked) }]);
+      expect(readdirSync(local).sort()).toEqual([held, "sibling.md"].sort());
+      expect(readFileSync(join(local, "sibling.md"), "utf8")).toBe("old\n");
+    });
+  }
+
+  test.skipIf(aliasesHere("Foo.md", "foo.md"))("where the filesystem holds both spellings, an upstream rename that only changes case is carried out", () => {
+    const oldUp = tree({ "Foo.md": "body\n" });
+    const newUp = tree({ "foo.md": "body\n" });
+    const local = tree({ "Foo.md": "body\n" });
 
     const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
 
-    expect(report.collisions).toEqual([{ rel: "Foo.md", reason: "differs only in case from foo.md" }]);
-    expect(readdirSync(local).sort()).toEqual(["Foo.md", "sibling.md"]);
-    expect(readFileSync(join(local, "sibling.md"), "utf8")).toBe("old\n");
+    expect(report.collisions).toEqual([]);
+    expect(readdirSync(local)).toEqual(["foo.md"]);
   });
 
-  test("a new upstream file that differs only in case from a port path with no outcome fails the run before any write", () => {
+  onAliasingFilesystems("a new upstream file the filesystem resolves to a port path with no outcome fails the run before any write", { "kit.md": "Kit.md", "notes.md": "NOTES.md" }, (filesystem) => {
     const oldUp = tree({ "a.md": "old a\n" });
     const newUp = tree({ "a.md": "new a\n", "kit.md": "upstream\n", "notes.md": "upstream\n" });
     const local = tree({ "a.md": "old a\n", "Kit.md": "another component's\n", "NOTES.md": "the port's own\n" });
 
-    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, carriedElsewhere: ["Kit.md"], exclude: ["NOTES.md"] });
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, carriedElsewhere: ["Kit.md"], exclude: ["NOTES.md"], ...filesystem });
 
     expect(report.collisions).toEqual([
-      { rel: "Kit.md", reason: "differs only in case from kit.md" },
-      { rel: "NOTES.md", reason: "differs only in case from notes.md" },
+      { rel: "Kit.md", reason: sameEntry("kit.md") },
+      { rel: "NOTES.md", reason: sameEntry("notes.md") },
     ]);
     expect(readFileSync(join(local, "a.md"), "utf8")).toBe("old a\n");
     expect(readFileSync(join(local, "Kit.md"), "utf8")).toBe("another component's\n");
@@ -1073,16 +1119,16 @@ describe("syncComponent", () => {
     expect(readFileSync(join(local, "a.md"), "utf8")).toBe("old a\n");
   });
 
-  const caseInsensitive = existsSync(gitConfigDir.toUpperCase());
-  test.skipIf(!caseInsensitive)("a port file that an upstream directory matches but for case fails the run before any write", () => {
+  onAliasingFilesystems("an upstream directory the filesystem resolves to a port file fails the run before any write", { b: "B" }, (filesystem) => {
     const oldUp = tree({ "a.md": "old a\n" });
     const newUp = tree({ "a.md": "new a\n", "b/new.md": "n\n" });
     const local = tree({ "a.md": "old a\n", B: "a file in the port\n" });
 
-    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local, ...filesystem });
 
-    expect(report.collisions).toEqual([{ rel: "b", reason: "a file where upstream has a directory" }]);
+    expect(report.collisions).toEqual([{ rel: "B", reason: sameEntry("b") }]);
     expect(readFileSync(join(local, "a.md"), "utf8")).toBe("old a\n");
+    expect(readFileSync(join(local, "B"), "utf8")).toBe("a file in the port\n");
   });
 
   test("a binary port copy under an upstream text edit blocks every write", () => {

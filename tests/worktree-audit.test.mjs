@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -453,6 +453,25 @@ describe("pathSpellings", () => {
       chmodSync(join(root, "elsewhere"), 0o311);
       locked.push(join(root, "elsewhere"));
       expect(pathSpellings(join(root, "real/worktree"))).toEqual(before);
+    });
+
+    // Stands in for a filesystem: each listed path reports the given device and inode.
+    const reporting = (ids) => (path, options) => {
+      if (!ids[path]) return statSync(path, options);
+      const [dev, ino] = ids[path];
+      return options?.bigint ? { dev, ino } : { dev: Number(dev), ino: Number(ino) };
+    };
+    const spell = (path, stat) => pathSpellings(path, (dir) => symlinkTargets(dir, stat), stat);
+
+    test("a link that shares its identity with two directories on the path is a spelling of both", () => {
+      const root = layout();
+      const worktree = join(root, "real/worktree");
+      mkdirSync(join(root, "elsewhere"));
+      symlinkSync(join(root, "elsewhere"), join(root, "other"));
+      const shared = [1n, 7n];
+      const spellings = spell(worktree, reporting({ [join(root, "real")]: shared, [worktree]: shared, [join(root, "other")]: shared }));
+      expect(spellings).toContain(join(root, "other/worktree"));
+      expect(spellings).toContain(join(root, "other"));
     });
 
     test("a symlink reached through another symlink composes with it", () => {

@@ -128,9 +128,11 @@ export function pathSpellings(path, linksIn = symlinkTargets, stat = statSync) {
     if (dir === dirname(dir)) break;
   }
   const onPath = [...ancestors, resolved];
-  // A link lands on the directory it names and on the one that shares its identity, if any.
-  const landings = ({ id, name }) => [name, onPath.find((dir) => fileId(dir, stat) === id)];
-  const links = ancestors.flatMap((dir) => linksIn(dir).flatMap(([link, target]) => landings(target).map((landing) => [dir, link, landing])));
+  // A link lands on every directory that it names or that shares its identity:
+  // a filesystem may report one identity for several, and a spare spelling
+  // costs a hold where a missed one can cost the worktree.
+  const links = ancestors.flatMap((dir) => linksIn(dir).flatMap(([link, { id, name }]) =>
+    onPath.filter((target) => target === name || fileId(target, stat) === id).map((target) => [dir, link, target])));
   // Spell each directory from the root down, so a link's own directory is
   // already spelled when the link is applied. A link back up to an ancestor of
   // its directory is applied through that directory's resolved spelling only,

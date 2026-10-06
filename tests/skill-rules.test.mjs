@@ -97,6 +97,21 @@ const rules = [
     phrase: "confirm that the PR or stack it reports matches the request",
   },
   {
+    source: "autopilot verify loop: only findings the diff causes go back",
+    file: "poteto-mode/playbooks/autopilot-full.md",
+    phrase: "A finding blocks the merge only when the diff causes it",
+  },
+  {
+    source: "autopilot verify loop: bounded rounds",
+    file: "poteto-mode/playbooks/autopilot-full.md",
+    phrase: "Two fix-forwards per PR is the ceiling.",
+  },
+  {
+    source: "autopilot verify loop: size stated before fan-out",
+    file: "poteto-mode/playbooks/autopilot-full.md",
+    phrase: "A program of more than three owners waits for the operator's go on that size",
+  },
+  {
     source: "#188 no self-review in place of an independent one",
     file: "poteto-mode/SKILL.md",
     phrase: "Never count your own review, passing tests, or CI as the independent verdict.",

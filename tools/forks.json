@@ -44,7 +44,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/autopilot-full.md": {
       "kind": "policy",
-      "why": "Owners stop at merge-ready and the operator clicks every merge, with the patch-id rule governing re-verification if trunk moves first, instead of each owner merging after a clean verdict, and the root writes the program objective into standing orders on the go and re-reads it each tick, arms the tick as a dynamic-mode /loop, proves the live lane through the driver skill, and takes the pre-review checks from CLAUDE.md files.",
+      "why": "Owners stop at merge-ready and the operator clicks every merge, with the patch-id rule governing re-verification if trunk moves first, instead of each owner merging after a clean verdict, and the root writes the program objective into standing orders on the go and re-reads it each tick, arms the tick as a dynamic-mode /loop, proves the live lane through the driver skill, takes the pre-review checks from CLAUDE.md files, states the program's size before the first owner starts and waits for the operator's go above three owners, sends an owner only the findings its diff causes, runs the full swarm in the first round only, and stops a PR at two fix-forwards.",
       "since": "0.9.39",
       "upstream": "not-proposed"
     },

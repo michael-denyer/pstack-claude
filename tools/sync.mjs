@@ -34,8 +34,10 @@
 //   - upstream deleted it and local matches the derived OLD text and mode ->
 //     deleted
 //
-// A written file takes the new upstream file's mode, except that a merged or
-// conflicted file keeps the port's mode when upstream left the mode alone.
+// Modes compare as git records them, executable or not. A written file takes
+// the new upstream file's, except that a merged or conflicted file keeps the
+// port's when upstream left it alone. A write changes a file's mode only when
+// that bit has to change, so a port file's other permission bits stay.
 //
 // Every effective text file, a conflict's marked bytes included, is
 // denylist-scanned; a hit fails the run with file, line, and the hint for that
@@ -467,7 +469,9 @@ export function syncComponent({
     if (write) {
       mkdirSync(dirname(localFile), { recursive: true });
       writeFileSync(localFile, write.bytes);
-      chmodSync(localFile, write.mode);
+      // Git records only whether a file is executable, so that is all a write
+      // changes. A port file's other permission bits stay as they are.
+      if (gitMode(lstatSync(localFile).mode) !== write.mode) chmodSync(localFile, write.mode);
     } else if (kind === "deleted") {
       unlinkSync(localFile);
     }

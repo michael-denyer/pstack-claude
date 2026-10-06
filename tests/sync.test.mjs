@@ -1320,6 +1320,30 @@ describe("syncComponent", () => {
     expect(statSync(join(local, "run.sh")).mode & 0o777).toBe(0o755);
   });
 
+  test("a written file keeps the permission bits git does not record", () => {
+    const base = "l1\nl2\nl3\nl4\nl5\nl6\nl7\n";
+    const edited = base.replace("l7", "l7 upstream");
+    const oldUp = tree({ "merged.md": base, "merged.sh": base, "updated.md": base });
+    const newUp = tree({ "merged.md": edited, "merged.sh": edited, "updated.md": edited });
+    const local = tree({ "merged.md": base.replace("l1", "l1 the port"), "merged.sh": base.replace("l1", "l1 the port"), "updated.md": base });
+    for (const upstream of [oldUp, newUp]) chmodSync(join(upstream, "merged.sh"), 0o755);
+    chmodSync(join(local, "merged.md"), 0o600);
+    chmodSync(join(local, "merged.sh"), 0o700);
+    chmodSync(join(local, "updated.md"), 0o600);
+
+    const report = sync({ oldDir: oldUp, newDir: newUp, localDir: local });
+
+    expect(report.written).toEqual([
+      { kind: "merged", rel: "merged.md" },
+      { kind: "merged", rel: "merged.sh" },
+      { kind: "updated", rel: "updated.md" },
+    ]);
+    expect(statSync(join(local, "merged.md")).mode & 0o777).toBe(0o600);
+    expect(statSync(join(local, "merged.sh")).mode & 0o777).toBe(0o700);
+    expect(statSync(join(local, "updated.md")).mode & 0o777).toBe(0o600);
+    expect(readFileSync(join(local, "updated.md"), "utf8")).toBe(edited);
+  });
+
   test("forks are reported largest first by changed lines, and a mode-only fork is marked", () => {
     const body = { "a.md": "one\n", "b.md": "one\ntwo\nthree\n", "run.sh": "echo\n" };
     const oldUp = tree(body);

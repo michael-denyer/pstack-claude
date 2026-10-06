@@ -1292,11 +1292,15 @@ describe("syncComponent", () => {
     expect(statSync(join(local, "run.sh")).mode & 0o777).toBe(0o755);
   });
 
-  test("a mode that differs only in bits git does not record is unchanged, not a mode fork", () => {
+  test.each([
+    ["the port's copy is group-writable", 0o644, 0o664],
+    ["upstream's clone is group-writable", 0o664, 0o644],
+    ["the port's script is executable by its owner alone", 0o755, 0o700],
+  ])("a mode that differs only in bits git does not record is unchanged, not a mode fork: %s", (_, upstreamMode, portMode) => {
     const up = tree({ "s.md": "same\n" });
     const local = tree({ "s.md": "same\n" });
-    chmodSync(join(up, "s.md"), 0o644);
-    chmodSync(join(local, "s.md"), 0o664);
+    chmodSync(join(up, "s.md"), upstreamMode);
+    chmodSync(join(local, "s.md"), portMode);
 
     const report = sync({ oldDir: up, newDir: up, localDir: local, forks: new Map(), atPin: true, dryRun: true });
 

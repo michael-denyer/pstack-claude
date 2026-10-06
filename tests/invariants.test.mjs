@@ -100,6 +100,8 @@ describe("static plugin invariants", () => {
     'Agent(subagent_type="NAME", prompt=...)',
     "**subagent_type**: NAME",
     '{\\"subagent_type\\": \\"NAME\\"}',
+    'Use\\nsubagent_type: "NAME"',
+    '"prompt": "Dispatch:\\nsubagent_type: \\"NAME\\""',
   ])("a bare dispatch spelled %s fails for every shipped agent", (spelling) => {
     expect(shippedAgents.length).toBeGreaterThan(0);
     const root = plugin((r) => shippedAgents.forEach((name) => agent(r, name)));

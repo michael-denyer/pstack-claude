@@ -209,7 +209,9 @@ export function validatePluginLayout(pluginRoot) {
   const bareDispatches = [];
   for (const file of markdownFiles(join(pluginRoot, "skills"))) {
     readFileSync(file, "utf8").split("\n").forEach((line, i) => {
-      for (const [, name] of line.matchAll(/\bsubagent_type[\s\\"'`*]*[:=][\s\\"'`*]*([a-z0-9-]+)(?![\w-]|\.\w)/g)) {
+      // Only an underscore makes a longer key. \b would also reject the key
+      // after the n of a literal "\n" in an escaped prompt string.
+      for (const [, name] of line.matchAll(/(?<!_)subagent_type[\s\\"'`*]*[:=][\s\\"'`*]*([a-z0-9-]+)(?![\w-]|\.\w)/g)) {
         if (agents.includes(name)) {
           bareDispatches.push(`${relative(pluginRoot, file)}:${i + 1}: subagent_type: "${name}" (use "pstack:${name}")`);
         }

@@ -37,6 +37,7 @@ try {
   writeFileSync(join(dir, "tsconfig.json"), JSON.stringify(config, null, 2));
   console.log(`typechecking plugins/pstack/pi against ${piDir}`);
   const tsc = spawnSync("bunx", ["--package", "typescript@5.9.3", "tsc", "-p", join(dir, "tsconfig.json")], { cwd: dir, stdio: "inherit" });
+  if (tsc.error) console.error(`could not run bunx: ${tsc.error.message}`);
   process.exitCode = tsc.status ?? 1;
 } finally {
   rmSync(dir, { recursive: true, force: true });

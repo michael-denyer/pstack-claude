@@ -17,7 +17,7 @@ afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
 });
 
-function run(scenario: string, extra: string[] = []) {
+function run(scenario: string, extra: string[] = [], path?: string) {
   const dir = mkdtempSync(join(tmpdir(), "watch-transport-"));
   directories.push(dir);
   const bin = join(dir, "bin");
@@ -81,7 +81,7 @@ console.log(JSON.stringify(value));
       encoding: "utf8",
       timeout: 6000,
       env: {
-        PATH: `${bin}:${process.env.PATH}`,
+        PATH: path ?? `${bin}:${process.env.PATH}`,
         WATCH_FIXTURE: scenario,
         WATCH_CALLS: callsFile,
         WATCH_PID: pidFile,
@@ -188,6 +188,20 @@ it("fails closed when the check queries fail instead of reporting no checks", ()
       blocker: { kind: "status-query" },
     });
   }
+});
+
+it("exits 7 with a JSON verdict when gh is not on PATH", () => {
+  const result = run("missing-gh", [], "/nonexistent");
+  expect(result.status).toBe(7);
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({
+    kind: "BLOCKER",
+    exitCode: 7,
+    blocker: {
+      kind: "status-query",
+      failures: 1,
+      failure: { kind: "spawn-failed", retryable: false },
+    },
+  });
 });
 
 it("cancels an in-flight command at the CLI deadline", () => {

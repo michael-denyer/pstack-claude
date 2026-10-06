@@ -158,13 +158,13 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/github.test.ts": {
       "kind": "policy",
-      "why": "Covers the port's GitHub reader: completed conclusions that gh buckets as pending, a checkout PR paired with a different explicit repository, a full open-PR page refused as a possibly cut stack, a check-rollup cursor that does not advance, the base revision field, and a no-checks reading that needs both check reads to agree and fails closed otherwise.",
+      "why": "Covers the port's GitHub reader: completed conclusions that gh buckets as pending, a checkout PR paired with a different explicit repository, a full open-PR page refused as a possibly cut stack, a check-rollup cursor that does not advance, a binary that cannot be spawned, the base revision field, and a no-checks reading that needs both check reads to agree and fails closed otherwise.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/github.ts": {
       "kind": "policy",
-      "why": "Runs every gh and git call under the shared deadline, reads the base revision, pages through every review thread, refuses a review-thread or check-rollup cursor that does not advance, fails completed conclusions that gh buckets as pending, refuses a checkout PR paired with a different explicit repository, orders a stack only through branches in the PR's own repository while rejecting duplicate head branches, cycles, and a full open-PR page, and reads a repository with no checks configured as its own result when gh reports none and the head commit has no rollup.",
+      "why": "Runs every gh and git call under the shared deadline, reports a binary that cannot be spawned as a non-retryable query failure, reads the base revision, pages through every review thread, refuses a review-thread or check-rollup cursor that does not advance, fails completed conclusions that gh buckets as pending, refuses a checkout PR paired with a different explicit repository, orders a stack only through branches in the PR's own repository while rejecting duplicate head branches, cycles, and a full open-PR page, and reads a repository with no checks configured as its own result when gh reports none and the head commit has no rollup.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
@@ -194,7 +194,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/types.ts": {
       "kind": "policy",
-      "why": "Adds the review-required, behind-base, and merge-blocked gate reasons, the landing revision on open PR facts and in the ready proof, the head repository of an open PR, deadline, snapshot-changed, invalid-stack, and mergeability-unknown query failures, and the no-checks reading (a none-reported fast path, a no-rollup page, the ci-none state, the ci-unreported first sighting, and the checks-unreported wait reason).",
+      "why": "Adds the review-required, behind-base, and merge-blocked gate reasons, the landing revision on open PR facts and in the ready proof, the head repository of an open PR, deadline, spawn-failed, snapshot-changed, invalid-stack, and mergeability-unknown query failures, and the no-checks reading (a none-reported fast path, a no-rollup page, the ci-none state, the ci-unreported first sighting, and the checks-unreported wait reason).",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },

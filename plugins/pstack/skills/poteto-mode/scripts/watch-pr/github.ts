@@ -82,7 +82,13 @@ function run(
     });
     child.on("error", (error) => {
       clearTimeout(timer);
-      reject(error);
+      reject(
+        new WatcherQueryError({
+          kind: "spawn-failed",
+          retryable: false,
+          detail: `could not run ${argv[0]}: ${error.message}`,
+        })
+      );
     });
     child.on("close", (code) => {
       clearTimeout(timer);

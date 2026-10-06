@@ -241,7 +241,7 @@ export type MergeBlocker =
     };
 export type QueryFailure =
   | {
-      readonly kind: "deadline";
+      readonly kind: "deadline" | "spawn-failed";
       readonly retryable: false;
       readonly detail: string;
     }

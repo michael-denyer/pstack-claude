@@ -244,12 +244,19 @@ describe("assertChangesHeading", () => {
     );
   });
 
-  test.each(["## v0.9.71 - newer", "## [0.9.71] - newer", "##  0.9.71 - newer", "### 0.9.71 - newer", "## Unreleased"])(
-    "an entry headed %s above the VERSION heading fails, whatever shape its heading takes",
+  test.each(["## v0.9.71 - newer", "## [0.9.71] - newer", "##  0.9.71 - newer", "##0.9.71 - newer", "### 0.9.71 - newer", "# 0.9.71 - newer"])(
+    "an entry headed %s above the VERSION heading fails, whatever level or decoration its version takes",
     (heading) => {
       expect(() => assertChangesHeading(`# Changes\n\n${heading}\n\n## 0.9.70 - current\n`, "0.9.70")).toThrow(
         `CHANGES.md's newest release heading is "${heading}", but VERSION is 0.9.70`,
       );
+    },
+  );
+
+  test.each(["## About this file", "### Format", "## Unreleased", "## Format since 0.9.13"])(
+    "a heading that does not lead with a version is no entry and may sit above the newest: %s",
+    (heading) => {
+      expect(() => assertChangesHeading(`# Changes\n\n${heading}\n\n## 0.9.71 - new\n\n## 0.9.70 - old\n`, "0.9.71")).not.toThrow();
     },
   );
 

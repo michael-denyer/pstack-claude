@@ -131,9 +131,11 @@ export function assertChangesHeading(changelog, version) {
   const lines = outsideFences(changelog.split("\n"));
   const current = lines.find((line) => line.startsWith(`## ${version} `));
   if (!current) throw new Error(`CHANGES.md has no "## ${version} - <title>" heading`);
-  // Any "##" line counts, not only a release-shaped one. An entry headed
-  // "## Unreleased" or "## v1.2.3" above the VERSION heading ships nothing either.
-  const newest = lines.find((line) => line.startsWith("##"));
+  // An entry is a heading whose first word carries a version, at any level or
+  // decoration: "# 1.2.3", "## v1.2.3", "## [1.2.3]". A heading without one is
+  // not read as an entry, because "## Unreleased" over forgotten work has the
+  // shape of a preamble section such as "## About this file".
+  const newest = lines.find((line) => /^#+\s*\S*\d+\.\d+\.\d+/.test(line));
   if (newest !== current) throw new Error(`CHANGES.md's newest release heading is "${newest}", but VERSION is ${version}`);
   const headings = lines.filter((line) => /^## \d+\.\d+\.\d+/.test(line));
   const malformed = headings.filter((line) => !/^## \d+\.\d+\.\d+ - \S/.test(line));

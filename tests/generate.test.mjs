@@ -228,6 +228,25 @@ describe("assertChangesHeading", () => {
       'CHANGES.md\'s newest release heading is "## 0.9.71 - newer", but VERSION is 0.9.70',
     );
   });
+
+  test.each(["## v0.9.71 - newer", "## [0.9.71] - newer", "##  0.9.71 - newer", "### 0.9.71 - newer", "## Unreleased"])(
+    "an entry headed %s above the VERSION heading fails, whatever shape its heading takes",
+    (heading) => {
+      expect(() => assertChangesHeading(`# Changes\n\n${heading}\n\n## 0.9.70 - current\n`, "0.9.70")).toThrow(
+        `CHANGES.md's newest release heading is "${heading}", but VERSION is 0.9.70`,
+      );
+    },
+  );
+
+  test("a version that heads two entries fails naming both, so new work under the old number cannot ship", () => {
+    expect(() => assertChangesHeading("# Changes\n\n## 0.9.70 - newer work\n\n## 0.9.70 - current\n", "0.9.70")).toThrow(
+      "CHANGES.md heads two entries with one version:\n## 0.9.70 - newer work\n## 0.9.70 - current",
+    );
+  });
+
+  test("a heading that is not a release may sit below the newest entry", () => {
+    expect(() => assertChangesHeading("## 0.9.1 - title\n\n## Upstream review\n\n## 0.9.0 - older\n", "0.9.1")).not.toThrow();
+  });
 });
 
 describe("slashCommands", () => {

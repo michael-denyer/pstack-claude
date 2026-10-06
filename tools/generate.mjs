@@ -116,12 +116,16 @@ export function assertChangesHeading(changelog, version) {
   const lines = changelog.split("\n");
   const current = lines.find((line) => line.startsWith(`## ${version} `));
   if (!current) throw new Error(`CHANGES.md has no "## ${version} - <title>" heading`);
+  const newest = lines.find((line) => line.startsWith("##"));
+  if (newest !== current) throw new Error(`CHANGES.md's newest release heading is "${newest}", but VERSION is ${version}`);
   const headings = lines.filter((line) => /^## \d+\.\d+\.\d+/.test(line));
-  if (headings[0] !== current) throw new Error(`CHANGES.md's newest release heading is "${headings[0]}", but VERSION is ${version}`);
   const malformed = headings.filter((line) => !/^## \d+\.\d+\.\d+ - \S/.test(line));
   if (malformed.length) {
     throw new Error(`CHANGES.md release headings read "## <version> - <title>":\n${malformed.join("\n")}`);
   }
+  const versions = headings.map((line) => line.split(" ")[1]);
+  const repeated = headings.filter((_, i) => versions.indexOf(versions[i]) !== versions.lastIndexOf(versions[i]));
+  if (repeated.length) throw new Error(`CHANGES.md heads two entries with one version:\n${repeated.join("\n")}`);
 }
 
 // Split a Markdown file into its YAML frontmatter and the text after it.

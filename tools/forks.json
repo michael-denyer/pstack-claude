@@ -242,7 +242,7 @@
     },
     "plugins/pstack/skills/show-me-your-work/scripts/log.sh": {
       "kind": "policy",
-      "why": "Prefixes a cell opening with a double quote so a spreadsheet or TSV reader cannot parse it as a quoted field, and appends each row through one perl syswrite so parallel writers cannot interleave rows longer than the shell's stdio buffer, reporting a short or failed write and falling back to upstream's printf when perl is missing or does not work.",
+      "why": "Prefixes a cell opening with a double quote so a spreadsheet or TSV reader cannot parse it as a quoted field, appends each row through one perl syswrite so parallel writers cannot interleave rows longer than the shell's stdio buffer, reports a short or failed write, and falls back to upstream's printf when perl is missing or does not work.",
       "since": "0.9.41",
       "upstream": "not-proposed"
     },

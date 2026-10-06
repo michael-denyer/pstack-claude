@@ -132,7 +132,7 @@ describe("project playbooks", () => {
     try {
       const bundled = join(root, "bundled");
       mkdirSync(join(bundled, "sub"), { recursive: true });
-      // POSIX makes one file named `sub\x.md`. On Windows both paths are sub/x.md.
+      // On POSIX the second path is a file named `sub\x.md`. On Windows both paths are sub/x.md.
       for (const file of ["sub/x.md", "sub\\x.md"]) writeFileSync(join(bundled, file), "");
       mkdirSync(join(root, ".agents/playbooks"), { recursive: true });
       writeFileSync(join(root, ".agents/playbooks/ship.md"), "---\nextends: sub/x, sub\\x\nwhen: Use it to ship.\n---\n");

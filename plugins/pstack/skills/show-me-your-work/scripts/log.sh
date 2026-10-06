@@ -47,7 +47,7 @@ printf -v row '%s\t%s\t%s\t%s\t%s\t%s\n' \
 	"$ts" "$(clean "$1")" "$(clean "$2")" "$(clean "$3")" "$(clean "$4")" "$(clean "$5")"
 # perl runs once before it gets the row. A perl that is missing, a shim that
 # fails, or one PERL5OPT breaks would otherwise take the row with it.
-if [ "$(perl -e 'binmode STDOUT; syswrite(STDOUT, "ok")' 2>/dev/null </dev/null)" = ok ]; then
+if [ "$(perl -e 'print "ok"' 2>/dev/null </dev/null)" = ok ]; then
 	printf '%s' "$row" |
 		perl -e 'binmode STDIN; binmode STDOUT; local $/; $_ = <STDIN>;
 			my $n = syswrite(STDOUT, $_) // die "log.sh: $!\n";

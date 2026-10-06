@@ -55,7 +55,7 @@ test("40 concurrent writers with 400 KB rows leave every row intact", async () =
       .split("\n")
       .map((line) => line.split("\t"))
       .filter((row) => row[0] !== "ts");
-    expect(rows.filter((row) => row.length !== 6 || row.slice(2).some((cell) => cell !== manyStdioBuffers)).length).toBe(0);
+    expect(rows.filter((row) => row.length === 6 && row.slice(2).every((cell) => cell === manyStdioBuffers)).length).toBe(40);
     expect(rows.length).toBe(40);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -104,9 +104,11 @@ test("a row is appended when perl is not installed", () => {
   }
 });
 
+const drainsItsStdin = "#!/bin/sh\nwhile read -r _; do :; done\n";
+
 for (const [state, shim, env] of [
   ["is a shim that exits 3", "#!/bin/sh\necho 'perl: broken shim' >&2\nexit 3\n", {}],
-  ["is a shim that exits 0 and writes nothing", "#!/bin/sh\nwhile read -r _; do :; done\n", {}],
+  ["is a shim that exits 0 and writes nothing", drainsItsStdin, {}],
   ["cannot load a module PERL5OPT names", null, { PERL5OPT: "-Mpstack_no_such_module" }],
 ]) test(`a row is appended, with nothing on stderr, when perl ${state}`, () => {
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
@@ -132,7 +134,7 @@ test("the caller's stdin is left unread when perl is a shim that drains its own"
   try {
     const bin = join(dir, "bin");
     mkdirSync(bin);
-    writeFileSync(join(bin, "perl"), "#!/bin/sh\nwhile read -r _; do :; done\n", { mode: 0o755 });
+    writeFileSync(join(bin, "perl"), drainsItsStdin, { mode: 0o755 });
     const { stdout } = spawnSync(
       "bash",
       ["-c", 'bash "$@" && cat', "bash", logScript, join(dir, "log.tsv"), "phase", "decision", "why", "evidence", "result"],
@@ -147,12 +149,10 @@ test("the caller's stdin is left unread when perl is a shim that drains its own"
 test("a short write fails and says how many bytes of the row were appended", () => {
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
   try {
-    const log = join(dir, "log.tsv");
-    execFileSync("bash", [logScript, log, "phase", "decision", "why", "evidence", "result"]);
     const pastTheCap = "y".repeat(3000);
     const { status, stderr } = spawnSync(
       "bash",
-      ["-c", 'ulimit -f 1 && exec bash "$@"', "bash", logScript, log, "phase", "decision", "why", pastTheCap, "result"],
+      ["-c", 'ulimit -f 1 && exec bash "$@"', "bash", logScript, join(dir, "log.tsv"), "phase", "decision", "why", pastTheCap, "result"],
       { encoding: "utf8" },
     );
     expect(stderr).toMatch(/^log\.sh: short write, appended \d+ of 30\d\d bytes of the row\n$/);

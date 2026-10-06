@@ -301,6 +301,7 @@ describe("main", () => {
         now: () => now,
         async sleep(seconds: number) {
           now += seconds;
+          if (now > 3600) throw new Error("no verdict within an hour");
         },
       },
     };

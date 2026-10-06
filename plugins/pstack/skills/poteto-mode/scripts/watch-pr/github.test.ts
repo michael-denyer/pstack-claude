@@ -155,6 +155,27 @@ describe("checks fallback chain", () => {
     ]);
   });
 
+  it("rejects a rollup cursor that returns to an earlier page after moving on", async () => {
+    const page = (endCursor: string | null) =>
+      ({ kind: "contexts", checks: [], endCursor }) as const;
+    const reader = fakeReader({
+      fastPath: { kind: "checks", checks: [] },
+      rollupPages: [page("a"), page("b"), page("a"), page(null)],
+    });
+    await expect(resolveChecks(reader, context)).rejects.toMatchObject({
+      failure: {
+        kind: "missing-key",
+        detail: expect.stringContaining("must advance"),
+      },
+    });
+    expect(reader.calls).toEqual([
+      "checksFastPath",
+      "checkRollupPage:null",
+      "checkRollupPage:a",
+      "checkRollupPage:b",
+    ]);
+  });
+
   it("propagates a failed rollup query instead of reading it as no checks", async () => {
     const reader = fakeReader({ fastPath: { kind: "none-reported" } });
     const failure = new WatcherQueryError({
@@ -579,6 +600,28 @@ describe("context and stack discovery", () => {
     const reader = fakeReader({ defaultBranch: "trunk" });
     expect(await discoverStack(reader, context)).toEqual([context]);
     expect(reader.calls).toEqual(["openPullRequests", "defaultBranch"]);
+  });
+
+  it("orders a discovered stack around the default branch the repository reports", async () => {
+    const repo = { owner: "owner", repo: "repo" };
+    const reader = fakeReader({
+      defaultBranch: "develop",
+      openPullRequests: [
+        {
+          number: parsePrNumber(500),
+          headRepository: repo,
+          headRefName: "develop",
+          baseRefName: "main",
+        },
+        {
+          number: context.number,
+          headRepository: repo,
+          headRefName: "feature",
+          baseRefName: "develop",
+        },
+      ],
+    });
+    expect(numbers(await discoverStack(reader, context))).toEqual([42]);
   });
 
   it("refuses a full open-PR page, which may have cut the stack", async () => {

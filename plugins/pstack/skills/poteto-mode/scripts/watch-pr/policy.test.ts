@@ -525,6 +525,17 @@ describe("facts that change while the snapshot is read", () => {
       });
   });
 
+  it("retries when the PR closes, merges, or renames its head branch between the two reads", async () => {
+    for (const factsOnReread of [
+      { state: "CLOSED" },
+      { mergedAt: "2026-07-26T00:00:00Z" },
+      { headRefName: "renamed" },
+    ] as const)
+      await expect(read({ factsOnReread })).rejects.toMatchObject({
+        failure: { kind: "snapshot-changed", retryable: true },
+      });
+  });
+
   it("keeps an unknown first read when GitHub computes mergeability before the re-read", async () => {
     const unknown = {
       mergeable: "UNKNOWN",
@@ -551,6 +562,9 @@ const ticking = (onSleep = () => {}) => {
     now: () => now,
     async sleep(seconds: number) {
       now += seconds;
+      // A wait that never ends would spin on this clock without yielding to
+      // the test runner's own timeout.
+      if (now > 3600) throw new Error("no verdict within an hour of polling");
       onSleep();
     },
   };
@@ -852,6 +866,30 @@ describe("a PR with no checks configured", () => {
     expect(confirm({ ...head, headRefOid: "pushed" })).toBe(false);
     now = 120;
     expect(confirm({ ...head, headRefOid: "pushed" })).toBe(true);
+  });
+
+  it("times each PR from its own first sighting, not from another PR's", () => {
+    let now = 0;
+    const confirm = noChecksConfirmer({ now: () => now });
+    const first = { context: context(30), headRefOid: "head" };
+    const second = { context: context(31), headRefOid: "head" };
+    expect(confirm(first)).toBe(false);
+    now = 60;
+    expect(confirm(second)).toBe(false);
+    expect(confirm(first)).toBe(true);
+    now = 120;
+    expect(confirm(second)).toBe(true);
+  });
+
+  it("reads no checks as unreported when the caller supplies no confirmation", async () => {
+    expect(
+      await readSnapshot({
+        reader: fakeReader(noChecks),
+        context: context(30),
+        pendingHistory: "omit",
+        allowDraft: false,
+      }),
+    ).toMatchObject({ kind: "open", ci: { kind: "ci-unreported" } });
   });
 
   it("reports a repository with no CI ready 60 seconds after the first sighting, however short the interval", async () => {

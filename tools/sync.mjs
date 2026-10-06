@@ -243,7 +243,6 @@ export function isExcluded(rel, exclude) {
   });
 }
 
-// Git records one of two file modes, so only the owner's execute bit counts.
 const gitMode = (mode) => (mode & 0o100 ? 0o755 : 0o644);
 
 const lazyFile = (mode, load) => {
@@ -349,9 +348,9 @@ export function syncComponent({
     return lazyFile(gitMode(stat.mode), () => portForm(rel, readFileSync(file)));
   };
   const portCopy = (rel) => {
-    // Only a walked entry counts as present. existsSync would also answer for
-    // Foo.md when asked about foo.md on a case-insensitive filesystem, and for
-    // a directory when asked about a file.
+    // The walk decides what exists. Where the filesystem folds case it answers
+    // for Foo.md when asked about foo.md, and anywhere it answers for a
+    // directory when asked about a file.
     if (!localPaths.has(rel)) return null;
     const file = join(localDir, rel);
     const stat = lstatSync(file);
@@ -396,11 +395,7 @@ export function syncComponent({
     if (blocker) collisions.set(blocker, "a file where upstream has a directory");
     else if (onDisk(rel)?.isDirectory()) collisions.set(rel, "a directory where upstream has a file");
   }
-  // Every walked path counts, since one that another component carries or
-  // `exclude` names has no outcome, and a write under another spelling would
-  // land on it.
-  const held = new Set([...localPaths, ...writes]);
-  for (const group of Map.groupBy(held, (rel) => rel.toLowerCase()).values()) {
+  for (const group of Map.groupBy(new Set([...localPaths, ...writes]), (rel) => rel.toLowerCase()).values()) {
     if (group.length < 2) continue;
     const [first, ...rest] = group.sort();
     collisions.set(first, `differs only in case from ${rest.join(", ")}`);

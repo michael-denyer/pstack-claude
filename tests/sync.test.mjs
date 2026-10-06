@@ -37,10 +37,8 @@ afterEach(() => {
   for (const dir of fixtures.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-// Every git call the suite spawns runs with an empty config in place of the
-// developer's, so a setting such as merge.conflictStyle or commit.gpgsign
-// cannot change what it measures. Bun's child_process reads the environment
-// at startup unless `env` is passed, so each spawn here passes process.env.
+// Bun's child_process reads the environment at startup unless `env` is passed,
+// so each spawn here passes process.env.
 const gitConfigDir = mkdtempSync(join(tmpdir(), "sync-gitconfig-"));
 const savedGitEnv = { GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM };
 beforeAll(() => {

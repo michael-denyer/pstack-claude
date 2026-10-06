@@ -302,6 +302,8 @@ describe("lastChats matches a path as JSONL spells it, never a sibling's prefix"
     ["a path ending the text with a period", "/repo/worktree", "see /repo/worktree."],
     ["a path closing a bracket", "/repo/worktree", "[cmd /repo/worktree]"],
     ["a path closing a shell default", "/repo/worktree", "${WT:-/repo/worktree}"],
+    ["a path ending a question", "/repo/worktree", "still using /repo/worktree?"],
+    ["a path ending an exclamation", "/repo/worktree", "done with /repo/worktree!"],
   ])("finds %s", (_, path, cwd) => {
     expect(scan(path, cwd)).toBe(true);
   });

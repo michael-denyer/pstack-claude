@@ -141,8 +141,10 @@ export function pathSpellings(path, linksIn = symlinkTargets) {
 // JSON-escaped and a `\` after it opens the escape of a quote, backslash, or
 // control byte. `.` counts only before another boundary (a sentence-final
 // path), because `/x/candidate.bak` is a plausible sibling. `*`, `$`, and `{`
-// stay out: they extend a path by glob or expansion.
-const BOUNDARY = new Set(Buffer.from("/\\\"' `:;),|&<>]}"));
+// stay out: they extend a path by glob or expansion. `?` can glob one byte
+// too, but far more often ends a question about the path, and a wrong match
+// there costs a hold rather than a deletion.
+const BOUNDARY = new Set(Buffer.from("/\\\"' `:;),|&<>]}?!"));
 const DOT = ".".charCodeAt(0);
 const bounded = (text, at) => at === text.length || BOUNDARY.has(text[at]);
 function mentions(text, needle) {

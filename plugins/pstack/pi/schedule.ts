@@ -144,7 +144,7 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
       }
       if (scheduler.staleLoop(params.prompt)) {
         return {
-          content: [{ type: "text", text: "The loop this wakeup would continue was stopped or replaced; nothing was scheduled." }],
+          content: [{ type: "text", text: "No self-paced loop with this prompt is running: it was stopped, replaced, or never started. Nothing was scheduled." }],
           details: { stale: true },
         };
       }

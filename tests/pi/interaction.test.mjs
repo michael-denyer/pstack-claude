@@ -385,7 +385,9 @@ describe("/loop", () => {
 
   test("a re-arm for a loop that was never started schedules nothing", async () => {
     const { pi, ctx } = loop();
-    expect((await pi.call("schedule_wakeup", { delaySeconds: 60, prompt: "/loop watch" }, ctx)).details).toEqual({ stale: true });
+    const rearm = await pi.call("schedule_wakeup", { delaySeconds: 60, prompt: "/loop watch" }, ctx);
+    expect(rearm.details).toEqual({ stale: true });
+    expect(resultText(rearm)).toContain("never started");
     jest.advanceTimersByTime(3_600_000);
     expect(pi.userMessages).toEqual([]);
   });

@@ -25,15 +25,13 @@ test("cells a spreadsheet or TSV reader would reinterpret are written with a lea
   }
 });
 
-// 20 KB cells make each row longer than any stdio buffer, so a row written in
-// pieces shows up as a malformed row once writers overlap.
 test("40 concurrent writers with 20 KB cells leave every row intact", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
   try {
     const log = join(dir, "log.tsv");
-    const evidence = "x".repeat(20_000);
+    const longerThanStdioBuffer = "x".repeat(20_000);
     const writers = Array.from({ length: 40 }, (_, i) =>
-      spawn("bash", [logScript, log, `p${i}`, `decision ${i}`, "why", evidence, `result ${i}`], { stdio: "inherit" }),
+      spawn("bash", [logScript, log, `p${i}`, `decision ${i}`, "why", longerThanStdioBuffer, `result ${i}`], { stdio: "inherit" }),
     );
     const exits = await Promise.all(writers.map((writer) => once(writer, "exit")));
     expect(exits.map(([code]) => code)).toEqual(Array(40).fill(0));
@@ -42,15 +40,13 @@ test("40 concurrent writers with 20 KB cells leave every row intact", async () =
       .split("\n")
       .map((line) => line.split("\t"))
       .filter((row) => row[0] !== "ts");
-    expect(rows.filter((row) => row.length !== 6 || row[4] !== evidence).length).toBe(0);
+    expect(rows.filter((row) => row.length !== 6 || row[4] !== longerThanStdioBuffer).length).toBe(0);
     expect(rows.length).toBe(40);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-// PERL_UNICODE puts a :utf8 layer on perl's standard handles, and syswrite
-// refuses a handle that has one.
 test("a row with non-ASCII cells is appended when PERL_UNICODE is set", () => {
   const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
   try {
@@ -59,6 +55,19 @@ test("a row with non-ASCII cells is appended when PERL_UNICODE is set", () => {
     execFileSync("bash", [logScript, log, ...cells], { env: { ...process.env, PERL_UNICODE: "SDA" } });
     const rows = readFileSync(log, "utf8").trimEnd().split("\n").slice(1).map((line) => line.split("\t"));
     expect(rows.map((row) => row.slice(1))).toEqual([cells]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a 200 KB row is appended, though Linux caps one argument at 128 KiB", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pstack-log-"));
+  try {
+    const log = join(dir, "log.tsv");
+    const underTheCap = "x".repeat(100_000);
+    execFileSync("bash", [logScript, log, "phase", "decision", "why", underTheCap, underTheCap]);
+    const rows = readFileSync(log, "utf8").trimEnd().split("\n").slice(1).map((line) => line.split("\t"));
+    expect(rows.map((row) => row.slice(1))).toEqual([["phase", "decision", "why", underTheCap, underTheCap]]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

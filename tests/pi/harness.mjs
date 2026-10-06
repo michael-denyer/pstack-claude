@@ -75,7 +75,7 @@ export function fakePi() {
   };
 }
 
-export function fakeCtx({ cwd, entries = [], model = { provider: "anthropic", id: "parent-model" }, mode = "tui", hasUI = false, ui, idle = true, pending = () => false, auth = "configured" } = {}) {
+export function fakeCtx({ cwd, entries = [], model = { provider: "anthropic", id: "parent-model" }, mode = "tui", hasUI = false, ui = { notify() {} }, idle = true, pending = () => false, auth = "configured" } = {}) {
   return {
     cwd,
     mode,

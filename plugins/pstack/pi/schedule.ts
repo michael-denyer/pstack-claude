@@ -23,10 +23,14 @@ const wakeupParams = Type.Object({
 export class Scheduler {
   private wakeup?: NodeJS.Timeout;
   private loop?: NodeJS.Timeout;
-  // The prompt of the live self-paced loop. An iteration re-arms the loop
-  // through schedule_wakeup only once it finishes, by which time /loop stop or
-  // a new /loop may have run, so a re-arm is checked against this.
-  private selfPaced?: string;
+  // A self-paced loop has no timer of its own while its iteration runs, so
+  // this is what /loop stop finds then.
+  private selfPaced = false;
+  // Set by a /loop command that ends or replaces the loop while a run is in
+  // flight, until that run settles. A schedule_wakeup call names no loop, so
+  // nothing tells that run's re-arm of the old loop from any other wakeup. It
+  // is refused them all, or the loop the user just ended would come back.
+  sealed = false;
 
   constructor(private readonly pi: ExtensionAPI) {}
 
@@ -70,21 +74,17 @@ export class Scheduler {
     return had;
   }
 
-  startSelfPaced(prompt: string): void {
-    this.selfPaced = prompt;
+  startSelfPaced(): void {
+    this.selfPaced = true;
   }
 
-  staleLoop(wakeupPrompt: string): boolean {
-    const m = /^\/loop(\s[\s\S]*)?$/.exec(wakeupPrompt);
-    if (!m) return false;
-    const cmd = parseLoop(m[1] ?? "");
-    return cmd.kind === "dynamic" && cmd.prompt !== this.selfPaced;
-  }
-
-  stopAll(): boolean {
+  // Ends the loop and the pending wakeup. midRun says a run is in flight,
+  // which seals the wakeup slot against it.
+  stopAll(midRun = false): boolean {
     const wakeup = this.cancelWakeup();
-    const selfPaced = this.selfPaced !== undefined;
-    this.selfPaced = undefined;
+    const selfPaced = this.selfPaced;
+    this.selfPaced = false;
+    if (midRun) this.sealed = true;
     return this.stopLoop() || wakeup || selfPaced;
   }
 }
@@ -134,17 +134,19 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
     parameters: wakeupParams,
     async execute(_id, params, _signal, _onUpdate, ctx) {
       if (params.stop) {
-        const had = scheduler.cancelWakeup();
+        // What is pending in a sealed slot is a loop start the user asked for, not this run's.
+        const had = !scheduler.sealed && scheduler.cancelWakeup();
         const text = had ? "Pending wakeup cancelled." : "No wakeup was pending.";
         return { content: [{ type: "text", text }], details: { cancelled: had } };
       }
       if (params.delaySeconds === undefined || !params.prompt) {
         throw new Error("schedule_wakeup needs delaySeconds and prompt unless stop is true.");
       }
-      if (scheduler.staleLoop(params.prompt)) {
+      if (scheduler.sealed) {
+        ctx.ui.notify("A wakeup this run asked for was not scheduled: /loop ended or replaced the loop while it ran.", "warning");
         return {
-          content: [{ type: "text", text: "No self-paced loop with this prompt is running: it was stopped, replaced, or never started. Nothing was scheduled." }],
-          details: { stale: true },
+          content: [{ type: "text", text: "Not scheduled: the user ended or replaced the loop with a /loop command during this run. Do not schedule another wakeup in this run." }],
+          details: { refused: true },
         };
       }
       if (oneShot.exits(ctx)) {
@@ -161,13 +163,26 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
     },
   });
 
+  pi.on("agent_settled", () => {
+    scheduler.sealed = false;
+  });
+
   pi.registerCommand("loop", {
     description: "Run a prompt on an interval (/loop 5m <prompt>), self-paced (/loop <prompt>), or stop (/loop stop)",
     async handler(args, ctx) {
       const cmd = parseLoop(args);
+      const midRun = !ctx.isIdle();
       // sendUserMessage only starts the run, and a one-shot run disposes the
       // session as soon as the command returns, so there the command waits it out.
       const fire = async (prompt: string) => {
+        // The slot is sealed against the run in flight, so the loop's first
+        // prompt takes the slot and runs once that run has settled. Its own
+        // re-arm then comes from a later run and is not refused.
+        if (midRun) {
+          scheduler.scheduleWakeup(0, prompt, ctx);
+          ctx.ui.notify("The loop starts when the current run ends.", "info");
+          return;
+        }
         if (!oneShot.exits(ctx)) {
           scheduler.fire(prompt);
           return;
@@ -182,19 +197,19 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
           ctx.ui.notify(`${cmd.reason ? `${cmd.reason} ` : ""}Usage: /loop [interval like 5m or 1h] <prompt>, or /loop stop`, "info");
           return;
         case "stop":
-          ctx.ui.notify(scheduler.stopAll() ? "Loop stopped." : "No loop was running.", "info");
+          ctx.ui.notify(scheduler.stopAll(midRun) ? "Loop stopped." : "No loop was running.", "info");
           return;
         case "fixed": {
           const seconds = Math.max(MIN_DELAY_S, cmd.seconds);
-          scheduler.stopAll();
+          scheduler.stopAll(midRun);
           scheduler.startLoop(seconds, cmd.prompt, ctx);
           ctx.ui.notify(`Looping every ${seconds}s. /loop stop ends it.`, "info");
           await fire(cmd.prompt);
           return;
         }
         case "dynamic":
-          scheduler.stopAll();
-          scheduler.startSelfPaced(cmd.prompt);
+          scheduler.stopAll(midRun);
+          scheduler.startSelfPaced();
           await fire(dynamicPrompt(cmd.prompt));
       }
     },

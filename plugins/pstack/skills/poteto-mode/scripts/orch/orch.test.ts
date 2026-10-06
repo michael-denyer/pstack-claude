@@ -341,7 +341,11 @@ describe("Store", () => {
     ).toMatchObject({ id: "u1" });
     expect(stale).toEqual([String(exited.pid)]);
     await recovered.close();
-    expect(await readdir(directory)).not.toContain(".orch.lock");
+    expect(
+      (await readdir(directory)).filter((name) =>
+        name.startsWith(".orch.lock")
+      )
+    ).toEqual([]);
   });
 
   it("lets only one of two writers racing for a stale lock replace it", async () => {

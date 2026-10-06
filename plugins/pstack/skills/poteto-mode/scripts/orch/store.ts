@@ -18,6 +18,7 @@ import { stripVTControlCharacters } from "node:util";
 const UNIT_HEADER = "id\ttrack\tstate\tbranch\tpr\tsha\tbrief";
 const LEDGER_HEADER = "pr\tsha\tverdict\tevidence\tverifier\tts";
 const LOCK_FILE = ".orch.lock";
+const TAKEOVER_FILE = ".orch.lock.takeover";
 
 export type Verdict =
   | "live-ui-verified"
@@ -385,6 +386,7 @@ async function acquireLock(
   options: OpenStoreOptions
 ): Promise<() => Promise<void>> {
   const path = join(store, LOCK_FILE);
+  const takeover = join(store, TAKEOVER_FILE);
   const pid = String(process.pid);
   const create = async (): Promise<void> => {
     const handle = await open(path, "wx");
@@ -392,17 +394,49 @@ async function acquireLock(
     await handle.close();
   };
 
-  const takeOver = async (): Promise<void> => {
-    await unlink(path);
+  // Two writers that both saw the same dead holder must not both replace it,
+  // so the re-read and replace run behind a second exclusive file. A forced
+  // steal overwrites that file too, which also clears one a hard kill left.
+  const takeOver = async (holder: string): Promise<void> => {
     try {
-      await create();
-    } catch (retryError) {
-      if (errorCode(retryError) === "EEXIST") {
-        const retryHolder =
-          (await readFile(path, "utf8")).trim() || "unknown";
-        throw new UserError(`store lock held by pid ${retryHolder}`);
+      const guard = await open(takeover, options.force ? "w" : "wx");
+      await guard.writeFile(`${pid}\n`);
+      await guard.close();
+    } catch (error) {
+      if (errorCode(error) !== "EEXIST") {
+        throw error;
       }
-      throw retryError;
+      throw new UserError(
+        `store lock held by pid ${holder} is being replaced by another writer`
+      );
+    }
+    try {
+      let current: string | null = null;
+      try {
+        current = (await readFile(path, "utf8")).trim() || "unknown";
+      } catch (error) {
+        if (errorCode(error) !== "ENOENT") {
+          throw error;
+        }
+      }
+      if (current !== null && current !== holder) {
+        throw new UserError(`store lock held by pid ${current}`);
+      }
+      if (current !== null) {
+        await unlink(path);
+      }
+      try {
+        await create();
+      } catch (retryError) {
+        if (errorCode(retryError) === "EEXIST") {
+          const retryHolder =
+            (await readFile(path, "utf8")).trim() || "unknown";
+          throw new UserError(`store lock held by pid ${retryHolder}`);
+        }
+        throw retryError;
+      }
+    } finally {
+      await rm(takeover, { force: true }).catch(() => {});
     }
   };
 
@@ -420,10 +454,10 @@ async function acquireLock(
     }
     if (holderIsDead(holder)) {
       options.onStaleLock?.(holder);
-      await takeOver();
+      await takeOver(holder);
     } else if (options.force) {
       options.onLockStolen?.(holder);
-      await takeOver();
+      await takeOver(holder);
     } else {
       throw new UserError(`store lock held by pid ${holder}`);
     }

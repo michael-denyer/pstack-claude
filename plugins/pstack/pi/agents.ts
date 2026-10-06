@@ -218,8 +218,9 @@ export class AgentRunner {
   private launch(identity: AgentIdentity, prompt: string, background: boolean): RunningRecord {
     if (this.closed) throw new Error("This session is shutting down; no agent can start.");
     try {
-      if (identity.worktree) ensureWorktree(identity.worktree);
+      // First, so a failure here leaves no worktree or branch behind.
       this.ensureSystemPrompt(identity);
+      if (identity.worktree) ensureWorktree(identity.worktree);
     } catch (e) {
       const failed: EndedRecord = { agent: identity, status: "failed", exitCode: null, endedAt: now(), finalText: (e as Error).message };
       this.agents.set(identity.id, { kind: "ended", record: failed });

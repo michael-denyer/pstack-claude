@@ -1,11 +1,11 @@
 // What the agent tool registers and the child command a call produces.
 import { describe, expect, test } from "bun:test";
-import { chmodSync, rmSync, statSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
 import { chmodDeniesReads } from "../session-hook-sheets.mjs";
-import { agentBody, agentEntry, fakeCtx, fakePi, flag, listAgents, recordWith, restore, useWorld, waitFor } from "./harness.mjs";
+import { agentBody, agentEntry, fakeCtx, fakePi, flag, gitRepo, listAgents, recordWith, restore, useWorld, waitFor } from "./harness.mjs";
 
 const setup = useWorld();
 
@@ -113,6 +113,20 @@ describe("agent tool", () => {
     expect(err.message).toContain('its type "pstack:removed" no longer provides one');
     expect(w.invocations()).toHaveLength(1);
     expect((await listAgents(resumed, ctx)).map((a) => a.status)).toEqual(["failed"]);
+  });
+
+  test("a system prompt file that cannot be written fails the launch before a worktree or its branch is made", async () => {
+    const { w, pi, ctx } = setup();
+    const git = gitRepo(w.cwd);
+    const state = join(w.agentDir, "pstack", "parent-session");
+    mkdirSync(state, { recursive: true });
+    writeFileSync(join(state, "prompts"), "a file where the prompts directory belongs");
+
+    const err = await pi.call("agent", { description: "wt", prompt: "x", subagent_type: "pstack:poteto-agent", isolation: "worktree" }, ctx).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(git("worktree", "list").split("\n")).toHaveLength(1);
+    expect(git("branch", "--list").split("\n")).toHaveLength(1);
+    expect(w.invocations()).toEqual([]);
   });
 });
 

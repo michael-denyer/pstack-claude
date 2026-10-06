@@ -169,7 +169,12 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
       // sendUserMessage only starts the run, and a one-shot run disposes the
       // session as soon as the command returns, so there the command waits it out.
       const fire = async (prompt: string) => {
-        const settled = oneShot.exits(ctx) ? oneShot.untilSettled() : undefined;
+        if (!oneShot.exits(ctx)) {
+          scheduler.fire(prompt);
+          return;
+        }
+        await oneShot.assertStartsRun(prompt, ctx);
+        const settled = oneShot.untilSettled();
         scheduler.fire(prompt);
         await settled;
       };

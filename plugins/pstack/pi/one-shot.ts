@@ -8,7 +8,30 @@ const PENDING_POLL_MS = 50;
 export interface OneShot {
   exits(ctx: Pick<ExtensionContext, "mode">): boolean;
   untilSettled(): Promise<void>;
+  // Rejects, with the process marked failed, when Pi would start no run for the prompt.
+  assertStartsRun(prompt: string, ctx: ExtensionContext): Promise<void>;
   dispose(): void;
+}
+
+// Why Pi would start no run for a prompt this extension sends, by the checks
+// its prompt() makes first: an extension command runs in place, and a prompt
+// without a model or credentials is refused. No settle follows either, and Pi
+// reports a refusal only to its own error listeners, so a one-shot /loop
+// waiting on the settle would never return. An input handler that consumes the
+// prompt is the one case an extension cannot see.
+async function noRunReason(pi: ExtensionAPI, prompt: string, ctx: ExtensionContext): Promise<string | undefined> {
+  if (prompt.startsWith("/")) {
+    const space = prompt.indexOf(" ");
+    const name = prompt.slice(1, space === -1 ? undefined : space);
+    if (pi.getCommands().some((command) => command.source === "extension" && command.name === name)) {
+      return `/${name} is an extension command, not a prompt`;
+    }
+  }
+  const model = ctx.model;
+  if (!model) return "no model is selected";
+  if (ctx.modelRegistry.hasConfiguredAuth(model)) return undefined;
+  const available = await ctx.modelRegistry.getAvailableOfType("chat", model.provider);
+  return available.length ? undefined : "the selected model has no credentials";
 }
 
 // Resolves once Pi has a queued message, which is the same condition Pi checks
@@ -52,6 +75,13 @@ export function registerOneShot(pi: ExtensionAPI, settings: Settings, runner: Pi
   return {
     exits,
     untilSettled: () => new Promise<void>((resolve) => settleWaiters.push(resolve)),
+    assertStartsRun: async (prompt, ctx) => {
+      const reason = await noRunReason(pi, prompt, ctx);
+      if (reason === undefined) return;
+      // Pi prints a command handler's throw and still exits 0.
+      process.exitCode = 1;
+      throw new Error(`No run would start: ${reason}`);
+    },
     dispose: () => {
       process.off("SIGINT", onSigint);
       settle();

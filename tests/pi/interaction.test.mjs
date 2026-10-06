@@ -408,26 +408,26 @@ describe("/loop", () => {
     expect(pi.userMessages.map((m) => m.content)).toEqual([expect.stringContaining("watch old PR\n"), "old task", "new task", "new task"]);
   });
 
+  // Lets a handler reach its first fire or its failure; fake timers rule out sleeping.
+  const drain = async () => {
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+  };
+
   for (const mode of ["print", "json"]) {
     test(`in ${mode} mode /loop returns only once the run it started settles, since pi disposes the session when it returns`, async () => {
       const { pi, ctx, run } = loop({ mode });
       let returned = false;
       const done = run("tick").then(() => (returned = true));
-      await Promise.resolve();
+      await drain();
       expect(pi.userMessages).toHaveLength(1);
       jest.advanceTimersByTime(60_000);
-      await Promise.resolve();
+      await drain();
       expect(returned).toBe(false);
       await pi.emit("agent_settled", {}, ctx);
       await done;
       expect(returned).toBe(true);
     });
   }
-
-  // Lets a handler reach its first fire or its failure; fake timers rule out sleeping.
-  const drain = async () => {
-    for (let i = 0; i < 20; i++) await Promise.resolve();
-  };
 
   for (const [why, ctxOpts, args, reason] of [
     ["no model is selected", { model: null }, "1m tick", "no model is selected"],
@@ -450,10 +450,31 @@ describe("/loop", () => {
         expect(pi.userMessages).toEqual([]);
         expect(process.exitCode).toBe(1);
       } finally {
-        process.exitCode = exitCode;
+        // Bun ignores an undefined exit code, and a leftover 1 would fail the whole test run.
+        process.exitCode = exitCode ?? 0;
       }
     });
   }
+
+  for (const [what, ctxOpts, args, sent] of [
+    ["on credentials only pi's live check finds", { auth: "resolved" }, "1m tick", "tick"],
+    ["a slash prompt that names no extension command, such as a skill", {}, "1m /skill:babysit 42", "/skill:babysit 42"],
+  ]) {
+    test(`in print mode /loop still runs ${what}`, async () => {
+      const { pi, ctx, run } = loop({ mode: "print", ...ctxOpts });
+      const done = run(args);
+      await drain();
+      expect(pi.userMessages.map((m) => m.content)).toEqual([sent]);
+      await pi.emit("agent_settled", {}, ctx);
+      await done;
+    });
+  }
+
+  test("in tui mode /loop fires a prompt pi would refuse, since pi reports the refusal itself and nothing waits on the run", async () => {
+    const { pi, run } = loop({ auth: "none" });
+    await run("1m tick");
+    expect(pi.userMessages.map((m) => m.content)).toEqual(["tick"]);
+  });
 
   test("/loop stop also cancels a self-paced wakeup", async () => {
     const { pi, ctx, run, ui } = loop();

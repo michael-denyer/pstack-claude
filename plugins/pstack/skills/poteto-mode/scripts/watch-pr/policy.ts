@@ -181,12 +181,23 @@ const VERDICT_FACTS: Record<
   baseRefName: true,
   baseRefOid: true,
 };
+const mergeabilityUnknown = (facts: T.PullRequestFacts): boolean =>
+  facts.mergeable === "UNKNOWN" || facts.mergeStateStatus === "UNKNOWN";
+// GitHub computes these two on the first read that asks, so an unknown first
+// read usually has its answer by the re-read. That is not the PR changing.
+const COMPUTED_ON_DEMAND: ReadonlySet<string> = new Set([
+  "mergeable",
+  "mergeStateStatus",
+]);
 const changedFacts = (
   before: T.PullRequestFacts,
   after: T.PullRequestFacts
 ): string[] =>
   (Object.keys(VERDICT_FACTS) as (keyof typeof VERDICT_FACTS)[])
     .filter((key) => before[key] !== after[key])
+    .filter(
+      (key) => !(mergeabilityUnknown(before) && COMPUTED_ON_DEMAND.has(key))
+    )
     .map((key) => `${key} ${before[key]} -> ${after[key]}`);
 export async function readSnapshot(args: {
   readonly reader: T.GitHubReader;
@@ -200,12 +211,6 @@ export async function readSnapshot(args: {
     return { kind: "merged", context: args.context, facts };
   if (facts.state === "CLOSED")
     return { kind: "closed", context: args.context, facts };
-  if (facts.mergeable === "UNKNOWN" || facts.mergeStateStatus === "UNKNOWN")
-    throw new WatcherQueryError({
-      kind: "mergeability-unknown",
-      retryable: true,
-      detail: `GitHub has not computed mergeability for ${facts.headRefOid} against ${facts.baseRefName} yet`,
-    });
   const [threads, checks] = await Promise.all([
     args.reader.reviewThreads(args.context),
     resolveChecks(args.reader, args.context),
@@ -277,7 +282,10 @@ function waitReason(row: T.PrSnapshot): T.WaitReason | null {
   if (row.kind !== "open") return null;
   if (row.ci.kind === "ci-pending")
     return { kind: "pending-checks", pending: row.ci.pending };
-  return row.ci.kind === "ci-unreported" ? { kind: "checks-unreported" } : null;
+  if (row.ci.kind === "ci-unreported") return { kind: "checks-unreported" };
+  return mergeabilityUnknown(row.facts)
+    ? { kind: "mergeability-unknown" }
+    : null;
 }
 const DEFERRED_WHILE_WAITING: ReadonlySet<T.MergeGateReason> = new Set([
   "draft-pr",
@@ -294,6 +302,9 @@ function gateBlocker(
     ? null
     : { kind: "merge-gate", pr: row.context, reason };
 }
+// Indexed by the fact itself, so a proof compiles only where the guard below
+// has narrowed mergeable to MERGEABLE.
+const CLEAR_ONLY_WHEN = { MERGEABLE: "clear" } as const;
 function readyContribution(
   row: T.PrSnapshot,
   allowDraft: boolean
@@ -324,7 +335,7 @@ function readyContribution(
     context: row.context,
     proof: {
       revision: landingRevision(row.facts),
-      mergeability: "clear",
+      mergeability: CLEAR_ONLY_WHEN[row.facts.mergeable],
       threads: [],
       ci: row.ci,
       gate: {
@@ -807,9 +818,9 @@ export function evaluateQueue(
   const key =
     reason.kind === "pending-checks"
       ? `pending:${frontier.number}:${reason.pending.length}`
-      : reason.kind === "checks-unreported"
-        ? `unreported:${frontier.number}`
-        : `queue:${frontier.number}:${reason.unmergedCount}`;
+      : reason.kind === "merge-queue"
+        ? `queue:${frontier.number}:${reason.unmergedCount}`
+        : `${reason.kind}:${frontier.number}`;
   return {
     kind: "waiting",
     state: { ...state, frontier, lastWaitKey: key },

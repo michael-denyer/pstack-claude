@@ -245,10 +245,7 @@ export type QueryFailure =
       readonly detail: string;
     }
   | {
-      readonly kind:
-        | "snapshot-changed"
-        | "invalid-stack"
-        | "mergeability-unknown";
+      readonly kind: "snapshot-changed" | "invalid-stack";
       readonly retryable: true;
       readonly detail: string;
     }
@@ -285,7 +282,8 @@ export type WaitReason =
       readonly kind: "pending-checks";
       readonly pending: NonEmpty<PendingCheck>;
     }
-  | { readonly kind: "checks-unreported" };
+  | { readonly kind: "checks-unreported" }
+  | { readonly kind: "mergeability-unknown" };
 /**
  * `frontier` names the lowest unmerged PR that is actually waiting, and
  * `reason` carries that PR's checks only. Pooling every row's pending under the

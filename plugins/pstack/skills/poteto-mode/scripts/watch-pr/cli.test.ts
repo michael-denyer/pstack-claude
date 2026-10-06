@@ -260,6 +260,48 @@ describe("main", () => {
     ]);
   });
 
+  it("says that mergeability is unknown in the status table, the WAITING line, and the TIMEOUT line", async () => {
+    const argv = [
+      "--owner",
+      "owner",
+      "--repo",
+      "repo",
+      "--pr",
+      "1",
+      "--pretty",
+    ];
+    const unknown = () =>
+      testRuntime(
+        fakeReader({
+          facts: { mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" },
+        })
+      );
+    const status = unknown();
+    expect(await main([...argv, "--status-only"], status.runtime)).toBe(0);
+    expect(status.stdout.join("")).toContain(
+      "| [#1](https://github.com/owner/repo/pull/1) | ✅ | ✅ | ⏳ mergeability unknown |"
+    );
+    const waiting = unknown();
+    let now = 0;
+    const runtime = {
+      ...waiting.runtime,
+      deadline: new WatchDeadline(90, () => now),
+      clock: {
+        ...waiting.runtime.clock,
+        now: () => now,
+        async sleep(seconds: number) {
+          now += seconds;
+        },
+      },
+    };
+    expect(await main(argv, runtime)).toBe(5);
+    expect(waiting.stdout).toEqual([
+      "WAITING: frontier=#1; GitHub has not computed mergeability yet\n",
+      "WAITING: frontier=#1; GitHub has not computed mergeability yet\n",
+      "TIMEOUT: GitHub has not computed mergeability yet\n",
+    ]);
+  });
+
   it("shows help without touching the reader", async () => {
     const reader = fakeReader();
     const harness = testRuntime(reader);

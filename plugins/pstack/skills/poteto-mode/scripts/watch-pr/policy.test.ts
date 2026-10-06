@@ -517,30 +517,221 @@ describe("facts that change while the snapshot is read", () => {
     for (const factsOnReread of [
       { reviewDecision: "CHANGES_REQUESTED" },
       { mergeable: "CONFLICTING" },
+      { mergeable: "UNKNOWN" },
       { isDraft: true },
     ] as const)
       await expect(read({ factsOnReread })).rejects.toMatchObject({
         failure: { kind: "snapshot-changed", retryable: true },
       });
   });
+
+  it("keeps an unknown first read when GitHub computes mergeability before the re-read", async () => {
+    const unknown = {
+      mergeable: "UNKNOWN",
+      mergeStateStatus: "UNKNOWN",
+    } as const;
+    expect(
+      await read({
+        facts: unknown,
+        factsOnReread: { mergeable: "MERGEABLE", mergeStateStatus: "CLEAN" },
+      }),
+    ).toMatchObject({ kind: "open", facts: unknown });
+    await expect(
+      read({
+        facts: unknown,
+        factsOnReread: { reviewDecision: "CHANGES_REQUESTED" },
+      }),
+    ).rejects.toMatchObject({ failure: { kind: "snapshot-changed" } });
+  });
 });
 
+const ticking = (onSleep = () => {}) => {
+  let now = 0;
+  return {
+    now: () => now,
+    async sleep(seconds: number) {
+      now += seconds;
+      onSleep();
+    },
+  };
+};
+const dependencies = (
+  reader: GitHubReader,
+  clock: { now: () => number; sleep: (seconds: number) => Promise<void> },
+  emitted: ProgressVerdict[],
+  timeout = 0,
+) => ({
+  reader,
+  emit: (verdict: ProgressVerdict) => {
+    emitted.push(verdict);
+  },
+  clock: { ...clock, observedAt: () => "2026-07-26T00:00:00.000Z" },
+  deadline: new WatchDeadline(timeout, clock.now),
+});
+const kinds = (emitted: readonly ProgressVerdict[]) =>
+  emitted.map((verdict) =>
+    verdict.kind === "WAITING"
+      ? `${verdict.kind}:${verdict.reason.kind}`
+      : verdict.kind,
+  );
+
 describe("mergeability", () => {
-  it("retries while GitHub is still computing mergeability", async () => {
+  const unknown = {
+    mergeable: "UNKNOWN",
+    mergeStateStatus: "UNKNOWN",
+  } as const;
+  const read = (options: Parameters<typeof fakeReader>[0]) =>
+    readSnapshot({
+      reader: fakeReader(options),
+      context: context(27),
+      pendingHistory: "include",
+      allowDraft: false,
+    });
+  // One query error ends the run, so a wait that spent the budget would exit 7.
+  const watch = async (
+    reader: GitHubReader,
+    polling: Partial<PollingOptions> = {},
+    statusOnly = false,
+  ) => {
+    const clock = ticking();
+    const emitted: ProgressVerdict[] = [];
+    const verdict = await runSimple({
+      dependencies: dependencies(reader, clock, emitted, polling.timeout),
+      contexts: [context(27)],
+      mode: "single",
+      statusOnly,
+      options: { ...options, maxQueryErrors: 1, ...polling },
+    });
+    return { verdict, emitted: kinds(emitted), elapsed: clock.now() };
+  };
+
+  it("waits while GitHub has not computed mergeability instead of reporting ready", async () => {
     for (const facts of [
       { mergeable: "UNKNOWN" },
       { mergeStateStatus: "UNKNOWN" },
-    ] as const)
-      await expect(
-        readSnapshot({
-          reader: fakeReader({ facts }),
-          context: context(27),
-          pendingHistory: "include",
-          allowDraft: false,
+    ] as const) {
+      const snapshot = await read({ facts });
+      const waiting = {
+        kind: "waiting",
+        frontier: context(27),
+        reason: { kind: "mergeability-unknown" },
+      } as const;
+      expect(classifyPr(snapshot)).toEqual(waiting);
+      expect(selectTierMajorStackDecision([snapshot])).toEqual(waiting);
+    }
+  });
+
+  it("re-polls at the interval after an unknown first read, without spending the query-error budget", async () => {
+    const { verdict, emitted, elapsed } = await watch(
+      fakeReader({
+        facts: unknown,
+        factsOnReread: { mergeable: "MERGEABLE", mergeStateStatus: "CLEAN" },
+      }),
+    );
+    expect(emitted).toEqual(["WAITING:mergeability-unknown"]);
+    expect(elapsed).toBe(options.interval);
+    expect(verdict).toMatchObject({ kind: "READY", exitCode: 0 });
+  });
+
+  it("times out at the caller's deadline when GitHub never computes it", async () => {
+    const { verdict, emitted, elapsed } = await watch(
+      fakeReader({ facts: unknown }),
+      { timeout: 25 },
+    );
+    expect(emitted).toEqual([
+      "WAITING:mergeability-unknown",
+      "WAITING:mergeability-unknown",
+      "WAITING:mergeability-unknown",
+    ]);
+    expect(elapsed).toBe(25);
+    expect(verdict).toMatchObject({
+      kind: "TIMEOUT",
+      exitCode: 5,
+      reason: { kind: "mergeability-unknown" },
+    });
+  });
+
+  it("reports an unknown row on a status-only pass and exits 0 without waiting", async () => {
+    const { verdict, emitted, elapsed } = await watch(
+      fakeReader({ facts: unknown }),
+      {},
+      true,
+    );
+    expect(emitted).toEqual([]);
+    expect(elapsed).toBe(0);
+    expect(verdict).toMatchObject({
+      kind: "STATUS",
+      exitCode: 0,
+      rows: [{ kind: "open", facts: unknown, ci: { kind: "ci-clean" } }],
+    });
+  });
+
+  it("still stops at once on a blocker that does not depend on mergeability", async () => {
+    const thread = {
+      id: "thread",
+      firstComment: null,
+      isBugbot: false,
+      bugbotReviewPasses: 0,
+    };
+    const cases = [
+      [{ threads: [thread] }, { kind: "review-threads" }],
+      [
+        {
+          fastPath: { kind: "checks", checks: [failedCheck()] },
+          commitRollups: [{ oid: "head", state: "FAILURE" }],
+        },
+        { kind: "failing-checks" },
+      ],
+      [
+        { facts: { ...unknown, reviewDecision: "CHANGES_REQUESTED" } },
+        { kind: "merge-gate", reason: "changes-requested" },
+      ],
+    ] as const;
+    for (const [overrides, blocker] of cases)
+      expect(
+        classifyPr(await read({ facts: unknown, ...overrides })),
+      ).toMatchObject({ kind: "blocker", blocker });
+  });
+
+  it("defers a required review, and names pending checks first, while mergeability is unknown", async () => {
+    expect(
+      classifyPr(
+        await read({ facts: { ...unknown, reviewDecision: "REVIEW_REQUIRED" } }),
+      ),
+    ).toMatchObject({
+      kind: "waiting",
+      reason: { kind: "mergeability-unknown" },
+    });
+    expect(
+      classifyPr(
+        await read({
+          facts: unknown,
+          fastPath: { kind: "checks", checks: [pendingCheck()] },
         }),
-      ).rejects.toMatchObject({
-        failure: { kind: "mergeability-unknown", retryable: true },
-      });
+      ),
+    ).toMatchObject({ kind: "waiting", reason: { kind: "pending-checks" } });
+  });
+
+  it("does not report a queued frontier blocker-free while its mergeability is unknown", async () => {
+    let sleeps = 0;
+    const emitted: ProgressVerdict[] = [];
+    const running = runQueued({
+      dependencies: dependencies(
+        fakeReader({ facts: unknown }),
+        ticking(() => {
+          if (++sleeps === 2) throw new Error("stop after two polls");
+        }),
+        emitted,
+      ),
+      contexts: [context(27)],
+      options,
+    });
+    await expect(running).rejects.toThrow("stop after two polls");
+    expect(kinds(emitted)).toEqual([
+      "QUEUE",
+      "STATUS",
+      "WAITING:mergeability-unknown",
+    ]);
   });
 
   it("gates a branch that is behind its base instead of reporting it ready", async () => {
@@ -574,29 +765,6 @@ describe("a PR with no checks configured", () => {
       allowDraft: false,
       confirmNoChecks,
     });
-  const ticking = (onSleep = () => {}) => {
-    let now = 0;
-    return {
-      now: () => now,
-      async sleep(seconds: number) {
-        now += seconds;
-        onSleep();
-      },
-    };
-  };
-  const dependencies = (
-    reader: GitHubReader,
-    clock: { now: () => number; sleep: (seconds: number) => Promise<void> },
-    emitted: ProgressVerdict[],
-    timeout = 0,
-  ) => ({
-    reader,
-    emit: (verdict: ProgressVerdict) => {
-      emitted.push(verdict);
-    },
-    clock: { ...clock, observedAt: () => "2026-07-26T00:00:00.000Z" },
-    deadline: new WatchDeadline(timeout, clock.now),
-  });
   const run = (...args: Parameters<typeof dependencies>) =>
     runSimple({
       dependencies: dependencies(...args),
@@ -605,12 +773,6 @@ describe("a PR with no checks configured", () => {
       statusOnly: false,
       options,
     });
-  const kinds = (emitted: readonly ProgressVerdict[]) =>
-    emitted.map((verdict) =>
-      verdict.kind === "WAITING"
-        ? `${verdict.kind}:${verdict.reason.kind}`
-        : verdict.kind,
-    );
   // The suite polls every 10 seconds, so the 60 second floor is six polls.
   const sixPolls = (...perPoll: string[]) =>
     Array.from({ length: 6 }, () => perPoll).flat();

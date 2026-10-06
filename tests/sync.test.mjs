@@ -1339,9 +1339,10 @@ describe("syncComponent", () => {
   test("a written file keeps the permission bits git does not record", () => {
     const base = "l1\nl2\nl3\nl4\nl5\nl6\nl7\n";
     const edited = base.replace("l7", "l7 upstream");
+    const portEdit = base.replace("l1", "l1 the port");
     const oldUp = tree({ "merged.md": base, "merged.sh": base, "updated.md": base });
     const newUp = tree({ "merged.md": edited, "merged.sh": edited, "updated.md": edited });
-    const local = tree({ "merged.md": base.replace("l1", "l1 the port"), "merged.sh": base.replace("l1", "l1 the port"), "updated.md": base });
+    const local = tree({ "merged.md": portEdit, "merged.sh": portEdit, "updated.md": base });
     for (const upstream of [oldUp, newUp]) chmodSync(join(upstream, "merged.sh"), 0o755);
     chmodSync(join(local, "merged.md"), 0o600);
     chmodSync(join(local, "merged.sh"), 0o700);

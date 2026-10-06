@@ -35,9 +35,9 @@
 //     deleted
 //
 // Modes compare as git records them, executable or not. A written file takes
-// the new upstream file's, except that a merged or conflicted file keeps the
-// port's when upstream left it alone. A write changes a file's mode only when
-// that bit has to change, so a port file's other permission bits stay.
+// the new upstream file's mode, except that a merged or conflicted file keeps
+// the port's when upstream left it alone. A write changes a file's mode only
+// when that bit has to change, so a port file's other permission bits stay.
 //
 // Every effective text file, a conflict's marked bytes included, is
 // denylist-scanned; a hit fails the run with file, line, and the hint for that
@@ -419,9 +419,8 @@ export function syncComponent({
         return [pathTo(twin?.name ?? part), `the same entry as upstream's ${pathTo(part)} on this filesystem`];
       }
       const last = i === parts.length - 1;
-      if (last === entry.isDirectory()) {
-        return [pathTo(part), last ? "a directory where upstream has a file" : "a file where upstream has a directory"];
-      }
+      if (last && entry.isDirectory()) return [pathTo(part), "a directory where upstream has a file"];
+      if (!last && !entry.isDirectory()) return [pathTo(part), "a file where upstream has a directory"];
       dir = join(dir, part);
     }
     return null;

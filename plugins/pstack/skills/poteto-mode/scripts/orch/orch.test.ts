@@ -513,9 +513,7 @@ await store.close();
   it("refuses a stale lock another writer is replacing, forced or not", async () => {
     const { directory, store } = await initializedStore();
     await store.close();
-    const exited = Bun.spawn(["true"]);
-    await exited.exited;
-    await writeFile(join(directory, ".orch.lock"), `${exited.pid}\n`);
+    const stale = await plantStaleLock(directory);
     await mkdir(join(directory, ".orch.lock.takeover"));
     await writeFile(
       join(directory, ".orch.lock.takeover", String(process.pid)),
@@ -526,7 +524,7 @@ await store.close();
       await expect(
         useStore(directory, { force }).units.add({ id: "u1", track: "build" })
       ).rejects.toThrow(
-        `store lock held by pid ${exited.pid} is being replaced by another writer; retry`
+        `store lock held by pid ${stale} is being replaced by another writer; retry`
       );
     }
     expect(await lockFiles(directory)).toEqual([

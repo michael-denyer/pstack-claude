@@ -406,9 +406,9 @@ async function acquireLock(
 
   // POSIX cannot unlink a file only if its content still matches, so the
   // re-read and replace run behind a claim: a directory that holds one file
-  // named for the claimant's pid. rename refuses a directory that holds a
-  // file, so a claim excludes every other writer, and a dead claimant's file
-  // is removed by name, which cannot remove a live claimant's.
+  // named for the claimant's pid. rename cannot replace a directory that
+  // holds a file, so a claim excludes every other writer, and a dead
+  // claimant's file is removed by name, which cannot remove a live claimant's.
   const takeOver = async (holder: string): Promise<void> => {
     const staged = `${takeover}.${pid}.${randomUUID()}`;
     const discard = (): Promise<void> =>

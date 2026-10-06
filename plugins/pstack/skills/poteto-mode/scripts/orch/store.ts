@@ -418,6 +418,29 @@ async function acquireLock(
     }
   };
 
+  // Resolves to null once this writer holds the lock, or to the pid in the
+  // lock that stopped it. A holder can release between the failed create and
+  // the read, and a lock that vanished can be created again.
+  const lockOrHolder = async (): Promise<string | null> => {
+    for (let retries = 2; ; retries -= 1) {
+      try {
+        await create();
+        return null;
+      } catch (error) {
+        if (errorCode(error) !== "EEXIST") {
+          throw error;
+        }
+      }
+      try {
+        return (await readFile(path, "utf8")).trim() || "unknown";
+      } catch (error) {
+        if (errorCode(error) !== "ENOENT" || retries === 0) {
+          return "unknown";
+        }
+      }
+    }
+  };
+
   // POSIX cannot unlink a file only if its content still matches, so the
   // re-read and replace run behind a claim: a directory that holds one file
   // named for the claimant's pid. rename cannot replace a directory that
@@ -458,15 +481,9 @@ async function acquireLock(
           throw error;
         }
       }
-      try {
-        await create();
-      } catch (retryError) {
-        if (errorCode(retryError) === "EEXIST") {
-          const retryHolder =
-            (await readFile(path, "utf8")).trim() || "unknown";
-          throw new UserError(`store lock held by pid ${retryHolder}`);
-        }
-        throw retryError;
+      const blocker = await lockOrHolder();
+      if (blocker !== null) {
+        throw new UserError(`store lock held by pid ${blocker}`);
       }
     } finally {
       await rename(takeover, staged).catch(() => {});
@@ -474,18 +491,8 @@ async function acquireLock(
     }
   };
 
-  try {
-    await create();
-  } catch (error) {
-    if (errorCode(error) !== "EEXIST") {
-      throw error;
-    }
-    let holder = "unknown";
-    try {
-      holder = (await readFile(path, "utf8")).trim() || "unknown";
-    } catch {
-      holder = "unknown";
-    }
+  const holder = await lockOrHolder();
+  if (holder !== null) {
     if (holderIsDead(holder)) {
       options.onStaleLock?.(holder);
       await takeOver(holder);

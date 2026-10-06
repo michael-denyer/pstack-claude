@@ -7,6 +7,7 @@ import {
   readdir,
   rename,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { realpathSync } from "node:fs";
@@ -695,6 +696,58 @@ await store.close();
     expect(await new Response(writer.stderr).text()).toBe("");
     expect(await readFlags(flags)).toMatchObject({ "A.held": "" });
     expect(await lockFiles(directory)).toEqual([]);
+  });
+
+  it.each([
+    ["no lock", false],
+    ["a stale lock", true],
+  ])("takes the lock when it finds %s and the writer that beats it to the create releases before its pid is read", async (_found, stale) => {
+    const { directory, store } = await initializedStore();
+    await store.close();
+    if (stale) {
+      await plantStaleLock(directory);
+    }
+    const flags = await makeDirectory();
+
+    const writer = spawnWriter({
+      directory,
+      flags,
+      name: "A",
+      patch: `const { link, readFile } = promises;
+let rival = "absent";
+promises.link = async (from, to) => {
+  if (rival === "absent" && !existsSync(lock)) {
+    rival = "holding";
+    writeFileSync(lock, "1\\n");
+  }
+  return link(from, to);
+};
+promises.readFile = async (path, ...rest) => {
+  if (rival === "holding" && path === lock) {
+    rival = "released";
+    rmSync(lock);
+    writeFileSync(flag("rival-released"), "");
+  }
+  return readFile(path, ...rest);
+};`,
+    });
+    expect(await writer.exited).toBe(0);
+    expect(await new Response(writer.stderr).text()).toBe("");
+    expect(await readFlags(flags)).toEqual({
+      "A.rival-released": "",
+      "A.held": "",
+    });
+    expect(await lockFiles(directory)).toEqual([]);
+  });
+
+  it("reports a lock it can never read as held by an unknown pid", async () => {
+    const { directory, store } = await initializedStore();
+    await store.close();
+    await symlink(join(directory, "missing"), join(directory, ".orch.lock"));
+
+    await expect(
+      useStore(directory).units.add({ id: "u1", track: "build" })
+    ).rejects.toThrow("store lock held by pid unknown");
   });
 
   it("blocks a writer and steals the pid lock only with force", async () => {

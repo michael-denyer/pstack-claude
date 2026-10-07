@@ -2,6 +2,12 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.75 - base delegate worktrees on the branch and separate parallel todolists
+
+The Feature playbook notes that Claude Code's `isolation: "worktree"` branches from the remote default branch unless `worktree.baseRef` is `"head"`. A delegate that builds on commits the default branch lacks now gets a worktree the parent creates from `HEAD`, and its brief names that base commit ([#228](https://github.com/michael-denyer/pstack-claude/issues/228)).
+
+poteto-mode's fallback todolist moves to `.audit/<task-slug>.todo.md` when several sessions share a checkout, beside the decision trail show-me-your-work already keeps there, so parallel sessions no longer write one `todo.md` ([#229](https://github.com/michael-denyer/pstack-claude/issues/229)).
+
 ## 0.9.74 - fix the code review's findings and bound Autopilot's verify rounds
 
 `watch-pr` no longer reports a PR ready, or stopped at a merge gate, from a reading GitHub has not settled. A no-checks reading becomes `ci-none` only when the same head has shown no checks for 60 seconds, whatever `--interval` is, so a fresh PR whose checks have not registered waits as `checks-unreported` and a repository with no CI reaches READY a minute later. Unknown mergeability waits as `mergeability-unknown` and is never READY. The watcher reads the PR facts again after the checks and retries when one changed. A branch behind its base stops at the new `behind-base` gate, ahead of a required review. A check rollup cursor that does not advance is a query failure, a missing `gh` exits 7 with a JSON verdict, and a PR whose head is the default branch is in no stack.

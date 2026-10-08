@@ -11,7 +11,7 @@ const MUTATIONS: Record<string, { input: string; clears: string }> = {
 };
 
 const MUTATION =
-  /mutation\(\s*\$id\s*:\s*ID!\s*\)\s*\{\s*(\w+)\(\s*input\s*:\s*\{\s*(\w+)\s*:\s*\$id\s*\}\s*\)/;
+  /mutation\s*\w*\s*\(\s*\$id\s*:\s*ID!\s*\)\s*\{\s*(\w+)\(\s*input\s*:\s*\{\s*(\w+)\s*:\s*\$id\s*\}\s*\)/;
 
 /**
  * Answer one `gh api graphql` call the way GitHub would.
@@ -26,8 +26,11 @@ export function fakeGitHub(
 ): { data: Record<string, unknown> } {
   const query = argv.find((arg) => arg.startsWith("query=")) ?? "";
   if (!query.includes("mutation")) {
+    // Drop nested selections, so `mergeQueueEntry { id }` does not count as
+    // selecting the pull request's own `id`.
+    const selection = query.replace(/\{[^{}]*\}/g, "");
     const selected = Object.entries(pullRequest).filter(([field]) =>
-      new RegExp(`\\b${field}\\b`).test(query)
+      new RegExp(`\\b${field}\\b`).test(selection)
     );
     return {
       data: { repository: { pullRequest: Object.fromEntries(selected) } },

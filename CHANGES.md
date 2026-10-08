@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.77 - add haiku to the default panel
+
+The default panel is `opus`, `fable`, `sonnet`, `haiku`. With no override sheet, `arena` and `architect` run four runners, `interrogate` runs four reviewers, with `haiku` as Reviewer D, and the `arena` cross-judge pool includes `haiku`. A `pstack-models.md` sheet that names these roles keeps its own lists. The Codex panel is unchanged. On Pi, `haiku` resolves through the `pi.models` table in `models.json`.
+
 ## 0.9.76 - keep the parent's verdict out of reflect's reviewer prompts
 
 reflect passes the transcript path to its reviewers with nothing beside it. When the finder cannot locate the transcript, the fallback digest records the session's prompts, corrections, tool calls, results, and files in turn order, and states no diagnosis, verdict, or cause. A reviewer that reads the parent's conclusion first tends to audit that conclusion instead of the session ([#231](https://github.com/michael-denyer/pstack-claude/issues/231)).

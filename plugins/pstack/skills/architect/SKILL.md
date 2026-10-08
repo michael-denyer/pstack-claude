@@ -93,7 +93,7 @@ The caller's usage is written first and the type sketch derived from it. One fil
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in the `pstack-models.md` override sheet overrides each at runtime; `/setup-pstack` writes it and lists its path per runtime.
 
-- architect runners: `opus`, `fable`, `sonnet`
+- architect runners: `opus`, `fable`, `sonnet`, `haiku`
 
 ## Reasoning effort
 

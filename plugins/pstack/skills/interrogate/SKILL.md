@@ -43,6 +43,7 @@ Launch all reviewers in a single message using the `Agent` tool. Use the `interr
 | Reviewer A | `opus` |
 | Reviewer B | `fable` |
 | Reviewer C | `sonnet` |
+| Reviewer D | `haiku` |
 
 For each reviewer:
 - `subagent_type`: `general-purpose`

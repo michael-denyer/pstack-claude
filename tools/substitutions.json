@@ -259,7 +259,7 @@
       "rationale": "a reviewer row's default model is stamped into reflect's Models section, so an upstream model bump in the table is not a change to the port"
     },
     {
-      "regex": "(?:claude|gpt|grok|gemini|composer)-[0-9a-z.]+(?:-[0-9a-z.]+)+",
+      "regex": "(?:claude|gpt|grok|gemini|composer)-[0-9a-z.]+(?:-[0-9a-z.]+)+(?<!\\.)",
       "files": "^skills/setup-pstack/SKILL\\.md$",
       "replacement": "<slug>",
       "rationale": "the port writes its own sheet from models.json and replaces Cursor's budget step, so every upstream slug in setup-pstack is scrubbed to the placeholder the port already uses; a conflict there can then be written and resolved, and a model bump alone is no conflict. Must follow the default-phrase rules above"

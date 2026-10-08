@@ -8,7 +8,7 @@ The upstream pin moves from `2cbf585` to `df58112`, upstream v0.15.15, two commi
 
 The substitution rules that point a default model list at the Models section now match a list of any length, as does the rule for the model family sentence. New rules cover the delegate defaults in `poteto-mode`, the default-model column of the `reflect` reviewer table, and every slug in `setup-pstack`, so an upstream model change on those lines no longer conflicts with the port. `interrogate` says "the Reviewer labels below" and names no label run, since the generator stamps the table from the panel.
 
-Measured with `bun tools/sync.mjs pstack 1e56b29`, then `df58112`: 3 files merged, 2 updated, 80 unchanged, 36 excluded, and 2 conflicts, both resolved by hand. `poteto-help` keeps the port's `/swarm` row and takes upstream's `/interrogate` row. No file became port-only.
+Measured with `bun tools/sync.mjs pstack 1e56b29`, then `df58112`, over 82 synced files with 36 excluded: the first run changed `poteto-help`, and the second changed five files, `poteto-help` among them. Two conflicts were resolved by hand. `poteto-help` keeps the port's `/swarm` row and takes upstream's `/interrogate` row. No file became port-only.
 
 ## 0.9.77 - add haiku to the default panel
 

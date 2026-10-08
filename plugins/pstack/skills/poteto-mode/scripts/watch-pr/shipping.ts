@@ -211,7 +211,7 @@ export class GhShippingService implements ShippingService {
         "api",
         "graphql",
         "-f",
-        "query=mutation($id:ID!) { dequeuePullRequest(input:{pullRequestId:$id}) { clientMutationId } }",
+        "query=mutation($id:ID!) { dequeuePullRequest(input:{id:$id}) { clientMutationId } }",
         "-f",
         `id=${id}`,
       ])

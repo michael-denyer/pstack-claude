@@ -239,6 +239,7 @@ describe("shipping GitHub boundary", () => {
         };
       }
       if (query.includes("dequeuePullRequest")) {
+        expect(query).toContain("dequeuePullRequest(input:{id:$id})");
         expect(args).toContain("id=pr-id");
         mergeQueueEntry = null;
         return { data: { dequeuePullRequest: { clientMutationId: null } } };

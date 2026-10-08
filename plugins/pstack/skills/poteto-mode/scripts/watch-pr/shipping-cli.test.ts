@@ -49,6 +49,10 @@ if (query.includes('disablePullRequestAutoMerge')) {
   state.autoMergeRequest = null;
   result = { disablePullRequestAutoMerge: { clientMutationId: null } };
 } else if (query.includes('dequeuePullRequest')) {
+  if (!query.includes('dequeuePullRequest(input:{id:$id})')) {
+    console.error("DequeuePullRequestInput requires id");
+    process.exit(1);
+  }
   state.mergeQueueEntry = null;
   result = { dequeuePullRequest: { clientMutationId: null } };
 } else result = { repository: { pullRequest: state } };

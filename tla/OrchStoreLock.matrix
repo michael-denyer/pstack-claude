@@ -1,0 +1,84 @@
+# Matrix for OrchStoreLock.tla, the pid lock of the orch store (store.ts
+# acquireLock, lines 394-540). Run it with tlc-matrix.sh; OrchStoreLock.mutations
+# uses the same checks and runs.
+#
+# The two sections at the end are counter-examples and are expected to FAIL.
+# Each one keeps a property that the shipped code violates without hard
+# links, in its own section so that TLC prints one trace per property. The
+# sections above them must PASS.
+
+# Writers without --force on a filesystem with hard links: every property.
+spec OrchStoreLock.tla
+check INVARIANTS TypeOK OneHolder LockNamesHolder ClaimExclusive NoResidue
+check PROPERTIES TakeoverRemovesNamedLock TakeoverSparesLiveHolder ReleaseRemovesOwnLock
+check PROPERTIES Terminates CloseTerminates LateWriterAcquires
+reach ReleaseWindow | n=1
+reach StaleLock | n=2
+reach StaleLockReplaced | n=2
+reach LockVanished | n=2
+reach DeadClaimant | n=3
+reach EmptyTakeoverDir | n=3
+reach ClaimRefused | n=3
+reach LateWriterMeetsWreck | n=3
+run noforce hardlink n=1 | Procs={p1} Forcers={} HardLinks=TRUE
+run noforce hardlink n=2 | Procs={p1,p2} Forcers={} HardLinks=TRUE
+run noforce hardlink n=3 | Procs={p1,p2,p3} Forcers={} HardLinks=TRUE
+
+# Four writers reach the third ENOENT of lockOrHolder and a late writer that
+# finds an empty takeover directory. Safety only: the liveness graph of four
+# writers has 81 million nodes.
+spec OrchStoreLock.tla
+check INVARIANTS TypeOK OneHolder LockNamesHolder ClaimExclusive NoResidue
+check PROPERTIES TakeoverRemovesNamedLock TakeoverSparesLiveHolder ReleaseRemovesOwnLock
+reach RetriesExhausted | n=4
+reach LateWriterMeetsEmptyDir | n=4
+run noforce hardlink safety n=4 | Procs={p1,p2,p3,p4} Forcers={} HardLinks=TRUE
+
+# No hard links (the exclusive open of line 415): safety and termination.
+spec OrchStoreLock.tla
+check INVARIANTS TypeOK OneHolder LockNamesHolder ClaimExclusive NoResidue
+check PROPERTIES TakeoverRemovesNamedLock TakeoverSparesLiveHolder ReleaseRemovesOwnLock
+check PROPERTIES Terminates CloseTerminates
+reach OrphanBlankLock | n=2
+run noforce excl n=1 | Procs={p1} Forcers={} HardLinks=FALSE
+run noforce excl n=2 | Procs={p1,p2} Forcers={} HardLinks=FALSE
+run noforce excl n=3 | Procs={p1,p2,p3} Forcers={} HardLinks=FALSE
+
+# Writers with --force on a filesystem with hard links: every property. The
+# release's read and unlink run behind the claim, so a forced takeover cannot
+# sit between them, and no release can sit between a takeover's re-read and
+# its unlink. A release that finds the claim taken stages a new one until the
+# claimant finishes or dies.
+spec OrchStoreLock.tla
+check INVARIANTS TypeOK OneHolder LockNamesHolder ClaimExclusive NoResidue
+check PROPERTIES TakeoverRemovesNamedLock TakeoverSparesLiveHolder ReleaseRemovesOwnLock
+check PROPERTIES Terminates CloseTerminates LateWriterAcquires
+reach ForcedSteal | force one n=2
+reach ReleaseBlocked | force one n=2
+run force one n=2 | Procs={p1,p2} Forcers={p2} HardLinks=TRUE
+run force one n=3 | Procs={p1,p2,p3} Forcers={p3} HardLinks=TRUE
+run force all n=3 | Procs={p1,p2,p3} Forcers={p1,p2,p3} HardLinks=TRUE
+
+# Writers with --force and no hard links: the properties that hold. The empty
+# lock of line 415 reads as "unknown", which a forced writer takes over; see
+# the second expected FAIL.
+spec OrchStoreLock.tla
+check INVARIANTS TypeOK ClaimExclusive NoResidue
+check PROPERTIES TakeoverSparesLiveHolder ReleaseRemovesOwnLock
+check PROPERTIES Terminates CloseTerminates LateWriterAcquires
+run force all excl n=2 | Procs={p1,p2} Forcers={p1,p2} HardLinks=FALSE
+
+# Expected FAIL 1: without hard links, a writer that dies between the exclusive
+# open and the write of line 415 leaves an empty lock. No writer without
+# --force can replace it.
+spec OrchStoreLock.tla
+check PROPERTIES LateWriterAcquires
+run finding empty lock, excl n=2 | Procs={p1,p2} Forcers={} HardLinks=FALSE
+
+# Expected FAIL 2, the same limitation under --force: a forced writer reads the
+# lock between the exclusive open and the write of line 415, takes over the
+# holder "unknown", re-reads the lock still empty (line 484), and its unlink
+# (line 488) removes the pid the holder has written by then.
+spec OrchStoreLock.tla
+check INVARIANTS LockNamesHolder
+run finding forced empty lock, excl n=2 | Procs={p1,p2} Forcers={p1,p2} HardLinks=FALSE

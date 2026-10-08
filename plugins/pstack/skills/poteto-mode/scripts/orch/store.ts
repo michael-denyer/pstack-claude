@@ -441,12 +441,14 @@ async function acquireLock(
     }
   };
 
-  // POSIX cannot unlink a file only if its content still matches, so the
-  // re-read and replace run behind a claim: a directory that holds one file
+  // POSIX cannot unlink a file only if its content still matches, so each
+  // read-and-unlink runs behind a claim: a directory that holds one file
   // named for the claimant's pid. rename cannot replace a directory that
   // holds a file, so a claim excludes every other writer, and a dead
   // claimant's file is removed by name, which cannot remove a live claimant's.
-  const takeOver = async (holder: string): Promise<void> => {
+  // Resolves to false, without running the body, when a live writer holds
+  // the claim.
+  const claimed = async (body: () => Promise<void>): Promise<boolean> => {
     const staged = `${takeover}.${pid}.${randomUUID()}`;
     const discard = (): Promise<void> =>
       rm(staged, { recursive: true, force: true }).catch(() => {});
@@ -465,11 +467,19 @@ async function acquireLock(
       if (code !== "ENOTEMPTY" && code !== "EEXIST") {
         throw error;
       }
-      throw new UserError(
-        `store lock held by pid ${holder} is being replaced by another writer; retry`
-      );
+      return false;
     }
     try {
+      await body();
+    } finally {
+      await rename(takeover, staged).catch(() => {});
+      await discard();
+    }
+    return true;
+  };
+
+  const takeOver = async (holder: string): Promise<void> => {
+    const replaced = await claimed(async () => {
       try {
         const current = (await readFile(path, "utf8")).trim() || "unknown";
         if (current !== holder) {
@@ -485,9 +495,11 @@ async function acquireLock(
       if (blocker !== null) {
         throw new UserError(`store lock held by pid ${blocker}`);
       }
-    } finally {
-      await rename(takeover, staged).catch(() => {});
-      await discard();
+    });
+    if (!replaced) {
+      throw new UserError(
+        `store lock held by pid ${holder} is being replaced by another writer; retry`
+      );
     }
   };
 
@@ -504,15 +516,25 @@ async function acquireLock(
     }
   }
 
+  // A claimant that refuses the release is replacing the lock. It finishes or
+  // dies, and the next claim sweeps a dead one, so the release tries again.
   return async (): Promise<void> => {
-    try {
-      if ((await readFile(path, "utf8")).trim() === pid) {
-        await unlink(path);
+    const removeOwn = async (): Promise<void> => {
+      try {
+        if ((await readFile(path, "utf8")).trim() === pid) {
+          await unlink(path);
+        }
+      } catch (error) {
+        if (errorCode(error) !== "ENOENT") {
+          throw error;
+        }
       }
-    } catch (error) {
-      if (errorCode(error) !== "ENOENT") {
-        throw error;
+    };
+    for (;;) {
+      if (await claimed(removeOwn)) {
+        return;
       }
+      await new Promise((resolve) => setTimeout(resolve, 10));
     }
   };
 }

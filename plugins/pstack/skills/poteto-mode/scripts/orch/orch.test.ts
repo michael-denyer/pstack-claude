@@ -588,6 +588,40 @@ await store.close();
     expect(await lockFiles(directory)).toEqual([]);
   });
 
+  it("refuses a forced writer that arrives while the holder's release is between its read and its unlink", async () => {
+    const { directory, store } = await initializedStore();
+    await store.close();
+    const flags = await makeDirectory();
+
+    const a = spawnWriter({
+      directory,
+      flags,
+      name: "A",
+      atLockUnlink: `writeFileSync(flag("releasing"), "");
+    spin(() => peer("F.held") || peer("F.refused"));`,
+    });
+    const f = spawnWriter({
+      directory,
+      flags,
+      name: "F",
+      force: true,
+      before: `spin(() => peer("A.releasing"));`,
+    });
+    expect(await Promise.all([a.exited, f.exited])).toEqual([0, 0]);
+    expect(await new Response(a.stderr).text()).toBe("");
+    expect(await new Response(f.stderr).text()).toBe("");
+
+    expect(await readFlags(flags)).toEqual({
+      "A.releasing": "",
+      "A.held": "",
+      "F.refused": `store lock held by pid ${a.pid} is being replaced by another writer; retry`,
+    });
+    expect(await readFile(join(directory, "units.tsv"), "utf8")).toBe(
+      "id\ttrack\tstate\tbranch\tpr\tsha\tbrief\nA-unit\trace\tpending\t\t\t\t\n"
+    );
+    expect(await lockFiles(directory)).toEqual([]);
+  });
+
   it("replaces a stale lock after a writer was killed while replacing it", async () => {
     const { directory, store } = await initializedStore();
     await store.close();

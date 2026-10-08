@@ -1,0 +1,119 @@
+# Mutations for mutate.py. Each one swaps a piece of OrchStoreLock.tla for a
+# plausible bug in store.ts and names the one property that must fail on it.
+# Every `only` line picks a run that passes on the unmutated spec, so a
+# DETECTED line comes from the mutation, not from the expected-FAIL run.
+
+mutation create overwrites an existing lock (line 410 without EEXIST)
+detects OneHolder
+only noforce hardlink n=2
+- /\ IF lock # NoPid
++ /\ IF FALSE
+
+mutation takeOver skips the comparison with the holder (line 485)
+detects LockNamesHolder
+only noforce hardlink n=3
+- /\ Goto(p, IF LockText = holder[p] THEN "unlink" ELSE "unclaim")
++ /\ Goto(p, "unlink")
+
+mutation the sweep removes a live claimant's file (line 459 without holderIsDead)
+detects ClaimExclusive
+only noforce hardlink n=3
+- /\ claimants' = IF c \in dead THEN claimants \ {c} ELSE claimants
++ /\ claimants' = claimants \ {c}
+
+mutation a blocked takeOver keeps its claim (line 475 skipped)
+detects NoResidue
+only noforce hardlink n=3
+- THEN Goto(p, "unclaim") /\ UNCHANGED holder
++ THEN Goto(p, "failed") /\ UNCHANGED holder
+
+mutation rename replaces a claimed takeover directory (line 463 never fails)
+detects TakeoverRemovesNamedLock
+only noforce hardlink n=3
+- /\ IF claimants = {}
++ /\ IF TRUE
+
+mutation an empty lock counts as stale (holderIsDead true for "unknown")
+detects TakeoverSparesLiveHolder
+only noforce excl n=2
+- /\ Goto(p, IF holder[p] \in dead \/ p \in Forcers THEN "mkstaged" ELSE "failed")
++ /\ Goto(p, IF holder[p] \in dead \cup {Unknown} \/ p \in Forcers THEN "mkstaged" ELSE "failed")
+
+mutation every holder counts as stale (line 508 always true)
+detects TakeoverSparesLiveHolder
+only noforce hardlink n=2
+- /\ Goto(p, IF holder[p] \in dead \/ p \in Forcers THEN "mkstaged" ELSE "failed")
++ /\ Goto(p, "mkstaged")
+
+mutation takeOver's lockOrHolder starts with three retries (line 425)
+detects TypeOK
+only noforce hardlink n=2
+- StartCreate(p) == Goto(p, "mkpid") /\ retries' = [retries EXCEPT ![p] = 2]
++ StartCreate(p) == Goto(p, "mkpid") /\ retries' = [retries EXCEPT ![p] = 3]
+
+mutation an ENOENT retry reads again instead of creating (line 425 loop)
+detects Terminates
+only noforce hardlink n=2
+- THEN /\ retries' = [retries EXCEPT ![p] = @ - 1]
+-                      /\ Goto(p, "mkpid")
++ THEN /\ retries' = retries
++                      /\ Goto(p, "read")
+
+mutation release waits for the lock instead of unlinking it (line 525)
+detects CloseTerminates
+only noforce hardlink n=1
+- THEN Goto(p, "relunlink") /\ UNCHANGED got
++ THEN Goto(p, "relread") /\ UNCHANGED got
+
+# The release window: the read and unlink of lines 524-525 outside the claim.
+mutation release reads and unlinks without a claim (close before this fix)
+detects ReleaseRemovesOwnLock
+only force one n=2
+- /\ Goto(p, "mkstaged")
+-             /\ UNCHANGED <<lockfile, claim, temps, holder, retries, seen, got, env>>
++ /\ Goto(p, "relread")
++             /\ UNCHANGED <<lockfile, claim, temps, holder, retries, seen, got, env>>
+
+# The takeover window: a takeover that ignores a release's claim.
+mutation a takeover renames over a release's claim (line 463 ignores a releasing claimant)
+detects ReleaseRemovesOwnLock
+only force one n=2
+- /\ IF claimants = {}
++ /\ IF \A q \in claimants: closing[q]
+
+mutation a release refused the claim gives up and leaves its lock (line 533 without the loop)
+detects NoResidue
+only force one n=2
+- THEN IF pc[p] = "busy" THEN "mkstaged" ELSE "released"
++ THEN "released"
+
+mutation the sweep leaves a dead claimant's file (line 460 skipped), release
+detects CloseTerminates
+only force one n=2
+- /\ claimants' = IF c \in dead THEN claimants \ {c} ELSE claimants
++ /\ claimants' = claimants
+
+mutation the sweep leaves a dead claimant's file (line 460 skipped)
+detects LateWriterAcquires
+only noforce hardlink n=3
+- /\ claimants' = IF c \in dead THEN claimants \ {c} ELSE claimants
++ /\ claimants' = claimants
+
+# The assumption that rename replaces an empty directory.
+mutation rename cannot replace an empty takeover directory (not POSIX)
+detects LateWriterAcquires
+only noforce hardlink n=3
+- /\ IF claimants = {}
++ /\ IF ~tdir
+
+mutation a crash leaves no dead pid
+detects reach:StaleLock
+only noforce hardlink n=2
+- /\ dead' = dead \cup {p}
++ /\ dead' = dead
+
+mutation the sweep leaves a dead claimant's file (line 460 skipped), reach
+detects reach:EmptyTakeoverDir
+only noforce hardlink n=3
+- /\ claimants' = IF c \in dead THEN claimants \ {c} ELSE claimants
++ /\ claimants' = claimants

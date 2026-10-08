@@ -2,6 +2,22 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.79 - dequeue a queued PR, and fixes from three models and a code review
+
+`ship-pr cancel-pending` can take a PR out of a merge queue. The dequeue request named the pull request in `pullRequestId`, a field GitHub's `DequeuePullRequestInput` does not have, so GitHub refused it. The request now sends `id`, and `disablePullRequestAutoMerge` keeps `pullRequestId`, which is the name its own input type uses. @alex-overcyai found and fixed this in [#239](https://github.com/michael-denyer/pstack-claude/pull/239). Both shipping test files now answer from one fake of `gh api graphql`. The fake returns only the fields a query selects and refuses a mutation with the wrong input field or variable type, so the same mistake on either mutation fails a test.
+
+`watch-pr` refuses an `--interval` above 2147483.647 seconds. A timer delay above 2^31 - 1 ms is replaced with 1 ms, so a longer interval made every poll sleep return at once.
+
+On Pi, a `/loop` typed during a manual compaction no longer leaves the wakeup slot sealed. The scheduler treated any session that was not idle as a run in flight, and Pi is not idle during a compaction, so it refused the next run at every wakeup. It now tracks a run from `agent_start` to `agent_settled` and seals the slot only between the two.
+
+The orchestration store's lock release can no longer delete a lock that a forced takeover has just written. The release read the lock, saw its own pid, and unlinked the lock by path as a separate step. It now does both behind the claim a takeover holds, and waits for a live claimant to finish.
+
+The three fixes above came from models of the code, which ship with them: `lean/Model/WatchPoll.lean` for the polling arithmetic, and `tla/PiScheduler.tla` and `tla/OrchStoreLock.tla` for the scheduler and the lock. Two runs of each TLA+ model still fail by design and record narrower findings these fixes do not close.
+
+worktree-audit keeps a transcript root it cannot inspect for any reason other than absence. It reports the scan failure and leaves recent activity unknown, so the worktree needs review instead of reading as idle. On Pi, a restored agent stays unavailable until its previous process is confirmed gone. Pi signals only an orphan whose identity matches, and an older record without enough identity data refuses continuation while that process is alive.
+
+`/poteto-help` offers "a default effort" where it offered "a reasoning budget", a step the port's `/setup-pstack` does not have. The sync rule that scrubs model slugs in `setup-pstack` no longer takes a sentence's period into the slug.
+
 ## 0.9.78 - sync to upstream df58112 (v0.15.15)
 
 The upstream pin moves from `2cbf585` to `df58112`, upstream v0.15.15, two commits. `/poteto-help` now offers `/setup-pstack` when the model sheet is missing and the answer depends on it. It asks at most once per chat, and a user who declines is told that every role keeps its default model. Upstream also dropped one model from its default panel and lowered its Opus effort from `max` to `xhigh`. The port takes neither change, because `models.json` sets the port's panel and effort. `setup-pstack` keeps the port's default-effort step in place of upstream's reworded budget step.

@@ -217,6 +217,18 @@ describe("main", () => {
     );
   });
 
+  it("rejects an interval longer than one timer can sleep, and accepts the longest one", async () => {
+    const harness = testRuntime(fakeReader());
+    expect(await main(["--interval", "2147484"], harness.runtime)).toBe(64);
+    expect(harness.stdout).toEqual([]);
+    expect(harness.stderr.join("")).toContain(
+      "option '--interval <seconds>' argument '2147484' is invalid. must be at most 2147483.647"
+    );
+    expect(
+      parseArgs(["--interval", "2147483.647"], silentIo).polling.interval
+    ).toBe(2147483.647);
+  });
+
   it("bypasses the queue machine for queued-stack status-only", async () => {
     const reader = fakeReader();
     const harness = testRuntime(reader);

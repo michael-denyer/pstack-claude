@@ -40,6 +40,15 @@ function positiveNumber(value: string): number {
     throw new InvalidArgumentError("must be greater than zero");
   return parsed;
 }
+// A timer delay above 2^31 - 1 ms is replaced with 1 ms, so a longer sleep
+// would return at once and the loop would poll without pause.
+const MAX_SLEEP_SECONDS = (2 ** 31 - 1) / 1_000;
+function sleepSeconds(value: string): number {
+  const parsed = positiveNumber(value);
+  if (parsed > MAX_SLEEP_SECONDS)
+    throw new InvalidArgumentError(`must be at most ${MAX_SLEEP_SECONDS}`);
+  return parsed;
+}
 function nonNegativeNumber(value: string): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0)
@@ -113,7 +122,7 @@ export function parseArgs(
     .option(
       "--interval <seconds>",
       `poll interval; a PR with no checks takes ${NO_CHECKS_CONFIRM_SECONDS} seconds to confirm whatever this is`,
-      positiveNumber,
+      sleepSeconds,
       60
     )
     .option(

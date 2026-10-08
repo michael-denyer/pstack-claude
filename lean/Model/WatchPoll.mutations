@@ -1,0 +1,103 @@
+# Mutations for mutate.py. Each one swaps a piece of WatchPoll.lean for a
+# plausible bug. The text after `- ` must occur exactly once in the model;
+# `+ ` lines replace it. mutate.py reports the declarations that fail on each.
+
+# queryBackoffSeconds, policy.ts:399-402
+
+mutation backoff floor lowered to 30 seconds
+-   min (max interval 60 * 2 ^ (failures - 1)) 300
++   min (max interval 30 * 2 ^ (failures - 1)) 300
+
+mutation backoff cap raised to 600 seconds
+-   min (max interval 60 * 2 ^ (failures - 1)) 300
++   min (max interval 60 * 2 ^ (failures - 1)) 600
+
+mutation backoff exponent off by one
+-   min (max interval 60 * 2 ^ (failures - 1)) 300
++   min (max interval 60 * 2 ^ failures) 300
+
+mutation backoff ignores the poll interval
+-   min (max interval 60 * 2 ^ (failures - 1)) 300
++   min (60 * 2 ^ (failures - 1)) 300
+
+mutation backoff grows linearly instead of doubling
+-   min (max interval 60 * 2 ^ (failures - 1)) 300
++   min (max interval 60 * failures) 300
+
+# WatchDeadline, deadline.ts:9-20
+
+mutation deadline stays finite when the timeout is 0
+-   ⟨if timeout > 0 then .finite (now + timeout) else .infinity⟩
++   ⟨if timeout ≥ 0 then .finite (now + timeout) else .infinity⟩
+
+mutation remaining budget does not shrink as the clock advances
+-   | .finite r => .finite (r - seconds)
++   | .finite r => .finite r
+
+# pollUntilTerminal, policy.ts:509-562
+
+mutation loop runs with no budget left
+-   | .finite remaining => decide (0 < remaining)
++   | .finite remaining => decide (0 ≤ remaining)
+
+mutation one retry more than the error budget
+-       if retryable = false ∨ failures ≥ o.maxQueryErrors then
++       if retryable = false ∨ failures > o.maxQueryErrors then
+
+mutation failure count is not incremented
+-       let failures := s.failures + 1
++       let failures := s.failures
+
+mutation a successful step keeps the failure count
+-       some { s with failures := 0, retries := 0, remaining := remaining, last := .continued }
++       some { s with retries := 0, remaining := remaining, last := .continued }
+
+mutation poll sleep ignores the deadline
+-       let requested := remaining.cap seconds
++       let requested := seconds
+
+mutation poll sleep capped by the budget from before the step
+-       let requested := remaining.cap seconds
++       let requested := s.remaining.cap seconds
+
+mutation retry sleep ignores the deadline
+-         let retryInSeconds := remaining.cap (queryBackoffSeconds o.interval failures)
++         let retryInSeconds := queryBackoffSeconds o.interval failures
+
+mutation backoff uses the failure count from before the increment
+-         let retryInSeconds := remaining.cap (queryBackoffSeconds o.interval failures)
++         let retryInSeconds := remaining.cap (queryBackoffSeconds o.interval s.failures)
+
+mutation backoff arguments swapped
+-         let retryInSeconds := remaining.cap (queryBackoffSeconds o.interval failures)
++         let retryInSeconds := remaining.cap (queryBackoffSeconds failures o.interval)
+
+# noChecksConfirmer, policy.ts:63-85
+
+mutation confirmation window shortened to 30 seconds
+- def NO_CHECKS_CONFIRM_SECONDS : Nat := 60
++ def NO_CHECKS_CONFIRM_SECONDS : Nat := 30
+
+mutation confirmation needs more than 60 seconds
+-       (firstSeen, decide (now - prior.seenAt ≥ NO_CHECKS_CONFIRM_SECONDS))
++       (firstSeen, decide (now - prior.seenAt > NO_CHECKS_CONFIRM_SECONDS))
+
+mutation seeing the same head again restarts the timer
+-       (firstSeen, decide (now - prior.seenAt ≥ NO_CHECKS_CONFIRM_SECONDS))
++       (firstSeenSet firstSeen pr ⟨headRefOid, now⟩, decide (now - prior.seenAt ≥ NO_CHECKS_CONFIRM_SECONDS))
+
+mutation a changed head keeps the old timer
+-     else (firstSeenSet firstSeen pr ⟨headRefOid, now⟩, false)
++     else (firstSeenSet firstSeen pr ⟨headRefOid, prior.seenAt⟩, false)
+
+mutation a changed head confirms on the old timer
+-     else (firstSeenSet firstSeen pr ⟨headRefOid, now⟩, false)
++     else (firstSeenSet firstSeen pr ⟨headRefOid, now⟩, decide (now - prior.seenAt ≥ NO_CHECKS_CONFIRM_SECONDS))
+
+mutation a first sighting is not recorded
+-   | none => (firstSeenSet firstSeen pr ⟨headRefOid, now⟩, false)
++   | none => (firstSeen, false)
+
+mutation one timer shared by every pull request
+-   fun n => if n = pr then some sighting else firstSeen n
++   fun _ => some sighting

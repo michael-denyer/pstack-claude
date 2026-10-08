@@ -146,13 +146,13 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/cli.test.ts": {
       "kind": "policy",
-      "why": "Supplies the shared deadline and landing revision the port's watcher requires, and checks that a PR with no checks configured gets a first-sighting status cell and, after one WAITING poll, a READY verdict that names the absence, and that mergeability GitHub has not computed is named in the status table, the WAITING line, and the TIMEOUT line, that a retry after a mid-read change is not called a failed query, that a command that could not run gets an install action, and the two help lines the port rewrote.",
+      "why": "Supplies the shared deadline and landing revision the port's watcher requires, and checks that a PR with no checks configured gets a first-sighting status cell and, after one WAITING poll, a READY verdict that names the absence, and that mergeability GitHub has not computed is named in the status table, the WAITING line, and the TIMEOUT line, that a retry after a mid-read change is not called a failed query, that a command that could not run gets an install action, that an --interval longer than one timer can sleep is refused, and the two help lines the port rewrote.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/cli.ts": {
       "kind": "policy",
-      "why": "Threads one WatchDeadline through discovery, commands, and polling, reports a deadline verdict instead of throwing, and says in its help that --interval does not shorten the 60 second no-checks confirmation and that exit 0 from --status-only does not mean ready.",
+      "why": "Threads one WatchDeadline through discovery, commands, and polling, reports a deadline verdict instead of throwing, rejects an --interval longer than one timer can sleep, and says in its help that --interval does not shorten the 60 second no-checks confirmation and that exit 0 from --status-only does not mean ready.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },

@@ -1,0 +1,2758 @@
+{
+  "format": 1,
+  "toolchain": "leanprover/lean4:v4.34.1",
+  "module": "Model.WatchPoll",
+  "declarations": [
+    {
+      "name": "WatchPoll.BackoffSpec",
+      "kind": "definition",
+      "type": "Nat → Nat → Prop",
+      "typeHash": "0dae82c6f1aa4ce803efc560501e2281aba6ecedadabcc41a212033d7dc97223",
+      "valueHash": "2e833d4c54023bf61b7009ec35bbe493cd91f009b6a65213a7c87e8f75f15520"
+    },
+    {
+      "name": "WatchPoll.Call",
+      "kind": "inductive",
+      "type": "Type",
+      "typeHash": "7051ab654d793c216d744f7920d98d672357a0efa67248ee75d146d668f60997",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Call.casesOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Call → Sort u} → (t : WatchPoll.Call) → ((now pr headRefOid : Nat) → motive { now := now, pr := pr, headRefOid := headRefOid }) → motive t",
+      "typeHash": "b4363b5b01c54f98f69312cf255e2aea42ff0a2190633293ed98c37ba7ba969d",
+      "valueHash": "05ca26ca4c974c50313bd520413bc199c20b50ea73470cf75e085c108c019fc3"
+    },
+    {
+      "name": "WatchPoll.Call.ctorIdx",
+      "kind": "definition",
+      "type": "WatchPoll.Call → Nat",
+      "typeHash": "bc7cb18601f96f72d3ee15ab15684d99bd303a2b988c537e4228645409a1d6b8",
+      "valueHash": "bb250933ead0a758c3b3f7e19759f49c6646ac3d600b50e7f9b9815bff0ade25"
+    },
+    {
+      "name": "WatchPoll.Call.headRefOid",
+      "kind": "definition",
+      "type": "WatchPoll.Call → Nat",
+      "typeHash": "d2420d36e0a6efa6196fa981834368126db1a010b09da26b929ba66b75261d76",
+      "valueHash": "c7efb54489fc93d7e41222365ede52d2a14d11da1777cc5bdeb2eb8db2765017"
+    },
+    {
+      "name": "WatchPoll.Call.mk",
+      "kind": "constructor",
+      "type": "Nat → Nat → Nat → WatchPoll.Call",
+      "typeHash": "fd46628f53e4014d36239ce15d00a9b16acc7ded580f4cb5c13bc685cdcb1081",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Call.mk.inj",
+      "kind": "theorem",
+      "type": "∀ {now pr headRefOid now_1 pr_1 headRefOid_1 : Nat}, { now := now, pr := pr, headRefOid := headRefOid } = { now := now_1, pr := pr_1, headRefOid := headRefOid_1 } → now = now_1 ∧ pr = pr_1 ∧ headRefOid = headRefOid_1",
+      "typeHash": "374356fa12948f1cee29c922f7903e3a7c1d158f515d3bc48268164490164e15",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Call.mk.injEq",
+      "kind": "theorem",
+      "type": "∀ (now pr headRefOid now_1 pr_1 headRefOid_1 : Nat), ({ now := now, pr := pr, headRefOid := headRefOid } = { now := now_1, pr := pr_1, headRefOid := headRefOid_1 }) = (now = now_1 ∧ pr = pr_1 ∧ headRefOid = headRefOid_1)",
+      "typeHash": "a3c2fc962b029f1c546951bdb6ecc7a0010f80e2e9623ec3f13fa45437b42eb8",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Call.mk.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {now pr headRefOid now' pr' headRefOid' : Nat} → { now := now, pr := pr, headRefOid := headRefOid } = { now := now', pr := pr', headRefOid := headRefOid' } → (now = now' → pr = pr' → headRefOid = headRefOid' → P) → P",
+      "typeHash": "923e68b32bc8556312de5f7b60f126a60af954879fae13cc7f0b7866889e702d",
+      "valueHash": "08ce78d0441e4175fea5dbd95053e992d29db18c6dcb4308af57b8cf82379d0e"
+    },
+    {
+      "name": "WatchPoll.Call.mk.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (now pr headRefOid : Nat), sizeOf { now := now, pr := pr, headRefOid := headRefOid } = 1 + sizeOf now + sizeOf pr + sizeOf headRefOid",
+      "typeHash": "9ffd5b025175463b1a1ab9e086a100d865f724ba8df221ef73ed7e1937b2def4",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Call.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {t t' : WatchPoll.Call} → t = t' → WatchPoll.Call.noConfusionType P t t'",
+      "typeHash": "05e3703f5564c8b38368f641236abe8d8aee975e705f6717e15881bf89d4a522",
+      "valueHash": "9d0ed728773d79bdf45c0eb047afb5bd92f825a05b5853e7b7b6d80b05c2059e"
+    },
+    {
+      "name": "WatchPoll.Call.noConfusionType",
+      "kind": "definition",
+      "type": "Sort u → WatchPoll.Call → WatchPoll.Call → Sort u",
+      "typeHash": "f187009dfe119ee03f321acd6a53ba8ea5d73b2f8bd91ceeb9acd651a9e5da29",
+      "valueHash": "33584bcd1211e3fea756d1bc5290bb94e93231f8eabfaafd31ae2094ac98c015"
+    },
+    {
+      "name": "WatchPoll.Call.now",
+      "kind": "definition",
+      "type": "WatchPoll.Call → Nat",
+      "typeHash": "d2420d36e0a6efa6196fa981834368126db1a010b09da26b929ba66b75261d76",
+      "valueHash": "d407d01883baf477d1643034cb2f2d13333bcbcfb08b82878aabc305628455ee"
+    },
+    {
+      "name": "WatchPoll.Call.pr",
+      "kind": "definition",
+      "type": "WatchPoll.Call → Nat",
+      "typeHash": "d2420d36e0a6efa6196fa981834368126db1a010b09da26b929ba66b75261d76",
+      "valueHash": "6e75276921efb91e4d32fa6671cee9fff95e9a84b99fcc3be9e967a7bcb705e4"
+    },
+    {
+      "name": "WatchPoll.Call.rec",
+      "kind": "recursor",
+      "type": "{motive : WatchPoll.Call → Sort u} → ((now pr headRefOid : Nat) → motive { now := now, pr := pr, headRefOid := headRefOid }) → (t : WatchPoll.Call) → motive t",
+      "typeHash": "dec2013366fe59350c5fe3601f50d5147952cfefc7a4f9b7ab2ad59c1502ae62",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Call.recOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Call → Sort u} → (t : WatchPoll.Call) → ((now pr headRefOid : Nat) → motive { now := now, pr := pr, headRefOid := headRefOid }) → motive t",
+      "typeHash": "b4363b5b01c54f98f69312cf255e2aea42ff0a2190633293ed98c37ba7ba969d",
+      "valueHash": "dd6f39e2784a6f24ce63787ea678885a99d8513971bb1b900fa5f3a7cbc9c1cf"
+    },
+    {
+      "name": "WatchPoll.ClockMustAdvance",
+      "kind": "definition",
+      "type": "List WatchPoll.Call → WatchPoll.Call → Prop",
+      "typeHash": "83ce7891a040b224adc8624057bed5f87dd68396bdb0533616800bb394187f16",
+      "valueHash": "69ecce0d41492588ae94cbbac0cfacca11fedde1b7dea62d0fde84e58e33d91a"
+    },
+    {
+      "name": "WatchPoll.ConfirmSound",
+      "kind": "definition",
+      "type": "List WatchPoll.Call → WatchPoll.Call → Prop",
+      "typeHash": "83ce7891a040b224adc8624057bed5f87dd68396bdb0533616800bb394187f16",
+      "valueHash": "963d8b08cccc8b3b00a6690c3c961220dc2d10a60f1d7803d3c224111218f969"
+    },
+    {
+      "name": "WatchPoll.ConfirmSpec",
+      "kind": "definition",
+      "type": "List WatchPoll.Call → WatchPoll.Call → Prop",
+      "typeHash": "83ce7891a040b224adc8624057bed5f87dd68396bdb0533616800bb394187f16",
+      "valueHash": "c07905aba3a85166af4bd9695e8161b9c92de39ce27d2b8d154c1056cdf30bf7"
+    },
+    {
+      "name": "WatchPoll.Event",
+      "kind": "inductive",
+      "type": "Type",
+      "typeHash": "7051ab654d793c216d744f7920d98d672357a0efa67248ee75d146d668f60997",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Event.casesOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Event → Sort u} → (t : WatchPoll.Event) → ((outcome : WatchPoll.StepOutcome) → (stepElapsed sleepElapsed : Nat) → motive { outcome := outcome, stepElapsed := stepElapsed, sleepElapsed := sleepElapsed }) → motive t",
+      "typeHash": "db985f919ff1f330488246e520d8e4cae007337e195869df6f9eaa8a50209c3b",
+      "valueHash": "f3a6db032df850b7f6213e8e6d34b7e57a9cb8b57fe96cd8836814af864c7e15"
+    },
+    {
+      "name": "WatchPoll.Event.ctorIdx",
+      "kind": "definition",
+      "type": "WatchPoll.Event → Nat",
+      "typeHash": "44e365ee103cce197cf5697da89eef8bf974214e47896921900356e5c6c17949",
+      "valueHash": "595275faf926c6e3c79c515b99958850a382cb9c9928bd4b915cc815ebcde93b"
+    },
+    {
+      "name": "WatchPoll.Event.mk",
+      "kind": "constructor",
+      "type": "WatchPoll.StepOutcome → Nat → Nat → WatchPoll.Event",
+      "typeHash": "688a547e5811030a1d7d892d2046da2d6a85c5e1c11fc4168fb2b22adfe99017",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Event.mk.inj",
+      "kind": "theorem",
+      "type": "∀ {outcome : WatchPoll.StepOutcome} {stepElapsed sleepElapsed : Nat} {outcome_1 : WatchPoll.StepOutcome} {stepElapsed_1 sleepElapsed_1 : Nat}, { outcome := outcome, stepElapsed := stepElapsed, sleepElapsed := sleepElapsed } = { outcome := outcome_1, stepElapsed := stepElapsed_1, sleepElapsed := sleepElapsed_1 } → outcome = outcome_1 ∧ stepElapsed = stepElapsed_1 ∧ sleepElapsed = sleepElapsed_1",
+      "typeHash": "6786ea41386160305171b09776b8ea4b75f7932d2c991bd1fcf0dc26bcd56ac3",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Event.mk.injEq",
+      "kind": "theorem",
+      "type": "∀ (outcome : WatchPoll.StepOutcome) (stepElapsed sleepElapsed : Nat) (outcome_1 : WatchPoll.StepOutcome) (stepElapsed_1 sleepElapsed_1 : Nat), ({ outcome := outcome, stepElapsed := stepElapsed, sleepElapsed := sleepElapsed } = { outcome := outcome_1, stepElapsed := stepElapsed_1, sleepElapsed := sleepElapsed_1 }) = (outcome = outcome_1 ∧ stepElapsed = stepElapsed_1 ∧ sleepElapsed = sleepElapsed_1)",
+      "typeHash": "d5dfcea0120f3b4fb9ebf6adf1886e3397682c3c9d3dc1a93207184ad044fe4d",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Event.mk.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {outcome : WatchPoll.StepOutcome} → {stepElapsed sleepElapsed : Nat} → {outcome' : WatchPoll.StepOutcome} → {stepElapsed' sleepElapsed' : Nat} → { outcome := outcome, stepElapsed := stepElapsed, sleepElapsed := sleepElapsed } = { outcome := outcome', stepElapsed := stepElapsed', sleepElapsed := sleepElapsed' } → (outcome = outcome' → stepElapsed = stepElapsed' → sleepElapsed = sleepElapsed' → P) → P",
+      "typeHash": "38132b8482cddf30b2b7f494d5fecfdbfaf28ea33cb43c18e8c2c3d7ec7f3398",
+      "valueHash": "c46068417a998c6c968afd07b121b3a27a6ee3fc3eaed995260986fdcf2ada27"
+    },
+    {
+      "name": "WatchPoll.Event.mk.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (outcome : WatchPoll.StepOutcome) (stepElapsed sleepElapsed : Nat), sizeOf { outcome := outcome, stepElapsed := stepElapsed, sleepElapsed := sleepElapsed } = 1 + sizeOf outcome + sizeOf stepElapsed + sizeOf sleepElapsed",
+      "typeHash": "a1f6b0c3089b2daa2823afa6590002a058980b46c8e5cd28237fcb033443e9ec",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Event.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {t t' : WatchPoll.Event} → t = t' → WatchPoll.Event.noConfusionType P t t'",
+      "typeHash": "401896adaba7a0589b74ddeb58065ac7ee537b9a61a1419bddec8492ca5614da",
+      "valueHash": "653af2916ddcac6233f85eac5ee2c6f005f70d5160cfa61b019473ca968adc8d"
+    },
+    {
+      "name": "WatchPoll.Event.noConfusionType",
+      "kind": "definition",
+      "type": "Sort u → WatchPoll.Event → WatchPoll.Event → Sort u",
+      "typeHash": "d364dd484faf989769bd6a2d2ca896a46675d85870009ddede3a97eb78dfd9d4",
+      "valueHash": "5eba754efd9998cd9427837923c1b4f506fbe27aedbeb7641321e26a508ac2b6"
+    },
+    {
+      "name": "WatchPoll.Event.outcome",
+      "kind": "definition",
+      "type": "WatchPoll.Event → WatchPoll.StepOutcome",
+      "typeHash": "68a88576a649bbbec0ba68488c81af616c6aba245f8c81b0d93b826e2a41afa9",
+      "valueHash": "49b85e3b6461e370b5d8a3a78b3e16c8bbe240cb0c8d39273c1eaf61368e3986"
+    },
+    {
+      "name": "WatchPoll.Event.rec",
+      "kind": "recursor",
+      "type": "{motive : WatchPoll.Event → Sort u} → ((outcome : WatchPoll.StepOutcome) → (stepElapsed sleepElapsed : Nat) → motive { outcome := outcome, stepElapsed := stepElapsed, sleepElapsed := sleepElapsed }) → (t : WatchPoll.Event) → motive t",
+      "typeHash": "ff4bac9874f21d5ae23240c2086d118535400473951da962532d16d7aecf0c59",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Event.recOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Event → Sort u} → (t : WatchPoll.Event) → ((outcome : WatchPoll.StepOutcome) → (stepElapsed sleepElapsed : Nat) → motive { outcome := outcome, stepElapsed := stepElapsed, sleepElapsed := sleepElapsed }) → motive t",
+      "typeHash": "db985f919ff1f330488246e520d8e4cae007337e195869df6f9eaa8a50209c3b",
+      "valueHash": "29378c045db8f3b0f7d302eb8d8600e7c105374a98c9083cf67907dffcb4f250"
+    },
+    {
+      "name": "WatchPoll.Event.sleepElapsed",
+      "kind": "definition",
+      "type": "WatchPoll.Event → Nat",
+      "typeHash": "48c7e4b970ab96069032dacee319c261d69fea8b832c840c14e84822aa0c028e",
+      "valueHash": "4a1ba7d64ec6050bbf6da083e5b652b6c3b6b46433297facfde5b036eec7a671"
+    },
+    {
+      "name": "WatchPoll.Event.stepElapsed",
+      "kind": "definition",
+      "type": "WatchPoll.Event → Nat",
+      "typeHash": "48c7e4b970ab96069032dacee319c261d69fea8b832c840c14e84822aa0c028e",
+      "valueHash": "9bc6cee40f9ddfd2fd2275750b933784174e809b9fc81ed7c1571e5ac5359064"
+    },
+    {
+      "name": "WatchPoll.FirstSeen",
+      "kind": "definition",
+      "type": "Type",
+      "typeHash": "7051ab654d793c216d744f7920d98d672357a0efa67248ee75d146d668f60997",
+      "valueHash": "cd57d6be0ae4dc87942064f509cc5d60c14f11c8a819c3aaa86cb121cc1b68f4"
+    },
+    {
+      "name": "WatchPoll.FirstSightingFalse",
+      "kind": "definition",
+      "type": "List WatchPoll.Call → WatchPoll.Call → Prop",
+      "typeHash": "83ce7891a040b224adc8624057bed5f87dd68396bdb0533616800bb394187f16",
+      "valueHash": "5e0f8b7f5342d1ec69685207008b375b7de14b1d6af3a1f63792916cd2cfc0d9"
+    },
+    {
+      "name": "WatchPoll.HeadChangeFalse",
+      "kind": "definition",
+      "type": "List WatchPoll.Call → WatchPoll.Call → Prop",
+      "typeHash": "83ce7891a040b224adc8624057bed5f87dd68396bdb0533616800bb394187f16",
+      "valueHash": "2d48f695155913ea847ffbf45122b5c9ecba415a4de01aac90aec230624214aa"
+    },
+    {
+      "name": "WatchPoll.HeadChangeFalse.match_1",
+      "kind": "definition",
+      "type": "(motive : Option WatchPoll.Call → Sort u_1) → (x : Option WatchPoll.Call) → ((latest : WatchPoll.Call) → motive (some latest)) → (Unit → motive none) → motive x",
+      "typeHash": "466ff817b93608d9f0e0691c9bd2538b48a4e6d010cd18edfd2db3faf99600c3",
+      "valueHash": "1222be1a4ebee0d0e5237b1b58fe3d876b4298adc32ed381e0b1dde9680588fd"
+    },
+    {
+      "name": "WatchPoll.HeadChangeFalse.match_1.eq_1",
+      "kind": "theorem",
+      "type": "∀ (motive : Option WatchPoll.Call → Sort u_1) (latest : WatchPoll.Call) (h_1 : (latest : WatchPoll.Call) → motive (some latest)) (h_2 : Unit → motive none), (match some latest with | some latest => h_1 latest | none => h_2 ()) = h_1 latest",
+      "typeHash": "f6cdb03b6376a350616c9edce0919da7d8c50e8cd979dee123c54392f349f057",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.HeadChangeFalse.match_1.eq_2",
+      "kind": "theorem",
+      "type": "∀ (motive : Option WatchPoll.Call → Sort u_1) (h_1 : (latest : WatchPoll.Call) → motive (some latest)) (h_2 : Unit → motive none), (match none with | some latest => h_1 latest | none => h_2 ()) = h_2 ()",
+      "typeHash": "d6203fdfa0177e8189c05b75a21827be76ff560d27b8b7eb07d4a1c7093bc22d",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.HeadChangeFalse.match_1.splitter",
+      "kind": "definition",
+      "type": "(motive : Option WatchPoll.Call → Sort u_1) → (x : Option WatchPoll.Call) → ((latest : WatchPoll.Call) → motive (some latest)) → (Unit → motive none) → motive x",
+      "typeHash": "466ff817b93608d9f0e0691c9bd2538b48a4e6d010cd18edfd2db3faf99600c3",
+      "valueHash": "cbc1ef6084130211c55240d5036daa274f3eaea6c7cdb3a230998e92fd0a13a7"
+    },
+    {
+      "name": "WatchPoll.HonestClock",
+      "kind": "definition",
+      "type": "WatchPoll.Event → WatchPoll.State → Prop",
+      "typeHash": "f2fe8d1b0b79f37f73a13df2dd8632996e4d814040bbb5c6737ba65cbb6bfd9f",
+      "valueHash": "0772c6b1c56e4471c557d0d8e9390d6838b303dd46bd8b28907afe194458c1c2"
+    },
+    {
+      "name": "WatchPoll.HonestRun",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → WatchPoll.State → List WatchPoll.Event → Prop",
+      "typeHash": "a823f839c23d4c05bf14631e3dd0fd6e39001ae1fa45e8b090cb3e8cf3d6c6e4",
+      "valueHash": "f20851c8682f87256c9316c5fa127292d6ab934ff708e5515443d9fa95667b87"
+    },
+    {
+      "name": "WatchPoll.Invariant",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → WatchPoll.State → Prop",
+      "typeHash": "806abaf0994e23552112ca5fc0e9baaf70774e7ef4e647f7f68a33b9ee753ddc",
+      "valueHash": "73080e8ac86a15989c8934d7deef6bda3b39697fca2d33ced68884c40a258390"
+    },
+    {
+      "name": "WatchPoll.Last",
+      "kind": "inductive",
+      "type": "Type",
+      "typeHash": "7051ab654d793c216d744f7920d98d672357a0efa67248ee75d146d668f60997",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.casesOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → (t : WatchPoll.Last) → motive WatchPoll.Last.start → ((seconds : Nat) → motive (WatchPoll.Last.sleptPoll seconds)) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds)) → motive WatchPoll.Last.continued → motive WatchPoll.Last.returnedVerdict → ((failures : Nat) → motive (WatchPoll.Last.returnedStatusQuery failures)) → motive WatchPoll.Last.returnedOnDeadline → motive WatchPoll.Last.threw → motive t",
+      "typeHash": "cf58ac1b6f4a63e35359ee9328eb9f7a453a1035e6d4264db84bee3599502778",
+      "valueHash": "566192517f433b1f5a38c06498f4a3c4e93dc827eca1056a179b4a2cdc78cc43"
+    },
+    {
+      "name": "WatchPoll.Last.continued",
+      "kind": "constructor",
+      "type": "WatchPoll.Last",
+      "typeHash": "3120367cac7d19428f10ba958934db8caf91fcd329c508c64099d26517728cf5",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.continued.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → (t : WatchPoll.Last) → t.ctorIdx = 3 → motive WatchPoll.Last.continued → motive t",
+      "typeHash": "ee6b9c3bacb6eb06b11e5650236ab4b14d9820caf91255e13ed0ad9480982789",
+      "valueHash": "04b3d7b1b515b4ba7c8e905edc37252913504a7bad39d111f75eec489ae0db50"
+    },
+    {
+      "name": "WatchPoll.Last.continued.sizeOf_spec",
+      "kind": "theorem",
+      "type": "sizeOf WatchPoll.Last.continued = 1",
+      "typeHash": "d5b4357fc23c37a2cde7f07b522fc81022c7e029ab299bf3fee7b03895528d31",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.ctorElim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → (ctorIdx : Nat) → (t : WatchPoll.Last) → ctorIdx = t.ctorIdx → WatchPoll.Last.ctorElimType ctorIdx → motive t",
+      "typeHash": "07d1569057066980b19c2a82644b8e0eea81bb6f9cba03ebe38c4e1e6c8c8748",
+      "valueHash": "2c8afde2e19e2461bdc5a9072dd0e806b6776d414e2ba6434157793da17d3f75"
+    },
+    {
+      "name": "WatchPoll.Last.ctorElimType",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → Nat → Sort (max 1 u)",
+      "typeHash": "9fe1f3f5298b5d6c9548bcb433f8252f5f7df1651adda0fae33b3d90160eeb49",
+      "valueHash": "97824acf24ae34e2f7584d6a5dff9172d6615544821fa65bd50a36628c5605dd"
+    },
+    {
+      "name": "WatchPoll.Last.ctorIdx",
+      "kind": "definition",
+      "type": "WatchPoll.Last → Nat",
+      "typeHash": "365510ba2576c32956c415e9b371c3c6248bd5c2b610ee3eb547c7bd5496370e",
+      "valueHash": "9ff8ba758b44e3512d4262d6f60f7475f54ca158b2d63e5761a44e245a09a7dd"
+    },
+    {
+      "name": "WatchPoll.Last.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {t t' : WatchPoll.Last} → t = t' → WatchPoll.Last.noConfusionType P t t'",
+      "typeHash": "bf749c9aff9e64f609a8b69d13cae1526f7c08ac56e84c44a085ecd15ea05fa8",
+      "valueHash": "2ecc7569c441312ea03ea04a6831a2088808469a4f9d433cd1e57905433f873a"
+    },
+    {
+      "name": "WatchPoll.Last.noConfusionType",
+      "kind": "definition",
+      "type": "Sort u → WatchPoll.Last → WatchPoll.Last → Sort u",
+      "typeHash": "62406b894761875a6d2392a8816778edd99025229abc3631ed465bcf1d9063f8",
+      "valueHash": "c4b71db873b66644bdc30eff93f134a9c0364c01b0d9f8431c5b73dec832d740"
+    },
+    {
+      "name": "WatchPoll.Last.rec",
+      "kind": "recursor",
+      "type": "{motive : WatchPoll.Last → Sort u} → motive WatchPoll.Last.start → ((seconds : Nat) → motive (WatchPoll.Last.sleptPoll seconds)) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds)) → motive WatchPoll.Last.continued → motive WatchPoll.Last.returnedVerdict → ((failures : Nat) → motive (WatchPoll.Last.returnedStatusQuery failures)) → motive WatchPoll.Last.returnedOnDeadline → motive WatchPoll.Last.threw → (t : WatchPoll.Last) → motive t",
+      "typeHash": "4a8f9a27f5cc2403420b344baec7eecfcb7d444545a5578c41b0e0670f8bab45",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.recOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → (t : WatchPoll.Last) → motive WatchPoll.Last.start → ((seconds : Nat) → motive (WatchPoll.Last.sleptPoll seconds)) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds)) → motive WatchPoll.Last.continued → motive WatchPoll.Last.returnedVerdict → ((failures : Nat) → motive (WatchPoll.Last.returnedStatusQuery failures)) → motive WatchPoll.Last.returnedOnDeadline → motive WatchPoll.Last.threw → motive t",
+      "typeHash": "cf58ac1b6f4a63e35359ee9328eb9f7a453a1035e6d4264db84bee3599502778",
+      "valueHash": "440560cf4324111f1d770918692e41e92b65ef4b5956607f5084f4c4332aba75"
+    },
+    {
+      "name": "WatchPoll.Last.returnedOnDeadline",
+      "kind": "constructor",
+      "type": "WatchPoll.Last",
+      "typeHash": "3120367cac7d19428f10ba958934db8caf91fcd329c508c64099d26517728cf5",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.returnedOnDeadline.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → (t : WatchPoll.Last) → t.ctorIdx = 6 → motive WatchPoll.Last.returnedOnDeadline → motive t",
+      "typeHash": "26ad8ec6f0904fa5af7af166bab486ee0c1aa7c9be57fe59f3ccdfb66e65af6c",
+      "valueHash": "1488fb61dd4e57b5477d61ca074999c405913afe4a3deb92eeda0a842ba38495"
+    },
+    {
+      "name": "WatchPoll.Last.returnedOnDeadline.sizeOf_spec",
+      "kind": "theorem",
+      "type": "sizeOf WatchPoll.Last.returnedOnDeadline = 1",
+      "typeHash": "91edd39717c010012e8420ff2ba492697ca11d84545d34ec455451c56bce0521",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.returnedStatusQuery",
+      "kind": "constructor",
+      "type": "Nat → WatchPoll.Last",
+      "typeHash": "4aa8b4a3d40e4ea0bd47d78db56aebe50aac681400dac0ab9912bb277ea3353e",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.returnedStatusQuery.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → (t : WatchPoll.Last) → t.ctorIdx = 5 → ((failures : Nat) → motive (WatchPoll.Last.returnedStatusQuery failures)) → motive t",
+      "typeHash": "4cdd2c93e7b9a3665297ab3cba2918be4f75e7969004f483097610d13fc71338",
+      "valueHash": "63e2c8b78868a8d1331790ce5754a2534a13d97a8d179b28fdd8ca5e53082f74"
+    },
+    {
+      "name": "WatchPoll.Last.returnedStatusQuery.inj",
+      "kind": "theorem",
+      "type": "∀ {failures failures_1 : Nat}, WatchPoll.Last.returnedStatusQuery failures = WatchPoll.Last.returnedStatusQuery failures_1 → failures = failures_1",
+      "typeHash": "299934fcc46f24295c756d743d8350067bccfb9a2494b305abf1f695037464a9",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.returnedStatusQuery.injEq",
+      "kind": "theorem",
+      "type": "∀ (failures failures_1 : Nat), (WatchPoll.Last.returnedStatusQuery failures = WatchPoll.Last.returnedStatusQuery failures_1) = (failures = failures_1)",
+      "typeHash": "c1efb2547ec0b1fe31f71569a7a1f20cd3854b0a466b661e5be6cbca71b9a485",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.returnedStatusQuery.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {failures failures' : Nat} → WatchPoll.Last.returnedStatusQuery failures = WatchPoll.Last.returnedStatusQuery failures' → (failures = failures' → P) → P",
+      "typeHash": "221ee0cb5d266cf92442e026750faa0aeb260674c1cc0a622086a808bc74e38b",
+      "valueHash": "4fe0172991b3da422b28dc0f4cf46cce49ea622d09f7c8feba20010c5303e07c"
+    },
+    {
+      "name": "WatchPoll.Last.returnedStatusQuery.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (failures : Nat), sizeOf (WatchPoll.Last.returnedStatusQuery failures) = 1 + sizeOf failures",
+      "typeHash": "c218575f4a43f1033bf3457e864caec08e757ee0c6a18d1124747ca0c85f641f",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.returnedVerdict",
+      "kind": "constructor",
+      "type": "WatchPoll.Last",
+      "typeHash": "3120367cac7d19428f10ba958934db8caf91fcd329c508c64099d26517728cf5",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.returnedVerdict.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → (t : WatchPoll.Last) → t.ctorIdx = 4 → motive WatchPoll.Last.returnedVerdict → motive t",
+      "typeHash": "b118220517d057669b90ad6c3cff7d5e81d79599518c7ffa73f743cf85c06840",
+      "valueHash": "c566acecbe7daf7e6e63395bd9f2c9c46d9fb305a2f112935a8c2ec2a15a2846"
+    },
+    {
+      "name": "WatchPoll.Last.returnedVerdict.sizeOf_spec",
+      "kind": "theorem",
+      "type": "sizeOf WatchPoll.Last.returnedVerdict = 1",
+      "typeHash": "ffc4763650967727f962f4101ba7812edb6e2281a3502a05444b2c2b1b4dd120",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.running",
+      "kind": "definition",
+      "type": "WatchPoll.Last → Bool",
+      "typeHash": "5f6dc32c00578e22097c48d2aefc107f1b9c3b5380e0d5ba987c3868027469ea",
+      "valueHash": "25dd504b6e743e978fff22a17d85da80190a3e25dbc6e374eaa6521ad5520180"
+    },
+    {
+      "name": "WatchPoll.Last.running.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Last → Sort u_1) → (x : WatchPoll.Last) → (Unit → motive WatchPoll.Last.start) → ((seconds : Nat) → motive (WatchPoll.Last.sleptPoll seconds)) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds)) → (Unit → motive WatchPoll.Last.continued) → ((x : WatchPoll.Last) → motive x) → motive x",
+      "typeHash": "f39da8b5757a5c5113973f40f097ff060b1fbd5eb32f50071b6747bfdb1d06bc",
+      "valueHash": "f9431b6e50a96877adcf543bbd5383744ff7a0474d8203a689936827c15d37d4"
+    },
+    {
+      "name": "WatchPoll.Last.sleepSeconds",
+      "kind": "definition",
+      "type": "WatchPoll.Last → Option Nat",
+      "typeHash": "2998cacf032e6b242c44e5a50a01412afcb080e8d2b786423d76e6692a39143c",
+      "valueHash": "28a04cee31a28cbf153a236c4fd83203ad49bf8bf4354e887cfab8fa6289c027"
+    },
+    {
+      "name": "WatchPoll.Last.sleepSeconds.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Last → Sort u_1) → (x : WatchPoll.Last) → ((seconds : Nat) → motive (WatchPoll.Last.sleptPoll seconds)) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds)) → ((x : WatchPoll.Last) → motive x) → motive x",
+      "typeHash": "a165f906b220eb3b98c8a1822ae169f4d358b73d6e641fbd5dcec3682babac17",
+      "valueHash": "0d290a6e90d54a3557140e99ab3da8de93a2416a6b1d21f59722583cc57fe721"
+    },
+    {
+      "name": "WatchPoll.Last.sleptPoll",
+      "kind": "constructor",
+      "type": "Nat → WatchPoll.Last",
+      "typeHash": "68170f6140999251b378fa9bbf03f656e198815acbbef45a52ecabecbb127c5e",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.sleptPoll.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → (t : WatchPoll.Last) → t.ctorIdx = 1 → ((seconds : Nat) → motive (WatchPoll.Last.sleptPoll seconds)) → motive t",
+      "typeHash": "7f751f46457da2706bda9e2a23a418b8a5a0a3d2ee27d8d6a11d9f0ef11484e3",
+      "valueHash": "29c7b620dd01bb323c8bd4c9afd9ef7eb2a4dfff232f30754c636ae3e5095c81"
+    },
+    {
+      "name": "WatchPoll.Last.sleptPoll.inj",
+      "kind": "theorem",
+      "type": "∀ {seconds seconds_1 : Nat}, WatchPoll.Last.sleptPoll seconds = WatchPoll.Last.sleptPoll seconds_1 → seconds = seconds_1",
+      "typeHash": "6e0125ccb095a12d60ccb55247960b4ce82c8a94e25eba3c876dcf624eaccf7a",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.sleptPoll.injEq",
+      "kind": "theorem",
+      "type": "∀ (seconds seconds_1 : Nat), (WatchPoll.Last.sleptPoll seconds = WatchPoll.Last.sleptPoll seconds_1) = (seconds = seconds_1)",
+      "typeHash": "f2047265013fdca5b70e37857ebef24d11df638834fe87319112f4ec98a3103a",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.sleptPoll.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {seconds seconds' : Nat} → WatchPoll.Last.sleptPoll seconds = WatchPoll.Last.sleptPoll seconds' → (seconds = seconds' → P) → P",
+      "typeHash": "c79cf77cded0c82391a347e461bb5ff0a6ed8b1c5f3fd525d137377d3d40c585",
+      "valueHash": "ccc286b92bc2028b3d62aa2ece48faf2b893c0ed0271ba83e0bb962149d1fea7"
+    },
+    {
+      "name": "WatchPoll.Last.sleptPoll.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (seconds : Nat), sizeOf (WatchPoll.Last.sleptPoll seconds) = 1 + sizeOf seconds",
+      "typeHash": "afe725b2ccbc64879cc0302b959e2acd4b9a714aa73e1fbfead1fa57dea25de0",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.sleptRetry",
+      "kind": "constructor",
+      "type": "Nat → WatchPoll.Last",
+      "typeHash": "68170f6140999251b378fa9bbf03f656e198815acbbef45a52ecabecbb127c5e",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.sleptRetry.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → (t : WatchPoll.Last) → t.ctorIdx = 2 → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds)) → motive t",
+      "typeHash": "d9f3e3cd5fc00c0054f1dd2b2d638ea101ec8ffd70640d28c6f818b3970d1a5d",
+      "valueHash": "353379747d930906445c10b175c0935afb50b5974adf740d0e213fd21de5188f"
+    },
+    {
+      "name": "WatchPoll.Last.sleptRetry.inj",
+      "kind": "theorem",
+      "type": "∀ {seconds seconds_1 : Nat}, WatchPoll.Last.sleptRetry seconds = WatchPoll.Last.sleptRetry seconds_1 → seconds = seconds_1",
+      "typeHash": "46932e39fbdb2d9aad4c7f238cfe5d7e9afb39238657d2ca2b9b64a0ad39d896",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.sleptRetry.injEq",
+      "kind": "theorem",
+      "type": "∀ (seconds seconds_1 : Nat), (WatchPoll.Last.sleptRetry seconds = WatchPoll.Last.sleptRetry seconds_1) = (seconds = seconds_1)",
+      "typeHash": "cdd33eb094f9df7d703ba24dafd259df4f37184551a9fa26f04c4164418bf1cd",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.sleptRetry.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {seconds seconds' : Nat} → WatchPoll.Last.sleptRetry seconds = WatchPoll.Last.sleptRetry seconds' → (seconds = seconds' → P) → P",
+      "typeHash": "3292fc5201adb8752ae9fa810aa5ef73a642afcbc2e908776ba33b808dcf172d",
+      "valueHash": "fb09195713c2404f0181df772f200b676fb4abce11c86d17fd4068fc91d6ae4c"
+    },
+    {
+      "name": "WatchPoll.Last.sleptRetry.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (seconds : Nat), sizeOf (WatchPoll.Last.sleptRetry seconds) = 1 + sizeOf seconds",
+      "typeHash": "4e098c166d047dd26369eb085e438f2bb1dc70d66c2fc9224af78a2b1d8068bd",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.start",
+      "kind": "constructor",
+      "type": "WatchPoll.Last",
+      "typeHash": "3120367cac7d19428f10ba958934db8caf91fcd329c508c64099d26517728cf5",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.start.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → (t : WatchPoll.Last) → t.ctorIdx = 0 → motive WatchPoll.Last.start → motive t",
+      "typeHash": "05371ea8dfd206acf1439d4b373dbfbe1383ed9aa581084664de84dd2ad05a7b",
+      "valueHash": "100c627e12766b7e1ed814a6859f3317132e8ca1a617336b81719462a79111c5"
+    },
+    {
+      "name": "WatchPoll.Last.start.sizeOf_spec",
+      "kind": "theorem",
+      "type": "sizeOf WatchPoll.Last.start = 1",
+      "typeHash": "74b7bcea68eb10efe3c46bb4b964d717850214c08d95ad8c06ce71465d50ec4b",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.threw",
+      "kind": "constructor",
+      "type": "WatchPoll.Last",
+      "typeHash": "3120367cac7d19428f10ba958934db8caf91fcd329c508c64099d26517728cf5",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Last.threw.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Last → Sort u} → (t : WatchPoll.Last) → t.ctorIdx = 7 → motive WatchPoll.Last.threw → motive t",
+      "typeHash": "397b8ed3188ffc5d61ce138f10408eafd9775468bc3e1a0aec85ebb9a0a16c78",
+      "valueHash": "952033fed208fd0894b31bbde4a2a5f109deec9103842e0d2c23bb0b70de7574"
+    },
+    {
+      "name": "WatchPoll.Last.threw.sizeOf_spec",
+      "kind": "theorem",
+      "type": "sizeOf WatchPoll.Last.threw = 1",
+      "typeHash": "e8634bd6cfad2bcd2bf653bcb834a4b2977a3d13002b25a9b3d2acb948f48116",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.NO_CHECKS_CONFIRM_SECONDS",
+      "kind": "definition",
+      "type": "Nat",
+      "typeHash": "d38ea4c0b755428100ea00487f1413e32d3d5dd05a51e0e78c9de5d27dd99e38",
+      "valueHash": "47a9c095bcb043915cf80f607e46e41a1134aa0faedbc01217ef03151d457a60"
+    },
+    {
+      "name": "WatchPoll.PollingOptions",
+      "kind": "inductive",
+      "type": "Type",
+      "typeHash": "7051ab654d793c216d744f7920d98d672357a0efa67248ee75d146d668f60997",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.PollingOptions.casesOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.PollingOptions → Sort u} → (t : WatchPoll.PollingOptions) → ((interval maxQueryErrors : Nat) → motive { interval := interval, maxQueryErrors := maxQueryErrors }) → motive t",
+      "typeHash": "4ce2f72d727a515e006958eb9b0c62378c7876e8f9356f9c163ffb0b804e0ce4",
+      "valueHash": "d12bf740b643904affd35c85d704a73d947447a3806d3a220baf1d32dafc3203"
+    },
+    {
+      "name": "WatchPoll.PollingOptions.ctorIdx",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → Nat",
+      "typeHash": "19d8e49a963b3e2084de852925601d4cab9bc5d41031e1cfa26404599e49bc93",
+      "valueHash": "1e163787844fc0f869c2ec1f85a564ad515f0cee5026af31dad6408ac27ffb6b"
+    },
+    {
+      "name": "WatchPoll.PollingOptions.interval",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → Nat",
+      "typeHash": "8756e90465bbd9157964eaf568593554488b17d223202940a757eda702850988",
+      "valueHash": "4308544074776e83c0587e065c56fd4c23f0540908fbdb6265969c968e641d48"
+    },
+    {
+      "name": "WatchPoll.PollingOptions.maxQueryErrors",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → Nat",
+      "typeHash": "8756e90465bbd9157964eaf568593554488b17d223202940a757eda702850988",
+      "valueHash": "372d5ed8d4551e5fad9eed1b3b74594fbf9045a7bccf324523ca0715c78ba20f"
+    },
+    {
+      "name": "WatchPoll.PollingOptions.mk",
+      "kind": "constructor",
+      "type": "Nat → Nat → WatchPoll.PollingOptions",
+      "typeHash": "07c3f0a3424063c6b1e4910ed71d9182c530e2cac8ab4371a39a61cfdfa23420",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.PollingOptions.mk.inj",
+      "kind": "theorem",
+      "type": "∀ {interval maxQueryErrors interval_1 maxQueryErrors_1 : Nat}, { interval := interval, maxQueryErrors := maxQueryErrors } = { interval := interval_1, maxQueryErrors := maxQueryErrors_1 } → interval = interval_1 ∧ maxQueryErrors = maxQueryErrors_1",
+      "typeHash": "fb74f80e2d0d301e9bc893d40ef9030f8aa8f076bf3e5dcb48757f594e144f2e",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.PollingOptions.mk.injEq",
+      "kind": "theorem",
+      "type": "∀ (interval maxQueryErrors interval_1 maxQueryErrors_1 : Nat), ({ interval := interval, maxQueryErrors := maxQueryErrors } = { interval := interval_1, maxQueryErrors := maxQueryErrors_1 }) = (interval = interval_1 ∧ maxQueryErrors = maxQueryErrors_1)",
+      "typeHash": "653dbce8bfa116f1d0d51d178e715286fed98b74d9e43c03c0e303c09cf828b9",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.PollingOptions.mk.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {interval maxQueryErrors interval' maxQueryErrors' : Nat} → { interval := interval, maxQueryErrors := maxQueryErrors } = { interval := interval', maxQueryErrors := maxQueryErrors' } → (interval = interval' → maxQueryErrors = maxQueryErrors' → P) → P",
+      "typeHash": "ff2185715534a4f08181591184f538b1f2177858e3f29f22558e486dd25e376f",
+      "valueHash": "5f3e8978b578931fab5cfc009b497a7894b2bc03542e4e79fc9841b351ebf9f4"
+    },
+    {
+      "name": "WatchPoll.PollingOptions.mk.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (interval maxQueryErrors : Nat), sizeOf { interval := interval, maxQueryErrors := maxQueryErrors } = 1 + sizeOf interval + sizeOf maxQueryErrors",
+      "typeHash": "83711364218edc075fb23929366b7cd56f40c5a54509374956ee9f5d610b839c",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.PollingOptions.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {t t' : WatchPoll.PollingOptions} → t = t' → WatchPoll.PollingOptions.noConfusionType P t t'",
+      "typeHash": "3f961fa303d86b0f87996d2b88c082e19920752cc514629c8c06379efed081c2",
+      "valueHash": "60e6ea28d3c37c5b7099836d67ba57741ebd9411f8d878fca08b9665981f3e9b"
+    },
+    {
+      "name": "WatchPoll.PollingOptions.noConfusionType",
+      "kind": "definition",
+      "type": "Sort u → WatchPoll.PollingOptions → WatchPoll.PollingOptions → Sort u",
+      "typeHash": "01fd6ecc7b972316b29a8b32f877f62202e56c6c1a8d3d473ad75cafd113f2ac",
+      "valueHash": "816d0f65518c61b2d7846afc98d394e3d2b8c76da7be7a428e67cc90a8e5a6f2"
+    },
+    {
+      "name": "WatchPoll.PollingOptions.rec",
+      "kind": "recursor",
+      "type": "{motive : WatchPoll.PollingOptions → Sort u} → ((interval maxQueryErrors : Nat) → motive { interval := interval, maxQueryErrors := maxQueryErrors }) → (t : WatchPoll.PollingOptions) → motive t",
+      "typeHash": "04a4c73cb7989d99c732c9d7e8adf32c6be874d1705ebe893de7e16d59e4cd3c",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.PollingOptions.recOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.PollingOptions → Sort u} → (t : WatchPoll.PollingOptions) → ((interval maxQueryErrors : Nat) → motive { interval := interval, maxQueryErrors := maxQueryErrors }) → motive t",
+      "typeHash": "4ce2f72d727a515e006958eb9b0c62378c7876e8f9356f9c163ffb0b804e0ce4",
+      "valueHash": "2924b645605146c22e1a7f1f02341a524fa77ea14d56b79669a5681eb1e48189"
+    },
+    {
+      "name": "WatchPoll.ResetsFailures",
+      "kind": "definition",
+      "type": "WatchPoll.State → WatchPoll.Event → WatchPoll.State → Prop",
+      "typeHash": "adea0fde04e4356b5dabed5e2f643f775e7b570553307a3b9c99d868c6faeefc",
+      "valueHash": "cfdf7f4d1bfdb74b5f3da2042f5a211c42539db8c84aeed4f92a8c14c9e2f7e8"
+    },
+    {
+      "name": "WatchPoll.RetriesBelowMax",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → WatchPoll.State → Prop",
+      "typeHash": "806abaf0994e23552112ca5fc0e9baaf70774e7ef4e647f7f68a33b9ee753ddc",
+      "valueHash": "7a3c9961dd068410081fef53787c99577dd82d526300e533af48e65fc1ca7f6e"
+    },
+    {
+      "name": "WatchPoll.RetryUsesBackoff",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → WatchPoll.State → WatchPoll.Event → WatchPoll.State → Prop",
+      "typeHash": "f48e3d974828b3bf9980945ba23d46a408f2b4a36bc16c232b65ff83fa1969f6",
+      "valueHash": "32289000dc29b0a1eb4eb4ffed0d12d6132e190ef8c5f806909eb8a7f460318f"
+    },
+    {
+      "name": "WatchPoll.RetryUsesBackoff.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Last → Sort u_1) → (x : WatchPoll.Last) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds)) → ((x : WatchPoll.Last) → motive x) → motive x",
+      "typeHash": "6774e8f0a20040847861b6a2cc6a9e0c417ae530a2799a35a8b4be1dde3405f8",
+      "valueHash": "eb4bec73d879562749114284966580749112e8de6190b4308d3d91805436c39f"
+    },
+    {
+      "name": "WatchPoll.RetryUsesBackoff.match_1.eq_1",
+      "kind": "theorem",
+      "type": "∀ (motive : WatchPoll.Last → Sort u_1) (seconds : Nat) (h_1 : (seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds)) (h_2 : (x : WatchPoll.Last) → motive x), (match WatchPoll.Last.sleptRetry seconds with | WatchPoll.Last.sleptRetry seconds => h_1 seconds | x => h_2 x) = h_1 seconds",
+      "typeHash": "8b79d843fc6f903791c91bb4e0a6668afe1220a909fac5351a62e88360bb5c88",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.RetryUsesBackoff.match_1.eq_2",
+      "kind": "theorem",
+      "type": "∀ (motive : WatchPoll.Last → Sort u_1) (x : WatchPoll.Last) (h_1 : (seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds)) (h_2 : (x : WatchPoll.Last) → motive x), (∀ (seconds : Nat), x = WatchPoll.Last.sleptRetry seconds → False) → (match x with | WatchPoll.Last.sleptRetry seconds => h_1 seconds | x => h_2 x) = h_2 x",
+      "typeHash": "ca55c378024e6543ef487f1572362f026bcfce1a414b5eb4fa4b9583dde58bba",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.RetryUsesBackoff.match_1.splitter",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Last → Sort u_1) → (x : WatchPoll.Last) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds)) → ((x : WatchPoll.Last) → (∀ (seconds : Nat), x = WatchPoll.Last.sleptRetry seconds → False) → motive x) → motive x",
+      "typeHash": "55953a1264c78d1c8c27c50512044bb15b3c4bc0696af74667e92beacb0459fa",
+      "valueHash": "64a87e2bab3cf6defdc0a9e9cca188ee7bff2780a5ed3febf55a5055d59cb377"
+    },
+    {
+      "name": "WatchPoll.Seconds",
+      "kind": "inductive",
+      "type": "Type",
+      "typeHash": "7051ab654d793c216d744f7920d98d672357a0efa67248ee75d146d668f60997",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Seconds.cap",
+      "kind": "definition",
+      "type": "WatchPoll.Seconds → Nat → Nat",
+      "typeHash": "d0cc204d25b2efea268eb346e4b0a7539523213688430c4a19435a324383ffe1",
+      "valueHash": "e028448fd46da9cd50813605d981d732545b1e481d0413a76ba878b3e0bd9e91"
+    },
+    {
+      "name": "WatchPoll.Seconds.casesOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Seconds → Sort u} → (t : WatchPoll.Seconds) → ((seconds : Nat) → motive (WatchPoll.Seconds.finite seconds)) → motive WatchPoll.Seconds.infinity → motive t",
+      "typeHash": "445040cb426c3f653db0462bff027adaf7248bd3a23dee43e0898443ce41912d",
+      "valueHash": "ec3a96201ef19ba0a5de136a422eb832d8f37073ac4c14854e176d49d9947afb"
+    },
+    {
+      "name": "WatchPoll.Seconds.covers",
+      "kind": "definition",
+      "type": "WatchPoll.Seconds → Nat → Prop",
+      "typeHash": "f1892df9d45103bf28372ea6c63d7bc5136f42d3539f24c47a4b05ee1a3a5d72",
+      "valueHash": "0181a8a8240ccd9c273f1e432e62eaaa4ccc26a3a332b496689054d3553445b4"
+    },
+    {
+      "name": "WatchPoll.Seconds.ctorElim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Seconds → Sort u} → (ctorIdx : Nat) → (t : WatchPoll.Seconds) → ctorIdx = t.ctorIdx → WatchPoll.Seconds.ctorElimType ctorIdx → motive t",
+      "typeHash": "f378fd7a77c08a3186fe4993954797bc52d3aa4bacad1bfb9ac2f728b85d358a",
+      "valueHash": "ee8761d487f0e814396a3d9a6f946fbde995f28c8bd3f93e9f63df0cba887dad"
+    },
+    {
+      "name": "WatchPoll.Seconds.ctorElimType",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Seconds → Sort u} → Nat → Sort (max 1 u)",
+      "typeHash": "dfda63133bc562efbbbf0ca3814a9bea83e1832ea46391a1e760f42d10442cd4",
+      "valueHash": "7d865d4fbea0e12059e5637f642de6014f650a8668c5f9c518e79a712335fabd"
+    },
+    {
+      "name": "WatchPoll.Seconds.ctorIdx",
+      "kind": "definition",
+      "type": "WatchPoll.Seconds → Nat",
+      "typeHash": "1cf16ea9d732ed6435f67e2996240ac2d9db021d7b3a0aee6130455397f14682",
+      "valueHash": "85ed3e459922d2546c665e03301237d5aab233b8475b3c81f31da515a144a9ac"
+    },
+    {
+      "name": "WatchPoll.Seconds.elapse",
+      "kind": "definition",
+      "type": "WatchPoll.Seconds → Nat → WatchPoll.Seconds",
+      "typeHash": "7dcc3245bce6d91c1f8259068daa7623d4c02ebadc44da7ed79ae6f1f6544999",
+      "valueHash": "fbcd057bfcf2d5c52d7da20ea73dcd7a27d9d45af9bb52bb5b58a261c5a67455"
+    },
+    {
+      "name": "WatchPoll.Seconds.finite",
+      "kind": "constructor",
+      "type": "Nat → WatchPoll.Seconds",
+      "typeHash": "bfaf9655ceea623ea57a2b37262ea763cb5f1e3abbe43c1436dbb6835393fda3",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Seconds.finite.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Seconds → Sort u} → (t : WatchPoll.Seconds) → t.ctorIdx = 0 → ((seconds : Nat) → motive (WatchPoll.Seconds.finite seconds)) → motive t",
+      "typeHash": "19b632026cda4e8f09b58d374dfa5205048778f4fc125d8adacdf629c3f1f0cc",
+      "valueHash": "737d26cf6d01c870a8867a48fcda245ac29a81f036fd3e7750c9ef7263b35288"
+    },
+    {
+      "name": "WatchPoll.Seconds.finite.inj",
+      "kind": "theorem",
+      "type": "∀ {seconds seconds_1 : Nat}, WatchPoll.Seconds.finite seconds = WatchPoll.Seconds.finite seconds_1 → seconds = seconds_1",
+      "typeHash": "bc01762f22d1153133bd3191c8957246680e762acca0e6fe89c5a0ef8e320fd8",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Seconds.finite.injEq",
+      "kind": "theorem",
+      "type": "∀ (seconds seconds_1 : Nat), (WatchPoll.Seconds.finite seconds = WatchPoll.Seconds.finite seconds_1) = (seconds = seconds_1)",
+      "typeHash": "05d5007a3348fa3b0bfdcad35b05e478580e5a5d77f452ef6ccf7faae9b4913c",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Seconds.finite.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {seconds seconds' : Nat} → WatchPoll.Seconds.finite seconds = WatchPoll.Seconds.finite seconds' → (seconds = seconds' → P) → P",
+      "typeHash": "275adc055e75aac88488560efd1f7f2b90f28abebf358c211a0f3e3433dec7ea",
+      "valueHash": "ce9b551e65441ecf2b09245df1ba5e2fe7c313d5c3f99535bba8f28655129673"
+    },
+    {
+      "name": "WatchPoll.Seconds.finite.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (seconds : Nat), sizeOf (WatchPoll.Seconds.finite seconds) = 1 + sizeOf seconds",
+      "typeHash": "934e4fbd664d736e8eb6efdc1917f7caec7cafbaf237a35ae19bb1b8c4c42dfa",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Seconds.infinity",
+      "kind": "constructor",
+      "type": "WatchPoll.Seconds",
+      "typeHash": "8db42a2f42ef3e50dcc25118167715f61f09a04c6d0d4a7e51ee3fa2007c6613",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Seconds.infinity.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Seconds → Sort u} → (t : WatchPoll.Seconds) → t.ctorIdx = 1 → motive WatchPoll.Seconds.infinity → motive t",
+      "typeHash": "99de191adae8914b0a3720e29d56965fe14a89f6876fc15205fc5d845bfe960a",
+      "valueHash": "b5b1dc91ae56dfbdfceae0fc14aad60023e2f2bd66cbbc15dce6c377d00af868"
+    },
+    {
+      "name": "WatchPoll.Seconds.infinity.sizeOf_spec",
+      "kind": "theorem",
+      "type": "sizeOf WatchPoll.Seconds.infinity = 1",
+      "typeHash": "ed10bd39b21f853b016df913fa87090cca0da4c186315e7bb0bc915455207417",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Seconds.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {t t' : WatchPoll.Seconds} → t = t' → WatchPoll.Seconds.noConfusionType P t t'",
+      "typeHash": "39ba043d8af4aa00194ca30e9bbdca06e5591c99a81ecf0d2755c012cb49dec0",
+      "valueHash": "88bb20caed9a314c6b42d56bf7df2fc494678cb44e7a20d4c3c5560770cb8779"
+    },
+    {
+      "name": "WatchPoll.Seconds.noConfusionType",
+      "kind": "definition",
+      "type": "Sort u → WatchPoll.Seconds → WatchPoll.Seconds → Sort u",
+      "typeHash": "37fbace67f7af355354486c7b99ce872a94e95a89301848ff4ecd9fd34b1bfa3",
+      "valueHash": "1d3cfc270d48a0a0f4f3bcad239c6cf3c80484c088f21a810468a2818556c6af"
+    },
+    {
+      "name": "WatchPoll.Seconds.positive",
+      "kind": "definition",
+      "type": "WatchPoll.Seconds → Bool",
+      "typeHash": "593fc83dfb8d4875915b30821f94ad44b6b98d838c06e97eaad050c12c2a6d64",
+      "valueHash": "9aa1343ed92cc24d051495f294313e1a1bae8ab69d7724b35e90e869226ba34e"
+    },
+    {
+      "name": "WatchPoll.Seconds.rec",
+      "kind": "recursor",
+      "type": "{motive : WatchPoll.Seconds → Sort u} → ((seconds : Nat) → motive (WatchPoll.Seconds.finite seconds)) → motive WatchPoll.Seconds.infinity → (t : WatchPoll.Seconds) → motive t",
+      "typeHash": "3870b58b0ff14d7e71e459e772fd3e4be0cf0bf3805d2a6a6c9531f4f5e618a5",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Seconds.recOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Seconds → Sort u} → (t : WatchPoll.Seconds) → ((seconds : Nat) → motive (WatchPoll.Seconds.finite seconds)) → motive WatchPoll.Seconds.infinity → motive t",
+      "typeHash": "445040cb426c3f653db0462bff027adaf7248bd3a23dee43e0898443ce41912d",
+      "valueHash": "14379873306e7783d26a9081a3e844c048d275626970696ba420d3f64a2e0b8e"
+    },
+    {
+      "name": "WatchPoll.Sighting",
+      "kind": "inductive",
+      "type": "Type",
+      "typeHash": "7051ab654d793c216d744f7920d98d672357a0efa67248ee75d146d668f60997",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Sighting.casesOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Sighting → Sort u} → (t : WatchPoll.Sighting) → ((headRefOid seenAt : Nat) → motive { headRefOid := headRefOid, seenAt := seenAt }) → motive t",
+      "typeHash": "04c20ab319a929fe711a70edbcf1846be8237ea3fd429a7c878f77c230756aaf",
+      "valueHash": "f9d68e861082135c414a54db738859dabdd3a005a7715a58f12423247192dcde"
+    },
+    {
+      "name": "WatchPoll.Sighting.ctorIdx",
+      "kind": "definition",
+      "type": "WatchPoll.Sighting → Nat",
+      "typeHash": "94f799bab78a9a40a4054c45f3c7d304347e14abb5487e4a19795b0dfe64ec8e",
+      "valueHash": "62bb22eb2d49dc7a26d0a57c6de73459ebe1971f38f0b703d86367d3ddd772e2"
+    },
+    {
+      "name": "WatchPoll.Sighting.headRefOid",
+      "kind": "definition",
+      "type": "WatchPoll.Sighting → Nat",
+      "typeHash": "8f808618c6f531f02d6bcb0dcbe5d56fd1862fd356485be73e20e3e36d81f8a8",
+      "valueHash": "9f61ad1635e1847d4fc3a0d67ce08bb2ca9d6ee01461506653dff5fba30e4829"
+    },
+    {
+      "name": "WatchPoll.Sighting.mk",
+      "kind": "constructor",
+      "type": "Nat → Nat → WatchPoll.Sighting",
+      "typeHash": "937bca33510c6de9bff109b4100c8abe31a2204b1983812bac5d4aaedcc59f3f",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Sighting.mk.inj",
+      "kind": "theorem",
+      "type": "∀ {headRefOid seenAt headRefOid_1 seenAt_1 : Nat}, { headRefOid := headRefOid, seenAt := seenAt } = { headRefOid := headRefOid_1, seenAt := seenAt_1 } → headRefOid = headRefOid_1 ∧ seenAt = seenAt_1",
+      "typeHash": "f56a46d47caf5f1747edf5e0afaafefa6c0100f51fc6e167881975dc54203fe7",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Sighting.mk.injEq",
+      "kind": "theorem",
+      "type": "∀ (headRefOid seenAt headRefOid_1 seenAt_1 : Nat), ({ headRefOid := headRefOid, seenAt := seenAt } = { headRefOid := headRefOid_1, seenAt := seenAt_1 }) = (headRefOid = headRefOid_1 ∧ seenAt = seenAt_1)",
+      "typeHash": "012971717f098fbcafa9c4f68dc8d8c7be6dd87db2424eb2726d03ac7ba8370e",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Sighting.mk.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {headRefOid seenAt headRefOid' seenAt' : Nat} → { headRefOid := headRefOid, seenAt := seenAt } = { headRefOid := headRefOid', seenAt := seenAt' } → (headRefOid = headRefOid' → seenAt = seenAt' → P) → P",
+      "typeHash": "cc69a58c9e5bcb8be4ac5c8e0ab31639984e638b83c4b255a8f8c31811c81ecf",
+      "valueHash": "a839efab40d945741bdae4f17ef1e0ad7cc52b0e2ccef877e168091f1ae6dfc2"
+    },
+    {
+      "name": "WatchPoll.Sighting.mk.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (headRefOid seenAt : Nat), sizeOf { headRefOid := headRefOid, seenAt := seenAt } = 1 + sizeOf headRefOid + sizeOf seenAt",
+      "typeHash": "a69f193e9416a9699081e4900ba8626df13ea6fc1299e44cd25d2115c02759b7",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Sighting.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {t t' : WatchPoll.Sighting} → t = t' → WatchPoll.Sighting.noConfusionType P t t'",
+      "typeHash": "635ac385599a9770d45b9ffae276bed940349bfcd41f3945e4434c50d5e5959b",
+      "valueHash": "fa41d109e775043d40187fe0622dcbdf57790dd2e3416efb72656601a5083053"
+    },
+    {
+      "name": "WatchPoll.Sighting.noConfusionType",
+      "kind": "definition",
+      "type": "Sort u → WatchPoll.Sighting → WatchPoll.Sighting → Sort u",
+      "typeHash": "4acdad30be4d2ac0733f9a232f20e1fb31ccb6b4533b354250625a98ff8a964a",
+      "valueHash": "52ae9149f14741c06d9a10454904ed36efdfe439a2690baecc2d92216da7c343"
+    },
+    {
+      "name": "WatchPoll.Sighting.rec",
+      "kind": "recursor",
+      "type": "{motive : WatchPoll.Sighting → Sort u} → ((headRefOid seenAt : Nat) → motive { headRefOid := headRefOid, seenAt := seenAt }) → (t : WatchPoll.Sighting) → motive t",
+      "typeHash": "15e9b453fe8b737994bd1e869c111ac43733ed3e5eb6a71f9dc9f0921abf1ed6",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Sighting.recOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Sighting → Sort u} → (t : WatchPoll.Sighting) → ((headRefOid seenAt : Nat) → motive { headRefOid := headRefOid, seenAt := seenAt }) → motive t",
+      "typeHash": "04c20ab319a929fe711a70edbcf1846be8237ea3fd429a7c878f77c230756aaf",
+      "valueHash": "fe6c75f5071e34df8f4aafb202514afa2c97fdd078c14b696cbacdce47d4b72f"
+    },
+    {
+      "name": "WatchPoll.Sighting.seenAt",
+      "kind": "definition",
+      "type": "WatchPoll.Sighting → Nat",
+      "typeHash": "8f808618c6f531f02d6bcb0dcbe5d56fd1862fd356485be73e20e3e36d81f8a8",
+      "valueHash": "53966f574603c8bb15086c9fa11193d947ef7cdfc9f05070889fb43eaf4ee932"
+    },
+    {
+      "name": "WatchPoll.SleepWithinBudget",
+      "kind": "definition",
+      "type": "WatchPoll.State → WatchPoll.Event → WatchPoll.State → Prop",
+      "typeHash": "adea0fde04e4356b5dabed5e2f643f775e7b570553307a3b9c99d868c6faeefc",
+      "valueHash": "3570125c58005c20150146b716d3ee078e966c4b2bdd18fe632bcd9f548a06f8"
+    },
+    {
+      "name": "WatchPoll.SleepWithinBudget.match_1",
+      "kind": "definition",
+      "type": "(motive : Option Nat → Sort u_1) → (x : Option Nat) → ((seconds : Nat) → motive (some seconds)) → (Unit → motive none) → motive x",
+      "typeHash": "937e4345bcea644a15d9a4f2e8cd3f54b2f67921aff90de2f461f52d4b6abdeb",
+      "valueHash": "cffb696ce853615d87c7e090eac29136ee2212c874ac438a93b9e7f2005e9f99"
+    },
+    {
+      "name": "WatchPoll.SleepWithinBudget.match_1.eq_1",
+      "kind": "theorem",
+      "type": "∀ (motive : Option Nat → Sort u_1) (seconds : Nat) (h_1 : (seconds : Nat) → motive (some seconds)) (h_2 : Unit → motive none), (match some seconds with | some seconds => h_1 seconds | none => h_2 ()) = h_1 seconds",
+      "typeHash": "459be37cb37a28b3fb2a152a61e1d2207d0142cb131589b0cac265ec8d882af6",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.SleepWithinBudget.match_1.eq_2",
+      "kind": "theorem",
+      "type": "∀ (motive : Option Nat → Sort u_1) (h_1 : (seconds : Nat) → motive (some seconds)) (h_2 : Unit → motive none), (match none with | some seconds => h_1 seconds | none => h_2 ()) = h_2 ()",
+      "typeHash": "ed562fb89469f6ad0e4db7ffeca0c994bc20e3acc388b57fe54911e41f0094b2",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.SleepWithinBudget.match_1.splitter",
+      "kind": "definition",
+      "type": "(motive : Option Nat → Sort u_1) → (x : Option Nat) → ((seconds : Nat) → motive (some seconds)) → (Unit → motive none) → motive x",
+      "typeHash": "937e4345bcea644a15d9a4f2e8cd3f54b2f67921aff90de2f461f52d4b6abdeb",
+      "valueHash": "a7f04c49a199983bc6aaaa37b121554ac181627bb4d6fa4d795f6a032851fc06"
+    },
+    {
+      "name": "WatchPoll.Stalls",
+      "kind": "definition",
+      "type": "WatchPoll.Event → WatchPoll.State → Prop",
+      "typeHash": "f2fe8d1b0b79f37f73a13df2dd8632996e4d814040bbb5c6737ba65cbb6bfd9f",
+      "valueHash": "5a125479c778297682f56ef2932e55fcff4dcd2c92f50239d4dbd2f979d51073"
+    },
+    {
+      "name": "WatchPoll.State",
+      "kind": "inductive",
+      "type": "Type",
+      "typeHash": "7051ab654d793c216d744f7920d98d672357a0efa67248ee75d146d668f60997",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.State.casesOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.State → Sort u} → (t : WatchPoll.State) → ((failures : Nat) → (remaining : WatchPoll.Seconds) → (last : WatchPoll.Last) → (retries slept : Nat) → motive { failures := failures, remaining := remaining, last := last, retries := retries, slept := slept }) → motive t",
+      "typeHash": "31fd09b5cfd05f23a98e4ff1ddd682626ba07651feccf7521fcbc42fe505c93a",
+      "valueHash": "2a81f67578213a778213d9db932d204c89a7fb716b69ba64d77736714198227e"
+    },
+    {
+      "name": "WatchPoll.State.ctorIdx",
+      "kind": "definition",
+      "type": "WatchPoll.State → Nat",
+      "typeHash": "e686339d3077761ffc9cef3e37fde42edc131dcca74992c2d8c0c73ac940293a",
+      "valueHash": "86ff573214ea20c3b0e774834c47052e0f54ee9030391a39de05a50a82aa0763"
+    },
+    {
+      "name": "WatchPoll.State.failures",
+      "kind": "definition",
+      "type": "WatchPoll.State → Nat",
+      "typeHash": "fb865785b526b1c00c7137588c0b3c987e264802b36a30ef59df9ca640cfb76a",
+      "valueHash": "25cc3e790fb14cbe004d8429ed02ce328aa87d8a56562fbb50e30981ee97475c"
+    },
+    {
+      "name": "WatchPoll.State.last",
+      "kind": "definition",
+      "type": "WatchPoll.State → WatchPoll.Last",
+      "typeHash": "701d83fa77ceaab826283883beff00861cb5f258a2ced66d0abf106bc0fefe97",
+      "valueHash": "c831c7967d101ff59dc4845da9c4d9dae76b4882eef14a44c7d51fa600662faf"
+    },
+    {
+      "name": "WatchPoll.State.mk",
+      "kind": "constructor",
+      "type": "Nat → WatchPoll.Seconds → WatchPoll.Last → Nat → Nat → WatchPoll.State",
+      "typeHash": "5052941af781f1b9e01f6148f5e79d682c7717997efe271f31e387d1d3e83a7d",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.State.mk.inj",
+      "kind": "theorem",
+      "type": "∀ {failures : Nat} {remaining : WatchPoll.Seconds} {last : WatchPoll.Last} {retries slept failures_1 : Nat} {remaining_1 : WatchPoll.Seconds} {last_1 : WatchPoll.Last} {retries_1 slept_1 : Nat}, { failures := failures, remaining := remaining, last := last, retries := retries, slept := slept } = { failures := failures_1, remaining := remaining_1, last := last_1, retries := retries_1, slept := slept_1 } → failures = failures_1 ∧ remaining = remaining_1 ∧ last = last_1 ∧ retries = retries_1 ∧ slept = slept_1",
+      "typeHash": "56df4fc0aa6310fc197a7eaf3a4fdce8fe4a7591f6f3679f01a039736af7ebd3",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.State.mk.injEq",
+      "kind": "theorem",
+      "type": "∀ (failures : Nat) (remaining : WatchPoll.Seconds) (last : WatchPoll.Last) (retries slept failures_1 : Nat) (remaining_1 : WatchPoll.Seconds) (last_1 : WatchPoll.Last) (retries_1 slept_1 : Nat), ({ failures := failures, remaining := remaining, last := last, retries := retries, slept := slept } = { failures := failures_1, remaining := remaining_1, last := last_1, retries := retries_1, slept := slept_1 }) = (failures = failures_1 ∧ remaining = remaining_1 ∧ last = last_1 ∧ retries = retries_1 ∧ slept = slept_1)",
+      "typeHash": "913b31fd24001a1a957309340f3bc4b92e5608cf3bd554b148bbecb5f3677c40",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.State.mk.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {failures : Nat} → {remaining : WatchPoll.Seconds} → {last : WatchPoll.Last} → {retries slept failures' : Nat} → {remaining' : WatchPoll.Seconds} → {last' : WatchPoll.Last} → {retries' slept' : Nat} → { failures := failures, remaining := remaining, last := last, retries := retries, slept := slept } = { failures := failures', remaining := remaining', last := last', retries := retries', slept := slept' } → (failures = failures' → remaining = remaining' → last = last' → retries = retries' → slept = slept' → P) → P",
+      "typeHash": "85021eb3b06338351b38a6d6f3923b5e9d5f7ff21376454d992de27155b9f644",
+      "valueHash": "f9751e6929b6f90555b5e267197a19e582b5af9332ad29332f14754d02cf8e82"
+    },
+    {
+      "name": "WatchPoll.State.mk.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (failures : Nat) (remaining : WatchPoll.Seconds) (last : WatchPoll.Last) (retries slept : Nat), sizeOf { failures := failures, remaining := remaining, last := last, retries := retries, slept := slept } = 1 + sizeOf failures + sizeOf remaining + sizeOf last + sizeOf retries + sizeOf slept",
+      "typeHash": "6cdb5740b0348e0a9235020005c67cf3cb02cf8e54c2cbfe1d94e9c169713104",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.State.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {t t' : WatchPoll.State} → t = t' → WatchPoll.State.noConfusionType P t t'",
+      "typeHash": "977ba4d226c0233845f7ef3829fe03af348eb5b5f8daf46a64fbde18a7981a8e",
+      "valueHash": "b4f31046d9276e2bbf0f9d8b85b5cc6eadf6fa5fa0feeb4e734079149881fbed"
+    },
+    {
+      "name": "WatchPoll.State.noConfusionType",
+      "kind": "definition",
+      "type": "Sort u → WatchPoll.State → WatchPoll.State → Sort u",
+      "typeHash": "e88e541d095a466b415aec1436f830ebfecc3894ffe1dfcdf2aef3dbb4d3ebe7",
+      "valueHash": "c2c0fcf8d844ba2d354f689dce9761df3dc96f473397f8308436375ddaf4244a"
+    },
+    {
+      "name": "WatchPoll.State.rec",
+      "kind": "recursor",
+      "type": "{motive : WatchPoll.State → Sort u} → ((failures : Nat) → (remaining : WatchPoll.Seconds) → (last : WatchPoll.Last) → (retries slept : Nat) → motive { failures := failures, remaining := remaining, last := last, retries := retries, slept := slept }) → (t : WatchPoll.State) → motive t",
+      "typeHash": "638c076a8c03246a5681c778bf92ae3af0e7aab72fe0a56e16784c60e7fd7b34",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.State.recOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.State → Sort u} → (t : WatchPoll.State) → ((failures : Nat) → (remaining : WatchPoll.Seconds) → (last : WatchPoll.Last) → (retries slept : Nat) → motive { failures := failures, remaining := remaining, last := last, retries := retries, slept := slept }) → motive t",
+      "typeHash": "31fd09b5cfd05f23a98e4ff1ddd682626ba07651feccf7521fcbc42fe505c93a",
+      "valueHash": "3305025c9becfa962f46a3819cade327b42d89ca00746121b60ea428ac86f5e9"
+    },
+    {
+      "name": "WatchPoll.State.remaining",
+      "kind": "definition",
+      "type": "WatchPoll.State → WatchPoll.Seconds",
+      "typeHash": "8a8563c336453381427c5493b0793d2daad8016554579d851508ff1638e6157d",
+      "valueHash": "d0e9fa062b106c3f51c7ea5e309170b7724e1aea453bded81270a5a9bfa14d81"
+    },
+    {
+      "name": "WatchPoll.State.retries",
+      "kind": "definition",
+      "type": "WatchPoll.State → Nat",
+      "typeHash": "fb865785b526b1c00c7137588c0b3c987e264802b36a30ef59df9ca640cfb76a",
+      "valueHash": "e8d67d5406604c438a77b9c36c9d95c099cba5a8415d7b4f1c79e58579a10d9b"
+    },
+    {
+      "name": "WatchPoll.State.slept",
+      "kind": "definition",
+      "type": "WatchPoll.State → Nat",
+      "typeHash": "fb865785b526b1c00c7137588c0b3c987e264802b36a30ef59df9ca640cfb76a",
+      "valueHash": "d868553df711d7dc41cfe114b1d3ed7feaf88378107d4012a53e1051bf7f1f7c"
+    },
+    {
+      "name": "WatchPoll.StepOutcome",
+      "kind": "inductive",
+      "type": "Type",
+      "typeHash": "7051ab654d793c216d744f7920d98d672357a0efa67248ee75d146d668f60997",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.casesOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.StepOutcome → Sort u} → (t : WatchPoll.StepOutcome) → motive WatchPoll.StepOutcome.terminal → ((seconds : Nat) → motive (WatchPoll.StepOutcome.sleep seconds)) → motive WatchPoll.StepOutcome.continue_ → ((retryable : Bool) → motive (WatchPoll.StepOutcome.queryError retryable)) → motive WatchPoll.StepOutcome.deadlineExceeded → motive WatchPoll.StepOutcome.otherError → motive t",
+      "typeHash": "c37eaf10ebe0ae1147c1253e7d299341d1bde4fb87c4d0f21b0803cc401d89ce",
+      "valueHash": "bae96b72aa0e03ae83b1214d5f6084a0ca42b199b75e57f843aaabc0b882caec"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.continue_",
+      "kind": "constructor",
+      "type": "WatchPoll.StepOutcome",
+      "typeHash": "d7acffb592e54431c7977b89619e6b1389d32a22a4dfaa92302b6476e4ca95b8",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.continue_.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.StepOutcome → Sort u} → (t : WatchPoll.StepOutcome) → t.ctorIdx = 2 → motive WatchPoll.StepOutcome.continue_ → motive t",
+      "typeHash": "3e5e71319336a26d78c10a7221121945e50ea06e1593c44cb8524e4e21e9276f",
+      "valueHash": "5c8633e4f7aedd00c9b280ec45187c914ba58592af1b51f04231ca8ceb65e2c9"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.continue_.sizeOf_spec",
+      "kind": "theorem",
+      "type": "sizeOf WatchPoll.StepOutcome.continue_ = 1",
+      "typeHash": "54f94bb6c0d67c3a6e0b84b40d4cfe9a3df15bc7b59d110ea2ef654a36af2d1e",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.ctorElim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.StepOutcome → Sort u} → (ctorIdx : Nat) → (t : WatchPoll.StepOutcome) → ctorIdx = t.ctorIdx → WatchPoll.StepOutcome.ctorElimType ctorIdx → motive t",
+      "typeHash": "e84e52c7366eb7c8b13ac43ddbbfe3eac87073f5a891deeb9a49f7688a34869a",
+      "valueHash": "52b0281e2db07131e02d91d711882b39535c18b6110cb0954c178ef7629d4a14"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.ctorElimType",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.StepOutcome → Sort u} → Nat → Sort (max 1 u)",
+      "typeHash": "b70af6570f6b966d7e11a62bd901ad6a4ea9d0a5224dfdede6a7b036d378ad10",
+      "valueHash": "ebd07c53cec4acbfb29e137154936fd862480e990e55205d07ab60da49961be1"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.ctorIdx",
+      "kind": "definition",
+      "type": "WatchPoll.StepOutcome → Nat",
+      "typeHash": "19af1da29d54b3a13b6b3db61b332b9b57d71d36854c1cb65bc290d43a33c1af",
+      "valueHash": "5bc166f5ecf9fc9c05499ab28402104fd73f1ecf48f7c45e3151673d6dc6588b"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.deadlineExceeded",
+      "kind": "constructor",
+      "type": "WatchPoll.StepOutcome",
+      "typeHash": "d7acffb592e54431c7977b89619e6b1389d32a22a4dfaa92302b6476e4ca95b8",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.deadlineExceeded.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.StepOutcome → Sort u} → (t : WatchPoll.StepOutcome) → t.ctorIdx = 4 → motive WatchPoll.StepOutcome.deadlineExceeded → motive t",
+      "typeHash": "179845b64babddea935eff58bca79b4f3ee5eb531d68e4ccdd83db26afafb61c",
+      "valueHash": "a36742b8991e9c576e5db68d84a2207c1b8bfe321977bd04f2baa717a1c93f6c"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.deadlineExceeded.sizeOf_spec",
+      "kind": "theorem",
+      "type": "sizeOf WatchPoll.StepOutcome.deadlineExceeded = 1",
+      "typeHash": "901cbed333d2d33f51411fa6792683626172b9b6213d75097e9828cdd5319bca",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {t t' : WatchPoll.StepOutcome} → t = t' → WatchPoll.StepOutcome.noConfusionType P t t'",
+      "typeHash": "0fb77dc03dd53de6cb7b8bbbe4382101f2b73468353ff69c950cc64688ddf5a4",
+      "valueHash": "2f965f163813518e1989c02cd19964f5a38d50eb6764057bb49a908f04e1b1d5"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.noConfusionType",
+      "kind": "definition",
+      "type": "Sort u → WatchPoll.StepOutcome → WatchPoll.StepOutcome → Sort u",
+      "typeHash": "d62ba1cc8cb96fe3b1e7a59eb03d40d93fb291366cfb271004843cd94c20c720",
+      "valueHash": "3e5ccb443f69eb27f3bff79e0f50139cac7d6b9bddc0e740a1c7c90cd2072714"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.otherError",
+      "kind": "constructor",
+      "type": "WatchPoll.StepOutcome",
+      "typeHash": "d7acffb592e54431c7977b89619e6b1389d32a22a4dfaa92302b6476e4ca95b8",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.otherError.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.StepOutcome → Sort u} → (t : WatchPoll.StepOutcome) → t.ctorIdx = 5 → motive WatchPoll.StepOutcome.otherError → motive t",
+      "typeHash": "343625010cac62ba2fce7752e52c0068b22183ba226b5d804c41546340f8fe9e",
+      "valueHash": "22411655e1dee7ef2ffbded5555f36c04da0948476771a9d57827ff991d03220"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.otherError.sizeOf_spec",
+      "kind": "theorem",
+      "type": "sizeOf WatchPoll.StepOutcome.otherError = 1",
+      "typeHash": "3d3a4c26ef369930b7b57531a31b6a21d66c64836a0de43157d2067023dbab59",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.queryError",
+      "kind": "constructor",
+      "type": "Bool → WatchPoll.StepOutcome",
+      "typeHash": "28e1d12b5bf67bd0a687dbc2938246ab2e21f9ee7ebe843e547db5ab1d00c30f",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.queryError.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.StepOutcome → Sort u} → (t : WatchPoll.StepOutcome) → t.ctorIdx = 3 → ((retryable : Bool) → motive (WatchPoll.StepOutcome.queryError retryable)) → motive t",
+      "typeHash": "1f2d48e4212da5a8d919783b5dfbf9050934c8cef8ca605def061345f57b5133",
+      "valueHash": "18823f9a768e978dc38363442ce7fdca0cc2c973047dde06b5a02e4f308e3f7f"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.queryError.inj",
+      "kind": "theorem",
+      "type": "∀ {retryable retryable_1 : Bool}, WatchPoll.StepOutcome.queryError retryable = WatchPoll.StepOutcome.queryError retryable_1 → retryable = retryable_1",
+      "typeHash": "166028c42eede4cc1d088ece67e092f8f3003b7339dae132d91833dd65f2138a",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.queryError.injEq",
+      "kind": "theorem",
+      "type": "∀ (retryable retryable_1 : Bool), (WatchPoll.StepOutcome.queryError retryable = WatchPoll.StepOutcome.queryError retryable_1) = (retryable = retryable_1)",
+      "typeHash": "820d23ae665a9c464fa26a824cd9b35580d7a669eba0178e1094c0a28eae76ea",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.queryError.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {retryable retryable' : Bool} → WatchPoll.StepOutcome.queryError retryable = WatchPoll.StepOutcome.queryError retryable' → (retryable = retryable' → P) → P",
+      "typeHash": "cdd122683adb02f6d7e2e71ee10cef3b092a125f134e18802b20ce2f50085c50",
+      "valueHash": "69bf4e1f7a9c855ed94a4ab89aeb547aa5c4d9d080536f8dcad2e64ff20d5925"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.queryError.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (retryable : Bool), sizeOf (WatchPoll.StepOutcome.queryError retryable) = 1 + sizeOf retryable",
+      "typeHash": "8b4a2f99c2d086ccedad57cb078f90ed113534cd8b84d653324e9f3aa439ad9c",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.rec",
+      "kind": "recursor",
+      "type": "{motive : WatchPoll.StepOutcome → Sort u} → motive WatchPoll.StepOutcome.terminal → ((seconds : Nat) → motive (WatchPoll.StepOutcome.sleep seconds)) → motive WatchPoll.StepOutcome.continue_ → ((retryable : Bool) → motive (WatchPoll.StepOutcome.queryError retryable)) → motive WatchPoll.StepOutcome.deadlineExceeded → motive WatchPoll.StepOutcome.otherError → (t : WatchPoll.StepOutcome) → motive t",
+      "typeHash": "8a5651b0e077516519bc9d87f11df40e0145f9ed143a6bec79f63a22fa467245",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.recOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.StepOutcome → Sort u} → (t : WatchPoll.StepOutcome) → motive WatchPoll.StepOutcome.terminal → ((seconds : Nat) → motive (WatchPoll.StepOutcome.sleep seconds)) → motive WatchPoll.StepOutcome.continue_ → ((retryable : Bool) → motive (WatchPoll.StepOutcome.queryError retryable)) → motive WatchPoll.StepOutcome.deadlineExceeded → motive WatchPoll.StepOutcome.otherError → motive t",
+      "typeHash": "c37eaf10ebe0ae1147c1253e7d299341d1bde4fb87c4d0f21b0803cc401d89ce",
+      "valueHash": "514845f0f54aa2253079fb594298a5a39b3f8805579466114f795907ae9ef7b4"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.sleep",
+      "kind": "constructor",
+      "type": "Nat → WatchPoll.StepOutcome",
+      "typeHash": "fd91854da07e1ef1f12c2ccf456c86527a4afeee6765e7a49fb3883d50773a7e",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.sleep.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.StepOutcome → Sort u} → (t : WatchPoll.StepOutcome) → t.ctorIdx = 1 → ((seconds : Nat) → motive (WatchPoll.StepOutcome.sleep seconds)) → motive t",
+      "typeHash": "610071f1d9ca26a8f5b5c1a22504767317725e13f0982b562a5539ea4227356f",
+      "valueHash": "0bf6cc13f449016ab0ca1022384d598e2e2b9999ee78271c93f16469de7ed2df"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.sleep.inj",
+      "kind": "theorem",
+      "type": "∀ {seconds seconds_1 : Nat}, WatchPoll.StepOutcome.sleep seconds = WatchPoll.StepOutcome.sleep seconds_1 → seconds = seconds_1",
+      "typeHash": "a3c1c726358a09a92bfb626673c8aee5515ded9ec5b3294baaba9ddc0ceb6ad1",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.sleep.injEq",
+      "kind": "theorem",
+      "type": "∀ (seconds seconds_1 : Nat), (WatchPoll.StepOutcome.sleep seconds = WatchPoll.StepOutcome.sleep seconds_1) = (seconds = seconds_1)",
+      "typeHash": "0ad7a94e3ee09f7fdb484e7d0c256e571c7c79a8e2ea247e5b512f2e2de80795",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.sleep.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {seconds seconds' : Nat} → WatchPoll.StepOutcome.sleep seconds = WatchPoll.StepOutcome.sleep seconds' → (seconds = seconds' → P) → P",
+      "typeHash": "7a1f9673e4d67335ae6a46c6f6098292c2cab70ad4e3099b5217547164662ecd",
+      "valueHash": "07bc4200d3b32ff3080ae668019ae8392477d2fa58d38823ef75b35b109f17c4"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.sleep.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (seconds : Nat), sizeOf (WatchPoll.StepOutcome.sleep seconds) = 1 + sizeOf seconds",
+      "typeHash": "8ef5b6755ca921eab74007e7d861251c2cb61264701738960e1966c8377838c6",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.succeeded",
+      "kind": "definition",
+      "type": "WatchPoll.StepOutcome → Bool",
+      "typeHash": "fddd083e982f5949643330747c7febf9c81871ac291a5667c3ae94f1e4837d28",
+      "valueHash": "14fe51b90c6b4e3afd55534f128e3893de5cecf246cfd8a48accf8e8ff44e54a"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.succeeded.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.StepOutcome → Sort u_1) → (x : WatchPoll.StepOutcome) → (Unit → motive WatchPoll.StepOutcome.terminal) → ((seconds : Nat) → motive (WatchPoll.StepOutcome.sleep seconds)) → (Unit → motive WatchPoll.StepOutcome.continue_) → ((x : WatchPoll.StepOutcome) → motive x) → motive x",
+      "typeHash": "111f1a7e37c71056d35fe8f64716862756ca9c98b58949be6f3c5b5f95263615",
+      "valueHash": "11b0e05a8703c69a6b0f5b8ca3a36b274fd86049620bc1499e82f0186c4fb6f1"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.terminal",
+      "kind": "constructor",
+      "type": "WatchPoll.StepOutcome",
+      "typeHash": "d7acffb592e54431c7977b89619e6b1389d32a22a4dfaa92302b6476e4ca95b8",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.StepOutcome.terminal.elim",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.StepOutcome → Sort u} → (t : WatchPoll.StepOutcome) → t.ctorIdx = 0 → motive WatchPoll.StepOutcome.terminal → motive t",
+      "typeHash": "c45260a6ebf42c6bac7ed0af11c322fcbcaa035651521c8cf176b6f02e9e8512",
+      "valueHash": "9dfbd5efbcc92c6d1d741bdbba11f71d669d7909367d8fdb7bcbcaff9a034790"
+    },
+    {
+      "name": "WatchPoll.StepOutcome.terminal.sizeOf_spec",
+      "kind": "theorem",
+      "type": "sizeOf WatchPoll.StepOutcome.terminal = 1",
+      "typeHash": "6213a25c9b0c37464ac64e5445681bc21febe9c9f4133dc6623e2c2cd50ccd86",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Transition",
+      "kind": "inductive",
+      "type": "Type",
+      "typeHash": "7051ab654d793c216d744f7920d98d672357a0efa67248ee75d146d668f60997",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Transition.after",
+      "kind": "definition",
+      "type": "WatchPoll.Transition → WatchPoll.State",
+      "typeHash": "5f89684429c49309443ae98df121ec810b74d7499ff1b8d8d6884d7c82ccaedb",
+      "valueHash": "44d64ad4aa985c3298069b2b1d957eff2a5a9542ff7e1c5119fd1c97f6461ee9"
+    },
+    {
+      "name": "WatchPoll.Transition.before",
+      "kind": "definition",
+      "type": "WatchPoll.Transition → WatchPoll.State",
+      "typeHash": "5f89684429c49309443ae98df121ec810b74d7499ff1b8d8d6884d7c82ccaedb",
+      "valueHash": "61caccfa2bbc8619459590f7f56989e06342910916525f2e0ac35e6631963343"
+    },
+    {
+      "name": "WatchPoll.Transition.casesOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Transition → Sort u} → (t : WatchPoll.Transition) → ((options : WatchPoll.PollingOptions) → (start : WatchPoll.Seconds) → (before : WatchPoll.State) → (event : WatchPoll.Event) → (after : WatchPoll.State) → motive { options := options, start := start, before := before, event := event, after := after }) → motive t",
+      "typeHash": "db8405809be802065d1c3671060cdc31695743dd7cf174c21d3534836b9fea59",
+      "valueHash": "2ee5ec2e79172371c0ca3498e575644efbb903aac27f7ee4891431b27530e7c6"
+    },
+    {
+      "name": "WatchPoll.Transition.ctorIdx",
+      "kind": "definition",
+      "type": "WatchPoll.Transition → Nat",
+      "typeHash": "59d30f9966ee6ee63bdda1efcbcaeffaa8f7d184110efe1b4fdd8d8c3f68b666",
+      "valueHash": "051b955a3f8ee8eb98cb8dc3980e14963c357b9270505063bb014a0e3319c07d"
+    },
+    {
+      "name": "WatchPoll.Transition.event",
+      "kind": "definition",
+      "type": "WatchPoll.Transition → WatchPoll.Event",
+      "typeHash": "1d154d1d96c06d85365e6d87e91c2e76598d076fa33265380f89e784eb66e615",
+      "valueHash": "eac95a8936c0464614662d1d1ca3a49ebc23b4944593abfb9a75c841d0109829"
+    },
+    {
+      "name": "WatchPoll.Transition.mk",
+      "kind": "constructor",
+      "type": "WatchPoll.PollingOptions → WatchPoll.Seconds → WatchPoll.State → WatchPoll.Event → WatchPoll.State → WatchPoll.Transition",
+      "typeHash": "5b16fa8e2b769d2478b00313d363ae7687f474eaf8adda552bb376cbbae040f4",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Transition.mk.inj",
+      "kind": "theorem",
+      "type": "∀ {options : WatchPoll.PollingOptions} {start : WatchPoll.Seconds} {before : WatchPoll.State} {event : WatchPoll.Event} {after : WatchPoll.State} {options_1 : WatchPoll.PollingOptions} {start_1 : WatchPoll.Seconds} {before_1 : WatchPoll.State} {event_1 : WatchPoll.Event} {after_1 : WatchPoll.State}, { options := options, start := start, before := before, event := event, after := after } = { options := options_1, start := start_1, before := before_1, event := event_1, after := after_1 } → options = options_1 ∧ start = start_1 ∧ before = before_1 ∧ event = event_1 ∧ after = after_1",
+      "typeHash": "2a99a3184e45b4d215e293ce41f237c63c9c18918722b7d676ec7e41a034001c",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Transition.mk.injEq",
+      "kind": "theorem",
+      "type": "∀ (options : WatchPoll.PollingOptions) (start : WatchPoll.Seconds) (before : WatchPoll.State) (event : WatchPoll.Event) (after : WatchPoll.State) (options_1 : WatchPoll.PollingOptions) (start_1 : WatchPoll.Seconds) (before_1 : WatchPoll.State) (event_1 : WatchPoll.Event) (after_1 : WatchPoll.State), ({ options := options, start := start, before := before, event := event, after := after } = { options := options_1, start := start_1, before := before_1, event := event_1, after := after_1 }) = (options = options_1 ∧ start = start_1 ∧ before = before_1 ∧ event = event_1 ∧ after = after_1)",
+      "typeHash": "1dccd6b83a12b799299a402cd13cb99d2f7e76e32c634afdf9a5430b72285cf8",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Transition.mk.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {options : WatchPoll.PollingOptions} → {start : WatchPoll.Seconds} → {before : WatchPoll.State} → {event : WatchPoll.Event} → {after : WatchPoll.State} → {options' : WatchPoll.PollingOptions} → {start' : WatchPoll.Seconds} → {before' : WatchPoll.State} → {event' : WatchPoll.Event} → {after' : WatchPoll.State} → { options := options, start := start, before := before, event := event, after := after } = { options := options', start := start', before := before', event := event', after := after' } → (options = options' → start = start' → before = before' → event = event' → after = after' → P) → P",
+      "typeHash": "0cb0d2ec0e69899df3d2d428c727413d5420efb5b39ad1721f22c05692c98b32",
+      "valueHash": "94282cd63ab0eb45f466376089cb5b7f82ebd669771ee0ff753cf89c0bc5f37d"
+    },
+    {
+      "name": "WatchPoll.Transition.mk.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (options : WatchPoll.PollingOptions) (start : WatchPoll.Seconds) (before : WatchPoll.State) (event : WatchPoll.Event) (after : WatchPoll.State), sizeOf { options := options, start := start, before := before, event := event, after := after } = 1 + sizeOf options + sizeOf start + sizeOf before + sizeOf event + sizeOf after",
+      "typeHash": "9197641cc9055a7cc21eb4b720b921b32cf6948b26f5855a9d0f432dcd728043",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Transition.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {t t' : WatchPoll.Transition} → t = t' → WatchPoll.Transition.noConfusionType P t t'",
+      "typeHash": "40331328ffb96ac269451809d16fdda0f564c8c597d2c8a477bbdffd13875452",
+      "valueHash": "8fe9a763db61e21709fbaa661c8e15956bd3e0420171e6d354ef3ac4520d9066"
+    },
+    {
+      "name": "WatchPoll.Transition.noConfusionType",
+      "kind": "definition",
+      "type": "Sort u → WatchPoll.Transition → WatchPoll.Transition → Sort u",
+      "typeHash": "ee5c1ab8f2a134883657b0980f4473514cf909f1c4e7c68bffcc4ba3c6501f6e",
+      "valueHash": "99607774d8bc394b7a6b77f1aad0248e7905b1df7e085b367df66352e9de102a"
+    },
+    {
+      "name": "WatchPoll.Transition.options",
+      "kind": "definition",
+      "type": "WatchPoll.Transition → WatchPoll.PollingOptions",
+      "typeHash": "5e876f43d34ba39c7aba3298fbcbcd5b6fdcc8b1f2b4a84f2ae72fbb889089ef",
+      "valueHash": "1e1eb5f8f80a75fc3b298306f30e2978cf52aa30bad4b2207f23d83dd1f85970"
+    },
+    {
+      "name": "WatchPoll.Transition.rec",
+      "kind": "recursor",
+      "type": "{motive : WatchPoll.Transition → Sort u} → ((options : WatchPoll.PollingOptions) → (start : WatchPoll.Seconds) → (before : WatchPoll.State) → (event : WatchPoll.Event) → (after : WatchPoll.State) → motive { options := options, start := start, before := before, event := event, after := after }) → (t : WatchPoll.Transition) → motive t",
+      "typeHash": "fffb4ddaa11741540061190e550fe5f381c0194295d67eaf757f556f1d35177f",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.Transition.recOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.Transition → Sort u} → (t : WatchPoll.Transition) → ((options : WatchPoll.PollingOptions) → (start : WatchPoll.Seconds) → (before : WatchPoll.State) → (event : WatchPoll.Event) → (after : WatchPoll.State) → motive { options := options, start := start, before := before, event := event, after := after }) → motive t",
+      "typeHash": "db8405809be802065d1c3671060cdc31695743dd7cf174c21d3534836b9fea59",
+      "valueHash": "ff1b2f51ebd981aa90efac51b8d10e41e183b4cb8925a182ca5a44a4ed3caace"
+    },
+    {
+      "name": "WatchPoll.Transition.start",
+      "kind": "definition",
+      "type": "WatchPoll.Transition → WatchPoll.Seconds",
+      "typeHash": "542377b62fb7884e34c369952642bd32efaccd753e61bd4d24b545b50347abf5",
+      "valueHash": "1f4b5443955b59141304a3d3578bc0ca1b335b5ff9e2c393fee5759de17f7f9c"
+    },
+    {
+      "name": "WatchPoll.Transition.timeout",
+      "kind": "definition",
+      "type": "WatchPoll.Transition → Nat",
+      "typeHash": "2c50c9340c2d4dfc4ccdea7aeb8854fca6c9b1352574232fe3412f42977f0949",
+      "valueHash": "84ac70169b92bf46f1c98568485dc397a3c3adfa0fa3403e2d8621be3affe393"
+    },
+    {
+      "name": "WatchPoll.WatchDeadline",
+      "kind": "inductive",
+      "type": "Type",
+      "typeHash": "7051ab654d793c216d744f7920d98d672357a0efa67248ee75d146d668f60997",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.casesOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.WatchDeadline → Sort u} → (t : WatchPoll.WatchDeadline) → ((expiresAt : WatchPoll.Seconds) → motive { expiresAt := expiresAt }) → motive t",
+      "typeHash": "bbe12b6143258bdb3740ddf5558b6ace0d58c84ee4de9d537b360bd5b6e468ea",
+      "valueHash": "c66b6edd85a5a87ca8f3f3aea5e255d6cab58f290c7530594b257aea388a134a"
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.create",
+      "kind": "definition",
+      "type": "Nat → Nat → WatchPoll.WatchDeadline",
+      "typeHash": "ef9fa035e4e980b0ea2e67a315f6310280e3fd9590590a0d99b98a9b3fedcbc9",
+      "valueHash": "aa2066507604867fe2e41e855f149d1b27dd65abeb839460d4816de64a40b4d8"
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.ctorIdx",
+      "kind": "definition",
+      "type": "WatchPoll.WatchDeadline → Nat",
+      "typeHash": "3729c325b068c41848c3f843a60bd732fdef890dbb6160840e541105dc236942",
+      "valueHash": "c21e0cd183992e9a40db29749e81aeaba6175a72a5e04af52500ff6e9eae0b27"
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.expiresAt",
+      "kind": "definition",
+      "type": "WatchPoll.WatchDeadline → WatchPoll.Seconds",
+      "typeHash": "cefd7337f7b029f20a0a5ff66555173a50f5997462f34cfcc0bdb39e39a3d14b",
+      "valueHash": "544c5223bac579de9af6599a4d326d67cc34646cf0381f6c2aab96f6b777e9e8"
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.mk",
+      "kind": "constructor",
+      "type": "WatchPoll.Seconds → WatchPoll.WatchDeadline",
+      "typeHash": "9703eae3d12b4b2ceecbac729be5af0309563e0e863e112987924bb9e3ca5bda",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.mk.inj",
+      "kind": "theorem",
+      "type": "∀ {expiresAt expiresAt_1 : WatchPoll.Seconds}, { expiresAt := expiresAt } = { expiresAt := expiresAt_1 } → expiresAt = expiresAt_1",
+      "typeHash": "719fbeb354717a0627ee9ec2a701116fd8cc86e5833e7fc7750ef325a93c0c0f",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.mk.injEq",
+      "kind": "theorem",
+      "type": "∀ (expiresAt expiresAt_1 : WatchPoll.Seconds), ({ expiresAt := expiresAt } = { expiresAt := expiresAt_1 }) = (expiresAt = expiresAt_1)",
+      "typeHash": "f4093570920bbec1ff6c6657c83ef6ee98c81519dc42f7142570dfe510464a59",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.mk.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {expiresAt expiresAt' : WatchPoll.Seconds} → { expiresAt := expiresAt } = { expiresAt := expiresAt' } → (expiresAt = expiresAt' → P) → P",
+      "typeHash": "01844067ff4d2c7e3c036ae6455045db1d71ed70b369edfa425a24ade3c4e06d",
+      "valueHash": "e92e3470d5acf826e7e2fe4e8a1661e134df7ae0eaf025015941c8437fd76866"
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.mk.sizeOf_spec",
+      "kind": "theorem",
+      "type": "∀ (expiresAt : WatchPoll.Seconds), sizeOf { expiresAt := expiresAt } = 1 + sizeOf expiresAt",
+      "typeHash": "4910ba1788310b98ff9e161eaba87e172d4b8b7d22e17e98a556bd55838dfbdf",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.noConfusion",
+      "kind": "definition",
+      "type": "{P : Sort u} → {t t' : WatchPoll.WatchDeadline} → t = t' → WatchPoll.WatchDeadline.noConfusionType P t t'",
+      "typeHash": "24da8534837d90abc4645fceb67774237ec1d6b3b3423609ff3c345bcba0856d",
+      "valueHash": "87ad17bf961e36acf7116f06bdef9b50de112c3ffb1830a6b5bbcd1431ac36a3"
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.noConfusionType",
+      "kind": "definition",
+      "type": "Sort u → WatchPoll.WatchDeadline → WatchPoll.WatchDeadline → Sort u",
+      "typeHash": "0d8a638c444e0a28d7ec722bebd0b00f2e28e2c326dbc2b908d1d62ee3d8c4a6",
+      "valueHash": "5da5ebbe76d8154a2ec26fe18bac88fe604e7e123881c9866e7d55a0097838c7"
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.rec",
+      "kind": "recursor",
+      "type": "{motive : WatchPoll.WatchDeadline → Sort u} → ((expiresAt : WatchPoll.Seconds) → motive { expiresAt := expiresAt }) → (t : WatchPoll.WatchDeadline) → motive t",
+      "typeHash": "bd03ac181ee15bcc898c4215a7290bf75e017ff83962ec1f79be6a97cddefd28",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.recOn",
+      "kind": "definition",
+      "type": "{motive : WatchPoll.WatchDeadline → Sort u} → (t : WatchPoll.WatchDeadline) → ((expiresAt : WatchPoll.Seconds) → motive { expiresAt := expiresAt }) → motive t",
+      "typeHash": "bbe12b6143258bdb3740ddf5558b6ace0d58c84ee4de9d537b360bd5b6e468ea",
+      "valueHash": "7df2b7f29af8a6398deb5148d74476d29d857fd70f1b2c4487faf37c9369cb7e"
+    },
+    {
+      "name": "WatchPoll.WatchDeadline.remaining",
+      "kind": "definition",
+      "type": "WatchPoll.WatchDeadline → Nat → WatchPoll.Seconds",
+      "typeHash": "1a5365bcf05e7a8bc02d162897bf38a38bda344d7df16ac9fe48894f9903b99f",
+      "valueHash": "c671ea6ee90a407f44f11fc3fff9eb0fde4e2c117e351c80b7ecd5f0370e3177"
+    },
+    {
+      "name": "WatchPoll.WithinTimeout",
+      "kind": "definition",
+      "type": "Nat → WatchPoll.State → Prop",
+      "typeHash": "7d781158993a7bb099c72710e5a3c30ed337a057a6dc7c9120bf62c97f7a8cc5",
+      "valueHash": "2136af33bf556a064f341c4407e8360eaa1a1639e7b3ad9024c9de3df838d073"
+    },
+    {
+      "name": "WatchPoll.backoffFailures",
+      "kind": "definition",
+      "type": "List Nat",
+      "typeHash": "80b301ef6c9d59c7d03cad6e3c50ce9efd0b17f8713597f3eed7c178ee58ff1a",
+      "valueHash": "3a3724f43a22467a6a2deae1ebbc3fd45533aae20c818aed17f892afb04840b2"
+    },
+    {
+      "name": "WatchPoll.backoffIntervals",
+      "kind": "definition",
+      "type": "List Nat",
+      "typeHash": "80b301ef6c9d59c7d03cad6e3c50ce9efd0b17f8713597f3eed7c178ee58ff1a",
+      "valueHash": "baa3d698e3ea7431c846ca2f909d7b838c11b88737510a2438ec3d9b76247f77"
+    },
+    {
+      "name": "WatchPoll.backoffSpec",
+      "kind": "theorem",
+      "type": "∀ (interval failures : Nat), 1 ≤ failures → WatchPoll.BackoffSpec interval failures",
+      "typeHash": "5c99f3706aff25f009698022a23de26f5deb8f2c77f6c529967a576c904ce186",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.backoffVectors",
+      "kind": "definition",
+      "type": "List (Nat × Nat)",
+      "typeHash": "f36ec9eb1a6a03a4acca1f7bda790d433ce7445fb9242f15bbbbd83596b845d6",
+      "valueHash": "dccc53c8f54487c65b0c11fda697a71db90e555d8d7645c8f8cf0092e697148b"
+    },
+    {
+      "name": "WatchPoll.badBackoff",
+      "kind": "definition",
+      "type": "List (Nat × Nat)",
+      "typeHash": "f36ec9eb1a6a03a4acca1f7bda790d433ce7445fb9242f15bbbbd83596b845d6",
+      "valueHash": "7c1abec4b591adb33ad2bbbce26ddf40f4bb852c7cf6d5bd3789ca9f0e74e891"
+    },
+    {
+      "name": "WatchPoll.badBackoff.match_1",
+      "kind": "definition",
+      "type": "(motive : Nat × Nat → Sort u_1) → (x : Nat × Nat) → ((interval failures : Nat) → motive (interval, failures)) → motive x",
+      "typeHash": "e115785e52bac2501b452d95eaf78acc89e6ca079e55f85f9651b4684e05019c",
+      "valueHash": "a400c9b821ccbf21adbc7ab27cb3651c4c3f8c93082e9f323faac110c5444933"
+    },
+    {
+      "name": "WatchPoll.badConfirms",
+      "kind": "definition",
+      "type": "List (String × List WatchPoll.Call × WatchPoll.Call)",
+      "typeHash": "7d85403b2e235e9eaab2b5c66c3d291e02adee097f291e9701eca035fdb52f22",
+      "valueHash": "6ca0b4043d332fbade7b45fab358dfa42f9ec52407a9a5f0670f586c62808a0a"
+    },
+    {
+      "name": "WatchPoll.badConfirms.match_1",
+      "kind": "definition",
+      "type": "(motive : String × (List WatchPoll.Call → WatchPoll.Call → Bool) → Sort u_1) → (x : String × (List WatchPoll.Call → WatchPoll.Call → Bool)) → ((fst : String) → (p : List WatchPoll.Call → WatchPoll.Call → Bool) → motive (fst, p)) → motive x",
+      "typeHash": "9d49519410fff88c573d3806e53a6b6a39cc5b6fd06b634da52fa33758cd3df0",
+      "valueHash": "4a2e385fadf32ed93fbaba5e46bca939826fa723347b07441106bee97443c4b8"
+    },
+    {
+      "name": "WatchPoll.badConfirms.match_3",
+      "kind": "definition",
+      "type": "(motive : List WatchPoll.Call × WatchPoll.Call → Sort u_1) → (x : List WatchPoll.Call × WatchPoll.Call) → ((past : List WatchPoll.Call) → (c : WatchPoll.Call) → motive (past, c)) → motive x",
+      "typeHash": "bdae02eb7e5b70eb0aaf5ee39a13a1a29cdbcf575edc691816560aafa9e97903",
+      "valueHash": "ffdeec75c556aa12dbb52506d9e03217b175bec1b5e1347917f2b7a34183724d"
+    },
+    {
+      "name": "WatchPoll.badSteps",
+      "kind": "definition",
+      "type": "List (String × WatchPoll.Transition)",
+      "typeHash": "08b6a4e81417648ab668ffcdd5c361210a0d3e4aa6935a380e8f9df793bcbbc2",
+      "valueHash": "03027ad161d4b190a250247065865378b7eb687568ca60f68419178a70e03ab7"
+    },
+    {
+      "name": "WatchPoll.badSteps.match_1",
+      "kind": "definition",
+      "type": "(motive : String × (WatchPoll.Transition → Bool) → Sort u_1) → (x : String × (WatchPoll.Transition → Bool)) → ((fst : String) → (p : WatchPoll.Transition → Bool) → motive (fst, p)) → motive x",
+      "typeHash": "f5511c7dc434f25e1da25293bd6439aa0bda87657fbf5d707c4068cf6a01eb15",
+      "valueHash": "c04828ce8ad2cca1ac4a7465fbf849a52afbc00b37eb04b34fed2d26198049fd"
+    },
+    {
+      "name": "WatchPoll.boundedBudgets",
+      "kind": "definition",
+      "type": "List WatchPoll.Seconds",
+      "typeHash": "63f99823149c95f496e692d1160fc63d528c8b205583befd4313c743e1acd4ce",
+      "valueHash": "44a5383a694a1dee0227270c92c62fbdd3582069281a533d1c3be13974d21500"
+    },
+    {
+      "name": "WatchPoll.boundedCalls",
+      "kind": "definition",
+      "type": "List WatchPoll.Call",
+      "typeHash": "0ff773ada97755cb188d0da36849d6cc273d8f29425a77a3ee8fb6db7b2dff15",
+      "valueHash": "07a0e700da39c4c1f0e044278566c8a2671f3a6373ad7d01b100177a2fb52596"
+    },
+    {
+      "name": "WatchPoll.boundedEvents",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → List WatchPoll.Event",
+      "typeHash": "c5bd0ed03bd6770d91f74166ee14ee492f9df9d982696dfa062c4b303fdb4f60",
+      "valueHash": "a2fd945a99ba3c634393e654c9ff5a8067eebf489d02b2352657217f5e3948a1"
+    },
+    {
+      "name": "WatchPoll.boundedOptions",
+      "kind": "definition",
+      "type": "List WatchPoll.PollingOptions",
+      "typeHash": "9e9c8e3f84119f2a4a8040e84092d1dc67209fa6aeab35aca2633d95b41f0fed",
+      "valueHash": "05670476ffa8dbc62f554d57da97412cf1087fd8384f3a088abf6d775654801b"
+    },
+    {
+      "name": "WatchPoll.confirm",
+      "kind": "definition",
+      "type": "WatchPoll.FirstSeen → Nat → Nat → Nat → WatchPoll.FirstSeen × Bool",
+      "typeHash": "db8ec329f5ae74bca6e69dca55f1fa547e45111a240e2cd19e7035297ce9dedf",
+      "valueHash": "1a7e721f5e55af123d2d9bd567e6b91626a872a256407a48f6282d3ee15c9e31"
+    },
+    {
+      "name": "WatchPoll.confirm.match_1",
+      "kind": "definition",
+      "type": "(motive : Option WatchPoll.Sighting → Sort u_1) → (x : Option WatchPoll.Sighting) → ((prior : WatchPoll.Sighting) → motive (some prior)) → (Unit → motive none) → motive x",
+      "typeHash": "0d0147d7054ef229ca744607a70997ab2dffc770df8e9bde8aa80c76e252a4c2",
+      "valueHash": "46794cede32f83675da4cc96377150e407d1ced8f81571e0548808e3d6b4d98f"
+    },
+    {
+      "name": "WatchPoll.confirmAfter",
+      "kind": "definition",
+      "type": "List WatchPoll.Call → WatchPoll.Call → Bool",
+      "typeHash": "adabd3caed81ce05b49fad14590241b28ae2ebb5d291c0b14e59c37eb41bb6c5",
+      "valueHash": "cbcc6686d2c5ef4de7635d10e976f239a5baa040b3169942611797f3be3eab03"
+    },
+    {
+      "name": "WatchPoll.confirmAfter_spec",
+      "kind": "theorem",
+      "type": "∀ (past : List WatchPoll.Call) (c : WatchPoll.Call), WatchPoll.ConfirmSpec past c",
+      "typeHash": "88f0f19fd023700bccfab03ce00105349bef232fa4c8ea3c9edd31c64ffc360e",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.confirmAll",
+      "kind": "definition",
+      "type": "List WatchPoll.Call → List Bool",
+      "typeHash": "8f7dcbb36d80698567e1ff75a6a2ffc5b162652292edd221d66f28bf74db7290",
+      "valueHash": "6273329aa88250ea0626bc56341bfad523d2bcb647eb36eba72ed78c2cbf3e38"
+    },
+    {
+      "name": "WatchPoll.confirmCases",
+      "kind": "definition",
+      "type": "List (List WatchPoll.Call × WatchPoll.Call)",
+      "typeHash": "03c65282f86bb28369bf2fac70f67727d87534b0e188212f6486ce8b89e80921",
+      "valueHash": "664c221cb77b7a0c63c965095c59432b5678e96a2633721b50bd660286b4eef4"
+    },
+    {
+      "name": "WatchPoll.confirmProperties",
+      "kind": "definition",
+      "type": "List (String × (List WatchPoll.Call → WatchPoll.Call → Bool))",
+      "typeHash": "2ac1fd337b5b3bfc8a2119abd3c8ece261d4fb2d1d4d6a361f15158e28663e57",
+      "valueHash": "3cfd842022de589ed182eba56e00c236960d13a0d2c691e535427e542a90c67b"
+    },
+    {
+      "name": "WatchPoll.confirmTargets",
+      "kind": "definition",
+      "type": "List (String × (List WatchPoll.Call → WatchPoll.Call → Bool))",
+      "typeHash": "2ac1fd337b5b3bfc8a2119abd3c8ece261d4fb2d1d4d6a361f15158e28663e57",
+      "valueHash": "1774776dc5345daf83cc67492934b0b2815fd9fdeb1bb57c3fa6383c2a61f1d9"
+    },
+    {
+      "name": "WatchPoll.confirmVectors",
+      "kind": "definition",
+      "type": "List (List WatchPoll.Call)",
+      "typeHash": "c29bb3252e2c8a645d3e1b87fbb5569f06e710f67ab18dbce020fe05a578b465",
+      "valueHash": "a2f63f349d7831933ea25cdbecc04b310a39128e9fa0f9ff19613a957b4806f2"
+    },
+    {
+      "name": "WatchPoll.confirm_aba_restarts",
+      "kind": "theorem",
+      "type": "∀ (older : List WatchPoll.Call) (pr a b t1 t2 now : Nat), a ≠ b → WatchPoll.confirmAfter ({ now := t2, pr := pr, headRefOid := a } :: { now := t1, pr := pr, headRefOid := b } :: older) { now := now, pr := pr, headRefOid := a } = decide (t2 + 60 ≤ now)",
+      "typeHash": "7b1a579c16ae02b0a4699ad67e3f39ee223b57b83cdee4376b7162b7d6f08b48",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.confirm_clock_must_advance",
+      "kind": "theorem",
+      "type": "∀ (past : List WatchPoll.Call) (c : WatchPoll.Call), WatchPoll.ClockMustAdvance past c",
+      "typeHash": "3f253763407f05aa1cbcac3392424a4696c3553d930ebfa311f16c112c5474a8",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.confirm_first_sighting_false",
+      "kind": "theorem",
+      "type": "∀ (past : List WatchPoll.Call) (c : WatchPoll.Call), WatchPoll.FirstSightingFalse past c",
+      "typeHash": "25caf64553371f7bb50c6ac6f0d4d5a405a0810924f7e05af736b3cc17a117b2",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.confirm_head_change_false",
+      "kind": "theorem",
+      "type": "∀ (past : List WatchPoll.Call) (c : WatchPoll.Call), WatchPoll.HeadChangeFalse past c",
+      "typeHash": "6bf2098b0c607162fc45de1831fdedab3a26a234dd948c4fa9b036c596b629ac",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.confirm_new_head_resets",
+      "kind": "theorem",
+      "type": "∀ (firstSeen : WatchPoll.FirstSeen) (now pr headRefOid : Nat), (∀ (firstSeenAt : Nat), firstSeen pr ≠ some { headRefOid := headRefOid, seenAt := firstSeenAt }) → (WatchPoll.confirm firstSeen now pr headRefOid).snd = false ∧ (WatchPoll.confirm firstSeen now pr headRefOid).fst pr = some { headRefOid := headRefOid, seenAt := now }",
+      "typeHash": "9eb73b3d99ef2db21d712faf050d8b7e112975c7785e3c4aa2f412fd8bca5768",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.confirm_other_pr_untouched",
+      "kind": "theorem",
+      "type": "∀ (firstSeen : WatchPoll.FirstSeen) (now pr headRefOid other : Nat), other ≠ pr → (WatchPoll.confirm firstSeen now pr headRefOid).fst other = firstSeen other",
+      "typeHash": "3a42caec0f5a1b33251b9e0b07921b4cd2e0d52ca10c84f30c2eb3fbf7531139",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.confirm_same_head_keeps_first_seen",
+      "kind": "theorem",
+      "type": "∀ (firstSeen : WatchPoll.FirstSeen) (now pr headRefOid firstSeenAt : Nat), firstSeen pr = some { headRefOid := headRefOid, seenAt := firstSeenAt } → (WatchPoll.confirm firstSeen now pr headRefOid).fst = firstSeen",
+      "typeHash": "002fb503e7083bcec5a220b98995ddda99de1ef4f1edbeed3d6f60f338807780",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.confirm_sound",
+      "kind": "theorem",
+      "type": "∀ (past : List WatchPoll.Call) (c : WatchPoll.Call), WatchPoll.ConfirmSound past c",
+      "typeHash": "29058cc9713653234e6762fddb423675e26aaab112cd202da1c23bb92ba3ba4e",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.confirm_true_iff",
+      "kind": "theorem",
+      "type": "∀ (firstSeen : WatchPoll.FirstSeen) (now pr headRefOid : Nat), (WatchPoll.confirm firstSeen now pr headRefOid).snd = true ↔ ∃ firstSeenAt, firstSeen pr = some { headRefOid := headRefOid, seenAt := firstSeenAt } ∧ firstSeenAt + 60 ≤ now",
+      "typeHash": "0c144785176748d5fd3b87be930dc6175d0cd4533ae2b7c19bad78427c6c4850",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.continue_without_clock_repeats",
+      "kind": "theorem",
+      "type": "∀ (o : WatchPoll.PollingOptions) (s : WatchPoll.State) (sleepElapsed : Nat), s.last = WatchPoll.Last.continued → s.remaining.positive = true → s.failures = 0 → s.retries = 0 → WatchPoll.pollStep o s { outcome := WatchPoll.StepOutcome.continue_, stepElapsed := 0, sleepElapsed := sleepElapsed } = some s",
+      "typeHash": "cc429765a8ebb5533feb86ed8a08fdf48dc5dc2375c5e85ff22fbd2e80b3d86b",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.firstSeenAfter",
+      "kind": "definition",
+      "type": "List WatchPoll.Call → WatchPoll.FirstSeen",
+      "typeHash": "dc310c2d950d771c81ca17346c7a778b481577d0d102b3491f270e6de6abb2b0",
+      "valueHash": "879a788e36a6831ae060a88e20d5944f767da751c589c65a06aa1a9bd862bbaa"
+    },
+    {
+      "name": "WatchPoll.firstSeenAfter.match_1",
+      "kind": "definition",
+      "type": "(motive : List WatchPoll.Call → Sort u_1) → (x : List WatchPoll.Call) → (Unit → motive []) → ((c : WatchPoll.Call) → (older : List WatchPoll.Call) → motive (c :: older)) → motive x",
+      "typeHash": "878d24c3a88507f5063bf4180d2cfc5d14ebd2db8f13c11188217e0ba20476ed",
+      "valueHash": "f8303eea7858d1b8a07e7a8b011946deb8a5e34ec9a60189cdcd9d4977e931a7"
+    },
+    {
+      "name": "WatchPoll.firstSeenAfter_spec",
+      "kind": "theorem",
+      "type": "∀ (past : List WatchPoll.Call) (pr headRefOid firstSeenAt : Nat), WatchPoll.firstSeenAfter past pr = some { headRefOid := headRefOid, seenAt := firstSeenAt } ↔ WatchPoll.runStart pr headRefOid past = some firstSeenAt",
+      "typeHash": "f9c5b3f09712d26ac9c2963dd0ffb050dbeea1c2b04dc6f0065ade4c97614aab",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.firstSeenSet",
+      "kind": "definition",
+      "type": "WatchPoll.FirstSeen → Nat → WatchPoll.Sighting → WatchPoll.FirstSeen",
+      "typeHash": "1bacd697602e24817f862eb45bf97573d591a234f6f033211f9107203cf73e5c",
+      "valueHash": "c6e2a489508061206dc7231e0daddfb67752e42572bfd6b0a18c59dd4408450b"
+    },
+    {
+      "name": "WatchPoll.frontier",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → WatchPoll.Seconds → Nat → List WatchPoll.State",
+      "typeHash": "f243d716a1060f41b7c7a7d2423f9217fd13fd7ce69e18d553e02b386c79e666",
+      "valueHash": "b3828d545aabd4173627d755fa95a2fc6f6e03f5cebc8a2592ea991d88c5cb86"
+    },
+    {
+      "name": "WatchPoll.frontier.match_1",
+      "kind": "definition",
+      "type": "(motive : Nat → Sort u_1) → (x : Nat) → (Unit → motive 0) → ((depth : Nat) → motive depth.succ) → motive x",
+      "typeHash": "04f0d092f6ae5801bb88e69a95d609947162ea69e6ad35a930a4020b9bc3cebc",
+      "valueHash": "4d669dbec0cdae014a42200b0fc9b8f411ef600432cdccb8be171dda38311272"
+    },
+    {
+      "name": "WatchPoll.headJson",
+      "kind": "definition",
+      "type": "Nat → String",
+      "typeHash": "faacb663ba282bfb7b22ced9bc6cbd1350916362e5fd756dde0ab7dc6eb2621e",
+      "valueHash": "30f8460974cbf5d25d6359bd4d3647eae3a3e1bc77473af6c33fe2d199a63cad"
+    },
+    {
+      "name": "WatchPoll.histories",
+      "kind": "definition",
+      "type": "Nat → List (List WatchPoll.Call)",
+      "typeHash": "50f2023f2b62cd0dcbec9eaccb782c4112c8630c4e1bb7e136afd8901e9ad16b",
+      "valueHash": "d44c2f6af36a8127ed63464f79fb19769344f3084c427aff87afd412726e79ec"
+    },
+    {
+      "name": "WatchPoll.init",
+      "kind": "definition",
+      "type": "WatchPoll.Seconds → WatchPoll.State",
+      "typeHash": "d824f35ce51a4352f26c8f62b7cf562243ba661301b540312419c3fef4a28c1d",
+      "valueHash": "e07aa37480f7f6652faa83a00d5e64769a9536b6a6ee02cedf8c9f249515e004"
+    },
+    {
+      "name": "WatchPoll.instDecidableBackoffSpec",
+      "kind": "definition",
+      "type": "(interval failures : Nat) → Decidable (WatchPoll.BackoffSpec interval failures)",
+      "typeHash": "67361222c70dd7e9bbf79829ceec09f3386e4d8fd36da8177651759dbefd1ecc",
+      "valueHash": "6d0336821c73ceb2d6815952b7fd53c88d9be5bf78f92fb537783317353c3ae5"
+    },
+    {
+      "name": "WatchPoll.instDecidableClockMustAdvance",
+      "kind": "definition",
+      "type": "(past : List WatchPoll.Call) → (c : WatchPoll.Call) → Decidable (WatchPoll.ClockMustAdvance past c)",
+      "typeHash": "11eb93ae036245706215753a8a0265e09ce18658071a4a1dda5c65f580c0889f",
+      "valueHash": "24bfbb55aae5ab19eb82090857452542fe0ad3f6aa46ac539901f4d50851fc01"
+    },
+    {
+      "name": "WatchPoll.instDecidableConfirmSound",
+      "kind": "definition",
+      "type": "(past : List WatchPoll.Call) → (c : WatchPoll.Call) → Decidable (WatchPoll.ConfirmSound past c)",
+      "typeHash": "d58c503f409580264b6c19e425d1e8ae95a94529c3ad2f7f584cb062cfd14e7f",
+      "valueHash": "2a21e7933596612e21050acf2ec9f5dfe3163965e099209602d5c600bbf1f7f3"
+    },
+    {
+      "name": "WatchPoll.instDecidableConfirmSpec",
+      "kind": "definition",
+      "type": "(past : List WatchPoll.Call) → (c : WatchPoll.Call) → Decidable (WatchPoll.ConfirmSpec past c)",
+      "typeHash": "b29d98b4f37b39306d650956521f6e9e9d158bfe543a858997220163e8ef506b",
+      "valueHash": "d8ad2d3506b87dde8adf11dff56981baf0aad6d5e7f97f5e88fa013fcff54fba"
+    },
+    {
+      "name": "WatchPoll.instDecidableCovers",
+      "kind": "definition",
+      "type": "(remaining : WatchPoll.Seconds) → (seconds : Nat) → Decidable (remaining.covers seconds)",
+      "typeHash": "30c4a2aac5dec418e35c6c62cd4f46a3ed7d9752dae8e9a2c26682aac95a0ece",
+      "valueHash": "0c8efebf8de4d102109c53aebc0904369a4748bf633201ad200c37889f44cc70"
+    },
+    {
+      "name": "WatchPoll.instDecidableCovers.match_4",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Seconds → Nat → Sort u_1) → (x : WatchPoll.Seconds) → (x_1 : Nat) → ((r seconds : Nat) → motive (WatchPoll.Seconds.finite r) seconds) → ((x : Nat) → motive WatchPoll.Seconds.infinity x) → motive x x_1",
+      "typeHash": "605eec39aced62c1f994481d3c9c3ea5f34c59bc634b62da9eb60ddf9abaac11",
+      "valueHash": "90065490e2fa2fd6fb8a07c8d889b8d1c94c5d3aa9aa64012f1ec3d99f10ae63"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqCall",
+      "kind": "definition",
+      "type": "DecidableEq WatchPoll.Call",
+      "typeHash": "e96db09358f33ffd7f904b6c6d1d5f8328ea5f568e6f45cd1893a58cc26fc4dd",
+      "valueHash": "80bd1778ad9c323026806e15b2e93051d0a11e1d671212f3900a200e30b4ae59"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqCall.decEq",
+      "kind": "definition",
+      "type": "(x x_1 : WatchPoll.Call) → Decidable (x = x_1)",
+      "typeHash": "1856153c2be08dd13c9ee2e453fa09b2082831522875ee09793d37631db2b054",
+      "valueHash": "6b1c9f1ad2f19fe07473bd3a9145a56b9fc38fbd56c542137b461dc458fead21"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqCall.decEq.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Call → WatchPoll.Call → Sort u_1) → (x x_1 : WatchPoll.Call) → ((a a_1 a_2 b b_1 b_2 : Nat) → motive { now := a, pr := a_1, headRefOid := a_2 } { now := b, pr := b_1, headRefOid := b_2 }) → motive x x_1",
+      "typeHash": "f46afd402399ad4af61997417ffb546e5dae801a9ac30aee818677dd65a1df7d",
+      "valueHash": "e29649a0e85ee163cbfb5714aad70d4c26ff91ea748f0a7534fcfc71d685d330"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqEvent",
+      "kind": "definition",
+      "type": "DecidableEq WatchPoll.Event",
+      "typeHash": "c3ae976d5da1c686e50f6b06bf7e9f8eaf75e439d8d5fadce9ca962092e7342e",
+      "valueHash": "3a1ab179bbc1abb12ab6360ece3c0e75f192159f0c096887f50b9c7304061514"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqEvent.decEq",
+      "kind": "definition",
+      "type": "(x x_1 : WatchPoll.Event) → Decidable (x = x_1)",
+      "typeHash": "be2f3a4b4d83acf637f6fb54322806160c016059261539d61a6f0bdd5673c802",
+      "valueHash": "dd3c1b36c60c2fbd48bf4bd36db68729ae5af7940eee2c8d4ec17a2a2fbc6c94"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqEvent.decEq.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Event → WatchPoll.Event → Sort u_1) → (x x_1 : WatchPoll.Event) → ((a : WatchPoll.StepOutcome) → (a_1 a_2 : Nat) → (b : WatchPoll.StepOutcome) → (b_1 b_2 : Nat) → motive { outcome := a, stepElapsed := a_1, sleepElapsed := a_2 } { outcome := b, stepElapsed := b_1, sleepElapsed := b_2 }) → motive x x_1",
+      "typeHash": "1a118aef25dce53eba0fcca02c09c6ece1f3c98d502940650c74d3eae8a4d86b",
+      "valueHash": "2cc2f3e35a8f3f32976a8c9d864eafbf6f411bc598da1931c3c3566d904c690d"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqLast",
+      "kind": "definition",
+      "type": "DecidableEq WatchPoll.Last",
+      "typeHash": "58f9bf95f07dafbd9861cf1cdd8872aa3eecf7b29bc5ca71ca1dcc2e3b71f48f",
+      "valueHash": "713180fbcb31a2a79fc35783e782d4704eaa483ec584517d6cfddb8df415c9f6"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqLast.decEq",
+      "kind": "definition",
+      "type": "(x x_1 : WatchPoll.Last) → Decidable (x = x_1)",
+      "typeHash": "3c79a69bb68e07c591edf89f39e73e3c07ec7c474ed51d4f69bd0f784e390725",
+      "valueHash": "8c4a4c09254001eee18e07b14ac0db842985c1ca1d4dd937cca6869795cf0827"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqLast.decEq.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Last → WatchPoll.Last → Sort u_1) → (x x_1 : WatchPoll.Last) → (Unit → motive WatchPoll.Last.start WatchPoll.Last.start) → ((seconds : Nat) → motive WatchPoll.Last.start (WatchPoll.Last.sleptPoll seconds)) → ((seconds : Nat) → motive WatchPoll.Last.start (WatchPoll.Last.sleptRetry seconds)) → (Unit → motive WatchPoll.Last.start WatchPoll.Last.continued) → (Unit → motive WatchPoll.Last.start WatchPoll.Last.returnedVerdict) → ((failures : Nat) → motive WatchPoll.Last.start (WatchPoll.Last.returnedStatusQuery failures)) → (Unit → motive WatchPoll.Last.start WatchPoll.Last.returnedOnDeadline) → (Unit → motive WatchPoll.Last.start WatchPoll.Last.threw) → ((seconds : Nat) → motive (WatchPoll.Last.sleptPoll seconds) WatchPoll.Last.start) → ((a b : Nat) → motive (WatchPoll.Last.sleptPoll a) (WatchPoll.Last.sleptPoll b)) → ((seconds seconds_1 : Nat) → motive (WatchPoll.Last.sleptPoll seconds) (WatchPoll.Last.sleptRetry seconds_1)) → ((seconds : Nat) → motive (WatchPoll.Last.sleptPoll seconds) WatchPoll.Last.continued) → ((seconds : Nat) → motive (WatchPoll.Last.sleptPoll seconds) WatchPoll.Last.returnedVerdict) → ((seconds failures : Nat) → motive (WatchPoll.Last.sleptPoll seconds) (WatchPoll.Last.returnedStatusQuery failures)) → ((seconds : Nat) → motive (WatchPoll.Last.sleptPoll seconds) WatchPoll.Last.returnedOnDeadline) → ((seconds : Nat) → motive (WatchPoll.Last.sleptPoll seconds) WatchPoll.Last.threw) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds) WatchPoll.Last.start) → ((seconds seconds_1 : Nat) → motive (WatchPoll.Last.sleptRetry seconds) (WatchPoll.Last.sleptPoll seconds_1)) → ((a b : Nat) → motive (WatchPoll.Last.sleptRetry a) (WatchPoll.Last.sleptRetry b)) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds) WatchPoll.Last.continued) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds) WatchPoll.Last.returnedVerdict) → ((seconds failures : Nat) → motive (WatchPoll.Last.sleptRetry seconds) (WatchPoll.Last.returnedStatusQuery failures)) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds) WatchPoll.Last.returnedOnDeadline) → ((seconds : Nat) → motive (WatchPoll.Last.sleptRetry seconds) WatchPoll.Last.threw) → (Unit → motive WatchPoll.Last.continued WatchPoll.Last.start) → ((seconds : Nat) → motive WatchPoll.Last.continued (WatchPoll.Last.sleptPoll seconds)) → ((seconds : Nat) → motive WatchPoll.Last.continued (WatchPoll.Last.sleptRetry seconds)) → (Unit → motive WatchPoll.Last.continued WatchPoll.Last.continued) → (Unit → motive WatchPoll.Last.continued WatchPoll.Last.returnedVerdict) → ((failures : Nat) → motive WatchPoll.Last.continued (WatchPoll.Last.returnedStatusQuery failures)) → (Unit → motive WatchPoll.Last.continued WatchPoll.Last.returnedOnDeadline) → (Unit → motive WatchPoll.Last.continued WatchPoll.Last.threw) → (Unit → motive WatchPoll.Last.returnedVerdict WatchPoll.Last.start) → ((seconds : Nat) → motive WatchPoll.Last.returnedVerdict (WatchPoll.Last.sleptPoll seconds)) → ((seconds : Nat) → motive WatchPoll.Last.returnedVerdict (WatchPoll.Last.sleptRetry seconds)) → (Unit → motive WatchPoll.Last.returnedVerdict WatchPoll.Last.continued) → (Unit → motive WatchPoll.Last.returnedVerdict WatchPoll.Last.returnedVerdict) → ((failures : Nat) → motive WatchPoll.Last.returnedVerdict (WatchPoll.Last.returnedStatusQuery failures)) → (Unit → motive WatchPoll.Last.returnedVerdict WatchPoll.Last.returnedOnDeadline) → (Unit → motive WatchPoll.Last.returnedVerdict WatchPoll.Last.threw) → ((failures : Nat) → motive (WatchPoll.Last.returnedStatusQuery failures) WatchPoll.Last.start) → ((failures seconds : Nat) → motive (WatchPoll.Last.returnedStatusQuery failures) (WatchPoll.Last.sleptPoll seconds)) → ((failures seconds : Nat) → motive (WatchPoll.Last.returnedStatusQuery failures) (WatchPoll.Last.sleptRetry seconds)) → ((failures : Nat) → motive (WatchPoll.Last.returnedStatusQuery failures) WatchPoll.Last.continued) → ((failures : Nat) → motive (WatchPoll.Last.returnedStatusQuery failures) WatchPoll.Last.returnedVerdict) → ((a b : Nat) → motive (WatchPoll.Last.returnedStatusQuery a) (WatchPoll.Last.returnedStatusQuery b)) → ((failures : Nat) → motive (WatchPoll.Last.returnedStatusQuery failures) WatchPoll.Last.returnedOnDeadline) → ((failures : Nat) → motive (WatchPoll.Last.returnedStatusQuery failures) WatchPoll.Last.threw) → (Unit → motive WatchPoll.Last.returnedOnDeadline WatchPoll.Last.start) → ⋯",
+      "typeHash": "217a4970721a5d72e5215b0f967dd2f3ce2f2fe3bc921b95821cae28410b5b80",
+      "valueHash": "2f741f5fb3d91f6f90cfff123f5cdee54d95968900dd4dd63257c6b9d7dc1815"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqPollingOptions",
+      "kind": "definition",
+      "type": "DecidableEq WatchPoll.PollingOptions",
+      "typeHash": "1c665bd743d2be4c655c639c98ac6dc85dff44e9ab8f46d96d499bc1e1074674",
+      "valueHash": "cf8c7af1791efa859962ec080215593bfeeb23c3b9e3a588d838a87117f4990c"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqPollingOptions.decEq",
+      "kind": "definition",
+      "type": "(x x_1 : WatchPoll.PollingOptions) → Decidable (x = x_1)",
+      "typeHash": "0a500fa4592cae43922cd447c88813178219e850b7547d95ed4d9a4ef74154f7",
+      "valueHash": "7a0216b24c37b8ac2a0e3f916434d76e8e85fd85aa7976a498025b0bbaa392f9"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqPollingOptions.decEq.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.PollingOptions → WatchPoll.PollingOptions → Sort u_1) → (x x_1 : WatchPoll.PollingOptions) → ((a a_1 b b_1 : Nat) → motive { interval := a, maxQueryErrors := a_1 } { interval := b, maxQueryErrors := b_1 }) → motive x x_1",
+      "typeHash": "92b26f28918dd71a095c14522d152219ffa5d0867fd6e9153b3a45dabc7c297d",
+      "valueHash": "a2d1badc82706d70e425ca7c967af7bf0d3b4ce56317f189a3e5f448a6e3f112"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqSeconds",
+      "kind": "definition",
+      "type": "DecidableEq WatchPoll.Seconds",
+      "typeHash": "19d59640c7a0bce550a6d86f0798a3022f6ce640aacca3950ee4593d5db6f1b0",
+      "valueHash": "3f6c7b2772a1729acb1423e0d8d5d979f2dbc4bb86e0281dd1768ba7e8c6a852"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqSeconds.decEq",
+      "kind": "definition",
+      "type": "(x x_1 : WatchPoll.Seconds) → Decidable (x = x_1)",
+      "typeHash": "c6ccc94dd42afee932caaf511fcfa5cad359f81d69436d134238ce8703289e45",
+      "valueHash": "780d1be94d58d142be05b3e79203b8e8ef0ecb3bf9c3f095780237ba1e8f2d67"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqSeconds.decEq.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Seconds → WatchPoll.Seconds → Sort u_1) → (x x_1 : WatchPoll.Seconds) → ((a b : Nat) → motive (WatchPoll.Seconds.finite a) (WatchPoll.Seconds.finite b)) → ((seconds : Nat) → motive (WatchPoll.Seconds.finite seconds) WatchPoll.Seconds.infinity) → ((seconds : Nat) → motive WatchPoll.Seconds.infinity (WatchPoll.Seconds.finite seconds)) → (Unit → motive WatchPoll.Seconds.infinity WatchPoll.Seconds.infinity) → motive x x_1",
+      "typeHash": "9e8126710e76bc59b9a752236f767bbe7fc17a32e436e13d71d12bd3956bcab4",
+      "valueHash": "9622610069e24ac30ed798d02fbd554ce9a3d92ef285c44b7d36227f7c51cae9"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqSighting",
+      "kind": "definition",
+      "type": "DecidableEq WatchPoll.Sighting",
+      "typeHash": "f0b6aa7bb6aaaae1dfe41f6099a4eb9154d8898bdb01db74664c62c40d85393b",
+      "valueHash": "b59bf3731a55f4aefaa1df45a166158d64e82e79ea815fc2296f5fa91a268a2d"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqSighting.decEq",
+      "kind": "definition",
+      "type": "(x x_1 : WatchPoll.Sighting) → Decidable (x = x_1)",
+      "typeHash": "da7bafc040ee92c4417a7f213a61edb22528743757ae902f745a07af052f27df",
+      "valueHash": "f295f1a0e712503c5f5e4e6581fcfc514b79ca2b23c1307246088929e0f512ec"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqSighting.decEq.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Sighting → WatchPoll.Sighting → Sort u_1) → (x x_1 : WatchPoll.Sighting) → ((a a_1 b b_1 : Nat) → motive { headRefOid := a, seenAt := a_1 } { headRefOid := b, seenAt := b_1 }) → motive x x_1",
+      "typeHash": "9b693ea81c8322b4b9557acc24f20918c6724d20ee8e71e8bbfdd775640f3bc9",
+      "valueHash": "67fbba5f105ced8ce51f854824c347c70eebbb9ee546d37442f072df3afaa448"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqState",
+      "kind": "definition",
+      "type": "DecidableEq WatchPoll.State",
+      "typeHash": "4773ee7f53f9404583abb9fa932bd0b4e859cea416797c7585f334825d450509",
+      "valueHash": "fc109430a6e0fa6a5ddd0ade54398afc335ea8b7bd4454cf6556eae6f431f58c"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqState.decEq",
+      "kind": "definition",
+      "type": "(x x_1 : WatchPoll.State) → Decidable (x = x_1)",
+      "typeHash": "b97382511bd496375e662b5e9dd19f768023146728d02b3fc42f3f14b1f6d4d9",
+      "valueHash": "13e307688b060ef7a1f7b9aaa2727f9c8541f9117a01d855726a8d221600f1dc"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqState.decEq.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.State → WatchPoll.State → Sort u_1) → (x x_1 : WatchPoll.State) → ((a : Nat) → (a_1 : WatchPoll.Seconds) → (a_2 : WatchPoll.Last) → (a_3 a_4 b : Nat) → (b_1 : WatchPoll.Seconds) → (b_2 : WatchPoll.Last) → (b_3 b_4 : Nat) → motive { failures := a, remaining := a_1, last := a_2, retries := a_3, slept := a_4 } { failures := b, remaining := b_1, last := b_2, retries := b_3, slept := b_4 }) → motive x x_1",
+      "typeHash": "3dee918d953f936d22b32507f5c811ce200ebd722c500c00a2b424737484743b",
+      "valueHash": "0ec1141f3dfb3be73a81b06746e36619ce859f468e993265a1f5fc794e19af17"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqStepOutcome",
+      "kind": "definition",
+      "type": "DecidableEq WatchPoll.StepOutcome",
+      "typeHash": "212ca80448d38c22368f7cced9e1f8e10a01a81d33d83eb2e3a22e42bf8c08e3",
+      "valueHash": "8261a48373ae507f97cba4b69db83603b4070fc5a133d5e0dbd2a0d436c034dc"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqStepOutcome.decEq",
+      "kind": "definition",
+      "type": "(x x_1 : WatchPoll.StepOutcome) → Decidable (x = x_1)",
+      "typeHash": "938bff0a454a200ae945a14d90bcf72ee005cff8b465ae6c271850db65e07295",
+      "valueHash": "7c61d4e7f874b18975abea1bbf738ef2c5cf82e54d887649a7854ac411a25e10"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqStepOutcome.decEq.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.StepOutcome → WatchPoll.StepOutcome → Sort u_1) → (x x_1 : WatchPoll.StepOutcome) → (Unit → motive WatchPoll.StepOutcome.terminal WatchPoll.StepOutcome.terminal) → ((seconds : Nat) → motive WatchPoll.StepOutcome.terminal (WatchPoll.StepOutcome.sleep seconds)) → (Unit → motive WatchPoll.StepOutcome.terminal WatchPoll.StepOutcome.continue_) → ((retryable : Bool) → motive WatchPoll.StepOutcome.terminal (WatchPoll.StepOutcome.queryError retryable)) → (Unit → motive WatchPoll.StepOutcome.terminal WatchPoll.StepOutcome.deadlineExceeded) → (Unit → motive WatchPoll.StepOutcome.terminal WatchPoll.StepOutcome.otherError) → ((seconds : Nat) → motive (WatchPoll.StepOutcome.sleep seconds) WatchPoll.StepOutcome.terminal) → ((a b : Nat) → motive (WatchPoll.StepOutcome.sleep a) (WatchPoll.StepOutcome.sleep b)) → ((seconds : Nat) → motive (WatchPoll.StepOutcome.sleep seconds) WatchPoll.StepOutcome.continue_) → ((seconds : Nat) → (retryable : Bool) → motive (WatchPoll.StepOutcome.sleep seconds) (WatchPoll.StepOutcome.queryError retryable)) → ((seconds : Nat) → motive (WatchPoll.StepOutcome.sleep seconds) WatchPoll.StepOutcome.deadlineExceeded) → ((seconds : Nat) → motive (WatchPoll.StepOutcome.sleep seconds) WatchPoll.StepOutcome.otherError) → (Unit → motive WatchPoll.StepOutcome.continue_ WatchPoll.StepOutcome.terminal) → ((seconds : Nat) → motive WatchPoll.StepOutcome.continue_ (WatchPoll.StepOutcome.sleep seconds)) → (Unit → motive WatchPoll.StepOutcome.continue_ WatchPoll.StepOutcome.continue_) → ((retryable : Bool) → motive WatchPoll.StepOutcome.continue_ (WatchPoll.StepOutcome.queryError retryable)) → (Unit → motive WatchPoll.StepOutcome.continue_ WatchPoll.StepOutcome.deadlineExceeded) → (Unit → motive WatchPoll.StepOutcome.continue_ WatchPoll.StepOutcome.otherError) → ((retryable : Bool) → motive (WatchPoll.StepOutcome.queryError retryable) WatchPoll.StepOutcome.terminal) → ((retryable : Bool) → (seconds : Nat) → motive (WatchPoll.StepOutcome.queryError retryable) (WatchPoll.StepOutcome.sleep seconds)) → ((retryable : Bool) → motive (WatchPoll.StepOutcome.queryError retryable) WatchPoll.StepOutcome.continue_) → ((a b : Bool) → motive (WatchPoll.StepOutcome.queryError a) (WatchPoll.StepOutcome.queryError b)) → ((retryable : Bool) → motive (WatchPoll.StepOutcome.queryError retryable) WatchPoll.StepOutcome.deadlineExceeded) → ((retryable : Bool) → motive (WatchPoll.StepOutcome.queryError retryable) WatchPoll.StepOutcome.otherError) → (Unit → motive WatchPoll.StepOutcome.deadlineExceeded WatchPoll.StepOutcome.terminal) → ((seconds : Nat) → motive WatchPoll.StepOutcome.deadlineExceeded (WatchPoll.StepOutcome.sleep seconds)) → (Unit → motive WatchPoll.StepOutcome.deadlineExceeded WatchPoll.StepOutcome.continue_) → ((retryable : Bool) → motive WatchPoll.StepOutcome.deadlineExceeded (WatchPoll.StepOutcome.queryError retryable)) → (Unit → motive WatchPoll.StepOutcome.deadlineExceeded WatchPoll.StepOutcome.deadlineExceeded) → (Unit → motive WatchPoll.StepOutcome.deadlineExceeded WatchPoll.StepOutcome.otherError) → (Unit → motive WatchPoll.StepOutcome.otherError WatchPoll.StepOutcome.terminal) → ((seconds : Nat) → motive WatchPoll.StepOutcome.otherError (WatchPoll.StepOutcome.sleep seconds)) → (Unit → motive WatchPoll.StepOutcome.otherError WatchPoll.StepOutcome.continue_) → ((retryable : Bool) → motive WatchPoll.StepOutcome.otherError (WatchPoll.StepOutcome.queryError retryable)) → (Unit → motive WatchPoll.StepOutcome.otherError WatchPoll.StepOutcome.deadlineExceeded) → (Unit → motive WatchPoll.StepOutcome.otherError WatchPoll.StepOutcome.otherError) → motive x x_1",
+      "typeHash": "6cdcd6736a6e804ca26c0153fb8045a8d25fcda24a693a68d0a12c80407c04ee",
+      "valueHash": "6d7fa25a883ba909f9ccd29435eb1fd452bb61987a494c194b7ec00cce2919dc"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqWatchDeadline",
+      "kind": "definition",
+      "type": "DecidableEq WatchPoll.WatchDeadline",
+      "typeHash": "54d9195f75aa5637d02c432e16ffbba6e3e3182993cd8babb3bcdfa04ca21e27",
+      "valueHash": "f3060104d0dca23f8385602c9ef9e59081d8abeaa4ce04dd9ed55770216c3918"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqWatchDeadline.decEq",
+      "kind": "definition",
+      "type": "(x x_1 : WatchPoll.WatchDeadline) → Decidable (x = x_1)",
+      "typeHash": "04302b920f2701f4d10da3623f710124f570e4dc39ad4325ce75c87bb89121b4",
+      "valueHash": "dc9f4cda998b0d64d23b481fb62c02eea518f3edec767e3efe73931cba2e64e8"
+    },
+    {
+      "name": "WatchPoll.instDecidableEqWatchDeadline.decEq.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.WatchDeadline → WatchPoll.WatchDeadline → Sort u_1) → (x x_1 : WatchPoll.WatchDeadline) → ((a b : WatchPoll.Seconds) → motive { expiresAt := a } { expiresAt := b }) → motive x x_1",
+      "typeHash": "f71a0cb291c31f580284f0251c4cc27ab0ecf4e644e62d4e744185c1cf6527f4",
+      "valueHash": "fcad1a5539d4217f1ed69e286da413434c78a72fbdf993864b22fccf1ce7fc58"
+    },
+    {
+      "name": "WatchPoll.instDecidableFirstSightingFalse",
+      "kind": "definition",
+      "type": "(past : List WatchPoll.Call) → (c : WatchPoll.Call) → Decidable (WatchPoll.FirstSightingFalse past c)",
+      "typeHash": "27994754486b339273dbafe1463720699f9c4141f6ee69a02a36e7ee68906671",
+      "valueHash": "74d5896027191d63b8dd307ad14e9637badd4df53d8b3fd620436cb14d086ed5"
+    },
+    {
+      "name": "WatchPoll.instDecidableHeadChangeFalse",
+      "kind": "definition",
+      "type": "(past : List WatchPoll.Call) → (c : WatchPoll.Call) → Decidable (WatchPoll.HeadChangeFalse past c)",
+      "typeHash": "4707e2719b42b0a818df7d0fa982e8ddded0435c1b57bf3b499ea07593deeb84",
+      "valueHash": "0f064b814a079e18c8aedc44b48923e5a0f8505a8b80866e939c2b1a9f013a89"
+    },
+    {
+      "name": "WatchPoll.instDecidableHonestClock",
+      "kind": "definition",
+      "type": "(e : WatchPoll.Event) → (t : WatchPoll.State) → Decidable (WatchPoll.HonestClock e t)",
+      "typeHash": "ac46e39dbaead496b59bff59920dc93b3fee1ccce68cabf5b7775cb7ea8cb7ff",
+      "valueHash": "f0704e2fc1261dcb8f7ffe2eb27fe2b751078548f6eec7aecb29cf6719fa2cd5"
+    },
+    {
+      "name": "WatchPoll.instDecidableInvariant",
+      "kind": "definition",
+      "type": "(o : WatchPoll.PollingOptions) → (s : WatchPoll.State) → Decidable (WatchPoll.Invariant o s)",
+      "typeHash": "75aae2f6e1706b3f68579a751623b5b04cfdccf8364bea6a2d2e2442aa974008",
+      "valueHash": "235d74c10c28f51cc17cc3fc5e7218f5cb66d3743e43aa20a34157bfc785dd18"
+    },
+    {
+      "name": "WatchPoll.instDecidableResetsFailures",
+      "kind": "definition",
+      "type": "(s : WatchPoll.State) → (e : WatchPoll.Event) → (t : WatchPoll.State) → Decidable (WatchPoll.ResetsFailures s e t)",
+      "typeHash": "c46a502fa793dea1835d25533320d384e1c33d20939bf6df9d63640dca4bc944",
+      "valueHash": "091c99f6afd5728915e1eb7ae1200f35d74c5bc6b31d8a7c529fd00a23741451"
+    },
+    {
+      "name": "WatchPoll.instDecidableRetriesBelowMax",
+      "kind": "definition",
+      "type": "(o : WatchPoll.PollingOptions) → (s : WatchPoll.State) → Decidable (WatchPoll.RetriesBelowMax o s)",
+      "typeHash": "cf25f846852370ab010666a531a78eb65214f7395238d1ffb6fa0db9169b5f86",
+      "valueHash": "af22452ebe28eb3b9475b224b614e54edad9024fd06c1599f57380ec1f44700d"
+    },
+    {
+      "name": "WatchPoll.instDecidableRetryUsesBackoff",
+      "kind": "definition",
+      "type": "(o : WatchPoll.PollingOptions) → (s : WatchPoll.State) → (e : WatchPoll.Event) → (t : WatchPoll.State) → Decidable (WatchPoll.RetryUsesBackoff o s e t)",
+      "typeHash": "50b60ca1702a1bd44f13efbcb8e050324596182cf99d7a9e137336dde3ea6bec",
+      "valueHash": "670a094422b8ca2c0099fe0a890521be752667e06e38bc37b55f772f0261f253"
+    },
+    {
+      "name": "WatchPoll.instDecidableSleepWithinBudget",
+      "kind": "definition",
+      "type": "(s : WatchPoll.State) → (e : WatchPoll.Event) → (t : WatchPoll.State) → Decidable (WatchPoll.SleepWithinBudget s e t)",
+      "typeHash": "d28a4590540914d5c90077bab9e33ab23c8699e35d190fa4c5707230f7e9c9fa",
+      "valueHash": "ffbec3c571af7861a21b693a8353b537bf38c9387cb9f89840ade833e1c1a452"
+    },
+    {
+      "name": "WatchPoll.instDecidableStalls",
+      "kind": "definition",
+      "type": "(e : WatchPoll.Event) → (t : WatchPoll.State) → Decidable (WatchPoll.Stalls e t)",
+      "typeHash": "2af1254a1424eb32aaf1269744a317f1bb65b1be38106bf9e8738a707606ad5d",
+      "valueHash": "317d97c53456c3881d7f83f7fa542256fb1584345e54cf2a46c6a71a14282053"
+    },
+    {
+      "name": "WatchPoll.instDecidableWithinTimeout",
+      "kind": "definition",
+      "type": "(timeout : Nat) → (s : WatchPoll.State) → Decidable (WatchPoll.WithinTimeout timeout s)",
+      "typeHash": "6a51531e8d933a068db727aa672a1924c87800783861bd0b62937b574a148995",
+      "valueHash": "5f6dc8ac00898c4df33788cf79cf35a094739010da1f1c7bd4af6fe1b7b50357"
+    },
+    {
+      "name": "WatchPoll.instReprCall",
+      "kind": "definition",
+      "type": "Repr WatchPoll.Call",
+      "typeHash": "2b3f89614280302d71f9741f2f5aa3adb306ab907c85cb56294ca8cf58d9c923",
+      "valueHash": "aa2d88d29f7ef32337881fe41ae87121b0f84b4bb0f9506036c2e0bfd1a91947"
+    },
+    {
+      "name": "WatchPoll.instReprCall.repr",
+      "kind": "definition",
+      "type": "WatchPoll.Call → Nat → Format",
+      "typeHash": "8a5e2696c4f3b027f666d20a380bf2fc0aa0181f03c9f912aacfe9063c382815",
+      "valueHash": "820349dbea000e5893f6019967c786ec7b71362883157dfa0b93e2a0ae615c62"
+    },
+    {
+      "name": "WatchPoll.instReprEvent",
+      "kind": "definition",
+      "type": "Repr WatchPoll.Event",
+      "typeHash": "eb97e1f0dd321893573849b5eeb1f0c4ad28112a98ac48be36541e36ed4d32e9",
+      "valueHash": "8046e99d342f252b23123ab9c10678e87d262f21f96e836af1f2329d1e6af174"
+    },
+    {
+      "name": "WatchPoll.instReprEvent.repr",
+      "kind": "definition",
+      "type": "WatchPoll.Event → Nat → Format",
+      "typeHash": "444eb84a50f0e80fa932aa188540c1e040dbc39f4323d8328a78837b7b2f9d1f",
+      "valueHash": "118fd11c0aba431e67e2ab69ac7f28c9386a75e5ac37c5dbb8663c15c1fb3b23"
+    },
+    {
+      "name": "WatchPoll.instReprLast",
+      "kind": "definition",
+      "type": "Repr WatchPoll.Last",
+      "typeHash": "6fed6a0f817a0eeed415223d63b7bb9a468a684341109e34b1c3aeae015f4944",
+      "valueHash": "85cf0423e5197614580230966c21c175c592811b2c85d3accf00a7ecb4fe0816"
+    },
+    {
+      "name": "WatchPoll.instReprLast.repr",
+      "kind": "definition",
+      "type": "WatchPoll.Last → Nat → Format",
+      "typeHash": "49f63de8f1aa88732defeb042074d779a8f03ca766bc5a7ba63dd9751d7dcb97",
+      "valueHash": "51ad52d8544124ed1c79a3835b1bf3d7b52a75a04662f314aa11aa17de084546"
+    },
+    {
+      "name": "WatchPoll.instReprLast.repr.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Last → Sort u_1) → (x : WatchPoll.Last) → (Unit → motive WatchPoll.Last.start) → ((a : Nat) → motive (WatchPoll.Last.sleptPoll a)) → ((a : Nat) → motive (WatchPoll.Last.sleptRetry a)) → (Unit → motive WatchPoll.Last.continued) → (Unit → motive WatchPoll.Last.returnedVerdict) → ((a : Nat) → motive (WatchPoll.Last.returnedStatusQuery a)) → (Unit → motive WatchPoll.Last.returnedOnDeadline) → (Unit → motive WatchPoll.Last.threw) → motive x",
+      "typeHash": "b5cc61e12f0fd15abb8deb414d61ae9eed599bb2b299b57908c440cd9d011fe4",
+      "valueHash": "815b687739a206cf50df0ae70d96f295c53aae266c268e3ee47beb6b199e7b0d"
+    },
+    {
+      "name": "WatchPoll.instReprPollingOptions",
+      "kind": "definition",
+      "type": "Repr WatchPoll.PollingOptions",
+      "typeHash": "b0b3d7e47766f48f2e38a3e9333629df00ef485ac56603d2b7b0c04a2870d39a",
+      "valueHash": "ca96d04f13464f35c76b365078b8e0c54c7642a36994678c6bf05092d401fb14"
+    },
+    {
+      "name": "WatchPoll.instReprPollingOptions.repr",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → Nat → Format",
+      "typeHash": "b4585af3333fe833839b0254378c22a3c2ff6e72ef5791542cee332d2ac8b247",
+      "valueHash": "fbc97d94ebdc627f5c5fab70bd9977b67b9f3b156e0a336e2deecf0a69457dc9"
+    },
+    {
+      "name": "WatchPoll.instReprSeconds",
+      "kind": "definition",
+      "type": "Repr WatchPoll.Seconds",
+      "typeHash": "672a6dd7c12f72cae5b06a3f6429f0e1f88861db8f3b1cb003a9bcc818bf1704",
+      "valueHash": "61355da861053f78a79a6270de92aa91fcd3ba7ae28680d8e906afcba554e45e"
+    },
+    {
+      "name": "WatchPoll.instReprSeconds.repr",
+      "kind": "definition",
+      "type": "WatchPoll.Seconds → Nat → Format",
+      "typeHash": "3d819e316f2dca02ee72b44907ba63961f4a88fc945dcc00b78313c5008791a5",
+      "valueHash": "198bb937ec704dccbb1be381075b69fe7ff47aa0e562e3d9bb1a7b3cfb3014ea"
+    },
+    {
+      "name": "WatchPoll.instReprSeconds.repr.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Seconds → Sort u_1) → (x : WatchPoll.Seconds) → ((a : Nat) → motive (WatchPoll.Seconds.finite a)) → (Unit → motive WatchPoll.Seconds.infinity) → motive x",
+      "typeHash": "4acf454f795e573f1577832d746549a3cee0ea22e7974245a9ac7603049b35d4",
+      "valueHash": "5a584ece15061c1d55f73d2bd0de34634d1110b8823def917061f9308994d01c"
+    },
+    {
+      "name": "WatchPoll.instReprSeconds.repr.match_1.eq_1",
+      "kind": "theorem",
+      "type": "∀ (motive : WatchPoll.Seconds → Sort u_1) (a : Nat) (h_1 : (a : Nat) → motive (WatchPoll.Seconds.finite a)) (h_2 : Unit → motive WatchPoll.Seconds.infinity), (match WatchPoll.Seconds.finite a with | WatchPoll.Seconds.finite a => h_1 a | WatchPoll.Seconds.infinity => h_2 ()) = h_1 a",
+      "typeHash": "23c1e20487437cc78e01ab18c1e349e65ef84b0bc41d08c9c69bd46ba2cc0473",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.instReprSeconds.repr.match_1.eq_2",
+      "kind": "theorem",
+      "type": "∀ (motive : WatchPoll.Seconds → Sort u_1) (h_1 : (a : Nat) → motive (WatchPoll.Seconds.finite a)) (h_2 : Unit → motive WatchPoll.Seconds.infinity), (match WatchPoll.Seconds.infinity with | WatchPoll.Seconds.finite a => h_1 a | WatchPoll.Seconds.infinity => h_2 ()) = h_2 ()",
+      "typeHash": "0d38636a4887a17b9769177f849fa1d50b8e039cc2f43db76d61f3e424de51b6",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.instReprSeconds.repr.match_1.splitter",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.Seconds → Sort u_1) → (x : WatchPoll.Seconds) → ((a : Nat) → motive (WatchPoll.Seconds.finite a)) → (Unit → motive WatchPoll.Seconds.infinity) → motive x",
+      "typeHash": "4acf454f795e573f1577832d746549a3cee0ea22e7974245a9ac7603049b35d4",
+      "valueHash": "42c340f061064e8027eec975211d34bae0adb0bf1b2288c2f1cfe7823ef782fa"
+    },
+    {
+      "name": "WatchPoll.instReprSighting",
+      "kind": "definition",
+      "type": "Repr WatchPoll.Sighting",
+      "typeHash": "ec87e20562f71b3b555218cbff32f29e85c4ca46f5077e8a4c4b46f8181af0c7",
+      "valueHash": "631101a02a2ef70c3fa0d97f332608546cb66224a2479610779cab7ce9ef698a"
+    },
+    {
+      "name": "WatchPoll.instReprSighting.repr",
+      "kind": "definition",
+      "type": "WatchPoll.Sighting → Nat → Format",
+      "typeHash": "f423777d006a3ad7a21e9bb9769afa06c61ae54cc868e8c630e0db8d9d069678",
+      "valueHash": "87c40cba3f4a6106bad12b5acdb24eaa8d300f89ae64c974cd71a3d653ea7bcf"
+    },
+    {
+      "name": "WatchPoll.instReprState",
+      "kind": "definition",
+      "type": "Repr WatchPoll.State",
+      "typeHash": "f2bb1573de4cbb72d692d32a7a190748f7e4976bde43cee88fdba260362f4209",
+      "valueHash": "3c4d72dd43e5b813010c7ffa5f196835f0623ddb28fa4a741c3677b7cb6e0d96"
+    },
+    {
+      "name": "WatchPoll.instReprState.repr",
+      "kind": "definition",
+      "type": "WatchPoll.State → Nat → Format",
+      "typeHash": "af19d97459b8870eb182d70fc0cf97915a37db061d0c4a5ed70f0e1fb11e30da",
+      "valueHash": "b9ced07e25a11bb5efce70304d4ff06302bbc58d4284ba3460190cbca1e81537"
+    },
+    {
+      "name": "WatchPoll.instReprStepOutcome",
+      "kind": "definition",
+      "type": "Repr WatchPoll.StepOutcome",
+      "typeHash": "075deece719da945d096b43b61555e9ef35f190104af19503a31c064502ac85c",
+      "valueHash": "b8440c55cd3ea16ed0ff84fce0440e76566f9f348a92cf2deb64c2979a7c8466"
+    },
+    {
+      "name": "WatchPoll.instReprStepOutcome.repr",
+      "kind": "definition",
+      "type": "WatchPoll.StepOutcome → Nat → Format",
+      "typeHash": "3483edd30541309866d86d3207877f2c26802805e88d8d94d485203a0b32da5d",
+      "valueHash": "9df84f40ad33ce4190b47670d6328f081cc9ebf9a138e946b6435449d641f3e0"
+    },
+    {
+      "name": "WatchPoll.instReprStepOutcome.repr.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.StepOutcome → Sort u_1) → (x : WatchPoll.StepOutcome) → (Unit → motive WatchPoll.StepOutcome.terminal) → ((a : Nat) → motive (WatchPoll.StepOutcome.sleep a)) → (Unit → motive WatchPoll.StepOutcome.continue_) → ((a : Bool) → motive (WatchPoll.StepOutcome.queryError a)) → (Unit → motive WatchPoll.StepOutcome.deadlineExceeded) → (Unit → motive WatchPoll.StepOutcome.otherError) → motive x",
+      "typeHash": "d374f0e69b5b93ccd1b25cdcba35ffe95c031a51aad5e82a8a85aec448f26f55",
+      "valueHash": "bc88611105448fcefa44b952e9f213f2195c76874a995ecff0ff35cc85fb0ea3"
+    },
+    {
+      "name": "WatchPoll.instReprTransition",
+      "kind": "definition",
+      "type": "Repr WatchPoll.Transition",
+      "typeHash": "ba25730b15f354f96037f3d66c97c3ce5d2e8a9b21d3d7a1a54e4d7ef78513ae",
+      "valueHash": "af0e038fd41c1d1ad2ddd29d0bc1157666317f9c402b1618a0596d74fcb098bc"
+    },
+    {
+      "name": "WatchPoll.instReprTransition.repr",
+      "kind": "definition",
+      "type": "WatchPoll.Transition → Nat → Format",
+      "typeHash": "8a11760c5a4ce141ea9117050a4416776b6885ec7425e13f23446bd9225f60c1",
+      "valueHash": "7997215440807658f71b5bdc90fc37b7c704d47b7f22f1ee77e079b2c365b7ee"
+    },
+    {
+      "name": "WatchPoll.instReprWatchDeadline",
+      "kind": "definition",
+      "type": "Repr WatchPoll.WatchDeadline",
+      "typeHash": "79224db6b0a4fa74442742ac29422876f5b0014b4d81ffe33a1c914decc200c4",
+      "valueHash": "82507217e0dacfc23f3bb7c59476cdb84276f93689eb2fcae7477ce417bf1e4a"
+    },
+    {
+      "name": "WatchPoll.instReprWatchDeadline.repr",
+      "kind": "definition",
+      "type": "WatchPoll.WatchDeadline → Nat → Format",
+      "typeHash": "06990e934d055da4f218653146266d5f1969313325d23c753ea20356142b3a46",
+      "valueHash": "33f227fbf474a662d5920e344a4fe2f86ec895ffc7f6a379cb7704a667bac9f9"
+    },
+    {
+      "name": "WatchPoll.invariant_init",
+      "kind": "theorem",
+      "type": "∀ (o : WatchPoll.PollingOptions) (remaining : WatchPoll.Seconds), WatchPoll.Invariant o (WatchPoll.init remaining)",
+      "typeHash": "f7f1bc39f61f0294127fb3c98adcaee4423e6010159704ea9d90a6949bfda298",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.pollStep",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → WatchPoll.State → WatchPoll.Event → Option WatchPoll.State",
+      "typeHash": "2340df5f2caffa6798ab97f189433e6305f2370f6e078785deaf44b2eda9ac1e",
+      "valueHash": "954a9062e746f7bf1cf19d1563109bdfa370e17557c7f0692378b077e4f840ed"
+    },
+    {
+      "name": "WatchPoll.pollStep.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.StepOutcome → Sort u_1) → (x : WatchPoll.StepOutcome) → (Unit → motive WatchPoll.StepOutcome.terminal) → ((seconds : Nat) → motive (WatchPoll.StepOutcome.sleep seconds)) → (Unit → motive WatchPoll.StepOutcome.continue_) → (Unit → motive WatchPoll.StepOutcome.deadlineExceeded) → (Unit → motive WatchPoll.StepOutcome.otherError) → ((retryable : Bool) → motive (WatchPoll.StepOutcome.queryError retryable)) → motive x",
+      "typeHash": "8fd46ca8061c4f6ebe2b1cc48ce84ae3667266a59eb433e04ae5d0cac48dee07",
+      "valueHash": "181575057ac01be6ab59edfa3a6ab61542c10b1a4429b86dbe5dbf033d3d8b67"
+    },
+    {
+      "name": "WatchPoll.pollStep_keeps_invariant",
+      "kind": "theorem",
+      "type": "∀ (o : WatchPoll.PollingOptions) (s t : WatchPoll.State) (e : WatchPoll.Event), WatchPoll.Invariant o s → WatchPoll.pollStep o s e = some t → WatchPoll.Invariant o t",
+      "typeHash": "dea516aab50c6f3e5fa6254a76ebe4490bf9c9709e72534c25665301aaefdb40",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.pollStep_keeps_timeout",
+      "kind": "theorem",
+      "type": "∀ (timeout : Nat) (o : WatchPoll.PollingOptions) (s t : WatchPoll.State) (e : WatchPoll.Event), WatchPoll.WithinTimeout timeout s → WatchPoll.pollStep o s e = some t → WatchPoll.HonestClock e t → WatchPoll.WithinTimeout timeout t",
+      "typeHash": "f07e4dfcfe1e57e2486e58a2e0d59cd87f76720a0ee0880f111e643794564d3a",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.pollStep_resets_failures",
+      "kind": "theorem",
+      "type": "∀ (o : WatchPoll.PollingOptions) (s t : WatchPoll.State) (e : WatchPoll.Event), WatchPoll.pollStep o s e = some t → WatchPoll.ResetsFailures s e t",
+      "typeHash": "80c04a2989042f5ce26a335322a69c584b504617e40e88a025770497e51d96ee",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.pollStep_retry_uses_backoff",
+      "kind": "theorem",
+      "type": "∀ (o : WatchPoll.PollingOptions) (s t : WatchPoll.State) (e : WatchPoll.Event), WatchPoll.pollStep o s e = some t → WatchPoll.RetryUsesBackoff o s e t",
+      "typeHash": "9aeb54c270911c1846e90fab164d20f15f166f06eba1b1e1f406be8f3ffffe92",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.pollStep_sleep_within_budget",
+      "kind": "theorem",
+      "type": "∀ (o : WatchPoll.PollingOptions) (s t : WatchPoll.State) (e : WatchPoll.Event), WatchPoll.pollStep o s e = some t → WatchPoll.SleepWithinBudget s e t",
+      "typeHash": "661cf1fb491c212ca684231daf9f37f425987c05053a30fa5569b5ea2ae393c1",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.pollUntilTerminal_slept_le_timeout",
+      "kind": "theorem",
+      "type": "∀ (o : WatchPoll.PollingOptions) (timeout t0 elapsed : Nat) (es : List WatchPoll.Event), 0 < timeout → WatchPoll.HonestRun o (WatchPoll.init ((WatchPoll.WatchDeadline.create timeout t0).remaining (t0 + elapsed))) es → (WatchPoll.run o (WatchPoll.init ((WatchPoll.WatchDeadline.create timeout t0).remaining (t0 + elapsed))) es).slept ≤ timeout",
+      "typeHash": "8147547dc10a1b7fb17d537395ce712dd914ceb3b92d1d3171c295d20813bcba",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.queryBackoffHalfSeconds",
+      "kind": "definition",
+      "type": "Nat → Nat → Nat",
+      "typeHash": "94b9a6a83b4de49ceaccbbb340e4b2ebf92d42dc5f64dea3e8b246e159a30fd5",
+      "valueHash": "c8b0ca1e3319ffc91fa973a81601bd3a1a3c02a88a5c27af83bbf46160a1843e"
+    },
+    {
+      "name": "WatchPoll.queryBackoffHalfSeconds_eq",
+      "kind": "theorem",
+      "type": "∀ (interval failures : Nat), 1 ≤ failures → WatchPoll.queryBackoffHalfSeconds interval failures = 2 * WatchPoll.queryBackoffSeconds interval failures",
+      "typeHash": "9488cfee81c2100202aecab21d933d22662c2eb54957df0a269d6c3b2318d557",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.queryBackoffHalfSeconds_zero",
+      "kind": "theorem",
+      "type": "∀ (interval : Nat), WatchPoll.queryBackoffHalfSeconds interval 0 = min (max interval 60) 600",
+      "typeHash": "5c2f0c649700784ca97ac11bbb3325376914cfee2875559fbc38ba7e95f6d5cb",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.queryBackoffSeconds",
+      "kind": "definition",
+      "type": "Nat → Nat → Nat",
+      "typeHash": "94b9a6a83b4de49ceaccbbb340e4b2ebf92d42dc5f64dea3e8b246e159a30fd5",
+      "valueHash": "c994e4a86bf7fc3c531631780c7d843c0e03390877983f0fa938905a3d732e82"
+    },
+    {
+      "name": "WatchPoll.queryBackoff_doubles",
+      "kind": "theorem",
+      "type": "∀ (interval failures : Nat), 1 ≤ failures → WatchPoll.queryBackoffSeconds interval (failures + 1) = min (2 * WatchPoll.queryBackoffSeconds interval failures) 300",
+      "typeHash": "f90af4f7a707dd46cbd65c8b217c39aa50abf19dde421ce960bd9dd260643003",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.queryBackoff_eq_300",
+      "kind": "theorem",
+      "type": "∀ (interval failures : Nat), 4 ≤ failures → WatchPoll.queryBackoffSeconds interval failures = 300",
+      "typeHash": "f7b74dc74e4bc083f60d6b3545d7a1163e00f666bc65e29503407473d0fbf846",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.queryBackoff_first",
+      "kind": "theorem",
+      "type": "∀ (interval : Nat), WatchPoll.queryBackoffSeconds interval 1 = min (max interval 60) 300",
+      "typeHash": "85c5620679b14f1f312b88353acf170efd8701e86f857394b0dddf1d40869ff3",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.queryBackoff_ge_60",
+      "kind": "theorem",
+      "type": "∀ (interval failures : Nat), 1 ≤ failures → 60 ≤ WatchPoll.queryBackoffSeconds interval failures",
+      "typeHash": "1a9c94ee2e8d7b14a735a9cab0102583918395352fb17888357d8d6efd1bcd71",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.queryBackoff_le_300",
+      "kind": "theorem",
+      "type": "∀ (interval failures : Nat), WatchPoll.queryBackoffSeconds interval failures ≤ 300",
+      "typeHash": "50aaf557b371108ffe464d600d2bf057d4b86bff2aff88f3c6402d739741c2ee",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.queryBackoff_mono",
+      "kind": "theorem",
+      "type": "∀ (interval f g : Nat), 1 ≤ f → f ≤ g → WatchPoll.queryBackoffSeconds interval f ≤ WatchPoll.queryBackoffSeconds interval g",
+      "typeHash": "50c2542310099b5f974fb4cbc865e0d7c8a8f65024789707f10d92f10c7e352b",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.queryBackoff_zero_below_floor",
+      "kind": "theorem",
+      "type": "∀ (interval : Nat), WatchPoll.queryBackoffHalfSeconds interval 0 < 2 * 60 ↔ interval < 120",
+      "typeHash": "c8090b9fea5a4ce4f28cc66c991911e2bd562bc27cd5e52bde28696fbc941701",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.reachTargets",
+      "kind": "definition",
+      "type": "List (String × (WatchPoll.Transition → Bool))",
+      "typeHash": "fdfe3e056397b87e9e3678ca0a64990aa87db4c014c1ad0c7eda7d247e0b837a",
+      "valueHash": "07b3ec4de0cca047848e56e8faf043a2dae15367c6862c22d139af527cec26d3"
+    },
+    {
+      "name": "WatchPoll.reachTargets.match_1",
+      "kind": "definition",
+      "type": "(motive : WatchPoll.StepOutcome → WatchPoll.Last → Sort u_1) → (x : WatchPoll.StepOutcome) → (x_1 : WatchPoll.Last) → ((asked seconds : Nat) → motive (WatchPoll.StepOutcome.sleep asked) (WatchPoll.Last.sleptPoll seconds)) → ((x : WatchPoll.StepOutcome) → (x_2 : WatchPoll.Last) → motive x x_2) → motive x x_1",
+      "typeHash": "583584a04cb3bc8ceaf15b6da9ba192e079ea15f047a6035dd8eeefd99149ebf",
+      "valueHash": "8c9bc60795132700e24ddbbdf6f01c6dc65bae68dea734500f64f27a8f8555f5"
+    },
+    {
+      "name": "WatchPoll.reachable",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → WatchPoll.Seconds → Nat → List WatchPoll.State",
+      "typeHash": "acbc50f6633254e3487dc00498656cf6a2b3e9d94a7aedb972d3add2bae6e9ec",
+      "valueHash": "a92945bc4d4decc21fa4babec73954356e1c52b638657ccd62043a4e02a8daaa"
+    },
+    {
+      "name": "WatchPoll.remaining_create_finite",
+      "kind": "theorem",
+      "type": "∀ (timeout t0 elapsed : Nat), 0 < timeout → (WatchPoll.WatchDeadline.create timeout t0).remaining (t0 + elapsed) = WatchPoll.Seconds.finite (timeout - elapsed)",
+      "typeHash": "6f9a32f0e510f018eb93762b7e7e8cf7427e2871a422af80b3ccf849a73c1938",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.remaining_create_infinity",
+      "kind": "theorem",
+      "type": "∀ (t0 now : Nat), (WatchPoll.WatchDeadline.create 0 t0).remaining now = WatchPoll.Seconds.infinity",
+      "typeHash": "7dc9cd6cd603b8d335084697155334e7a7302b88ec2e3154d6b3f27ee75dba88",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.remaining_elapse",
+      "kind": "theorem",
+      "type": "∀ (d : WatchPoll.WatchDeadline) (now seconds : Nat), d.remaining (now + seconds) = (d.remaining now).elapse seconds",
+      "typeHash": "4503894aee2530603b23ed4ab7b33c43149a581d762009ef8f3d9b934f4f14e2",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.run",
+      "kind": "definition",
+      "type": "WatchPoll.PollingOptions → WatchPoll.State → List WatchPoll.Event → WatchPoll.State",
+      "typeHash": "438e5f926cbac1f7d7cd30a896f384370d386c07e2cf93864a6cffb4cbe05a92",
+      "valueHash": "7d87b4094451083ecf97e7947d8b6642e37057876cf80a07300f4daeba4ed3f0"
+    },
+    {
+      "name": "WatchPoll.run.match_1",
+      "kind": "definition",
+      "type": "(motive : Option WatchPoll.State → Sort u_1) → (x : Option WatchPoll.State) → ((t : WatchPoll.State) → motive (some t)) → (Unit → motive none) → motive x",
+      "typeHash": "1bc30e6d20b76786e39adca4cc22f9cf285e45b37cdf4e15758734d229ec5042",
+      "valueHash": "0c36549b657ebb7d92a775a328e7cdcb1bd5db26c5c54bc3dd0485f996f48689"
+    },
+    {
+      "name": "WatchPoll.run.match_3",
+      "kind": "definition",
+      "type": "(motive : List WatchPoll.Event → Sort u_1) → (x : List WatchPoll.Event) → (Unit → motive []) → ((e : WatchPoll.Event) → (es : List WatchPoll.Event) → motive (e :: es)) → motive x",
+      "typeHash": "579d7b4ed8bec1c5dfe391b4b905ea66e82913a13bbf55d571bfdbae5609a1d8",
+      "valueHash": "2e42f8a029e70772916302d3d5865a3617e81d0509a256f1e19887bbb565e80e"
+    },
+    {
+      "name": "WatchPoll.runStart",
+      "kind": "definition",
+      "type": "Nat → Nat → List WatchPoll.Call → Option Nat",
+      "typeHash": "243611db33d6352bf2d87596f1f1e9526bde1d0deecb30f39930eca8d3c437a3",
+      "valueHash": "3fde59a1e08545a794655a6bca17a7b3864e1b0f67521f12f628d7e19c4d54e2"
+    },
+    {
+      "name": "WatchPoll.run_keeps_invariant",
+      "kind": "theorem",
+      "type": "∀ (o : WatchPoll.PollingOptions) (s : WatchPoll.State) (es : List WatchPoll.Event), WatchPoll.Invariant o s → WatchPoll.Invariant o (WatchPoll.run o s es)",
+      "typeHash": "e225667eba79d9448c81f9c89d8e296be967a86a51c26557d975f49db2b708e6",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.run_keeps_timeout",
+      "kind": "theorem",
+      "type": "∀ (timeout : Nat) (o : WatchPoll.PollingOptions) (s : WatchPoll.State) (es : List WatchPoll.Event), WatchPoll.WithinTimeout timeout s → WatchPoll.HonestRun o s es → WatchPoll.WithinTimeout timeout (WatchPoll.run o s es)",
+      "typeHash": "2218920ea73f2ee9bbe9bad83ad1e6fb4fc31728c12b2ed8e3556c0d1b0947b4",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.run_retries_below_max",
+      "kind": "theorem",
+      "type": "∀ (o : WatchPoll.PollingOptions) (remaining : WatchPoll.Seconds) (es : List WatchPoll.Event), 0 < o.maxQueryErrors → WatchPoll.RetriesBelowMax o (WatchPoll.run o (WatchPoll.init remaining) es)",
+      "typeHash": "8b71114f8e13cddefce418e70c74ebda88ca036f00c9b0c4d2336f943c508f06",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.secondsJson",
+      "kind": "definition",
+      "type": "Nat → String",
+      "typeHash": "8480599605e2fb8bce4345c14667997d8a76b4fbc6eeb9f15a938a347374fc71",
+      "valueHash": "cce06d8caead6ad82bcabed974fda9a2a4539a273ae932a74d2ed354c19bfdf2"
+    },
+    {
+      "name": "WatchPoll.stallOutcomes",
+      "kind": "definition",
+      "type": "List WatchPoll.StepOutcome",
+      "typeHash": "3bc0ca8158679f528eecb09acce134ac4d7e678736bbbc302397aa178643754e",
+      "valueHash": "bc028700a2a4591d4a8a17dff0b5d5601fd251f9b07d247b39af756fc42243ff"
+    },
+    {
+      "name": "WatchPoll.stall_needs_continue_or_zero_sleep",
+      "kind": "theorem",
+      "type": "∀ (o : WatchPoll.PollingOptions) (s t : WatchPoll.State) (e : WatchPoll.Event), WatchPoll.pollStep o s e = some t → WatchPoll.HonestClock e t → WatchPoll.Stalls e t → e.outcome = WatchPoll.StepOutcome.continue_ ∨ e.outcome = WatchPoll.StepOutcome.sleep 0",
+      "typeHash": "34d42e1d4f573bb959ca17904ac1c91172655f67816c4701a3bd7f97880ff12e",
+      "valueHash": null
+    },
+    {
+      "name": "WatchPoll.stepProperties",
+      "kind": "definition",
+      "type": "List (String × (WatchPoll.Transition → Bool))",
+      "typeHash": "fdfe3e056397b87e9e3678ca0a64990aa87db4c014c1ad0c7eda7d247e0b837a",
+      "valueHash": "5fc27cf1e2ddadc92af1bc28c2a9a218e3a4860ceeae161a6641303b41690ebf"
+    },
+    {
+      "name": "WatchPoll.transitions",
+      "kind": "definition",
+      "type": "List WatchPoll.Transition",
+      "typeHash": "672280a7d50e2ae0753c400cd5b5e553d2949645fcca44131585912480a4bfa1",
+      "valueHash": "7373d6b66ff7729d29233db07606e6be11b69490a5bd725ab34a366c7669a7ca"
+    },
+    {
+      "name": "WatchPoll.unreachedConfirms",
+      "kind": "definition",
+      "type": "List String",
+      "typeHash": "9530863598172fb42fb2852fa1a55bb0008754cdf21aff8d80fdeb1067897af9",
+      "valueHash": "8f5e82593e76aff9881b7caff651bb89b0a2bbbd9470ea34edd7a9a62c649e01"
+    },
+    {
+      "name": "WatchPoll.unreachedSteps",
+      "kind": "definition",
+      "type": "List String",
+      "typeHash": "9530863598172fb42fb2852fa1a55bb0008754cdf21aff8d80fdeb1067897af9",
+      "valueHash": "8002cb327a1d1df8d203dfbdbdb2cef817661bbf47e581fc8b6824f267fd81d5"
+    },
+    {
+      "name": "WatchPoll.zero_sleep_without_clock_repeats",
+      "kind": "theorem",
+      "type": "∀ (o : WatchPoll.PollingOptions) (s : WatchPoll.State), s.last = WatchPoll.Last.sleptPoll 0 → s.remaining.positive = true → s.failures = 0 → s.retries = 0 → WatchPoll.pollStep o s { outcome := WatchPoll.StepOutcome.sleep 0, stepElapsed := 0, sleepElapsed := 0 } = some s",
+      "typeHash": "ff9ec5a48d4dc9034ad487c5439063746f5563b222fa00632cd61d99d67313d2",
+      "valueHash": null
+    }
+  ]
+}

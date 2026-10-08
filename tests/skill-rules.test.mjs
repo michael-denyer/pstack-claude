@@ -131,6 +131,16 @@ const rules = [
     file: "poteto-mode/SKILL.md",
     phrase: "Record `BLOCKED: independent review` in the todolist",
   },
+  {
+    source: "#231 reflect digest carries no verdict",
+    file: "reflect/SKILL.md",
+    phrase: "It states no diagnosis, verdict, or cause.",
+  },
+  {
+    source: "#231 reflect adds nothing beside the transcript path",
+    file: "reflect/SKILL.md",
+    phrase: "Add nothing beside a transcript path",
+  },
 ];
 
 describe("port-local skill rules", () => {

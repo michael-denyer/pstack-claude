@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.76 - keep the parent's verdict out of reflect's reviewer prompts
+
+reflect passes the transcript path to its reviewers with nothing beside it. When the finder cannot locate the transcript, the fallback digest records the session's prompts, corrections, tool calls, results, and files in turn order, and states no diagnosis, verdict, or cause. A reviewer that reads the parent's conclusion first tends to audit that conclusion instead of the session ([#231](https://github.com/michael-denyer/pstack-claude/issues/231)).
+
 ## 0.9.75 - base delegate worktrees on the branch and separate parallel todolists
 
 The Feature playbook notes that Claude Code's `isolation: "worktree"` branches from the remote default branch unless `worktree.baseRef` is `"head"`. A delegate that builds on commits the default branch lacks now gets a worktree the parent creates from `HEAD`, and its brief names that base commit ([#228](https://github.com/michael-denyer/pstack-claude/issues/228)).

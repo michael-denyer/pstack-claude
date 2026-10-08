@@ -230,7 +230,7 @@
     },
     "plugins/pstack/skills/reflect/SKILL.md": {
       "kind": "port-feature",
-      "why": "Finds the session transcript with the port's find-transcript.mjs under Claude Code's projects directory and drops Cursor's readonly agent mode and inline model column.",
+      "why": "Finds the session transcript with the port's find-transcript.mjs under Claude Code's projects directory, keeps the parent's conclusions out of the reviewer prompts (a fallback digest records events without a verdict, and nothing goes beside a transcript path), and drops Cursor's readonly agent mode and inline model column.",
       "since": "0.1.0",
       "upstream": "not-proposed"
     },

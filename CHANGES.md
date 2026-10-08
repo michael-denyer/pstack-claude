@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.78 - sync to upstream df58112 (v0.15.15)
+
+The upstream pin moves from `2cbf585` to `df58112`, upstream v0.15.15, two commits. `/poteto-help` now offers `/setup-pstack` when the model sheet is missing and the answer depends on it. It asks at most once per chat, and a user who declines is told that every role keeps its default model. Upstream also dropped one model from its default panel and lowered its Opus effort from `max` to `xhigh`. The port takes neither change, because `models.json` sets the port's panel and effort. `setup-pstack` keeps the port's default-effort step in place of upstream's reworded budget step.
+
+The substitution rules that point a default model list at the Models section now match a list of any length, as does the rule for the model family sentence. New rules cover the delegate defaults in `poteto-mode`, the default-model column of the `reflect` reviewer table, and every slug in `setup-pstack`, so an upstream model change on those lines no longer conflicts with the port. `interrogate` says "the Reviewer labels below" and names no label run, since the generator stamps the table from the panel.
+
+Measured with `bun tools/sync.mjs pstack 1e56b29`, then `df58112`: 3 files merged, 2 updated, 80 unchanged, 36 excluded, and 2 conflicts, both resolved by hand. `poteto-help` keeps the port's `/swarm` row and takes upstream's `/interrogate` row. No file became port-only.
+
 ## 0.9.77 - add haiku to the default panel
 
 The default panel is `opus`, `fable`, `sonnet`, `haiku`. With no override sheet, `arena` and `architect` run four runners, `interrogate` runs four reviewers, with `haiku` as Reviewer D, and the `arena` cross-judge pool includes `haiku`. A `pstack-models.md` sheet that names these roles keeps its own lists. The Codex panel is unchanged. On Pi, `haiku` resolves through the `pi.models` table in `models.json`.

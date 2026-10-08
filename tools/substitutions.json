@@ -48,13 +48,13 @@
       "rationale": "where Claude Code exposes its MCP servers"
     },
     {
-      "regex": "default to one each on `(?:claude|gpt|grok|gemini|composer)-[^`]+`, `(?:claude|gpt|grok|gemini|composer)-[^`]+`, `(?:claude|gpt|grok|gemini|composer)-[^`]+`\\.",
+      "regex": "default to one each on `(?:claude|gpt|grok|gemini|composer)-[^`]+`(?:(?:,| and|, and) `(?:claude|gpt|grok|gemini|composer)-[^`]+`)*\\.",
       "files": "^skills/arena/SKILL\\.md$",
       "replacement": "run one each on the defaults in [Models](#models).",
       "rationale": "the runner defaults are stamped into the Models section"
     },
     {
-      "regex": "choose from `(?:claude|gpt|grok|gemini|composer)-[^`]+`, `(?:claude|gpt|grok|gemini|composer)-[^`]+`, `(?:claude|gpt|grok|gemini|composer)-[^`]+`\\.",
+      "regex": "choose from `(?:claude|gpt|grok|gemini|composer)-[^`]+`(?:(?:,| and|, and) `(?:claude|gpt|grok|gemini|composer)-[^`]+`)*\\.",
       "files": "^skills/arena/SKILL\\.md$",
       "replacement": "choose from the runner defaults in [Models](#models).",
       "rationale": "the cross-judge pool defaults to the stamped runners"
@@ -66,7 +66,7 @@
       "rationale": "the fallback model is the stamped single-role default"
     },
     {
-      "regex": "use `(?:claude|gpt|grok|gemini|composer)-[^`]+`, `(?:claude|gpt|grok|gemini|composer)-[^`]+`, `(?:claude|gpt|grok|gemini|composer)-[^`]+`\\.",
+      "regex": "use `(?:claude|gpt|grok|gemini|composer)-[^`]+`(?:(?:,| and|, and) `(?:claude|gpt|grok|gemini|composer)-[^`]+`)*\\.",
       "files": "^skills/architect/SKILL\\.md$",
       "replacement": "use the defaults in [Models](#models).",
       "rationale": "the runner defaults are stamped into the Models section"
@@ -236,6 +236,35 @@
       "rationale": "a role bullet's default model is stamped into the skill's Models section, never hard-coded in prose"
     },
     {
+      "regex": "Defaults `(?:claude|gpt|grok|gemini|composer)-[^`]+` for code, `(?:claude|gpt|grok|gemini|composer)-[^`]+` for prose and judgment",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "Role defaults in [Models](#models), with \"judgment and prose\" covering prose and judgment",
+      "rationale": "the delegate defaults are stamped into poteto-mode's Models section, so an upstream model bump on this line is not a change to the port"
+    },
+    {
+      "regex": "strongest judgment model \\(`(?:claude|gpt|grok|gemini|composer)-[^`]+`\\)",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "strongest-judgment model (default in [Models](#models))",
+      "rationale": "same line, the strongest-judgment default"
+    },
+    {
+      "pattern": "omit Task `model`",
+      "replacement": "omit `model` on the `Agent` call",
+      "rationale": "Claude Code's subagent tool is `Agent`, and the bare tool name is on the denylist"
+    },
+    {
+      "regex": " \\| `(?:claude|gpt|grok|gemini|composer)-[^`]+` \\| `references/",
+      "files": "^skills/reflect/SKILL\\.md$",
+      "replacement": " | default in [Models](#models) | `references/",
+      "rationale": "a reviewer row's default model is stamped into reflect's Models section, so an upstream model bump in the table is not a change to the port"
+    },
+    {
+      "regex": "(?:claude|gpt|grok|gemini|composer)-[0-9a-z.]+(?:-[0-9a-z.]+)+",
+      "files": "^skills/setup-pstack/SKILL\\.md$",
+      "replacement": "<slug>",
+      "rationale": "the port writes its own sheet from models.json and replaces Cursor's budget step, so every upstream slug in setup-pstack is scrubbed to the placeholder the port already uses; a conflict there can then be written and resolved, and a model bump alone is no conflict. Must follow the default-phrase rules above"
+    },
+    {
       "pattern": "the `pstack-models.mdc` rule and a default.",
       "replacement": "`pstack-models.md` and a default in [Models](#models).",
       "rationale": "the override sheet and the stamped defaults a spawn falls back to; must precede the shorter `pstack-models.mdc` rule phrase"
@@ -256,9 +285,15 @@
       "rationale": "same sentence, the other wording upstream uses"
     },
     {
-      "pattern": "Families go by prefix: `claude-*`, `gpt-*`, and `grok-*`.",
+      "regex": "Families go by prefix: `[a-z]+-\\*`(?:(?:,| and|, and) `[a-z]+-\\*`)*\\.",
       "replacement": "Families go by model name, such as Opus, Fable, or Sonnet.",
       "rationale": "Claude Code names models by family, not by slug prefix"
+    },
+    {
+      "regex": "the Reviewer A(?:/[B-Z])+ labels below",
+      "files": "^skills/interrogate/SKILL\\.md$",
+      "replacement": "the Reviewer labels below",
+      "rationale": "the reviewer table is stamped from the panel in models.json, so the prose names no label run that a panel change would make wrong"
     },
     {
       "pattern": ".cursor/skills/",

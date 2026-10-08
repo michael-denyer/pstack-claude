@@ -357,6 +357,7 @@ describe("/loop", () => {
       const { pi, ctx, run, ui } = loop({ idle: () => idle });
       await run("watch PR 42");
       idle = false;
+      await pi.emit("agent_start", {}, ctx);
       await run("stop");
       expect(ui.calls.at(-1).message).toBe("Loop stopped.");
       const refused = await pi.call("schedule_wakeup", { delaySeconds: 60, prompt: rearm }, { ...ctx, ui });
@@ -373,6 +374,7 @@ describe("/loop", () => {
     let idle = false;
     const { pi, ctx, run, ui } = loop({ idle: () => idle });
     const wake = () => pi.call("schedule_wakeup", { delaySeconds: 60, prompt: "later" }, { ...ctx, ui });
+    await pi.emit("agent_start", {}, ctx);
     await run("stop");
     expect(ui.calls.at(-1).message).toBe("No loop was running.");
     expect((await wake()).details).toEqual({ refused: true });
@@ -389,8 +391,9 @@ describe("/loop", () => {
     const wake = (params) => pi.call("schedule_wakeup", params, { ...ctx, ui });
     await run("watch old");
     idle = false;
+    await pi.emit("agent_start", {}, ctx);
     await run("watch new");
-    expect(ui.calls.at(-1).message).toBe("The loop starts when the current run ends.");
+    expect(ui.calls.at(-1).message).toBe("The loop starts once the session is idle.");
     expect((await wake({ delaySeconds: 60, prompt: "/loop watch old" })).details).toEqual({ refused: true });
     expect((await wake({ stop: true })).details).toEqual({ cancelled: false });
     jest.advanceTimersByTime(60_000);
@@ -412,6 +415,7 @@ describe("/loop", () => {
   test("a fixed loop asked for during a run sends its first prompt once that run settles", async () => {
     let idle = false;
     const { pi, ctx, run } = loop({ idle: () => idle });
+    await pi.emit("agent_start", {}, ctx);
     await run("5m check the deploy");
     jest.advanceTimersByTime(30_000);
     expect(pi.userMessages).toEqual([]);
@@ -419,6 +423,31 @@ describe("/loop", () => {
     idle = true;
     jest.advanceTimersByTime(1_000);
     expect(pi.userMessages.map((m) => m.content)).toEqual(["check the deploy"]);
+  });
+
+  // During a manual compaction isIdle() is false with no run in flight, and
+  // no agent_settled follows when it ends.
+  test("a self-paced loop started during a manual compaction waits for idle, then re-arms after its first iteration", async () => {
+    let idle = false;
+    const { pi, ctx, run, ui } = loop({ idle: () => idle });
+    await run("watch the deploy");
+    expect(ui.calls.at(-1).message).toBe("The loop starts once the session is idle.");
+    idle = true;
+    jest.advanceTimersByTime(1_000);
+    expect(pi.userMessages).toHaveLength(1);
+    idle = false;
+    await pi.emit("agent_start", {}, ctx);
+    const rearm = await pi.call("schedule_wakeup", { delaySeconds: 60, prompt: "/loop watch the deploy" }, { ...ctx, ui });
+    expect(resultText(rearm)).toContain("Wakeup scheduled");
+  });
+
+  test("/loop stop during a manual compaction does not refuse the next run's wakeup", async () => {
+    let idle = false;
+    const { pi, ctx, run, ui } = loop({ idle: () => idle });
+    await run("stop");
+    await pi.emit("agent_start", {}, ctx);
+    const wake = await pi.call("schedule_wakeup", { delaySeconds: 60, prompt: "later" }, { ...ctx, ui });
+    expect(resultText(wake)).toContain("Wakeup scheduled");
   });
 
   for (const [what, started, prompt] of [

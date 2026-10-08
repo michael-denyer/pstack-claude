@@ -1,0 +1,127 @@
+# Mutations for mutate.py. Each one swaps a piece of PiScheduler.tla for a
+# plausible bug in schedule.ts and names the one property that must fail on
+# it. Each mutation runs on one host where the unmutated spec passes every
+# property it checks, strict unless the bug needs CompactCmd, so a DETECTED
+# line is the mutation's doing.
+
+mutation scheduleWakeup does not cancel the pending wakeup first
+detects OneWakeup
+only strict w=2
+- /\ wtimer' = [Cleared EXCEPT ![nextW] = "armed"]
++ /\ wtimer' = [wtimer EXCEPT ![nextW] = "armed"]
+
+mutation the idle retry does not keep its new timer handle
+detects TimersOwned
+only strict w=2
+- /\ slot' = w
++ /\ slot' = None
+
+mutation cancel does not stop a timer whose delay has already passed
+detects NoCancelledDelivery
+only strict w=2
+- Cleared == [w \in W |-> IF w = slot THEN "off" ELSE wtimer[w]]
++ Cleared == [w \in W |-> IF w = slot /\ wtimer[w] = "armed" THEN "off" ELSE wtimer[w]]
+
+mutation schedule_wakeup ignores sealed
+detects NoRearmByCutRun
+only strict w=2
+- LET refused == sealed IN
++ LET refused == FALSE IN
+
+mutation agent_settled does not clear sealed
+detects SealedOnlyAgainstCutRun
+only strict w=2
+- /\ sealed' = FALSE
++ /\ sealed' = sealed
+
+mutation stopAll seals whether or not a run is in flight
+detects FreshRunNotRefused
+only strict w=2
+- /\ sealed' = (sealed \/ running)
++ /\ sealed' = TRUE
+
+# The bug before the fix: a /loop during a manual compaction sealed the slot
+# against a run that was not there, and the next run was refused.
+mutation /loop seals whenever the session is not idle, compaction included
+detects FreshRunNotRefused
+only host=compact
+- /\ sealed' = (sealed \/ running)
++ /\ sealed' = (sealed \/ midRun)
+
+mutation /loop seals during a compaction, so the loop it starts cannot re-arm
+detects reach:CompactionLoopRearmed
+only host=compact
+- /\ sealed' = (sealed \/ running)
++ /\ sealed' = (sealed \/ midRun)
+
+mutation agent_settled does not clear the running flag
+detects SealedOnlyAgainstCutRun
+only host=compact
+- /\ running' = FALSE
++ /\ running' = running
+
+mutation stop: true cancels a sealed slot
+detects StartSurvivesRuns
+only strict w=2
+- LET guarded == sealed IN
++ LET guarded == FALSE IN
+
+mutation a fixed /loop does not end the self-paced loop
+detects OneLoopKind
+only strict w=2
+- /\ selfPaced' = (c = "dynamic")
++ /\ selfPaced' = (c = "dynamic" \/ (c = "fixed" /\ selfPaced))
+
+mutation session_shutdown leaves the interval running
+detects StoppedIsTerminal
+only strict w=2
+- /\ Cancel /\ StopLoop
++ /\ Cancel /\ UNCHANGED loopVars
+
+mutation deliver does not check that the session is idle
+detects IdleDelivery
+only strict w=2
+- /\ ~down /\ wtimer[w] = "due" /\ Idle
++ /\ ~down /\ wtimer[w] = "due"
+
+mutation stopLoop clears the field but not the interval
+detects NothingFiresAfterStop
+only strict w=2
+- StoppedLoop == [l \in L |-> IF l = loop THEN "off" ELSE ltimer[l]]
++ StoppedLoop == ltimer
+
+mutation a wakeup that finds the session busy is dropped, not re-armed
+detects WakeupDelivered
+only strict w=2
+- /\ wtimer' = [wtimer EXCEPT ![w] = "armed"]
++ /\ wtimer' = [wtimer EXCEPT ![w] = "off"]
+
+# The next two are not code bugs. They weaken assumption A8 and show that
+# each strong-fairness conjunct is needed: with weak fairness a session that
+# is busy at every expiry, or that turns busy before every callback, starves
+# the wakeup.
+mutation only weak fairness on delivery
+detects WakeupDelivered
+only strict w=2
+- /\ SF_vars(DeliverFire(w))
++ /\ WF_vars(DeliverFire(w))
+
+mutation only weak fairness on expiry while idle
+detects WakeupDelivered
+only strict w=2
+- /\ SF_vars(Idle /\ Expire(w))
++ /\ WF_vars(Idle /\ Expire(w))
+
+# Not a code bug: it removes the model's bound on scheduleWakeup calls, to
+# show that TypeOK constrains the state.
+mutation the bound on wakeup ids is not enforced
+detects TypeOK
+only strict w=2
+- /\ nextW <= MaxWakeups
++ /\ TRUE
+
+mutation /loop during a run fires at once and does not take the slot
+detects reach:StartBehindCutRun
+only strict w=2
+- /\ IF c # "stop" /\ midRun THEN Arm(IF running THEN "cmd" ELSE "compact", "plain") ELSE Cancel
++ /\ IF FALSE THEN Arm("cmd", "plain") ELSE Cancel

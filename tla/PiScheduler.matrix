@@ -1,0 +1,70 @@
+# Matrix for tlc-matrix.sh. w is MaxWakeups (scheduleWakeup calls), l is
+# MaxLoops (startLoop calls). The code has exactly one wakeup slot and one
+# event loop, so there is no slot count or worker count to vary.
+#
+# "strict" is the host the comments in schedule.ts assume: not idle means a
+# run is in flight, a fired prompt is a run at once, and nothing else starts a
+# run while a /loop start waits in the slot. Every property holds there.
+
+spec PiScheduler.tla
+check INVARIANTS TypeOK OneWakeup TimersOwned NoCancelledDelivery NoRearmByCutRun SealedOnlyAgainstCutRun FreshRunNotRefused StartSurvivesRuns OneLoopKind StoppedIsTerminal
+check PROPERTIES IdleDelivery NothingFiresAfterStop
+reach ParkedWakeup | strict w=2
+reach DueWhileIdle | strict w=2
+reach TickWhileBusy | strict w=2
+reach StartBehindCutRun | strict w=2
+reach LoopAndWakeup | strict w=2
+reach SelfPacedRearm | strict w=2
+reach StoppedAfterDelivery | strict w=2
+reach ShutdownCancelled | strict w=2
+reach AllDelivered | strict w=2
+run strict w=0 l=1 | MaxWakeups=0 MaxLoops=1 CompactCmd=FALSE StartGap=FALSE StartRace=FALSE
+run strict w=1 l=0 | MaxWakeups=1 MaxLoops=0 CompactCmd=FALSE StartGap=FALSE StartRace=FALSE
+run strict w=1 l=1 | MaxWakeups=1 MaxLoops=1 CompactCmd=FALSE StartGap=FALSE StartRace=FALSE
+run strict w=2 l=1 | MaxWakeups=2 MaxLoops=1 CompactCmd=FALSE StartGap=FALSE StartRace=FALSE
+run strict w=3 l=2 | MaxWakeups=3 MaxLoops=2 CompactCmd=FALSE StartGap=FALSE StartRace=FALSE
+run strict w=5 l=2 | MaxWakeups=5 MaxLoops=2 CompactCmd=FALSE StartGap=FALSE StartRace=FALSE
+
+# Liveness, under the fairness in Spec. It holds on every host: a /loop start
+# that a run replaces counts as cancelled.
+spec PiScheduler.tla
+check PROPERTIES WakeupDelivered
+run strict w=1 l=1 liveness | MaxWakeups=1 MaxLoops=1 CompactCmd=FALSE StartGap=FALSE StartRace=FALSE
+run strict w=2 l=1 liveness | MaxWakeups=2 MaxLoops=1 CompactCmd=FALSE StartGap=FALSE StartRace=FALSE
+run host=all w=2 l=1 liveness | MaxWakeups=2 MaxLoops=1 CompactCmd=TRUE StartGap=TRUE StartRace=TRUE
+
+# All three host behaviours on. The timer, delivery, stop and sealed
+# properties do not depend on the host.
+spec PiScheduler.tla
+check INVARIANTS TypeOK OneWakeup TimersOwned NoCancelledDelivery SealedOnlyAgainstCutRun FreshRunNotRefused OneLoopKind StoppedIsTerminal
+check PROPERTIES IdleDelivery NothingFiresAfterStop
+run host=all w=3 l=2 | MaxWakeups=3 MaxLoops=2 CompactCmd=TRUE StartGap=TRUE StartRace=TRUE
+
+# One host behaviour at a time. First the sealed properties that still hold
+# with it on, then the ones that fail. The failing runs are the record of each
+# finding and are expected to FAIL; do not weaken the property.
+
+# /loop during a manual compaction. Every property holds: the seal follows the
+# extension's own run flag, not isIdle(), so a loop started during a
+# compaction runs and re-arms.
+spec PiScheduler.tla
+check INVARIANTS TypeOK NoRearmByCutRun SealedOnlyAgainstCutRun FreshRunNotRefused StartSurvivesRuns
+reach CompactionLoopRearmed | host=compact
+run host=compact holds w=3 l=2 | MaxWakeups=3 MaxLoops=2 CompactCmd=TRUE StartGap=FALSE StartRace=FALSE
+
+# A gap between fire() and the run becoming active.
+spec PiScheduler.tla
+check INVARIANTS TypeOK SealedOnlyAgainstCutRun FreshRunNotRefused StartSurvivesRuns
+reach StoppedLoopRearmed | host=gap
+run host=gap holds w=3 l=2 | MaxWakeups=3 MaxLoops=2 CompactCmd=FALSE StartGap=TRUE StartRace=FALSE
+spec PiScheduler.tla
+check INVARIANTS NoRearmByCutRun
+run finding rearm-after-stop-in-gap w=2 l=1 | MaxWakeups=2 MaxLoops=1 CompactCmd=FALSE StartGap=TRUE StartRace=FALSE
+
+# Another run starts while a /loop start waits in the slot.
+spec PiScheduler.tla
+check INVARIANTS TypeOK NoRearmByCutRun SealedOnlyAgainstCutRun FreshRunNotRefused
+run host=race holds w=3 l=2 | MaxWakeups=3 MaxLoops=2 CompactCmd=FALSE StartGap=FALSE StartRace=TRUE
+spec PiScheduler.tla
+check INVARIANTS StartSurvivesRuns
+run finding loop-start-replaced w=2 l=1 | MaxWakeups=2 MaxLoops=1 CompactCmd=FALSE StartGap=FALSE StartRace=TRUE

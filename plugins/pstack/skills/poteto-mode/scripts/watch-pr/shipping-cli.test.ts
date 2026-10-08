@@ -40,25 +40,12 @@ function fixture(
   writeFileSync(
     gh,
     `#!${process.execPath}
-import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { fakeGitHub } from ${JSON.stringify(join(import.meta.dir, "shipping.test-helper.ts"))};
 const state = JSON.parse(readFileSync(process.env.SHIPPING_STATE, 'utf8'));
-const args = process.argv.slice(2);
-const query = args.find(arg => arg.startsWith('query='));
-let result;
-if (query.includes('disablePullRequestAutoMerge')) {
-  state.autoMergeRequest = null;
-  result = { disablePullRequestAutoMerge: { clientMutationId: null } };
-} else if (query.includes('dequeuePullRequest')) {
-  if (!query.includes('dequeuePullRequest(input:{id:$id})')) {
-    console.error("DequeuePullRequestInput requires id");
-    process.exit(1);
-  }
-  state.mergeQueueEntry = null;
-  result = { dequeuePullRequest: { clientMutationId: null } };
-} else result = { repository: { pullRequest: state } };
-appendFileSync(process.env.SHIPPING_STATE + '.calls', query + '\\n');
+const response = fakeGitHub(state, process.argv.slice(2));
 writeFileSync(process.env.SHIPPING_STATE, JSON.stringify(state));
-console.log(JSON.stringify({ data: result }));
+console.log(JSON.stringify(response));
 `
   );
   chmodSync(gh, 0o755);

@@ -8,6 +8,7 @@ import {
   type LandingRecord,
   type ShippingService,
 } from "./shipping.ts";
+import { fakeGitHub } from "./shipping.test-helper.ts";
 
 const context = { owner: "owner", repo: "repo", number: parsePrNumber(1) };
 const empty: LandingRecord = {
@@ -227,25 +228,14 @@ describe("shipping GitHub boundary", () => {
   });
 
   it("uses separate mutations for both pending mechanisms", async () => {
-    let autoMergeRequest: { enabledAt: string } | null = { enabledAt: "now" };
-    let mergeQueueEntry: { id: string } | null = { id: "queue" };
-    const service = new GhShippingService(async (args) => {
-      const query = args.find((arg) => arg.startsWith("query=")) ?? "";
-      if (query.includes("disablePullRequestAutoMerge")) {
-        expect(args).toContain("id=pr-id");
-        autoMergeRequest = null;
-        return {
-          data: { disablePullRequestAutoMerge: { clientMutationId: null } },
-        };
-      }
-      if (query.includes("dequeuePullRequest")) {
-        expect(query).toContain("dequeuePullRequest(input:{id:$id})");
-        expect(args).toContain("id=pr-id");
-        mergeQueueEntry = null;
-        return { data: { dequeuePullRequest: { clientMutationId: null } } };
-      }
-      return response({ ...raw, autoMergeRequest, mergeQueueEntry });
-    });
+    const pullRequest = {
+      ...raw,
+      autoMergeRequest: { enabledAt: "now" },
+      mergeQueueEntry: { id: "queue" },
+    };
+    const service = new GhShippingService(async (args) =>
+      fakeGitHub(pullRequest, args)
+    );
     const expected = await service.inspect(context);
     expect(await cancelPending(service, expected)).toEqual({
       kind: "cancelled",

@@ -189,6 +189,11 @@ describe("applySubstitutions", () => {
       "Families go by model name, such as Opus, Fable, or Sonnet.",
     ],
     [
+      "skills/setup-pstack/SKILL.md",
+      "One runner is claude-opus-5-5-xhigh and one is gpt-5.5-high-fast. The last is grok-4.7-medium-fast.",
+      "One runner is <slug> and one is <slug>. The last is <slug>.",
+    ],
+    [
       "skills/reflect/SKILL.md",
       "One message, three `Task` calls, `subagent_type: generalPurpose`, with `model` set as below.",
       'One message, three `Agent` calls, `subagent_type: "general-purpose"`, with `model` set as below.',

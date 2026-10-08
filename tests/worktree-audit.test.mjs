@@ -335,6 +335,24 @@ for (const dir of ["sessions", "archived_sessions"]) {
   });
 }
 
+test.skipIf(noChmod)("an inaccessible default transcript root keeps a recently used worktree out of safe", () => {
+  const fixture = createFixture();
+  const chatted = addWorktree(fixture, "codex-inaccessible");
+  mkdirSync(join(fixture.root, ".claude", "projects"), { recursive: true });
+  const codex = join(fixture.root, ".codex");
+  const session = join(codex, "sessions", "recent.jsonl");
+  mkdirSync(dirname(session), { recursive: true });
+  writeFileSync(session, `${JSON.stringify({ type: "session_meta", payload: { cwd: chatted } })}\n`);
+  chmodSync(codex, 0o000);
+  locked.push(codex);
+
+  const transcripts = defaultTranscriptRoots({ env: {}, home: fixture.root });
+  const { rows, warnings } = runAudit(fixture, { transcripts });
+  expect(rowFor(rows, chatted).slice(6, 8)).toEqual(["-", "review"]);
+  expect(warnings).toHaveLength(1);
+  expect(warnings[0]).toMatch(/transcript scan failed.*EACCES/);
+});
+
 describe("lastChats matches a path as JSONL spells it, never a sibling's prefix", () => {
   const scan = (path, cwd, spellings = [path]) => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-chats-")));
@@ -550,7 +568,7 @@ describe("default transcripts roots", () => {
   const claude = "/home/u/.claude/projects";
   // These paths are POSIX literals, which path.join spells with backslashes on Windows.
   const roots = ({ exists, ...options }) =>
-    defaultTranscriptRoots({ ...options, home, exists: (path) => exists(gitPath(path)) }).map(gitPath);
+    defaultTranscriptRoots({ ...options, home, stat: (path) => exists(gitPath(path)) ? {} : undefined }).map(gitPath);
 
   test("every runtime directory that exists, Pi's under PI_CODING_AGENT_DIR when set", () => {
     const present = new Set([claude, "/home/u/.codex/sessions", "/pi/sessions", "/pi/pstack", "/home/u/.pi/agent/sessions"]);
@@ -587,12 +605,28 @@ describe("default transcripts roots", () => {
     expect(roots({ env: {}, exists: () => false })).toEqual([claude]);
   });
 
+  test.each(["EACCES", "EPERM", "EIO", "ELOOP"])("a %s while discovering a root retains it for the audit", (code) => {
+    const inaccessible = join(home, ".codex", "sessions");
+    const found = defaultTranscriptRoots({ env: {}, home, stat: (path) => {
+      if (path === inaccessible) throw Object.assign(new Error("cannot inspect root"), { code });
+      return gitPath(path) === claude ? {} : undefined;
+    } });
+    expect(found.map(gitPath)).toEqual([claude, gitPath(inaccessible)]);
+  });
+
+  test.each(["ENOENT", "ENOTDIR"])("a %s while discovering a root omits it", (code) => {
+    expect(defaultTranscriptRoots({ env: {}, home, stat: (path) => {
+      if (gitPath(path) === claude) return {};
+      throw Object.assign(new Error("root is absent"), { code });
+    } }).map(gitPath)).toEqual([claude]);
+  });
+
   test.each([
     ["PI_CODING_AGENT_DIR", { PI_CODING_AGENT_DIR: "/pi" }],
     ["the default agent directory", {}],
   ])("the Pi roots are where the extension keeps sessions and agent state under %s", (_, env) => {
     const { agentDir } = defaultSettings(() => 0, env);
-    const roots = defaultTranscriptRoots({ env, home: homedir(), exists: () => true });
+    const roots = defaultTranscriptRoots({ env, home: homedir(), stat: () => ({}) });
     expect(roots).toEqual(expect.arrayContaining([join(agentDir, "sessions"), join(agentDir, PSTACK_STATE_DIR)]));
   });
 });

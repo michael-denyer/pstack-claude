@@ -14,7 +14,7 @@
 // Every probe yields a Fact, { known: true, value } or { known: false }. A hold
 // bucket needs only its own fact; `safe` needs every fact known.
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import process from "node:process";
@@ -74,13 +74,19 @@ export function parseWorktrees(output) {
   return worktrees;
 }
 
-export function defaultTranscriptRoots({ env = process.env, home = homedir(), exists = existsSync } = {}) {
+export function defaultTranscriptRoots({ env = process.env, home = homedir(), stat = statSync } = {}) {
   const claude = join(env.CLAUDE_CONFIG_DIR || join(home, ".claude"), "projects");
   const codex = env.CODEX_HOME || join(home, ".codex");
   const piAgent = env.PI_CODING_AGENT_DIR || join(home, ".pi", "agent");
   const copilot = join(env.COPILOT_HOME || join(home, ".copilot"), "session-state");
   const found = [claude, join(codex, "sessions"), join(codex, "archived_sessions"),
-    join(piAgent, "sessions"), join(piAgent, "pstack"), copilot].filter((root) => exists(root));
+    join(piAgent, "sessions"), join(piAgent, "pstack"), copilot].filter((root) => {
+      try {
+        return stat(root, { throwIfNoEntry: false }) !== undefined;
+      } catch (error) {
+        return !["ENOENT", "ENOTDIR"].includes(error.code);
+      }
+    });
   return found.length ? found : [claude];
 }
 

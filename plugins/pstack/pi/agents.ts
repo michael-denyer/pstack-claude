@@ -78,7 +78,10 @@ interface Run {
 
 // A remote agent runs under the live pi process that restore left it to.
 type LocalAgent = { kind: "local"; record: RunningRecord; run: Run };
-type AgentState = LocalAgent | { kind: "remote"; record: RunningRecord } | { kind: "ended"; record: EndedRecord };
+type AgentState = LocalAgent
+  | { kind: "remote"; record: RunningRecord }
+  | { kind: "interrupted"; record: RunningRecord }
+  | { kind: "ended"; record: EndedRecord };
 
 // How a run ended, from what its process left behind. A run that settled on a
 // reply completed, whatever the exit code of the shutdown after it. Stderr
@@ -296,10 +299,10 @@ export class AgentRunner {
 
   private find(to: string): AgentState {
     const byId = this.agents.get(to);
-    if (byId) return byId;
+    if (byId) return this.refreshRestored(byId);
     const states = [...this.agents.values()];
     const matches = states.filter((state) => state.record.agent.description === to);
-    if (matches.length === 1) return matches[0];
+    if (matches.length === 1) return this.refreshRestored(matches[0]);
     if (matches.length > 1) {
       throw new Error(`"${to}" matches several agents (${matches.map((state) => state.record.agent.id).join(", ")}); pass an agentId.`);
     }
@@ -309,10 +312,13 @@ export class AgentRunner {
 
   // An agent this process can act on. One running under another pi process is
   // not: only that process holds its stdin and can message or stop it.
-  private owned(to: string): Exclude<AgentState, { kind: "remote" }> {
+  private owned(to: string): Exclude<AgentState, { kind: "remote" | "interrupted" }> {
     const state = this.find(to);
     if (state.kind === "remote") {
       throw new Error(`Agent ${state.record.agent.id} is running under another pi process (pid ${state.record.parentPid}); only that process can message or stop it.`);
+    }
+    if (state.kind === "interrupted") {
+      throw new Error(`Agent ${state.record.agent.id}'s previous process (pid ${state.record.pid}) has not exited; it cannot resume or be stopped here until its exit is confirmed.`);
     }
     return state;
   }
@@ -360,18 +366,41 @@ export class AgentRunner {
   }
 
   list(): AgentRecord[] {
-    return [...this.agents.values()].map((state) => state.record);
+    return [...this.agents.values()].map((state) => this.refreshRestored(state).record);
   }
 
   private persist(record: AgentRecord): void {
     this.pi.appendEntry(ENTRY_TYPE, record);
   }
 
-  // Folds persisted snapshots. A snapshot still marked running is left to the
-  // live pi process that launched it while its process is still that one's
-  // child: a live parent pid alone may be a reused one. Any other running
-  // snapshot ends here, and its process is stopped when it is known to be the
-  // agent's.
+  private refreshRestored(state: AgentState): AgentState {
+    if (state.kind === "local" || state.kind === "ended") return state;
+    const { record } = state;
+    const fate = fateOf(record);
+    if (fate === "kept" && state.kind === "remote") return state;
+    if (fate !== "gone") {
+      if (state.kind === "interrupted") return state;
+      const interrupted: AgentState = { kind: "interrupted", record };
+      this.agents.set(record.agent.id, interrupted);
+      reapOrphan(record, this.settings.killGraceMs);
+      return interrupted;
+    }
+    const stopped: EndedRecord = {
+      agent: record.agent,
+      status: "stopped",
+      pid: record.pid,
+      exitCode: null,
+      endedAt: now(),
+      finalText: "(interrupted: the session that started it ended)",
+    };
+    const ended: AgentState = { kind: "ended", record: stopped };
+    this.agents.set(record.agent.id, ended);
+    this.persist(stopped);
+    return ended;
+  }
+
+  // A restored process stays unavailable until its exit is confirmed. Only a
+  // process whose identity matches the record can be signalled.
   restore(entries: readonly SessionEntry[]): void {
     for (const entry of entries) {
       if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE || !Value.Check(recordSchema, entry.data)) continue;
@@ -379,21 +408,6 @@ export class AgentRunner {
       if (this.agents.get(id)?.kind === "local") continue;
       this.agents.set(id, entry.data.status === "running" ? { kind: "remote", record: entry.data } : { kind: "ended", record: entry.data });
     }
-    for (const [id, state] of this.agents) {
-      if (state.kind !== "remote") continue;
-      const { record } = state;
-      if (fateOf(record) === "kept") continue;
-      const stopped: EndedRecord = {
-        agent: record.agent,
-        status: "stopped",
-        pid: record.pid,
-        exitCode: null,
-        endedAt: now(),
-        finalText: "(interrupted: the session that started it ended)",
-      };
-      this.agents.set(id, { kind: "ended", record: stopped });
-      this.persist(stopped);
-      reapOrphan(record, this.settings.killGraceMs);
-    }
+    for (const state of this.agents.values()) this.refreshRestored(state);
   }
 }

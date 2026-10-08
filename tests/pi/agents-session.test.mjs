@@ -89,8 +89,8 @@ describe("registry", () => {
 
   // The other pi: a second process that starts a background agent and prints
   // the entries a pi process opening the same session would read.
-  async function otherPi() {
-    const { w, ctx } = setup({ script: { default: [{ spawn: "running" }, { sleep: 30000 }] } });
+  async function otherPi(options = {}) {
+    const { w, ctx } = setup({ script: { default: [{ spawn: "running" }, { sleep: 30000 }] }, ...options });
     const host = w.spawn(process.execPath, [join(import.meta.dir, "host.mjs"), JSON.stringify(w.settings), "stay"], {
       stdio: ["ignore", "pipe", "inherit"],
     });
@@ -100,6 +100,61 @@ describe("registry", () => {
     await waitFor(() => printed.includes("\n"));
     return { w, ctx, host, entries: JSON.parse(printed) };
   }
+
+  test("an orphan cannot resume its session while its process awaits SIGKILL", async () => {
+    const { w, ctx, host, entries } = await otherPi({ script: { byPrompt: {
+      x: [{ ignoreSigterm: true }, { spawn: "running" }, { sleep: 30000 }],
+      again: [{ reply: "resumed" }],
+    } } });
+    const [first] = w.invocations();
+    const exited = exitOf(host);
+    host.kill("SIGKILL");
+    await exited;
+    const resumed = await restore(w, entries);
+    const id = entries[0].data.agent.id;
+
+    expect(alive(first.pid)).toBe(true);
+    expect((await listAgents(resumed, ctx))[0].status).toBe("running");
+    await expect(resumed.call("send_message", { to: id, message: "again" }, ctx)).rejects.toThrow(/process.*has not exited/);
+    expect(w.invocations()).toHaveLength(1);
+    await waitFor(() => !alive(first.pid));
+    expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
+
+    await resumed.call("send_message", { to: id, message: "again" }, ctx);
+    await waitFor(() => resumed.messages.length === 1);
+    const second = w.invocations()[1];
+    expect(flag(second, "--session-id")).toBe(flag(first, "--session-id"));
+    expect(second.cwd).toBe(first.cwd);
+    expect(alive(first.pid)).toBe(false);
+  });
+
+  test("an orphan without recorded process identity cannot resume or be signalled until it exits", async () => {
+    const { w, ctx, host, entries } = await otherPi();
+    const [first] = w.invocations();
+    delete entries[0].data.pidStart;
+    const exited = exitOf(host);
+    host.kill("SIGKILL");
+    await exited;
+    const resumed = await restore(w, entries);
+    const id = entries[0].data.agent.id;
+
+    expect((await listAgents(resumed, ctx))[0].status).toBe("running");
+    for (const [tool, params] of [
+      ["send_message", { to: id, message: "again" }],
+      ["stop_agent", { id }],
+    ]) await expect(resumed.call(tool, params, ctx)).rejects.toThrow(/process.*has not exited/);
+    await sleep(2 * w.settings.killGraceMs);
+    expect(alive(first.pid)).toBe(true);
+    expect(w.invocations()).toHaveLength(1);
+
+    process.kill(-first.pid, "SIGTERM");
+    await waitFor(() => !alive(first.pid));
+    expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
+    await resumed.call("send_message", { to: id, message: "again" }, ctx);
+    await w.until("invocation", 2);
+    expect(flag(w.invocations()[1], "--session-id")).toBe(flag(first, "--session-id"));
+    await resumed.emit("session_shutdown", {}, ctx);
+  });
 
   for (const [what, edit, env, status] of [
     ["is left running, untouched", (data) => data, {}, "running"],

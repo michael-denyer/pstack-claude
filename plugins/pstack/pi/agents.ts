@@ -78,8 +78,10 @@ interface Run {
 
 // A remote agent runs under the live pi process that restore left it to.
 type LocalAgent = { kind: "local"; record: RunningRecord; run: Run };
+// Unverified restores retry identity checks; interrupted ones await termination.
 type AgentState = LocalAgent
   | { kind: "remote"; record: RunningRecord }
+  | { kind: "unverified"; record: RunningRecord }
   | { kind: "interrupted"; record: RunningRecord }
   | { kind: "ended"; record: EndedRecord };
 
@@ -169,8 +171,8 @@ function fateOf(record: RunningRecord): Fate {
 
 // Stops an orphan, by its group so the bash command it has running goes too.
 // No other fate is signalled: a pid that may have been reused is not ours to hit.
-function reapOrphan(record: RunningRecord, killGraceMs: number): void {
-  if (record.pid !== undefined) terminateGroup(record.pid, () => fateOf(record) === "orphan", killGraceMs);
+function reapOrphan(record: RunningRecord, killGraceMs: number): Promise<void> {
+  return record.pid === undefined ? Promise.resolve() : terminateGroup(record.pid, () => fateOf(record) === "orphan", killGraceMs);
 }
 
 const now = () => new Date().toISOString();
@@ -312,12 +314,12 @@ export class AgentRunner {
 
   // An agent this process can act on. One running under another pi process is
   // not: only that process holds its stdin and can message or stop it.
-  private owned(to: string): Exclude<AgentState, { kind: "remote" | "interrupted" }> {
+  private owned(to: string): Exclude<AgentState, { kind: "remote" | "unverified" | "interrupted" }> {
     const state = this.find(to);
     if (state.kind === "remote") {
       throw new Error(`Agent ${state.record.agent.id} is running under another pi process (pid ${state.record.parentPid}); only that process can message or stop it.`);
     }
-    if (state.kind === "interrupted") {
+    if (state.kind === "unverified" || state.kind === "interrupted") {
       throw new Error(`Agent ${state.record.agent.id}'s previous process (pid ${state.record.pid}) has not exited; it cannot resume or be stopped here until its exit is confirmed.`);
     }
     return state;
@@ -380,10 +382,19 @@ export class AgentRunner {
     if (fate === "kept" && state.kind === "remote") return state;
     if (fate !== "gone") {
       if (state.kind === "interrupted") return state;
-      const interrupted: AgentState = { kind: "interrupted", record };
-      this.agents.set(record.agent.id, interrupted);
-      reapOrphan(record, this.settings.killGraceMs);
-      return interrupted;
+      const restored: AgentState = {
+        kind: fate === "orphan" ? "interrupted" : "unverified",
+        record,
+      };
+      this.agents.set(record.agent.id, restored);
+      if (restored.kind === "interrupted") {
+        void reapOrphan(record, this.settings.killGraceMs).then(() => {
+          if (this.agents.get(record.agent.id) === restored) {
+            this.agents.set(record.agent.id, { kind: "unverified", record });
+          }
+        });
+      }
+      return restored;
     }
     const stopped: EndedRecord = {
       agent: record.agent,

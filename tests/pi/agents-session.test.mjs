@@ -1,6 +1,8 @@
 // The agent registry across a session's life: restore from persisted entries,
 // shutdown, an abrupt parent exit, and the settle hold of a non-interactive run.
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import * as childProcess from "node:child_process";
+import * as fs from "node:fs";
 import { join } from "node:path";
 
 import { agentEntry, alive, flag, listAgents, recordWith, restore, sleep, useWorld, waitFor } from "./harness.mjs";
@@ -154,6 +156,57 @@ describe("registry", () => {
     await w.until("invocation", 2);
     expect(flag(w.invocations()[1], "--session-id")).toBe(flag(first, "--session-id"));
     await resumed.emit("session_shutdown", {}, ctx);
+  });
+
+  for (const failure of ["restore", "escalation"]) test(`an orphan recovers from failed inspection at ${failure}, and resumes only after exit`, async () => {
+    const { w, ctx, host, entries } = await otherPi({ script: { byPrompt: {
+      x: [{ ignoreSigterm: true }, { spawn: "running" }, { sleep: 30000 }],
+      again: [{ reply: "resumed" }],
+    } } });
+    const [first] = w.invocations();
+    expect(entries[0].data.pidStart).toBeString();
+    const id = entries[0].data.agent.id;
+    const exited = exitOf(host);
+    host.kill("SIGKILL");
+    await exited;
+    let resumed;
+    if (failure === "escalation") {
+      resumed = await restore(w, entries);
+      await w.until("sigterm-ignored");
+    }
+
+    // Fail both process-inspection APIs while leaving the real child running.
+    const readFile = fs.readFileSync;
+    const spawn = childProcess.spawnSync;
+    const proc = spyOn(fs, "readFileSync").mockImplementation((path, ...args) => {
+      if (path === `/proc/${first.pid}/stat`) throw Object.assign(new Error("inspection unavailable"), { code: "EACCES" });
+      return readFile(path, ...args);
+    });
+    const ps = spyOn(childProcess, "spawnSync").mockImplementation((command, args, ...options) =>
+      command === "ps" && args.includes(String(first.pid)) ? { status: 1, stdout: "" } : spawn(command, args, ...options),
+    );
+    try {
+      if (failure === "restore") resumed = await restore(w, entries);
+      else await sleep(2 * w.settings.killGraceMs);
+      expect((await listAgents(resumed, ctx))[0].status).toBe("running");
+      await expect(resumed.call("send_message", { to: id, message: "again" }, ctx)).rejects.toThrow(/process.*has not exited/);
+      expect(alive(first.pid)).toBe(true);
+    } finally {
+      proc.mockRestore();
+      ps.mockRestore();
+    }
+
+    expect((await listAgents(resumed, ctx))[0].status).toBe("running");
+    await expect(resumed.call("stop_agent", { id }, ctx)).rejects.toThrow(/process.*has not exited/);
+    await expect(resumed.call("send_message", { to: id, message: "again" }, ctx)).rejects.toThrow(/process.*has not exited/);
+    expect(w.invocations()).toHaveLength(1);
+    await waitFor(() => !alive(first.pid));
+    expect(w.logged("sigterm-ignored")).toHaveLength(failure === "restore" ? 1 : 2);
+    expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
+
+    await resumed.call("send_message", { to: id, message: "again" }, ctx);
+    await waitFor(() => resumed.messages.length === 1);
+    expect(flag(w.invocations()[1], "--session-id")).toBe(flag(first, "--session-id"));
   });
 
   for (const [what, edit, env, status] of [

@@ -247,8 +247,15 @@ export function signalGroup(pid: number, signal: NodeJS.Signals): void {
 
 // SIGTERM to the group now, SIGKILL if `ours` still holds after the grace
 // period. `ours` guards both signals, since a reused pid is not ours to signal.
-export function terminateGroup(pid: number, ours: () => boolean, graceMs: number): void {
-  if (!ours()) return;
+// Resolves when the signal attempt ends, not when the process exits. A restored
+// orphan can retry if either identity check was unavailable during this attempt.
+export function terminateGroup(pid: number, ours: () => boolean, graceMs: number): Promise<void> {
+  if (!ours()) return Promise.resolve();
   signalGroup(pid, "SIGTERM");
-  setTimeout(() => ours() && signalGroup(pid, "SIGKILL"), graceMs).unref();
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      if (ours()) signalGroup(pid, "SIGKILL");
+      resolve();
+    }, graceMs).unref();
+  });
 }

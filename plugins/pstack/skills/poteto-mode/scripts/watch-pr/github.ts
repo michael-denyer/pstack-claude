@@ -1,4 +1,4 @@
-import { parseLandingRevision } from "./landing.ts";
+import { parseBaseRefTargetOid, parseLandingRevision } from "./landing.ts";
 import { spawn } from "node:child_process";
 import { DeadlineExceeded, type WatchDeadline } from "./deadline.ts";
 import type * as T from "./types.ts";
@@ -21,6 +21,22 @@ export const REVIEW_THREADS_QUERY = `query ReviewThreads($owner: String!, $repo:
 }`;
 export const PR_COMMIT_STATUS_QUERY =
   "\nquery PrCommitStatuses($owner: String!, $repo: String!, $pr: Int!) {\n  repository(owner: $owner, name: $repo) {\n    pullRequest(number: $pr) {\n      commits(last: 50) {\n        nodes {\n          commit {\n            oid\n            statusCheckRollup {\n              state\n            }\n          }\n        }\n      }\n    }\n  }\n}\n";
+export const PR_FACTS_QUERY = `query PullRequestFacts($owner: String!, $repo: String!, $pr: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $pr) {
+      mergeable
+      mergeStateStatus
+      reviewDecision
+      headRefOid
+      headRefName
+      baseRefName
+      baseRef { target { oid } }
+      state
+      mergedAt
+      isDraft
+    }
+  }
+}`;
 export const PR_CHECK_ROLLUP_QUERY =
   "\nquery PrCheckRollup($owner: String!, $repo: String!, $pr: Int!, $after: String) {\n  repository(owner: $owner, name: $repo) {\n    pullRequest(number: $pr) {\n      commits(last: 1) {\n        nodes {\n          commit {\n            statusCheckRollup {\n              contexts(first: 100, after: $after) {\n                pageInfo {\n                  hasNextPage\n                  endCursor\n                }\n                nodes {\n                  __typename\n                  ... on CheckRun {\n                    name\n                    status\n                    conclusion\n                    detailsUrl\n                  }\n                  ... on StatusContext {\n                    context\n                    state\n                    targetUrl\n                  }\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}\n";
 
@@ -471,6 +487,7 @@ export function parsePullRequest(
   const object = record(value, "pull request");
   if (typeof object.isDraft !== "boolean")
     missing("pull request.isDraft", object.isDraft);
+  const baseRefOid = parseBaseRefTargetOid(object.baseRef);
   const facts = {
     context,
     mergeable: enumValue(
@@ -485,7 +502,7 @@ export function parsePullRequest(
     ),
     reviewDecision: reviewDecision(object.reviewDecision),
     headRefOid: optionalString(object.headRefOid, "pull request.headRefOid"),
-    baseRefOid: optionalString(object.baseRefOid, "pull request.baseRefOid"),
+    baseRefOid,
     headRefName: string(object.headRefName, "pull request.headRefName"),
     baseRefName: string(object.baseRefName, "pull request.baseRefName"),
     state: enumValue(
@@ -497,7 +514,11 @@ export function parsePullRequest(
     isDraft: object.isDraft,
   };
   return facts.state === "OPEN"
-    ? { ...facts, ...parseLandingRevision(object, context), state: facts.state }
+    ? {
+        ...facts,
+        ...parseLandingRevision({ ...object, baseRefOid }, context),
+        state: facts.state,
+      }
     : { ...facts, state: facts.state };
 }
 function graphqlArgs(
@@ -543,17 +564,14 @@ export class GhGitHubReader implements T.GitHubReader {
     };
   }
   async pullRequest(context: T.PrContext): Promise<T.PullRequestFacts> {
+    const response = record(
+      await this.runJson(graphqlArgs(PR_FACTS_QUERY, context)),
+      "GraphQL response"
+    );
+    if (response.errors !== undefined)
+      missing("GraphQL errors", response.errors);
     return parsePullRequest(
-      await this.runJson([
-        "gh",
-        "pr",
-        "view",
-        String(context.number),
-        "--repo",
-        `${context.owner}/${context.repo}`,
-        "--json",
-        "mergeable,mergeStateStatus,reviewDecision,headRefOid,headRefName,baseRefName,baseRefOid,state,mergedAt,isDraft",
-      ]),
+      at(response, ["data", "repository", "pullRequest"]),
       context
     );
   }

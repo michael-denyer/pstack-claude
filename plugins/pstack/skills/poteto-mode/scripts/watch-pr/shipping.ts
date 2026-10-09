@@ -1,5 +1,6 @@
 import {
   flag,
+  parseBaseRefTargetOid,
   nullableText,
   object,
   oneOf,
@@ -117,7 +118,8 @@ export async function cancelPending(
 const INSPECT_QUERY = `query Landing($owner:String!,$repo:String!,$pr:Int!) {
   repository(owner:$owner,name:$repo) {
     pullRequest(number:$pr) {
-      id state headRefOid baseRefName baseRefOid
+      id state headRefOid baseRefName
+      baseRef { target { oid } }
       autoMergeRequest { enabledAt }
       mergeQueueEntry { id }
       mergeCommit { oid }
@@ -158,6 +160,7 @@ export class GhShippingService implements ShippingService {
       object(response.repository, "repository").pullRequest,
       "pullRequest"
     );
+    const baseRefOid = parseBaseRefTargetOid(fields.baseRef);
     const autoMerge =
       fields.autoMergeRequest === null
         ? false
@@ -175,7 +178,7 @@ export class GhShippingService implements ShippingService {
             "queue entry id"
           );
     return {
-      revision: parseLandingRevision(fields, context),
+      revision: parseLandingRevision({ ...fields, baseRefOid }, context),
       pullRequestId: text(fields.id, "pull request id"),
       state: oneOf(fields.state, STATES, "PR state"),
       pending: { autoMerge, queueEntryId },

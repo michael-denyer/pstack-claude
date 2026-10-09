@@ -47,7 +47,6 @@ describe("commit identity", () => {
     mergeStateStatus: "CLEAN",
     reviewDecision: "APPROVED",
     headRefOid: "head",
-    baseRefOid: "stale-base",
     baseRef: { target: { oid: "base" } },
     headRefName: "feature",
     baseRefName: "main",
@@ -835,10 +834,11 @@ describe("landing validators", () => {
     [
       "parseLandingRevision",
       () =>
-        parseLandingRevision(
-          { headRefOid: "head", baseRefName: "main" },
-          context
-        ),
+        parseLandingRevision({
+          context,
+          headRefOid: "head",
+          baseRefName: "main",
+        }),
       "baseRefOid must be a non-empty string",
     ],
   ] as const)

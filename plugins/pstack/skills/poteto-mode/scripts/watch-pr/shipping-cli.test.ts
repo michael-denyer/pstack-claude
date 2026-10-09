@@ -30,7 +30,6 @@ function fixture(
       state: "OPEN",
       headRefOid: "head",
       baseRefName: "main",
-      baseRefOid: "base",
       baseRef: { target: { oid: "base" } },
       autoMergeRequest: { enabledAt: "now" },
       mergeQueueEntry: { id: "queue" },

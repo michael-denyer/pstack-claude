@@ -1,6 +1,6 @@
 import {
+  baseRefTargetOid,
   flag,
-  parseBaseRefTargetOid,
   nullableText,
   object,
   oneOf,
@@ -160,7 +160,6 @@ export class GhShippingService implements ShippingService {
       object(response.repository, "repository").pullRequest,
       "pullRequest"
     );
-    const baseRefOid = parseBaseRefTargetOid(fields.baseRef);
     const autoMerge =
       fields.autoMergeRequest === null
         ? false
@@ -178,7 +177,15 @@ export class GhShippingService implements ShippingService {
             "queue entry id"
           );
     return {
-      revision: parseLandingRevision({ ...fields, baseRefOid }, context),
+      revision: {
+        context,
+        headRefOid: text(fields.headRefOid, "headRefOid"),
+        baseRefName: text(fields.baseRefName, "baseRefName"),
+        baseRefOid: text(
+          baseRefTargetOid(fields.baseRef),
+          "baseRef.target.oid"
+        ),
+      },
       pullRequestId: text(fields.id, "pull request id"),
       state: oneOf(fields.state, STATES, "PR state"),
       pending: { autoMerge, queueEntryId },

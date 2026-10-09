@@ -180,7 +180,6 @@ const raw = {
   state: "OPEN",
   headRefOid: "head",
   baseRefName: "main",
-  baseRefOid: "stale-base",
   baseRef: { target: { oid: "base" } },
   autoMergeRequest: null,
   mergeQueueEntry: null,

@@ -1,4 +1,4 @@
-import { parseBaseRefTargetOid, parseLandingRevision } from "./landing.ts";
+import { baseRefTargetOid, text } from "./landing.ts";
 import { spawn } from "node:child_process";
 import { DeadlineExceeded, type WatchDeadline } from "./deadline.ts";
 import type * as T from "./types.ts";
@@ -221,15 +221,8 @@ const REVIEW_DECISIONS = [
   "CHANGES_REQUESTED",
   "REVIEW_REQUIRED",
 ] as const;
-// `gh pr view` reports no review decision as "", not null. Only this field does
-// it, so the normalization stays here rather than in nullableEnum, where it
-// would stop a genuinely unexpected rollup state from failing closed.
 const reviewDecision = (value: unknown): T.ReviewDecision =>
-  nullableEnum(
-    value === "" ? null : value,
-    REVIEW_DECISIONS,
-    "pull request.reviewDecision"
-  );
+  nullableEnum(value, REVIEW_DECISIONS, "pull request.reviewDecision");
 function parseRemote(value: string): T.Repository | null {
   let normalized = value.trim();
   if (normalized.startsWith("git@github.com:"))
@@ -438,11 +431,9 @@ function passKey(comment: T.ReviewComment | null): string | null {
   }
   return null;
 }
-export function parseReviewThreads(value: unknown): readonly T.ReviewThread[] {
-  const nodes = list(
-    at(value, ["data", "repository", "pullRequest", "reviewThreads", "nodes"]),
-    "reviewThreads.nodes"
-  );
+export function parseReviewThreads(
+  nodes: readonly unknown[]
+): readonly T.ReviewThread[] {
   const threads: {
     readonly id: string;
     readonly firstComment: T.ReviewComment | null;
@@ -487,7 +478,6 @@ export function parsePullRequest(
   const object = record(value, "pull request");
   if (typeof object.isDraft !== "boolean")
     missing("pull request.isDraft", object.isDraft);
-  const baseRefOid = parseBaseRefTargetOid(object.baseRef);
   const facts = {
     context,
     mergeable: enumValue(
@@ -502,7 +492,7 @@ export function parsePullRequest(
     ),
     reviewDecision: reviewDecision(object.reviewDecision),
     headRefOid: optionalString(object.headRefOid, "pull request.headRefOid"),
-    baseRefOid,
+    baseRefOid: baseRefTargetOid(object.baseRef),
     headRefName: string(object.headRefName, "pull request.headRefName"),
     baseRefName: string(object.baseRefName, "pull request.baseRefName"),
     state: enumValue(
@@ -516,8 +506,10 @@ export function parsePullRequest(
   return facts.state === "OPEN"
     ? {
         ...facts,
-        ...parseLandingRevision({ ...object, baseRefOid }, context),
         state: facts.state,
+        headRefOid: text(facts.headRefOid, "headRefOid"),
+        baseRefName: text(facts.baseRefName, "baseRefName"),
+        baseRefOid: text(facts.baseRefOid, "baseRefOid"),
       }
     : { ...facts, state: facts.state };
 }
@@ -563,15 +555,24 @@ export class GhGitHubReader implements T.GitHubReader {
       number: pr ?? parsePrNumber(object.number, "current PR.number"),
     };
   }
-  async pullRequest(context: T.PrContext): Promise<T.PullRequestFacts> {
-    const response = record(
-      await this.runJson(graphqlArgs(PR_FACTS_QUERY, context)),
-      "GraphQL response"
-    );
+  private async graphql(
+    query: string,
+    context: T.PrContext,
+    after: string | null = null
+  ): Promise<Record<string, unknown>> {
+    const argv = graphqlArgs(query, context);
+    if (after !== null) argv.push("-f", `after=${after}`);
+    const response = record(await this.runJson(argv), "GraphQL response");
     if (response.errors !== undefined)
       missing("GraphQL errors", response.errors);
-    return parsePullRequest(
+    return record(
       at(response, ["data", "repository", "pullRequest"]),
+      "data.repository.pullRequest"
+    );
+  }
+  async pullRequest(context: T.PrContext): Promise<T.PullRequestFacts> {
+    return parsePullRequest(
+      await this.graphql(PR_FACTS_QUERY, context),
       context
     );
   }
@@ -668,11 +669,13 @@ export class GhGitHubReader implements T.GitHubReader {
     context: T.PrContext,
     after: string | null
   ): Promise<T.RollupPage> {
-    const argv = graphqlArgs(PR_CHECK_ROLLUP_QUERY, context);
-    if (after !== null) argv.push("-f", `after=${after}`);
-    const value = await this.runJson(argv);
+    const pullRequest = await this.graphql(
+      PR_CHECK_ROLLUP_QUERY,
+      context,
+      after
+    );
     const commits = list(
-      at(value, ["data", "repository", "pullRequest", "commits", "nodes"]),
+      at(pullRequest, ["commits", "nodes"]),
       "commits.nodes"
     );
     if (commits.length === 0)
@@ -709,13 +712,12 @@ export class GhGitHubReader implements T.GitHubReader {
     const cursors = new Set<string>();
     let after: string | null = null;
     do {
-      const argv = graphqlArgs(REVIEW_THREADS_QUERY, context);
-      if (after !== null) argv.push("-f", `after=${after}`);
-      const value = await this.runJson(argv);
-      const connection = record(
-        at(value, ["data", "repository", "pullRequest", "reviewThreads"]),
-        "reviewThreads"
+      const pullRequest = await this.graphql(
+        REVIEW_THREADS_QUERY,
+        context,
+        after
       );
+      const connection = record(pullRequest.reviewThreads, "reviewThreads");
       nodes.push(...list(connection.nodes, "reviewThreads.nodes"));
       const page = record(connection.pageInfo, "reviewThreads.pageInfo");
       if (typeof page.hasNextPage !== "boolean")
@@ -729,18 +731,14 @@ export class GhGitHubReader implements T.GitHubReader {
         cursors.add(after);
       }
     } while (after !== null);
-    return parseReviewThreads({
-      data: { repository: { pullRequest: { reviewThreads: { nodes } } } },
-    });
+    return parseReviewThreads(nodes);
   }
   async commitRollups(
     context: T.PrContext
   ): Promise<readonly T.CommitRollup[]> {
-    const value = await this.runJson(
-      graphqlArgs(PR_COMMIT_STATUS_QUERY, context)
-    );
+    const pullRequest = await this.graphql(PR_COMMIT_STATUS_QUERY, context);
     const commits = list(
-      at(value, ["data", "repository", "pullRequest", "commits", "nodes"]),
+      at(pullRequest, ["commits", "nodes"]),
       "commits.nodes"
     );
     return commits.map((item, index) => {

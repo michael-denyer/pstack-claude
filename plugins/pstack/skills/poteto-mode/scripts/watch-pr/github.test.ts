@@ -300,7 +300,6 @@ describe("closed enum parsing", () => {
     mergeStateStatus: "CLEAN",
     reviewDecision: "APPROVED",
     headRefOid: "head",
-    baseRefOid: "stale-base",
     baseRef: { target: { oid: "base" } },
     headRefName: "feature",
     baseRefName: "main",
@@ -318,11 +317,10 @@ describe("closed enum parsing", () => {
     ).toBe("CONFLICTING");
   });
 
-  it("reads gh's empty reviewDecision as no decision rather than a parse failure", () => {
-    expect(
+  it("rejects an empty reviewDecision like any other unknown enum value", () => {
+    expect(() =>
       parsePullRequest({ ...rawPullRequest, reviewDecision: "" }, context)
-        .reviewDecision
-    ).toBeNull();
+    ).toThrow(WatcherQueryError);
   });
 
   it("still rejects an unknown reviewDecision", () => {
@@ -434,7 +432,9 @@ it("annotates Bugbot threads with distinct review-pass counts", () => {
       },
     },
   };
-  const threads = parseReviewThreads(response);
+  const threads = parseReviewThreads(
+    response.data.repository.pullRequest.reviewThreads.nodes
+  );
   expect(threads).toHaveLength(2);
   expect(threads.map((thread) => thread.isBugbot)).toEqual([true, true]);
   expect(threads.map((thread) => thread.bugbotReviewPasses)).toEqual([3, 3]);

@@ -2,6 +2,12 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.81 - inspect terminal PRs and recover orphaned Pi agents
+
+`ship-pr inspect` reads closed and merged PRs after their base branch is deleted, using the stored base commit when the current branch is gone. Open PRs still require the current base target, and cancellation refuses a closed or merged PR before changing anything.
+
+Pi retries orphan cleanup when process inspection recovers, including when inspection failed at the delayed SIGKILL check. Each signal checks process identity, termination attempts do not overlap, and the agent can resume only after the previous process exits. Both fixes are in [#247](https://github.com/michael-denyer/pstack-claude/pull/247).
+
 ## 0.9.80 - compare the base branch's current commit
 
 `watch-pr` and `ship-pr` read the base branch's current commit from `baseRef { target { oid } }`. They read the pull request's `baseRefOid` before, a value GitHub records when the PR opens and does not always move when the base branch advances, so a base that moved between two reads could pass the snapshot check and the `cancel-pending` comparison. The watcher takes the head and base facts from one GraphQL query, so both come from one observation. An open PR whose base ref is unavailable is a query failure, not a landing record. @mshk found and fixed this in [#245](https://github.com/michael-denyer/pstack-claude/pull/245), closing [#244](https://github.com/michael-denyer/pstack-claude/issues/244).

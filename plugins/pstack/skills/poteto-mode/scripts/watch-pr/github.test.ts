@@ -353,10 +353,7 @@ describe("closed enum parsing", () => {
     const missingBaseRef = Object.fromEntries(
       Object.entries(rawPullRequest).filter(([key]) => key !== "baseRef")
     );
-    for (const value of [
-      { ...rawPullRequest, baseRef: null },
-      missingBaseRef,
-    ])
+    for (const value of [{ ...rawPullRequest, baseRef: null }, missingBaseRef])
       expect(() => parsePullRequest(value, context)).toThrow(WatcherQueryError);
   });
 

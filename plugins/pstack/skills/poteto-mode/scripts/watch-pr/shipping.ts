@@ -118,7 +118,7 @@ export async function cancelPending(
 const INSPECT_QUERY = `query Landing($owner:String!,$repo:String!,$pr:Int!) {
   repository(owner:$owner,name:$repo) {
     pullRequest(number:$pr) {
-      id state headRefOid baseRefName
+      id state headRefOid baseRefName baseRefOid
       baseRef { target { oid } }
       autoMergeRequest { enabledAt }
       mergeQueueEntry { id }
@@ -160,6 +160,8 @@ export class GhShippingService implements ShippingService {
       object(response.repository, "repository").pullRequest,
       "pullRequest"
     );
+    const state = oneOf(fields.state, STATES, "PR state");
+    const currentBaseOid = baseRefTargetOid(fields.baseRef);
     const autoMerge =
       fields.autoMergeRequest === null
         ? false
@@ -182,12 +184,14 @@ export class GhShippingService implements ShippingService {
         headRefOid: text(fields.headRefOid, "headRefOid"),
         baseRefName: text(fields.baseRefName, "baseRefName"),
         baseRefOid: text(
-          baseRefTargetOid(fields.baseRef),
+          state === "OPEN"
+            ? currentBaseOid
+            : (currentBaseOid ?? fields.baseRefOid),
           "baseRef.target.oid"
         ),
       },
       pullRequestId: text(fields.id, "pull request id"),
-      state: oneOf(fields.state, STATES, "PR state"),
+      state,
       pending: { autoMerge, queueEntryId },
       mergeCommitOid:
         fields.mergeCommit === null

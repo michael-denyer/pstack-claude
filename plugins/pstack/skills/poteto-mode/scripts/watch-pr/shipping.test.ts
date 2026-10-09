@@ -309,7 +309,7 @@ describe("shipping GitHub boundary", () => {
 
   it("treats a null base ref as unavailable for an open PR", async () => {
     const service = new GhShippingService(async () =>
-      response({ ...raw, baseRef: null })
+      response({ ...raw, baseRef: null, baseRefOid: "stored-base" })
     );
     expect(await inspectLanding(service, context)).toMatchObject({
       kind: "unavailable",

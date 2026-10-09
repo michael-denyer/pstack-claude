@@ -2,6 +2,12 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.80 - compare the base branch's current commit
+
+`watch-pr` and `ship-pr` read the base branch's current commit from `baseRef { target { oid } }`. They read the pull request's `baseRefOid` before, a value GitHub records when the PR opens and does not always move when the base branch advances, so a base that moved between two reads could pass the snapshot check and the `cancel-pending` comparison. The watcher takes the head and base facts from one GraphQL query, so both come from one observation. An open PR whose base ref is unavailable is a query failure, not a landing record. @mshk found and fixed this in [#245](https://github.com/michael-denyer/pstack-claude/pull/245), closing [#244](https://github.com/michael-denyer/pstack-claude/issues/244).
+
+The watcher unwraps every GraphQL response in one place, so a response carrying `errors` fails all five queries the same way. The empty review decision that `gh pr view` reported is gone with the command that reported it: GraphQL returns null, and an empty string is now rejected like any other unknown value.
+
 ## 0.9.79 - dequeue a queued PR, and fixes from three models and a code review
 
 `ship-pr cancel-pending` can take a PR out of a merge queue. The dequeue request named the pull request in `pullRequestId`, a field GitHub's `DequeuePullRequestInput` does not have, so GitHub refused it. The request now sends `id`, and `disablePullRequestAutoMerge` keeps `pullRequestId`, which is the name its own input type uses. @alex-overcyai found and fixed this in [#239](https://github.com/michael-denyer/pstack-claude/pull/239). Both shipping test files now answer from one fake of `gh api graphql`. The fake returns only the fields a query selects and refuses a mutation with the wrong input field or variable type, so the same mistake on either mutation fails a test.

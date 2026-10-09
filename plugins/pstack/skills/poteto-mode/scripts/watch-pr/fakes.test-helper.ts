@@ -98,11 +98,15 @@ export function fakeReader(
     async pullRequest(requested) {
       calls.push("pullRequest");
       reads += 1;
+      const facts = {
+        ...defaults,
+        ...options.facts,
+        ...(reads > 1 ? options.factsOnReread : {}),
+      };
       return parsePullRequest(
         {
-          ...defaults,
-          ...options.facts,
-          ...(reads > 1 ? options.factsOnReread : {}),
+          ...facts,
+          baseRef: { target: { oid: facts.baseRefOid } },
         },
         requested
       );

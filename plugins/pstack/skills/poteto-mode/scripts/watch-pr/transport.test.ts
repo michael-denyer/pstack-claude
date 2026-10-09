@@ -37,7 +37,9 @@ if (scenario === 'slow') {
 const noCi = scenario.startsWith('no-ci');
 const fail = (stderr) => { console.error(stderr); process.exit(1); };
 let value;
-if (args[0] === 'pr' && args[1] === 'view') {
+if (args.some(a => a.includes('query PullRequestFacts'))) {
+  value = { data: { repository: { pullRequest: { headRefOid: 'head', baseRef: { target: { oid: 'base' } }, mergeable: 'MERGEABLE', mergeStateStatus: scenario === 'no-ci-blocked' ? 'BLOCKED' : 'CLEAN', reviewDecision: noCi ? null : 'APPROVED', headRefName: 'feature', baseRefName: 'main', state: 'OPEN', mergedAt: null, isDraft: false } } } };
+} else if (args[0] === 'pr' && args[1] === 'view') {
   value = { headRefOid: 'head', baseRefOid: 'base', mergeable: 'MERGEABLE', mergeStateStatus: scenario === 'no-ci-blocked' ? 'BLOCKED' : 'CLEAN', reviewDecision: noCi ? '' : 'APPROVED', headRefName: 'feature', baseRefName: 'main', state: 'OPEN', mergedAt: null, isDraft: false };
 } else if (args[0] === 'pr' && args[1] === 'checks') {
   if (scenario === 'no-ci-unauthorized') fail('HTTP 401: Bad credentials (https://api.github.com/graphql)');

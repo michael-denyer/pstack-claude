@@ -180,7 +180,8 @@ const raw = {
   state: "OPEN",
   headRefOid: "head",
   baseRefName: "main",
-  baseRefOid: "base",
+  baseRefOid: "stale-base",
+  baseRef: { target: { oid: "base" } },
   autoMergeRequest: null,
   mergeQueueEntry: null,
   mergeCommit: null,
@@ -190,6 +191,18 @@ const response = (pullRequest: unknown) => ({
 });
 
 describe("shipping GitHub boundary", () => {
+  it("reads the current base target instead of the PR's stored base OID", async () => {
+    let query = "";
+    const service = new GhShippingService(async (args) => {
+      query = args.find((arg) => arg.startsWith("query=")) ?? "";
+      return response(raw);
+    });
+    expect(await service.inspect(context)).toMatchObject({
+      revision: { baseRefOid: "base" },
+    });
+    expect(query).toContain("baseRef { target { oid } }");
+  });
+
   it("parses the complete record and distinguishes queue-only pending state", async () => {
     const service = new GhShippingService(async () =>
       response({ ...raw, mergeQueueEntry: { id: "queued" } })
@@ -201,7 +214,7 @@ describe("shipping GitHub boundary", () => {
   });
 
   for (const field of [
-    "baseRefOid",
+    "baseRef",
     "autoMergeRequest",
     "mergeQueueEntry",
     "mergeCommit",
@@ -243,6 +256,67 @@ describe("shipping GitHub boundary", () => {
     });
   });
 
+  it("stops before dequeue when the current base moves during readback", async () => {
+    const reads = [
+      {
+        ...raw,
+        baseRef: { target: { oid: "base" } },
+        autoMergeRequest: { enabledAt: "now" },
+        mergeQueueEntry: { id: "queue" },
+      },
+      {
+        ...raw,
+        baseRef: { target: { oid: "base" } },
+        autoMergeRequest: { enabledAt: "now" },
+        mergeQueueEntry: { id: "queue" },
+      },
+      {
+        ...raw,
+        baseRef: { target: { oid: "advanced" } },
+        autoMergeRequest: null,
+        mergeQueueEntry: { id: "queue" },
+      },
+      {
+        ...raw,
+        baseRef: { target: { oid: "advanced" } },
+        autoMergeRequest: null,
+        mergeQueueEntry: null,
+      },
+    ];
+    const mutations: string[] = [];
+    const service = new GhShippingService(async (args) => {
+      const query = args.find((arg) => arg.startsWith("query=")) ?? "";
+      if (query.includes("disablePullRequestAutoMerge")) {
+        mutations.push("disable");
+        return { data: { disablePullRequestAutoMerge: {} } };
+      }
+      if (query.includes("dequeuePullRequest")) {
+        mutations.push("dequeue");
+        return { data: { dequeuePullRequest: {} } };
+      }
+      const pullRequest = reads.shift();
+      if (!pullRequest) throw new Error("unexpected inspection");
+      return response(pullRequest);
+    });
+    const expected = await service.inspect(context);
+
+    expect(await cancelPending(service, expected)).toMatchObject({
+      kind: "changed",
+      expected: { revision: { baseRefOid: "base" } },
+      observed: { revision: { baseRefOid: "advanced" } },
+    });
+    expect(mutations).toEqual(["disable"]);
+  });
+
+  it("treats a null base ref as unavailable for an open PR", async () => {
+    const service = new GhShippingService(async () =>
+      response({ ...raw, baseRef: null })
+    );
+    expect(await inspectLanding(service, context)).toMatchObject({
+      kind: "unavailable",
+    });
+  });
+
   it("rejects malformed saved context before it can select a PR", () => {
     expect(() =>
       parseLandingRecord({
@@ -262,8 +336,8 @@ describe("shipping validation detail", () => {
     ],
     [
       "an empty base commit",
-      { ...raw, baseRefOid: "" },
-      "baseRefOid must be a non-empty string",
+      { ...raw, baseRef: { target: { oid: "" } } },
+      "baseRef.target.oid must be a non-empty string",
     ],
     [
       "a malformed queue entry",

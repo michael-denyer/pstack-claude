@@ -9,6 +9,7 @@ import {
   parseFastCheck,
   parsePullRequest,
   parseReviewThreads,
+  PR_FACTS_QUERY,
   resolveChecks,
   resolveContext,
   runJson,
@@ -299,7 +300,8 @@ describe("closed enum parsing", () => {
     mergeStateStatus: "CLEAN",
     reviewDecision: "APPROVED",
     headRefOid: "head",
-    baseRefOid: "base",
+    baseRefOid: "stale-base",
+    baseRef: { target: { oid: "base" } },
     headRefName: "feature",
     baseRefName: "main",
     state: "OPEN",
@@ -327,6 +329,35 @@ describe("closed enum parsing", () => {
     expect(() =>
       parsePullRequest({ ...rawPullRequest, reviewDecision: "MAYBE" }, context)
     ).toThrow(WatcherQueryError);
+  });
+
+  it("uses the current base target when the scalar base OID is stale", () => {
+    expect(
+      parsePullRequest(
+        {
+          ...rawPullRequest,
+          baseRefOid: "stale-base",
+          baseRef: { target: { oid: "current-base" } },
+        },
+        context
+      ).baseRefOid
+    ).toBe("current-base");
+  });
+
+  it("queries the current base target with the other PR facts", () => {
+    expect(PR_FACTS_QUERY).toContain("baseRef { target { oid } }");
+    expect(PR_FACTS_QUERY).not.toContain("baseRefOid");
+  });
+
+  it("fails closed when the current base ref is null or missing", () => {
+    const missingBaseRef = Object.fromEntries(
+      Object.entries(rawPullRequest).filter(([key]) => key !== "baseRef")
+    );
+    for (const value of [
+      { ...rawPullRequest, baseRef: null },
+      missingBaseRef,
+    ])
+      expect(() => parsePullRequest(value, context)).toThrow(WatcherQueryError);
   });
 
   it("rejects unknown enum values as retryable errors carrying the raw value", () => {

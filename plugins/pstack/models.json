@@ -51,6 +51,12 @@
         "fable": "openai-codex/gpt-6-astra",
         "sonnet": "openai-codex/gpt-6-sol",
         "haiku": "openai-codex/gpt-6-luna"
+      },
+      "grok": {
+        "opus": "grok/grok-4.7-xhigh-fast",
+        "fable": "grok/grok-4.7-xhigh-fast",
+        "sonnet": "grok/grok-4.7-medium-fast",
+        "haiku": "grok/grok-4.7-medium-fast"
       }
     }
   }

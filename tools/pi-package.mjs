@@ -1,5 +1,6 @@
 // The installed @earendil-works/pi-coding-agent package: PI_PACKAGE_DIR when
-// set, otherwise the first global install under npm's root or bun's, or null.
+// set, otherwise the first global install under npm's root, Homebrew's, or
+// bun's, or null.
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
@@ -27,9 +28,20 @@ function npmRoot() {
   }
 }
 
+// `brew install pi-coding-agent` keeps Pi's npm tree in the formula's libexec,
+// reachable through the opt link that survives upgrades.
+function homebrewRoot() {
+  try {
+    const prefix = execFileSync("brew", ["--prefix"], { encoding: "utf8" }).trim();
+    return join(prefix, "opt/pi-coding-agent/libexec/lib/node_modules");
+  } catch {
+    return null;
+  }
+}
+
 export function findPiPackage() {
   if (process.env.PI_PACKAGE_DIR) return process.env.PI_PACKAGE_DIR;
-  const roots = [npmRoot(), ...bunRoots()];
+  const roots = [npmRoot(), homebrewRoot(), ...bunRoots()];
   return roots.filter(Boolean).map((root) => join(root, "@earendil-works/pi-coding-agent")).find((dir) => existsSync(join(dir, "package.json"))) ?? null;
 }
 

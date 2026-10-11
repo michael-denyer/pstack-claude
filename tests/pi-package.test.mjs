@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 
 import { piCompilerPaths, piDependency } from "../tools/pi-package.mjs";
 
@@ -55,13 +55,16 @@ test("piDependency picks the copy nested under Pi over one beside it, as Node do
 const PI = join("@earendil-works", "pi-coding-agent");
 const PI_PACKAGE_MODULE = resolve(import.meta.dir, "../tools/pi-package.mjs");
 
-// Bun's child processes ignore edits to process.env, so run findPiPackage in a fresh bun with HOME, npm, and the
-// bun variables pointed into a temp dir. Only the fake tree can match.
+// Bun's child processes ignore edits to process.env, so run findPiPackage in a fresh bun with HOME, npm, brew, and
+// the bun variables pointed into a temp dir. Only the fake tree can match.
 function findPiUnder(root, env, globalDir) {
   const piDir = join(globalDir, PI);
   mkdirSync(piDir, { recursive: true });
   writeFileSync(join(piDir, "package.json"), "{}");
-  const childEnv = { ...process.env, HOME: join(root, "home"), npm_config_prefix: join(root, "npm"), ...env };
+  const bin = join(root, "bin");
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(join(bin, "brew"), `#!/bin/sh\necho ${JSON.stringify(join(root, "brew"))}\n`, { mode: 0o755 });
+  const childEnv = { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}`, HOME: join(root, "home"), npm_config_prefix: join(root, "npm"), ...env };
   for (const key of ["PI_PACKAGE_DIR", "BUN_INSTALL", "BUN_INSTALL_GLOBAL_DIR", "XDG_CACHE_HOME"]) if (!(key in env)) delete childEnv[key];
   const run = spawnSync(process.execPath, ["-e", `import(${JSON.stringify(PI_PACKAGE_MODULE)}).then((m) => console.log(m.findPiPackage()))`], { env: childEnv, encoding: "utf8" });
   return { found: run.stdout.trim(), piDir };
@@ -75,6 +78,16 @@ test.each([
   const root = mkdtempSync(join(tmpdir(), "pstack-pi-package-"));
   try {
     const { found, piDir } = findPiUnder(root, env(root), globalDir(root));
+    expect(found).toBe(piDir);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test.skipIf(process.platform === "win32")("findPiPackage finds a Pi that brew install put under the Homebrew prefix", () => {
+  const root = mkdtempSync(join(tmpdir(), "pstack-pi-package-"));
+  try {
+    const { found, piDir } = findPiUnder(root, {}, join(root, "brew", "opt", "pi-coding-agent", "libexec", "lib", "node_modules"));
     expect(found).toBe(piDir);
   } finally {
     rmSync(root, { recursive: true, force: true });

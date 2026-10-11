@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { piCompilerPaths } from "../tools/pi-package.mjs";
+import { piCompilerPaths, piDependency } from "../tools/pi-package.mjs";
 
 const DEP_FILES = [
   "@types/node/index.d.ts",
@@ -32,6 +32,21 @@ test.each([
     expect(typeRoots.map((dir) => existsSync(join(dir, "node", "index.d.ts")))).toEqual([true]);
     const named = Object.values(paths).flat().map((target) => resolve(baseUrl, target.replace("*", "value")));
     expect(named.filter((file) => !existsSync(file))).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("piDependency picks the copy nested under Pi over one beside it, as Node does", () => {
+  const root = mkdtempSync(join(tmpdir(), "pstack-pi-package-"));
+  try {
+    const piDir = join(root, "node_modules", "@earendil-works", "pi-coding-agent");
+    const nested = join(piDir, "node_modules", "@earendil-works", "pi-ai");
+    mkdirSync(nested, { recursive: true });
+    mkdirSync(join(root, "node_modules", "@earendil-works", "pi-ai"), { recursive: true });
+
+    expect(piDependency(piDir, "@earendil-works/pi-ai")).toBe(nested);
+    expect(piDependency(piDir, "typebox")).toBeNull();
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

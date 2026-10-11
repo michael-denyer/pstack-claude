@@ -2,11 +2,13 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.82 - restore upstream's checks in two principle skills
+## 0.9.82 - restore upstream's checks in two principle skills and run haiku 5.5 on Pi
 
 `principle-attack-the-premise` and `principle-test-behavior-not-implementation` follow upstream's text again. The attack-the-premise Stop rule holds the next fix until the shared premise is written down and a per-actor census exists. When the premise is not about actors, the census is a rerunnable check whose result would differ if the premise were false. Test behavior asks whether a test would still pass if every imported function returned `undefined`, and names five shapes that would. Its keep-list adds an absence-only test that fails when the forbidden effect is injected, and a constant pin on a value promised to users. The `poteto-mode` summaries of both principles follow upstream as well. @johnkattenhorn found the drift in [#253](https://github.com/michael-denyer/pstack-claude/issues/253); the fix is in [#254](https://github.com/michael-denyer/pstack-claude/pull/254).
 
-CI typechecks the Pi extension against Pi 1.1.0, and the Pi catalog test reads the `pi-ai` package that Pi loads. When a nested and a flat copy are both installed, that is the nested copy ([#255](https://github.com/michael-denyer/pstack-claude/pull/255), [#256](https://github.com/michael-denyer/pstack-claude/pull/256)). New pull requests open with a template that asks for the test run and the release checklist.
+On Pi, the `anthropic` provider's `haiku` role runs `claude-haiku-5-5`, the same generation as the opus, fable, and sonnet roles. The model first appears in Pi 1.1's catalog, so a `haiku` role on that provider needs Pi 1.1 or later. @tlmader made this change in [#252](https://github.com/michael-denyer/pstack-claude/pull/252), closing [#251](https://github.com/michael-denyer/pstack-claude/issues/251).
+
+CI typechecks the Pi extension against Pi 1.1.0, and `CONTRIBUTING.md` asks for the local Pi checks on Pi 1.1. The Pi catalog test reads the `pi-ai` package that Pi loads. When a nested and a flat copy are both installed, that is the nested copy ([#255](https://github.com/michael-denyer/pstack-claude/pull/255), [#256](https://github.com/michael-denyer/pstack-claude/pull/256)). New pull requests open with a template that asks for the test run and the release checklist.
 
 ## 0.9.81 - inspect terminal PRs and recover orphaned Pi agents
 

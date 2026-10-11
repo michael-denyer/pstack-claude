@@ -206,8 +206,8 @@
     },
     "plugins/pstack/skills/principle-attack-the-premise/SKILL.md": {
       "kind": "policy",
-      "why": "Replaces the mandatory per-actor census with stating the shared assumption and choosing an observation that can challenge it.",
-      "since": "0.9.34",
+      "why": "Adds a Pattern line that replaces the per-actor census with a rerunnable falsifying check when the premise is not about actors.",
+      "since": "0.9.82",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/principle-prove-it-works/SKILL.md": {
@@ -218,8 +218,8 @@
     },
     "plugins/pstack/skills/principle-test-behavior-not-implementation/SKILL.md": {
       "kind": "policy",
-      "why": "Replaces the every-import-returns-undefined check with naming a relevant defect and confirming the test detects it.",
-      "since": "0.9.34",
+      "why": "Extends the keep-list to absence-only tests proven by injecting the forbidden effect, and to constant pins on values promised to users.",
+      "since": "0.9.82",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/recall/SKILL.md": {

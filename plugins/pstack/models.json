@@ -38,7 +38,7 @@
         "opus": "anthropic/claude-opus-5-5",
         "fable": "anthropic/claude-fable-5-1",
         "sonnet": "anthropic/claude-sonnet-5-5",
-        "haiku": "anthropic/claude-haiku-4-5"
+        "haiku": "anthropic/claude-haiku-5-5"
       },
       "openai": {
         "opus": "openai/gpt-6.1-sol",

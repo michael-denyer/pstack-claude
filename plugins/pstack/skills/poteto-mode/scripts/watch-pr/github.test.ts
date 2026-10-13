@@ -535,6 +535,24 @@ describe("review thread pagination", () => {
     expect(() => parseReviewThreadPage(response)).toThrow(WatcherQueryError);
   });
 
+  it("rejects a page that promises more pages without a cursor", () => {
+    for (const endCursor of [null, ""]) {
+      const response = {
+        data: {
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                pageInfo: { hasNextPage: true, endCursor },
+                nodes: [],
+              },
+            },
+          },
+        },
+      };
+      expect(() => parseReviewThreadPage(response)).toThrow(WatcherQueryError);
+    }
+  });
+
   it("rejects a thread cursor that does not advance instead of paging on", async () => {
     const stuck = { threads: [], endCursor: "same" };
     const reader = fakeReader({

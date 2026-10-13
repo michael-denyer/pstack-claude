@@ -450,6 +450,8 @@ export function parseReviewThreadPage(value: unknown): T.ReviewThreadPage {
     page.endCursor,
     "reviewThreads.pageInfo.endCursor"
   );
+  if (page.hasNextPage && !cursor)
+    missing("reviewThreads.pageInfo.endCursor", cursor);
   return { threads, endCursor: page.hasNextPage && cursor ? cursor : null };
 }
 export function buildReviewThreads(

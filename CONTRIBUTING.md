@@ -125,3 +125,5 @@ So: any PR that changes skill behavior either bumps the version itself or is fol
 ## Reporting bugs
 
 Include the pstack version, the Claude Code (or Codex, Pi, or GitHub Copilot) version, and the reproduction steps. [#22](https://github.com/michael-denyer/pstack-claude/issues/22) is the model to copy: it named versions, gave numbered steps, and included the experiment that isolated the cause.
+
+Reproduce the bug on the latest release before you file it, because only that release receives fixes. The [bug report form](.github/ISSUE_TEMPLATE/bug_report.yml) asks for each of these fields. An issue filed through `gh` or the API skips the form, so give the same fields in the same order.

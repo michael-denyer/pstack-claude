@@ -1,0 +1,75 @@
+name: Bug report
+description: Something in pstack does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Only the latest release receives fixes. Update pstack and reproduce the bug there before you file it.
+
+        Write for a reader who has never seen your project. Use pstack's own skill, command, and file names, and leave out names that exist only in your repository.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you file
+      options:
+        - label: I reproduced this on the [latest release](https://github.com/michael-denyer/pstack-claude/releases/latest).
+          required: true
+        - label: I searched [open and closed issues](https://github.com/michael-denyer/pstack-claude/issues?q=is%3Aissue) and [CHANGES.md](https://github.com/michael-denyer/pstack-claude/blob/main/CHANGES.md) and did not find this bug.
+          required: true
+  - type: input
+    id: pstack-version
+    attributes:
+      label: pstack version
+      description: The release number, or the commit SHA if you vendor pstack.
+      placeholder: "0.9.84"
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      options:
+        - Claude Code
+        - Codex
+        - Pi
+        - GitHub Copilot
+    validations:
+      required: true
+  - type: input
+    id: runtime-version
+    attributes:
+      label: Runtime version and operating system
+      placeholder: "Claude Code 2.1.267 on macOS 15.5"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: One or two plain sentences. Name the skill, command, or script that misbehaved.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that start from a fresh session. Give each command as you typed it.
+      placeholder: |
+        1. /plugin install pstack@pstack-claude
+        2. Start a new session and type ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The error or output you saw, pasted as text. Remove tokens and other secrets first.
+      render: text

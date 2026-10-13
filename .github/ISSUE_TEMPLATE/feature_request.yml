@@ -1,0 +1,24 @@
+name: Feature request or question
+description: Propose a change to pstack, or ask how something works.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write for a reader who has never seen your project. Use pstack's own skill, command, and file names, and leave out names that exist only in your repository.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The task, and what stops you today. For a question, ask it here.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like pstack to do
+      description: The change you propose, in one or two plain sentences. Leave this empty for a question.
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you do now
+      description: Any workaround you use, or other approaches you considered.

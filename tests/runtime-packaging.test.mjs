@@ -1,6 +1,6 @@
 // Runtime packaging contracts: manifests and hook commands.
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateHooks } from "../tools/generate.mjs";
@@ -68,6 +68,32 @@ describe("manifests", () => {
     expect(codexMarketplace.plugins.map(({ name, source, category }) => [name, source.path, category])).toEqual([
       [codex.name, claudeMarketplace.plugins[0].source, codex.interface.category],
     ]);
+  });
+});
+
+// #265: Codex takes a root plugin.json whose $schema is an Agent Plugins one
+// ahead of .codex-plugin/plugin.json, and loads no plugin hooks for that
+// format (codex-rs plugin_namespace.rs find_plugin_manifest_path and
+// loader.rs at rust-v0.162.1). This mirrors that lookup and returns the hook
+// events Codex would register.
+function codexHookEvents(read) {
+  const root = read("plugin.json");
+  if (root !== null && JSON.parse(root).$schema?.startsWith("https://agent-plugins.org/schemas/")) return [];
+  const { hooks } = JSON.parse(read(".codex-plugin/plugin.json"));
+  return Object.keys(JSON.parse(read(hooks)).hooks);
+}
+
+describe("Codex hook discovery", () => {
+  const pluginRoot = join(repoRoot, "plugins/pstack");
+  const shipped = (rel) => (existsSync(join(pluginRoot, rel)) ? readFileSync(join(pluginRoot, rel), "utf8") : null);
+
+  test("Codex registers the shipped SessionStart hook", () => {
+    expect(codexHookEvents(shipped)).toContain("SessionStart");
+  });
+
+  test("an Agent Plugins manifest at the plugin root hides the hooks, as 0.9.83 did", () => {
+    const manifest = JSON.stringify({ $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", name: "pstack" });
+    expect(codexHookEvents((rel) => (rel === "plugin.json" ? manifest : shipped(rel)))).toEqual([]);
   });
 });
 

@@ -943,6 +943,18 @@ describe("plan, changes, apply", () => {
     ]);
   });
 
+  // #265: 0.9.83 shipped this file, and Codex then loaded no plugin hooks.
+  test("problems reports a root plugin.json, and --check exits 1", () => {
+    const root = repoCopy();
+    const manifest = { $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", name: "pstack" };
+    writeFileSync(join(root, "plugins/pstack/plugin.json"), JSON.stringify(manifest));
+    const failure = "plugins/pstack/plugin.json exists; Codex then skips the hooks .codex-plugin/plugin.json names (#265)";
+    expect(problems(root)).toEqual([failure]);
+    const check = generate(root, "--check");
+    expect(check.status).toBe(1);
+    expect(check.stderr).toContain(`FAIL: ${failure}\n`);
+  });
+
   test("problems reports a hook path that resolves outside the plugin, through .. or through a symlink", () => {
     const root = repoCopy();
     const hooks = "plugins/pstack/hooks/hooks.json";

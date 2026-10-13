@@ -534,6 +534,26 @@ describe("review thread pagination", () => {
     };
     expect(() => parseReviewThreadPage(response)).toThrow(WatcherQueryError);
   });
+
+  it("rejects a thread cursor that does not advance instead of paging on", async () => {
+    const stuck = { threads: [], endCursor: "same" };
+    const reader = fakeReader({
+      threadPages: [stuck, stuck, { threads: [], endCursor: null }],
+    });
+    await expect(resolveReviewThreads(reader, context)).rejects.toMatchObject({
+      failure: {
+        kind: "missing-key",
+        retryable: true,
+        detail: expect.stringContaining(
+          "reviewThreads.pageInfo.endCursor must advance"
+        ),
+      },
+    });
+    expect(reader.calls).toEqual([
+      "reviewThreadPage:null",
+      "reviewThreadPage:same",
+    ]);
+  });
 });
 
 describe("context and stack discovery", () => {

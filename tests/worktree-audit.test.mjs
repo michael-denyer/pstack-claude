@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -13,8 +13,23 @@ const script = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/scrip
 // node's ESM loader takes a file URL, not a drive-lettered path.
 const scriptUrl = pathToFileURL(script).href;
 const noNode = spawnSync("node", ["--version"]).status !== 0;
-// Windows ignores chmod, so a directory cannot be made unreadable.
-const noChmod = process.platform === "win32";
+// Windows ignores chmod, and root (or any process with CAP_DAC_OVERRIDE) lists
+// a directory whatever its mode, so neither can make one unreadable.
+const noChmod = (() => {
+  if (process.platform === "win32") return true;
+  const dir = mkdtempSync(join(tmpdir(), "worktree-audit-chmod-"));
+  try {
+    chmodSync(dir, 0o000);
+    readdirSync(dir);
+    return true;
+  } catch (error) {
+    if (error.code === "EACCES") return false;
+    throw error;
+  } finally {
+    chmodSync(dir, 0o755);
+    rmSync(dir, { recursive: true, force: true });
+  }
+})();
 // The audit keys rows by git's spelling, which is forward-slashed on Windows.
 const gitPath = (path) => path.replaceAll(sep, "/");
 // Windows denies symlinkSync without the symlink privilege.

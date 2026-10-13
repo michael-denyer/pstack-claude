@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.84 - run the Codex SessionStart hook again
+
+0.9.83 shipped a root `plugins/pstack/plugin.json` in the Agent Plugins 1.0.0 format. Codex reads that manifest before `.codex-plugin/plugin.json` and loads no plugin hooks for an Agent Plugins manifest, so on Codex the `SessionStart` hook stopped running and sessions lost the pstack routing instruction. Skills still loaded, and Claude Code was not affected. The root manifest is gone, so Codex reads `.codex-plugin/plugin.json` and its hooks again. The generator now fails when `plugins/pstack/plugin.json` exists, and the sync still excludes upstream's copy. @Dude-Bear found the cause and confirmed it by moving the file aside, in [#265](https://github.com/michael-denyer/pstack-claude/issues/265).
+
 ## 0.9.83 - sync to upstream 997ffc7 (v0.15.21): adds /ketchup
 
 The upstream pin moves from `df58112` to `997ffc7`, upstream v0.15.21, 15 commits. The `/ketchup` skill catches the user up on everything in the chat since their last message, with a before-and-after visual for each action item, and `/poteto-help` routes to it. Upstream distilled the prompts of most skills to cut tokens, and the port takes every distilled text. `poteto-mode` tells the chat that receives `/poteto-mode` to run the playbook itself and spawn `poteto-agent` only as a delegate, which the agent's description and the generated effort agents repeat, and it names where the bundled leaf skills live relative to its own file. `create-verification-skill` reads "ready" as usable from an empty data dir, and `unslop`'s description drops "Must always apply." @Tradie-AI-2000 asked for this sync in [#260](https://github.com/michael-denyer/pstack-claude/issues/260).

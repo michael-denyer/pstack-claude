@@ -73,7 +73,6 @@ const PROMPT_RUNTIMES = RUNTIMES.filter((runtime) => runtime.prompts);
 const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
   `${PLUGIN}/.claude-plugin/plugin.json`,
-  `${PLUGIN}/plugin.json`,
   ...RUNTIMES.map((runtime) => runtime.manifest),
 ];
 
@@ -208,6 +207,13 @@ export function validatePluginLayout(pluginRoot) {
   if (existsSync(join(pluginRoot, "commands"))) {
     const prompts = PROMPT_RUNTIMES.map((runtime) => runtime.prompts).join(", ");
     throw new Error(`${PLUGIN}/commands/ exists; trampolines belong in ${prompts} (CHANGES 0.9.13)`);
+  }
+  // #265: Codex reads a root plugin.json with an Agent Plugins $schema ahead
+  // of .codex-plugin/plugin.json, and loads no plugin hooks in that format, so
+  // the SessionStart hook never runs. Each runtime's manifest lives in its own
+  // directory instead.
+  if (existsSync(join(pluginRoot, "plugin.json"))) {
+    throw new Error(`${PLUGIN}/plugin.json exists; Codex then skips the hooks .codex-plugin/plugin.json names (#265)`);
   }
   // #58: a plugin's agents register under the plugin namespace, so a dispatch
   // of the bare name errors at runtime with "Agent type 'x' not found".

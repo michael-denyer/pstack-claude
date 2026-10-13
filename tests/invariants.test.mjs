@@ -56,6 +56,11 @@ describe("static plugin invariants", () => {
     expect(() => check(root)).toThrow("plugins/pstack/commands/ exists");
   });
 
+  test("a root plugin.json fails", () => {
+    const root = plugin((r) => writeFileSync(join(r, "plugin.json"), "{}\n"));
+    expect(() => check(root)).toThrow("plugins/pstack/plugin.json exists");
+  });
+
   test("disable-model-invocation on a skill fails and names the file", () => {
     const root = plugin((r) => skill(r, "flagged", "disable-model-invocation: true\n"));
     expect(() => check(root)).toThrow(/skills\/flagged\/SKILL\.md: disable-model-invocation: true breaks/);

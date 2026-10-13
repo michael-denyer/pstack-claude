@@ -1,6 +1,6 @@
 # NOTICE for the skills-only distribution
 
-This distribution contains MIT-licensed work from two upstream sources. The copyright notices and license terms travel beside this file.
+This distribution contains MIT-licensed work from three upstream sources. The copyright notices and license terms travel beside this file.
 
 ## Upstream sources
 

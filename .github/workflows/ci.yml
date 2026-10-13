@@ -184,8 +184,9 @@ jobs:
       - name: Test
         run: bun test orch watch-pr check-plan.test.ts
       # Pinned here, not in package.json, so bun.lock stays identical to
-      # upstream's. 3.6.2 is the newest release that reproduces upstream's
-      # watch-pr files byte for byte; later ones rewrap its types.ts.
+      # upstream's. 3.6.2 reproduces upstream's watch-pr files byte for byte,
+      # except fakes.test-helper.ts, which .prettierignore lists; later
+      # releases rewrap types.ts too.
       - name: Check formatting
         run: bunx prettier@3.6.2 --check .
 

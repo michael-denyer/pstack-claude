@@ -144,12 +144,10 @@ export function fakeReader(
     },
     async reviewThreadPage(_requested, after) {
       calls.push(`reviewThreadPage:${after ?? "null"}`);
-      return (
-        options.threadPages?.[threadPage++] ?? {
-          threads: (options.threads ?? []).map(toRawThread),
-          endCursor: null,
-        }
-      );
+      return options.threadPages?.[threadPage++] ?? {
+        threads: (options.threads ?? []).map(toRawThread),
+        endCursor: null,
+      };
     },
     async commitRollups() {
       calls.push("commitRollups");

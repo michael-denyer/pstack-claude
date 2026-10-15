@@ -1072,9 +1072,12 @@ interface ForgePullRequestQuery {
   readonly stateField: string;
   readonly headField: string;
   readonly baseField: string;
-  // gh matches --head and --base by branch name alone, so a fork PR with a
-  // stack branch's name would join the chain without this field.
-  readonly crossRepositoryField?: string;
+  // gh matches --head and --base by branch name alone, so the chain keeps only
+  // PRs whose head repository, read from this field as { nameWithOwner } or
+  // null for a deleted fork, is the one the checkout pushes to.
+  readonly headRepositoryField?: string;
+  // gh lists 30 pull requests unless told otherwise.
+  readonly listArgs: readonly string[];
   readonly states: ReadonlyMap<string, FrontierPrState>;
 }
 
@@ -1085,7 +1088,8 @@ const FORGE_PULL_REQUEST_QUERIES: Readonly<
     stateField: "state",
     headField: "headRefName",
     baseField: "baseRefName",
-    crossRepositoryField: "isCrossRepository",
+    headRepositoryField: "headRepository",
+    listArgs: ["--limit", "1000"],
     states: new Map<string, FrontierPrState>([
       ["OPEN", "OPEN"],
       ["MERGED", "MERGED"],
@@ -1096,6 +1100,7 @@ const FORGE_PULL_REQUEST_QUERIES: Readonly<
     stateField: "status",
     headField: "headRef",
     baseField: "baseRef",
+    listArgs: [],
     states: new Map<string, FrontierPrState>([
       ["open", "OPEN"],
       ["draft", "OPEN"],
@@ -1124,6 +1129,33 @@ interface ForgePullRequest {
   readonly state: FrontierPrState;
   readonly branch: string;
   readonly base: string;
+  // owner/name in lower case; null when the forge does not say or the head
+  // repository is gone.
+  readonly repository: string | null;
+}
+
+interface ForgePullRequests {
+  // PRs whose head is in the repository the checkout pushes to.
+  readonly local: readonly ForgePullRequest[];
+  readonly foreign: readonly ForgePullRequest[];
+}
+
+// Resolves to null when the forge reports no head repository or the repository
+// is gone, and to undefined when the field is malformed.
+function headRepository(
+  row: Record<string, unknown>,
+  field: string | undefined
+): string | null | undefined {
+  if (field === undefined) {
+    return null;
+  }
+  const value = row[field];
+  if (value === null) {
+    return null;
+  }
+  return isRecord(value) && typeof value.nameWithOwner === "string"
+    ? value.nameWithOwner.toLowerCase()
+    : undefined;
 }
 
 function runTool({
@@ -1158,13 +1190,15 @@ function listPullRequests({
   forge,
   executable,
   repo,
+  localRepository,
 }: {
   filter: "--head" | "--base";
   branch: string;
   forge: Forge;
   executable: ForgeExecutable;
   repo: string;
-}): readonly ForgePullRequest[] {
+  localRepository: string | null;
+}): ForgePullRequests {
   const query = FORGE_PULL_REQUEST_QUERIES[forge];
   const command = `${forge} pr list ${filter} ${branch}`;
   // Every state is fetched because a merged or closed PR still anchors the
@@ -1178,13 +1212,14 @@ function listPullRequests({
       branch,
       "--state",
       "all",
+      ...query.listArgs,
       "--json",
       [
         "number",
         query.stateField,
         query.headField,
         query.baseField,
-        ...(query.crossRepositoryField ? [query.crossRepositoryField] : []),
+        ...(query.headRepositoryField ? [query.headRepositoryField] : []),
       ].join(","),
     ],
     repo,
@@ -1199,16 +1234,15 @@ function listPullRequests({
   if (!isUnknownArray(value)) {
     throw new UserError(`${command} output is not a JSON array`);
   }
-  const rows = value.map((row) => {
+  const rows = value.map((row): ForgePullRequest => {
     const status = isRecord(row) ? row[query.stateField] : undefined;
     const state =
       typeof status === "string" ? (query.states.get(status) ?? null) : null;
     const head = isRecord(row) ? row[query.headField] : undefined;
     const base = isRecord(row) ? row[query.baseField] : undefined;
-    const crossRepository =
-      isRecord(row) && query.crossRepositoryField
-        ? row[query.crossRepositoryField]
-        : false;
+    const repository = isRecord(row)
+      ? headRepository(row, query.headRepositoryField)
+      : undefined;
     if (
       !isRecord(row) ||
       typeof row.number !== "number" ||
@@ -1219,15 +1253,18 @@ function listPullRequests({
       head.length === 0 ||
       typeof base !== "string" ||
       base.length === 0 ||
-      typeof crossRepository !== "boolean"
+      repository === undefined
     ) {
       throw new UserError(`${command} output has an invalid PR row`);
     }
-    return { pr: row.number, state, branch: head, base, crossRepository };
+    return { pr: row.number, state, branch: head, base, repository };
   });
-  return rows
-    .filter((row) => !row.crossRepository)
-    .map(({ pr, state, branch, base }) => ({ pr, state, branch, base }));
+  const isLocal = (row: ForgePullRequest): boolean =>
+    localRepository === null || row.repository === localRepository;
+  return {
+    local: rows.filter(isLocal),
+    foreign: rows.filter((row) => !isLocal(row)),
+  };
 }
 
 function branchPullRequest({
@@ -1235,28 +1272,40 @@ function branchPullRequest({
   forge,
   executable,
   repo,
+  localRepository,
 }: {
   branch: string;
   forge: Forge;
   executable: ForgeExecutable;
   repo: string;
+  localRepository: string | null;
 }): ForgePullRequest {
-  const rows = listPullRequests({
+  const { local, foreign } = listPullRequests({
     filter: "--head",
     branch,
     forge,
     executable,
     repo,
+    localRepository,
   });
-  const row = rows[0];
+  const row = local[0];
   if (row === undefined) {
+    const ignored =
+      foreign.length === 0 || localRepository === null
+        ? ""
+        : ` from ${localRepository} (ignored ${foreign
+            .map(
+              (item) =>
+                `#${item.pr} from ${item.repository ?? "a deleted repository"}`
+            )
+            .join(", ")})`;
     throw new UserError(
-      `branch ${branch} has no pull request; open one with ${forge} pr create, or resolve the frontier from a branch whose chain is fully submitted`
+      `branch ${branch} has no pull request${ignored}; open one with ${forge} pr create, or resolve the frontier from a branch whose chain is fully submitted`
     );
   }
-  if (rows.length > 1) {
+  if (local.length > 1) {
     throw new UserError(
-      `branch ${branch} has multiple pull requests (${rows.map((item) => `#${item.pr}`).join(", ")}); close the stale ones first`
+      `branch ${branch} has multiple pull requests (${local.map((item) => `#${item.pr}`).join(", ")}); close the stale ones first`
     );
   }
   return row;
@@ -1267,11 +1316,13 @@ function openChildren({
   forge,
   executable,
   repo,
+  localRepository,
 }: {
   branch: string;
   forge: Forge;
   executable: ForgeExecutable;
   repo: string;
+  localRepository: string | null;
 }): readonly ForgePullRequest[] {
   return listPullRequests({
     filter: "--base",
@@ -1279,7 +1330,8 @@ function openChildren({
     forge,
     executable,
     repo,
-  }).filter((row) => row.state === "OPEN");
+    localRepository,
+  }).local.filter((row) => row.state === "OPEN");
 }
 
 function runGit({
@@ -1317,6 +1369,44 @@ function currentBranch(repo: string): string {
   );
 }
 
+// The repository the branch pushes to, as owner/name in lower case, from the
+// remote git itself would push it to.
+function pushRepository({
+  branch,
+  repo,
+}: {
+  branch: string;
+  repo: string;
+}): string {
+  const configured = (key: string): string | null => {
+    try {
+      return runGit({ args: ["config", "--get", key], repo }) || null;
+    } catch {
+      return null;
+    }
+  };
+  const remote =
+    configured(`branch.${branch}.pushRemote`) ??
+    configured("remote.pushDefault") ??
+    configured(`branch.${branch}.remote`) ??
+    "origin";
+  let url: string;
+  try {
+    url = runGit({ args: ["remote", "get-url", "--push", remote], repo });
+  } catch {
+    throw new UserError(
+      `branch ${branch} has no push remote (remote ${remote} has no URL), so the chain cannot tell which pull requests are the checkout's own`
+    );
+  }
+  const match = /([^/:]+)\/([^/]+?)(?:\.git)?\/?$/.exec(url);
+  const owner = match?.[1];
+  const name = match?.[2];
+  if (owner === undefined || name === undefined) {
+    throw new UserError(`remote ${remote} URL ${url} does not name a repository`);
+  }
+  return `${owner}/${name}`.toLowerCase();
+}
+
 function trunkBranch(repo: string): string {
   try {
     return runGit({
@@ -1343,12 +1433,17 @@ function resolveFrontier({
   if (current === trunk) {
     return [];
   }
+  const localRepository =
+    FORGE_PULL_REQUEST_QUERIES[forge].headRepositoryField === undefined
+      ? null
+      : pushRepository({ branch: current, repo });
   const seen = new Set([current]);
   let bottom = branchPullRequest({
     branch: current,
     forge,
     executable,
     repo,
+    localRepository,
   });
   const chain = [bottom];
   while (bottom.base !== trunk) {
@@ -1363,12 +1458,19 @@ function resolveFrontier({
       forge,
       executable,
       repo,
+      localRepository,
     });
     chain.unshift(bottom);
   }
   let tip = current;
   for (;;) {
-    const children = openChildren({ branch: tip, forge, executable, repo });
+    const children = openChildren({
+      branch: tip,
+      forge,
+      executable,
+      repo,
+      localRepository,
+    });
     const child = children[0];
     if (child === undefined) {
       break;

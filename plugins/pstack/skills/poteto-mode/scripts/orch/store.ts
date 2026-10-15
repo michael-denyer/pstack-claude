@@ -1294,7 +1294,7 @@ function branchSha({
 }
 
 function currentBranch(repo: string): string {
-  // --short names a branch that shares a tag's name heads/<branch>.
+  // --short prints heads/<branch> for a branch that shares a tag's name.
   return runGit({ args: ["symbolic-ref", "HEAD"], repo }).replace(
     /^refs\/heads\//,
     ""

@@ -376,6 +376,11 @@
       "rationale": "Claude Code installs plugins under ~/.claude/plugins/"
     },
     {
+      "pattern": ".cursor-plugin/plugin.json",
+      "replacement": ".claude-plugin/plugin.json",
+      "rationale": "the port's plugin manifest; the sync excludes upstream's .cursor-plugin/ directory"
+    },
+    {
       "pattern": "`generalPurpose`",
       "replacement": "`general-purpose`",
       "rationale": "Claude Code's built-in agent type is general-purpose"
@@ -568,6 +573,10 @@
     {
       "token": "grok-",
       "hint": "Cursor model slug; point at the Models section, or add a substitution rule for the phrase"
+    },
+    {
+      "token": ".cursor-plugin",
+      "hint": "Cursor's manifest directory, which the sync excludes; the port's manifest is .claude-plugin/plugin.json"
     },
     {
       "regex": "\\b(?:claude|gpt|gemini|composer)-[0-9a-z.-]*-(?:max|fast|xhigh|high|medium|low|thinking)\\b",

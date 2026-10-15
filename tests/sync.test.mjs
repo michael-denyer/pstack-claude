@@ -253,6 +253,11 @@ describe("applySubstitutions", () => {
       "On the operator's explicit go, arm a `/goal` with the full program objective. The goal continues across turns until the chain is done.",
       "On the operator's explicit go, write the full program objective into the standing orders and restate it in your todolist. That objective stands across turns until the chain is done.",
     ],
+    [
+      "agents/poteto-agent.md",
+      "search `~/.cursor/plugins/` for a file whose path ends in `skills/poteto-mode/SKILL.md`. If more than one file matches, use the copy whose `.cursor-plugin/plugin.json` has the highest `version`.",
+      "search `~/.claude/plugins/` for a file whose path ends in `skills/poteto-mode/SKILL.md`. If more than one file matches, use the copy whose `.claude-plugin/plugin.json` has the highest `version`.",
+    ],
   ])("%s: an upstream sentence takes the port's one form", (rel, upstream, port) => {
     const { text } = applySubstitutions(upstream, RULES.substitutions, rel);
     expect(text).toBe(port);

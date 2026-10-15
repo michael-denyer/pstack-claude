@@ -2,7 +2,7 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.85 - sync to upstream 99743e9 (v0.15.25): adds /in-your-own-words and /sharpen
+## 0.9.86 - sync to upstream 99743e9 (v0.15.25): adds /in-your-own-words and /sharpen
 
 The upstream pin moves from `997ffc7` to `99743e9`, upstream v0.15.25, 15 pstack commits. `/in-your-own-words` plays back the user's goal and the problem before work starts, and `/sharpen` aims a task the way a top expert would without overspecifying it. `/poteto-help` routes to both. `/ketchup` answers in about 150 words built on real visuals, and the autopilot ticks and replies catch the operator up through it. `principle-fix-root-causes` proposes a cheap always-on signal after a deep dig. `principle-attack-the-premise` and three other principles state their rules as reasoning, and four skills drop marginal sections. The package now carries 39 public skills and 24 principles.
 
@@ -17,6 +17,12 @@ Orchestrate no longer uses Graphite. `orch frontier set` walks the PR base chain
 New substitution rules translate upstream's effort sentence, the reworded cloud-agent and driver-skill sentences, the "re-reads from trunk" tick, and the orchestrate worker placement, so the next sync derives those lines without a conflict.
 
 Measured in two runs of `bun tools/sync.mjs pstack`. The step to `c86f349` merged clean: 4 updated, 1 added, 1 merged. The step to `99743e9`, over 106 files with 37 excluded, left 60 unchanged, updated 24, added 1, merged 6, and wrote 15 conflicts, each resolved by hand from upstream's new text plus the lines its `forks.json` entry names.
+
+## 0.9.85 - drop the signed C2PA manifest from the images
+
+The plugin icon (`.claude-plugin/icon.png` and `assets/pstack-icon.png`) and the README overview (`assets/pstack-overview.png`) each carried a PNG `caBX` chunk holding a signed C2PA manifest from the image generator: an X.509 certificate chain, a COSE signature, and an RFC 3161 timestamp. A plugin directory screen that reads the printable text of image files can take that text for a credential. The chunk is gone from all three files and the pixels are unchanged: `magick compare -metric AE` reports 0 differing pixels, and each file keeps only its `IHDR`, `IDAT`, and `IEND` chunks. A test walks the chunks of every tracked PNG and fails on a `caBX` chunk.
+
+## 0.9.84 - run the Codex SessionStart hook again
 
 0.9.83 shipped a root `plugins/pstack/plugin.json` in the Agent Plugins 1.0.0 format. Codex reads that manifest before `.codex-plugin/plugin.json` and loads no plugin hooks for an Agent Plugins manifest, so on Codex the `SessionStart` hook stopped running and sessions lost the pstack routing instruction. Skills still loaded, and Claude Code was not affected. The root manifest is gone, so Codex reads `.codex-plugin/plugin.json` and its hooks again. The generator now fails when `plugins/pstack/plugin.json` exists, and the sync still excludes upstream's copy. A packaging test follows Codex's manifest lookup over the shipped plugin and checks that it finds the `SessionStart` hook, and that the 0.9.83 manifest would hide it. @Dude-Bear found the cause and confirmed it by moving the file aside, in [#265](https://github.com/michael-denyer/pstack-claude/issues/265).
 

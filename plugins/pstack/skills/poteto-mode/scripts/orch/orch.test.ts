@@ -90,6 +90,10 @@ async function makeGitStack(directory: string): Promise<{
   git({ repo, args: ["init", "--initial-branch=main"] });
   git({ repo, args: ["config", "user.name", "Orch Test"] });
   git({ repo, args: ["config", "user.email", "orch@example.com"] });
+  git({
+    repo,
+    args: ["remote", "add", "origin", `https://github.com/${FIXTURE_REPOSITORY}.git`],
+  });
   await writeFile(join(repo, "main.txt"), "main\n");
   git({ repo, args: ["add", "."] });
   git({ repo, args: ["commit", "-m", "main"] });
@@ -119,33 +123,48 @@ async function makeGitStack(directory: string): Promise<{
 
 type FixtureState = "open" | "draft" | "merged" | "closed";
 
+const FIXTURE_REPOSITORY = "acme/widgets";
+
+interface FixturePr {
+  readonly number: number;
+  readonly state: FixtureState;
+  readonly head: string;
+  readonly base: string;
+  // The head repository as owner/name. Undefined takes the fixture's default
+  // and null stands for a fork that has since been deleted.
+  readonly repository?: string | null;
+}
+
 const FORGE_FIXTURES: Readonly<
   Record<
     Forge,
     {
       readonly fields: string;
-      readonly row: (pr: {
-        number: number;
-        state: FixtureState;
-        head: string;
-        base: string;
-        crossRepository?: boolean;
-      }) => Record<string, unknown>;
+      readonly listArgs: readonly string[];
+      readonly row: (
+        pr: FixturePr,
+        repository: string
+      ) => Record<string, unknown>;
     }
   >
 > = {
   gh: {
-    fields: "number,state,headRefName,baseRefName,isCrossRepository",
-    row: ({ number, state, head, base, crossRepository = false }) => ({
+    fields: "number,state,headRefName,baseRefName,headRepository",
+    listArgs: ["--limit", "1000"],
+    row: ({ number, state, head, base, repository }, fallback) => ({
       number,
       state: state === "draft" ? "OPEN" : state.toUpperCase(),
       headRefName: head,
       baseRefName: base,
-      isCrossRepository: crossRepository,
+      headRepository:
+        repository === null
+          ? null
+          : { nameWithOwner: repository ?? fallback },
     }),
   },
   origin: {
     fields: "number,status,headRef,baseRef",
+    listArgs: [],
     row: ({ number, state, head, base }) => ({
       number,
       status: state,
@@ -157,15 +176,12 @@ const FORGE_FIXTURES: Readonly<
 
 function forgeRows(
   forge: Forge,
-  prs: readonly {
-    number: number;
-    state: FixtureState;
-    head: string;
-    base: string;
-    crossRepository?: boolean;
-  }[]
+  prs: readonly FixturePr[],
+  repository = FIXTURE_REPOSITORY
 ): string {
-  return JSON.stringify(prs.map((pr) => FORGE_FIXTURES[forge].row(pr)));
+  return JSON.stringify(
+    prs.map((pr) => FORGE_FIXTURES[forge].row(pr, repository))
+  );
 }
 
 async function withFakeForge<T>({
@@ -173,11 +189,13 @@ async function withFakeForge<T>({
   forge,
   operation,
   currentRows,
+  repository = FIXTURE_REPOSITORY,
 }: {
   directory: string;
   forge: Forge;
   operation: () => Promise<T>;
   currentRows?: string;
+  repository?: string;
 }): Promise<T> {
   const bin = join(directory, "bin");
   const outputPath = join(directory, "forge-output.txt");
@@ -186,19 +204,33 @@ async function withFakeForge<T>({
     outputPath,
     `${
       currentRows ??
-      forgeRows(forge, [
-        {
-          number: 11,
-          state: "open",
-          head: "stack/open",
-          base: "stack/closed",
-        },
-      ])
+      forgeRows(
+        forge,
+        [
+          {
+            number: 11,
+            state: "open",
+            head: "stack/open",
+            base: "stack/closed",
+          },
+        ],
+        repository
+      )
     }\n`
   );
-  const { fields } = FORGE_FIXTURES[forge];
+  const { fields, listArgs } = FORGE_FIXTURES[forge];
   const list = (filter: string, branch: string): string =>
-    `pr list ${filter} ${branch} --state all --json ${fields}`;
+    [
+      "pr",
+      "list",
+      filter,
+      branch,
+      "--state",
+      "all",
+      ...listArgs,
+      "--json",
+      fields,
+    ].join(" ");
   const fake = join(bin, forge);
   await writeFile(
     fake,
@@ -213,21 +245,25 @@ case "$*" in
     cat "${outputPath}"
     ;;
   "${list("--head", "stack/closed")}")
-    printf '%s\\n' '${forgeRows(forge, [{ number: 13, state: "closed", head: "stack/closed", base: "stack/merged" }])}'
+    printf '%s\\n' '${forgeRows(forge, [{ number: 13, state: "closed", head: "stack/closed", base: "stack/merged" }], repository)}'
     ;;
   "${list("--head", "stack/merged")}")
-    printf '%s\\n' '${forgeRows(forge, [{ number: 10, state: "merged", head: "stack/merged", base: "main" }])}'
+    printf '%s\\n' '${forgeRows(forge, [{ number: 10, state: "merged", head: "stack/merged", base: "main" }], repository)}'
     ;;
   "${list("--base", "stack/open")}")
-    printf '%s\\n' '${forgeRows(forge, [
-      { number: 14, state: "draft", head: "stack/draft", base: "stack/open" },
-      {
-        number: 15,
-        state: "closed",
-        head: "stack/abandoned",
-        base: "stack/open",
-      },
-    ])}'
+    printf '%s\\n' '${forgeRows(
+      forge,
+      [
+        { number: 14, state: "draft", head: "stack/draft", base: "stack/open" },
+        {
+          number: 15,
+          state: "closed",
+          head: "stack/abandoned",
+          base: "stack/open",
+        },
+      ],
+      repository
+    )}'
     ;;
   "${list("--base", "stack/draft")}")
     printf '[]\\n'
@@ -1075,7 +1111,7 @@ promises.readFile = async (path, ...rest) => {
     });
   }
 
-  it("leaves fork pull requests out of the gh chain", async () => {
+  it("leaves pull requests whose head is in another repository out of the gh chain", async () => {
     const { directory, store } = await initializedStore();
     const stack = await makeGitStack(directory);
 
@@ -1089,12 +1125,109 @@ promises.readFile = async (path, ...rest) => {
           state: "open",
           head: "stack/open",
           base: "main",
-          crossRepository: true,
+          repository: "mallory/widgets",
+        },
+        {
+          number: 98,
+          state: "closed",
+          head: "stack/open",
+          base: "main",
+          repository: null,
         },
       ]),
       operation: async () => {
         const { prs } = await store.frontier.set({ repo: stack.repo });
         expect(prs.map((row) => row.pr)).toEqual([10, 13, 11, 14]);
+      },
+    });
+  });
+
+  it("names the pull requests it left out when a chain branch has only those", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+
+    await withFakeForge({
+      directory,
+      forge: "gh",
+      currentRows: forgeRows("gh", [
+        {
+          number: 99,
+          state: "open",
+          head: "stack/open",
+          base: "main",
+          repository: "mallory/widgets",
+        },
+        {
+          number: 98,
+          state: "closed",
+          head: "stack/open",
+          base: "main",
+          repository: null,
+        },
+      ]),
+      operation: async () => {
+        await expect(store.frontier.set({ repo: stack.repo })).rejects.toThrow(
+          "branch stack/open has no pull request from acme/widgets (ignored #99 from mallory/widgets, #98 from a deleted repository); open one with gh pr create"
+        );
+      },
+    });
+  });
+
+  it("keeps a stack pushed from a fork by matching the remote the branch pushes to", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+    git({
+      repo: stack.repo,
+      args: ["remote", "add", "fork", "git@github.com:Me/Widgets.git"],
+    });
+    git({ repo: stack.repo, args: ["config", "remote.pushDefault", "origin"] });
+    git({
+      repo: stack.repo,
+      args: ["config", "branch.stack/open.pushRemote", "fork"],
+    });
+
+    await withFakeForge({
+      directory,
+      forge: "gh",
+      repository: "me/widgets",
+      currentRows: forgeRows(
+        "gh",
+        [
+          {
+            number: 11,
+            state: "open",
+            head: "stack/open",
+            base: "stack/closed",
+          },
+          {
+            number: 97,
+            state: "open",
+            head: "stack/open",
+            base: "main",
+            repository: FIXTURE_REPOSITORY,
+          },
+        ],
+        "me/widgets"
+      ),
+      operation: async () => {
+        const { prs } = await store.frontier.set({ repo: stack.repo });
+        expect(prs.map((row) => row.pr)).toEqual([10, 13, 11, 14]);
+      },
+    });
+  });
+
+  it("rejects a gh chain from a checkout whose branch has no push remote", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+    git({ repo: stack.repo, args: ["remote", "remove", "origin"] });
+
+    await withFakeForge({
+      directory,
+      forge: "gh",
+      operation: async () => {
+        await expect(store.frontier.set({ repo: stack.repo })).rejects.toThrow(
+          "branch stack/open has no push remote (remote origin has no URL)"
+        );
       },
     });
   });
@@ -1400,7 +1533,7 @@ describe("port guards", () => {
     ["gh pr list --head stack/open", ""],
     [
       "gh pr list --base stack/open",
-      `if [ "$3" = --head ]; then printf '%s\\n' '[{"number":11,"state":"OPEN","headRefName":"stack/open","baseRefName":"main","isCrossRepository":false}]'; exit 0; fi\n`,
+      `if [ "$3" = --head ]; then printf '%s\\n' '[{"number":11,"state":"OPEN","headRefName":"stack/open","baseRefName":"main","headRepository":{"nameWithOwner":"${FIXTURE_REPOSITORY}"}}]'; exit 0; fi\n`,
     ],
   ])(
     "fails a frontier set when %s hangs and ignores SIGTERM",

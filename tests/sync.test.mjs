@@ -263,6 +263,28 @@ describe("applySubstitutions", () => {
 describe("parseSubstitutions", () => {
   const rule = (fields) => ({ replacement: "X", rationale: "fixture", ...fields });
 
+  test.each(["skills/poteto-mode/references/devin-tools.md", null, [""], [null], [42]].map((value) => [value]))(
+    "rejects malformed denylist exceptFiles %j",
+    (exceptFiles) => {
+      expect(() =>
+        parseSubstitutions({ substitutions: [], denylist: [{ token: "other" }, { token: "is_background", exceptFiles }] }),
+      ).toThrow("denylist[1].exceptFiles must be an array of non-empty filename strings");
+    },
+  );
+
+  test("preserves optional denylists and valid filename exceptions", () => {
+    for (const denylist of [
+      undefined,
+      null,
+      [],
+      [{ token: "other" }],
+      [{ token: "is_background", exceptFiles: [] }],
+      [{ token: "is_background", exceptFiles: ["skills/poteto-mode/references/devin-tools.md"] }],
+    ]) {
+      expect(parseSubstitutions({ substitutions: [], denylist }).denylist).toEqual(denylist);
+    }
+  });
+
   test("a misspelled field fails naming the rule instead of matching everywhere", () => {
     expect(() => parseRule(rule({ patern: "a" }), 3)).toThrow('substitutions[3]: unknown field "patern"');
     expect(() => parseRule(rule({ pattern: "a", file: "^skills/" }), 0)).toThrow('unknown field "file"');
@@ -364,6 +386,14 @@ describe("denylistHits", () => {
     for (const sentence of ["Use TaskCreate and TaskUpdate.", "## <Task as a verb phrase> (<PR id>)"]) {
       expect(denylistHits("skills/x/SKILL.md", sentence, RULES.denylist)).toEqual([]);
     }
+  });
+
+  test("the Devin tool mapping permits its native background flag without weakening other checks", () => {
+    const path = "skills/poteto-mode/references/devin-tools.md";
+    expect(denylistHits(path, "is_background: true", RULES.denylist)).toEqual([]);
+    expect(denylistHits("skills/x/SKILL.md", "is_background: true", RULES.denylist)).toHaveLength(1);
+    expect(denylistHits("skills/poteto-mode/references/codex-tools.md", "is_background: true", RULES.denylist)).toHaveLength(1);
+    expect(denylistHits(path, "run control-cli now", RULES.denylist)).toHaveLength(1);
   });
 
   test("flags residual Cursor-isms with file, line, and hint", () => {

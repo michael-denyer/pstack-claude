@@ -9,6 +9,8 @@ On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md),
 
 On GitHub Copilot, read the [platform mapping](../poteto-mode/references/copilot-tools.md), including its per-skill notes, before following this skill.
 
+On Devin CLI, read the [platform mapping](../poteto-mode/references/devin-tools.md), including its per-skill notes, before following this skill.
+
 Spawn comment-sicko. Act on accepted findings.
 
 Defer to comment-sicko's fresh perspective.

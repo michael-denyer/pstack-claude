@@ -108,6 +108,12 @@ export function parseRule(rule, i) {
 // pair fails here: put the longer, more specific pattern first.
 export function parseSubstitutions({ substitutions, denylist }) {
   const rules = substitutions.map(parseRule);
+  denylist?.forEach(({ exceptFiles }, index) => {
+    if (exceptFiles !== undefined &&
+      (!Array.isArray(exceptFiles) || exceptFiles.some((file) => typeof file !== "string" || file.length === 0))) {
+      throw new Error(`denylist[${index}].exceptFiles must be an array of non-empty filename strings`);
+    }
+  });
   substitutions.forEach((later, j) => {
     const earlier = substitutions.slice(0, j).findIndex((r) => r.pattern && later.pattern?.includes(r.pattern));
     if (earlier !== -1) {
@@ -173,11 +179,11 @@ export function applySubstitutions(text, rules, rel = "") {
   return { text: out, counts };
 }
 
-// An entry is a literal `token` or a `regex`; either fails the line it matches.
 export function denylistHits(path, text, denylist) {
   const hits = [];
   text.split("\n").forEach((line, i) => {
-    for (const { token, regex, hint } of denylist) {
+    for (const { token, regex, hint, exceptFiles } of denylist) {
+      if (exceptFiles?.includes(path)) continue;
       if (token ? line.includes(token) : new RegExp(regex).test(line)) {
         hits.push(`${path}:${i + 1}: "${token ?? regex}" — ${hint}`);
       }

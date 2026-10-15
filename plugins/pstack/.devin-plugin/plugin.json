@@ -1,0 +1,21 @@
+{
+  "name": "pstack",
+  "version": "0.9.85",
+  "description": "Rigorous agent workflows, shared skills, and per-role model profiles for Devin CLI. Original pstack by Lauren Tan (poteto).",
+  "author": {
+    "name": "Michael Denyer",
+    "url": "https://github.com/michael-denyer"
+  },
+  "homepage": "https://github.com/michael-denyer/pstack-claude",
+  "repository": "https://github.com/michael-denyer/pstack-claude",
+  "license": "MIT",
+  "keywords": [
+    "pstack",
+    "poteto-mode",
+    "workflow",
+    "skills",
+    "subagents",
+    "devin-cli"
+  ],
+  "skills": "skills"
+}

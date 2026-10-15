@@ -4,7 +4,7 @@ Start with the [README](../README.md) for installation and your first task.
 
 ## Slash commands
 
-The package includes 61 skill directories: 37 public skills and 24 `principle-*` references. Claude Code uses `/pstack:<name>`, and Pi uses `/skill:<name>`. In Codex, request a skill by name or install the [optional shortcuts](#codex) for the `/name` form below.
+The package includes 61 skill directories: 37 public skills and 24 `principle-*` references. Claude Code, GitHub Copilot, and Devin CLI use `/pstack:<name>`, and Pi uses `/skill:<name>`. In Codex, request a skill by name or install the [optional shortcuts](#codex) for the `/name` form below.
 
 Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
@@ -50,7 +50,7 @@ Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
 ## Runtime support
 
-All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code, Codex, and GitHub Copilot plugins also install automatic routing hooks, and the Pi package adds an extension that injects the same routing and supplies the subagent tools. Codex command shortcuts are separate.
+All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code, Codex, GitHub Copilot, and Devin CLI plugins also install automatic routing hooks, and the Pi package adds an extension that injects the same routing and supplies the subagent tools. Codex command shortcuts are separate.
 
 | Runtime | Setup and recorded verification |
 | --- | --- |
@@ -58,6 +58,7 @@ All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only i
 | Codex | Install the native plugin through the repository's marketplace and trust its hook through `/hooks`. The [Codex mapping](../plugins/pstack/skills/poteto-mode/references/codex-tools.md) translates Claude tools and model names. Shared skill symlinks were also detected in a live session. |
 | Pi | Install the repository as a Pi package with `pi install`. The [Pi extension](../plugins/pstack/pi/index.ts) registers the subagent, question, and wake-up tools and `/loop`, and the [Pi mapping](../plugins/pstack/skills/poteto-mode/references/pi-tools.md) translates Claude tools and model names. The [equivalence table](pi-equivalence.md) records each Claude Code mechanism and how it was verified on Pi 1.1. |
 | GitHub Copilot | Install the plugin through the repository's marketplace; the CLI and the GitHub Copilot app share it. The [Copilot mapping](../plugins/pstack/skills/poteto-mode/references/copilot-tools.md) translates Claude tools, paths, and model roles, and maps app-only tools to CLI fallbacks. Install, routing, agent dispatch, and first-run setup are smoke-tested on the CLI; see [GitHub Copilot](#github-copilot). |
+| Devin CLI | Install the `plugins/pstack` subdirectory as a native plugin. The [Devin mapping](../plugins/pstack/skills/poteto-mode/references/devin-tools.md) translates tools and role choices to model profiles. Project hooks, skills, and pinned profiles are verified; native installation was blocked by the test account's organization policy. |
 | Prime Agent | Its documentation describes shared-directory discovery; it has not been tested in a live session. Choose tools and models through Prime's configuration. |
 | opencode | Discovery and reading a linked skill were verified on version 1.18.25. Configure agents, commands, and permissions in `opencode.json`. Its picker also lists principle skills. |
 | Gemini CLI | Its documentation describes shared-directory discovery; it has not been tested in a live session. Use `/skills list` to check discovery and `/skills reload` after changes. |
@@ -164,6 +165,18 @@ Copilot lists only part of a large plugin's skills in its prompt, so some pstack
 
 [`tests/copilot-smoke.sh`](../tests/copilot-smoke.sh) installs the checkout into a throwaway `COPILOT_HOME` and checks installation, routing, `session hook: off`, agent dispatch with an explicit model, first-run setup, that setup writes no sheet without the user's answers and exactly the supplied IDs with them, and that saved choices and plugin files reach a session without `--allow-all-paths` or any path-access request, from each session's `events.jsonl` and the written sheet. It runs the setup checks once per model in `SMOKE_SETUP_MODELS`. It also checks the `PreToolUse` deny, a vendored script and `check-sheet.sh` run with no permission request, that an injected sheet line stays out of the context, that an invalid sheet yields `sheet invalid`, that each hook fires once, the merge with a second plugin's session-start context, a `-p` resume, and, on a pseudo-terminal through [`tests/copilot-tui.py`](../tests/copilot-tui.py), a slash-command first message and an interactive resume. It needs a signed-in `copilot` CLI, spends about twenty premium requests, and skips when `copilot` is missing. CI does not run it.
 
+### Devin CLI
+
+Devin reads the [native manifest](../plugins/pstack/.devin-plugin/plugin.json) before its Claude compatibility manifest. It discovers the shared `skills` directory, plugin agents, and the root [hook file](../plugins/pstack/hooks.json). Install the repository subdirectory with `devin plugins install minatoaquaMK2/pstack-claude#plugins/pstack`, or a local checkout with `devin plugins install --local ./plugins/pstack`.
+
+Run `/pstack:setup-pstack` in a fresh session. The [Devin setup](../plugins/pstack/skills/setup-pstack/devin.md) lists concrete UIDs with `devin models list`, confirms your choices, and writes `${XDG_CONFIG_HOME:-~/.config}/devin/pstack-models.md`. Its portable Node.js helper creates one pinned profile per distinct UID in the same configuration directory's `agents` folder. Repeated setup preserves identical profile files and refuses conflicting files. Old profiles remain in place. `inherit-parent` and `auto` select `subagent_general`. Custom unpinned profiles use the router, so they do not express parent inheritance. Thinking levels are part of concrete UIDs, with no `@effort` suffix.
+
+The SessionStart hook runs the shared POSIX adapter with `devin`. It emits `hookSpecificOutput.additionalContext` with `hookEventName` set to `SessionStart`. That context contains the routing instruction and the Devin mapping's path. The hook decodes the sheet to check only the exact `session hook: off` line. It never injects raw sheet text. Native plugin hooks use the `CLAUDE_PLUGIN_ROOT` compatibility convention, whose native hook behavior has not been live-verified. Windows hooks are not claimed.
+
+[`tests/devin-smoke.mjs`](../tests/devin-smoke.mjs) uses isolated XDG configuration, real project hooks, the actual shared skills, and generated global profiles. It exports the session and checks the `skill` invocation, `run_subagent` arguments, and child tool result. These checks passed on Devin CLI 3000.11.92. The test account's organization disables plugins, so native installation and hook-root expansion remain blocked. Project-level checks do not establish that native installation works. Respect organization policy when choosing an installation.
+
+For a skills-only install, use the [shared installation](#shared-skills-installation) and the same setup procedure. All helper and agent-reference files remain inside the skills tree. Invoke `poteto-mode` explicitly or add a standing routing instruction to the project's `AGENTS.md`. Read the [Devin mapping](../plugins/pstack/skills/poteto-mode/references/devin-tools.md) for profile discovery and independent-review limits.
+
 ## Configuration and dependencies
 
 Invoke [setup-pstack](../plugins/pstack/skills/setup-pstack/SKILL.md) to choose models for each role. It detects available models, confirms the choices, and writes an override sheet. Its [runtime table](../plugins/pstack/skills/setup-pstack/SKILL.md#other-runtimes) names the sheet path and loading mechanism for each runtime. Defaults live in [models.json](../plugins/pstack/models.json).
@@ -204,10 +217,12 @@ plugins/pstack/
   .claude-plugin/plugin.json      Claude Code plugin manifest
   .codex-plugin/                  Codex manifest and generated prompt stubs
   .github/plugin/plugin.json      GitHub Copilot plugin manifest
+  .devin-plugin/plugin.json       Devin CLI plugin manifest
+  hooks.json                      Devin CLI lifecycle hooks
   pi/                            Pi extension (subagent, question, and wake-up tools)
   skills/                        Shared skills, references, and scripts
   agents/                        Claude Code subagent definitions
-  hooks/                         Startup routing for Claude Code, Codex, and Copilot; Copilot tool checks
+  hooks/                         Startup routing for Claude Code, Codex, Copilot, and Devin; Copilot tool checks
 tools/                           Generation, validation, and upstream sync
 tests/                           Repository checks
 ```
@@ -236,7 +251,7 @@ CI also checks shell scripts, workflows, Markdown, relative links, and the bundl
 
 The skill tree is synced against upstream `997ffc7` (v0.15.21). The thermos skills and agents are synced against `118e73b` (thermos 1.0.0).
 
-This repository ports Lauren Tan's pstack from Cursor to Claude Code and shares the skills with other runtimes. It includes six cursor-team-kit skills, the three thermos skills with their two review subagents, and an independently authored `babysit` skill. The port supplies Claude Code plugin registration and routing, Codex manifests and shortcuts, the Codex tool mapping, the Pi package, extension, and tool mapping, and the GitHub Copilot hooks and tool mapping.
+This repository ports Lauren Tan's pstack from Cursor to Claude Code and shares the skills with other runtimes. It includes six cursor-team-kit skills, the three thermos skills with their two review subagents, and an independently authored `babysit` skill. The port supplies Claude Code plugin registration and routing, Codex manifests and shortcuts, the Codex tool mapping, the Pi package, extension, and tool mapping, the GitHub Copilot hooks and tool mapping, and the Devin CLI manifest, hooks, profile helper, and tool mapping.
 
 Cursor-specific automations, sticky-mode metadata, the Grok Bot UI workflow, and the Cursor UI tutorial are excluded. [tools/upstream.json](../tools/upstream.json) records the revisions and exclusions, [tools/substitutions.json](../tools/substitutions.json) holds the Cursor-to-Claude rewrite rules, and [CHANGES.md](../CHANGES.md) records each release. The bundled `thermo-nuclear-code-quality-review` provides a maintainability review when a workflow calls for one, `thermo-nuclear-review` a correctness and security audit, and `thermos` runs both as parallel subagents.
 

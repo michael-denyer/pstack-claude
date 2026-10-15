@@ -53,6 +53,17 @@ export const RUNTIMES = [
     hooks: (manifest) => [manifest.hooks],
     pluginRootVar: "COPILOT_PLUGIN_ROOT",
   },
+  {
+    name: "Devin CLI",
+    mapping: "devin-tools.md",
+    modelNames: devinModelNamesSection,
+    skillPreambles: true,
+    manifest: `${PLUGIN}/.devin-plugin/plugin.json`,
+    validate: ({ manifest, read, pathExists }) =>
+      validateDevinManifest(manifest, { claude: JSON.parse(read(`${PLUGIN}/.claude-plugin/plugin.json`)), pathExists }),
+    hooks: () => ["hooks.json"],
+    hooksFormat: "devin",
+  },
 ].map((runtime) => ({
   ...runtime,
   tools: `${SKILLS}/poteto-mode/references/${runtime.mapping}`,
@@ -232,4 +243,32 @@ export function copilotModelNamesSection(models) {
     "gpt-5.4-mini or a Sonnet-class Claude model. On a Haiku-class model, setup picked models the user never " +
     "chose in about half of the smoke runs."
   );
+}
+
+export function devinModelNamesSection() {
+  return (
+    "Skills name Claude Code aliases in their Models sections. Devin CLI ships no pstack model defaults. " +
+    "Run `setup-pstack` to choose concrete UIDs from `devin models list`; never substitute a Claude alias or invent a UID.\n\n" +
+    "The sheet is `${XDG_CONFIG_HOME:-~/.config}/devin/pstack-models.md`. Read its saved role choices before " +
+    "dispatching. `inherit-parent` and `auto` select `subagent_general`, which inherits the parent's model. " +
+    "A concrete UID selects the pinned profile created by setup. Resolve its exact name with " +
+    "`node <setup-pstack>/scripts/devin-profile.mjs --model <UID> --name-only`, using the installed skill's absolute path. " +
+    "Check that the profile is available before dispatching; if it is missing, finish [Devin setup](../../setup-pstack/devin.md) first.\n\n" +
+    "`run_subagent` takes `profile`, `task`, `title`, `is_background`, and `resume`. It has no model or reasoning-effort " +
+    "parameter. Custom profiles without `model` use the router rather than inheriting the parent. Choose a full UID " +
+    "whose thinking level matches the user's choice. Do not interpret an `@effort` suffix on Devin; keep `default effort: session`.\n\n" +
+    "For diverse-model panels, use distinct available UIDs from different model families when possible. If access " +
+    "limits the panel, report the reduced diversity. A required independent review stays blocked if no independent reviewer can run."
+  );
+}
+
+export function validateDevinManifest(manifest, { claude, pathExists }) {
+  const at = `${PLUGIN}/.devin-plugin/plugin.json`;
+  if (manifest.name !== claude.name) throw new Error(`${at}: name "${manifest.name}" != Claude Code manifest name "${claude.name}"`);
+  if (manifest.skills !== "skills" || !pathExists(`${PLUGIN}/skills`)) {
+    throw new Error(`${at}: skills must name the shared skills directory`);
+  }
+  for (const path of ["agents", "hooks.json"]) {
+    if (!pathExists(`${PLUGIN}/${path}`)) throw new Error(`${at}: ${path} does not exist in the plugin`);
+  }
 }

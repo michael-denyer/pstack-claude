@@ -854,6 +854,15 @@ const MATCHER_GROUP = Type.Object(
   { additionalProperties: false },
 );
 const HOOKS_FILE = Type.Object({ hooks: Type.Record(Type.String(), Type.Array(MATCHER_GROUP)) });
+const DEVIN_HOOK_TYPES = {
+  command: Type.Object({ type: Type.Literal("command"), command: Type.String(), timeout: Type.Optional(Type.Number()) }, { additionalProperties: false }),
+  prompt: Type.Object({ type: Type.Literal("prompt"), prompt: Type.String(), timeout: Type.Optional(Type.Number()) }, { additionalProperties: false }),
+};
+const DEVIN_HOOKS_FILE = Type.Object(
+  Object.fromEntries(["PreToolUse", "PostToolUse", "PermissionRequest", "UserPromptSubmit", "Stop", "PostCompaction", "SessionStart", "SessionEnd"]
+    .map((event) => [event, Type.Optional(Type.Array(MATCHER_GROUP))])),
+  { additionalProperties: false },
+);
 
 // typebox reports an unknown key twice, as a false schema at the key and as
 // additionalProperties on its object; the second names every such key.
@@ -872,15 +881,16 @@ function shapeFaults(schema, value, subject) {
 // directly must be executable, or the SessionStart hook fails silently for
 // every user.
 // The root is the variable the runtime exports with the plugin's directory.
-export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", root = "CLAUDE_PLUGIN_ROOT" }) {
+export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", root = "CLAUDE_PLUGIN_ROOT", format = "claude" }) {
   const raw = JSON.parse(hooksJson);
-  const faults = shapeFaults(HOOKS_FILE, raw, "file");
+  const faults = shapeFaults(format === "devin" ? DEVIN_HOOKS_FILE : HOOKS_FILE, raw, "file");
   if (faults.length) throw new Error(`${file}:\n  ${faults.join("\n  ")}`);
-  for (const [event, groups] of Object.entries(raw.hooks)) {
+  const types = format === "devin" ? DEVIN_HOOK_TYPES : HOOK_TYPES;
+  for (const [event, groups] of Object.entries(format === "devin" ? raw : raw.hooks)) {
     for (const hook of groups.flatMap((group) => group.hooks)) {
-      const schema = Object.hasOwn(HOOK_TYPES, hook.type) ? HOOK_TYPES[hook.type] : undefined;
+      const schema = Object.hasOwn(types, hook.type) ? types[hook.type] : undefined;
       if (!schema) {
-        faults.push(`${event}: hook type "${hook.type}" is not one of ${Object.keys(HOOK_TYPES).join(", ")}`);
+        faults.push(`${event}: hook type "${hook.type}" is not one of ${Object.keys(types).join(", ")}`);
         continue;
       }
       const shape = shapeFaults(schema, hook, "hook");
@@ -1091,11 +1101,11 @@ export function problems(root, models) {
   const hooksFiles = [
     { file: "hooks/hooks.json" },
     ...packages.flatMap(({ runtime, manifest }) =>
-      (runtime.hooks?.(manifest) ?? []).map((file) => ({ file, root: runtime.pluginRootVar })),
+      (runtime.hooks?.(manifest) ?? []).map((file) => ({ file, root: runtime.pluginRootVar, format: runtime.hooksFormat })),
     ),
   ];
-  for (const { file, root } of hooksFiles) {
-    attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file, root }));
+  for (const { file, root, format } of hooksFiles) {
+    attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file, root, format }));
   }
   return failures;
 }

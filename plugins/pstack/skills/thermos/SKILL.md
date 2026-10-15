@@ -9,6 +9,8 @@ On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md),
 
 On GitHub Copilot, read the [platform mapping](../poteto-mode/references/copilot-tools.md), including its per-skill notes, before following this skill.
 
+On Devin CLI, read the [platform mapping](../poteto-mode/references/devin-tools.md), including its per-skill notes, before following this skill.
+
 Run the two thermo review passes as async background subagents in parallel, then synthesize their results.
 
 ## Workflow

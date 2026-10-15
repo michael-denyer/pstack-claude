@@ -517,7 +517,8 @@
     },
     {
       "token": "is_background",
-      "hint": "Cursor-only agent frontmatter key; Claude Code sets run_in_background on each Agent call"
+      "exceptFiles": ["skills/poteto-mode/references/devin-tools.md"],
+      "hint": "Cursor agent frontmatter key; Claude Code sets run_in_background on each Agent call"
     },
     {
       "token": "cloud_base_branch",

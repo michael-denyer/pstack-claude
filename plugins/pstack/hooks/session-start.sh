@@ -12,12 +12,16 @@ case "${1:-}" in
     sheet="${CODEX_HOME:-$HOME/.codex}/pstack-models.md"
     reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
+  devin)
+    sheet="${XDG_CONFIG_HOME:-$HOME/.config}/devin/pstack-models.md"
+    reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
+    ;;
   copilot)
     sheet="${COPILOT_HOME:-$HOME/.copilot}/pstack-models.md"
     reader="${COPILOT_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
   *)
-    echo "session-start.sh: unknown runtime '${1:-}' (expected claude, codex, or copilot)" >&2
+    echo "session-start.sh: unknown runtime '${1:-}' (expected claude, codex, copilot, or devin)" >&2
     exit 2
     ;;
 esac
@@ -41,6 +45,14 @@ if [ "$1" = copilot ]; then
     -f "${COPILOT_PLUGIN_ROOT}/hooks/json.awk" \
     -f "${COPILOT_PLUGIN_ROOT}/skills/setup-pstack/scripts/sheet.awk" \
     -f "${COPILOT_PLUGIN_ROOT}/hooks/copilot-context.awk"
+  exit 0
+fi
+
+if [ "$1" = devin ]; then
+  LC_ALL=C awk -v mapping="${CLAUDE_PLUGIN_ROOT}/skills/poteto-mode/references/devin-tools.md" \
+    -f "${CLAUDE_PLUGIN_ROOT}/hooks/json.awk" \
+    -f "${CLAUDE_PLUGIN_ROOT}/hooks/devin-context.awk" \
+    "${CLAUDE_PLUGIN_ROOT}/hooks/session-start-context.md"
   exit 0
 fi
 

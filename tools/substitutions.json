@@ -340,7 +340,7 @@
       "rationale": "same sentence, the other wording upstream uses"
     },
     {
-      "regex": "Families go by prefix: `[a-z]+-\\*`(?:(?:,| and|, and) `[a-z]+-\\*`)*\\.",
+      "regex": "Families go by prefix: `[a-z-]+-\\*`(?:(?:,| and|, and| with) `[a-z-]+-\\*`)*\\.",
       "replacement": "Families go by model name, such as Opus, Fable, or Sonnet.",
       "rationale": "Claude Code names models by family, not by slug prefix"
     },
@@ -444,6 +444,92 @@
       "pattern": "skeptical Bugbot triage",
       "replacement": "skeptical review-bot triage",
       "rationale": "same routing, in the autopilot owner loop"
+    },
+    {
+      "regex": " A refused `composer-\\*` entry runs on (?:`[^`]+`|Reviewer B's default)\\.",
+      "replacement": "",
+      "rationale": "Claude Code has no composer models, so the fallback for one has nothing to say"
+    },
+    {
+      "pattern": "reasoning level and fast or standard speed for the job",
+      "replacement": "reasoning level for the job",
+      "rationale": "Claude Code sets fast mode for the session, not per spawn, so a spawn picks only its effort"
+    },
+    {
+      "pattern": "pick the reasoning level and speed the job needs. The `/setup-pstack` budget sets each role's starting level, xhigh by default.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "pick the reasoning level the job needs, set as [Reasoning effort](#reasoning-effort) describes. The role's `@level`, or the sheet's `default effort` line, sets its starting level, and `session` starts from the session's level.",
+      "rationale": "the port's per-spawn effort lever is the override sheet's @level and the effort agents, not a slug suffix"
+    },
+    {
+      "pattern": "Use fast mode only when the job is urgent, meaning CI or trunk is red or a person is blocked on the result right now. Otherwise use standard speed, the same slug without `-fast`.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "Claude Code sets fast mode for the whole session, so a spawn changes only its effort.",
+      "rationale": "Claude Code has no per-spawn fast slug"
+    },
+    {
+      "regex": "stays on the `swarm workers` model and speed \\(`[^`]+` by default\\)",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "stays on the `swarm workers` model and effort (default in the **swarm** skill's Models section)",
+      "rationale": "model defaults live in models.json and are stamped into Models sections, never hard-coded in prose"
+    },
+    {
+      "pattern": "Change only the effort level and whether the slug is fast, and keep the family the role names",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "Change only the effort level, and keep the model the role names",
+      "rationale": "Claude Code has no per-spawn fast slug"
+    },
+    {
+      "pattern": "If the family has no slug at that level and speed, use its nearest slug.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "If the model does not take that level, use its nearest level.",
+      "rationale": "on Claude Code the effort is a level on the dispatch, not a slug"
+    },
+    {
+      "pattern": "rejects the adjusted slug, do not try another adjusted slug.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "rejects the adjusted level, do not try another level.",
+      "rationale": "on Claude Code the effort is a level on the dispatch, not a slug"
+    },
+    {
+      "regex": " \\(?(?:with|through) (?:the matching|its) driver skill,? \\(?such as `control-(?:ui|cli)` or `control-(?:ui|cli)` from `cursor-team-kit`(?:, or a named driver where none exists)?\\)(?: or a named driver)?",
+      "files": "^skills/poteto-mode/playbooks/",
+      "replacement": " through the driver skill",
+      "rationale": "driver selection lives in poteto-mode/SKILL.md Non-negotiables, which resolve the project's driver or a named one"
+    },
+    {
+      "pattern": "Each owner is a Cursor cloud agent that builds",
+      "replacement": "Each owner is a background subagent in its own worktree that builds",
+      "rationale": "Claude Code runs subagents locally; a worktree per writer gives the isolation a cloud VM gave"
+    },
+    {
+      "pattern": "One verifier per PR, each a Cursor cloud agent, runs",
+      "replacement": "One verifier per PR, each a subagent in its own worktree, runs",
+      "rationale": "Claude Code runs subagents locally; a worktree per writer gives the isolation a cloud VM gave"
+    },
+    {
+      "pattern": "- **Sub-coordinator.** Always local, durable,",
+      "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
+      "replacement": "- **Sub-coordinator.** Durable,",
+      "rationale": "every Claude Code subagent is local, so the placement word distinguishes nothing"
+    },
+    {
+      "pattern": "spawns its own workers and verifiers (nesting works to depth 3, and a nested spawn has the full Task schema including `environment`).",
+      "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
+      "replacement": "spawns its own workers and verifiers where the runtime lets a subagent spawn one. Where it does not, it owns its track's units directly with the same review separation.",
+      "rationale": "Claude Code subagents cannot always spawn subagents, and the Agent tool has no environment parameter"
+    },
+    {
+      "pattern": "- **Worker / verifier.** Always `environment: \"cloud\"` unless the task needs this machine: `control-ui` or `control-cli` runtime verification (from `cursor-team-kit`). Reading local transcripts under `agent-transcripts/`. Simulators and local IDE state. Auth that exists only here. Cloud agents cannot read the local store, so their briefs inline what they need or point at repo paths.",
+      "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
+      "replacement": "- **Worker / verifier.** Background subagents (`run_in_background: true`). Claude Code has no remote worker environment, so isolation is a worktree or branch per writer, not a separate machine. Runtime verification goes through the driver skill. The brief names its resolved skill path or exact commands. A subagent never sees this chat, so its brief inlines what it needs or points at repo and store paths.",
+      "rationale": "Claude Code runs every subagent on this machine, so the cloud placement rule becomes a worktree rule"
+    },
+    {
+      "regex": "(?:Restacks|Chain rebases) run in cloud\\. A local (?:restack|rebase) at this scale takes the laptop down\\.",
+      "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
+      "replacement": "A chain rebase at this scale is slow and blocks whoever runs it, so give it its own unit and keep the coordinator out of it.",
+      "rationale": "Claude Code has no cloud placement for a long rebase, so the rule isolates it as a unit instead"
     }
   ],
   "denylist": [

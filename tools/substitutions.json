@@ -530,6 +530,38 @@
       "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
       "replacement": "A chain rebase at this scale is slow and blocks whoever runs it, so give it its own unit and keep the coordinator out of it.",
       "rationale": "Claude Code has no cloud placement for a long rebase, so the rule isolates it as a unit instead"
+    },
+    {
+      "pattern": "re-reads this playbook from trunk",
+      "files": "^skills/poteto-mode/playbooks/",
+      "replacement": "re-reads this playbook from disk under the installed plugin",
+      "rationale": "the playbook runs from the installed plugin, and the user's trunk is not pstack's"
+    },
+    {
+      "pattern": "re-reads both playbooks from trunk",
+      "files": "^skills/poteto-mode/playbooks/",
+      "replacement": "re-reads both playbooks from disk under the installed plugin",
+      "rationale": "the playbooks run from the installed plugin, and the user's trunk is not pstack's"
+    },
+    {
+      "pattern": "Assume the VM dies.",
+      "replacement": "Assume the owner's session dies.",
+      "rationale": "Claude Code subagents run on this machine, not on cloud VMs"
+    },
+    {
+      "pattern": "in the root agent's store (path in the system prompt)",
+      "replacement": "in the program's store under `~/.claude/orchestrate/<slug>/`",
+      "rationale": "Claude Code's system prompt names no agent store, so the port names the orchestrate store path"
+    },
+    {
+      "pattern": "a chart or diagram from `/visualize`",
+      "replacement": "a chart or diagram you render from the data",
+      "rationale": "/visualize is a Cursor command with no Claude Code equivalent"
+    },
+    {
+      "pattern": "a `/visualize` chart for numbers",
+      "replacement": "a chart rendered from the data for numbers",
+      "rationale": "/visualize is a Cursor command with no Claude Code equivalent"
     }
   ],
   "denylist": [
@@ -552,6 +584,10 @@
     {
       "token": "`verify` for UIs",
       "hint": "use the driver policy in poteto-mode/SKILL.md Non-negotiables"
+    },
+    {
+      "token": "/visualize",
+      "hint": "Cursor's chart command; Claude Code has none, so name a chart rendered from the data"
     },
     {
       "token": "control-cli",

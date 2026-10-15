@@ -109,7 +109,7 @@ const rules = [
   {
     source: "autopilot verify loop: only findings the diff causes go back",
     file: "poteto-mode/playbooks/autopilot-full.md",
-    phrase: "A finding blocks the merge only when the diff causes it",
+    phrase: "A defect trunk shows without the PR is recorded against trunk and does not gate the PR",
   },
   {
     source: "autopilot verify loop: bounded rounds",

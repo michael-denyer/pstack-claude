@@ -13,13 +13,12 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import { stripVTControlCharacters } from "node:util";
 
 const UNIT_HEADER = "id\ttrack\tstate\tbranch\tpr\tsha\tbrief";
 const LEDGER_HEADER = "pr\tsha\tverdict\tevidence\tverifier\tts";
 const LOCK_FILE = ".orch.lock";
 const TAKEOVER_DIR = ".orch.lock.takeover";
-const GT_TIMEOUT_MS = 60_000;
+const FORGE_TIMEOUT_MS = 60_000;
 
 export type Verdict =
   | "live-ui-verified"
@@ -170,6 +169,7 @@ export interface ResolveGateParams {
 
 export interface SetFrontierParams {
   readonly repo: string;
+  readonly forge?: Forge;
   readonly prs?: readonly number[];
 }
 
@@ -179,8 +179,8 @@ export interface AddStandingParams {
 
 export interface OpenStoreOptions {
   readonly force?: boolean;
-  readonly gt?: string;
-  readonly gtTimeoutMs?: number;
+  readonly forgePaths?: Readonly<Partial<Record<Forge, string>>>;
+  readonly forgeTimeoutMs?: number;
   readonly onLockStolen?: (holder: string) => void;
   readonly onStaleLock?: (holder: string) => void;
 }
@@ -1066,195 +1066,214 @@ function countLine(value: Counts): string {
     : entries.map(([name, count]) => `${name}=${count}`).join(", ");
 }
 
-const OPEN_GT_PR_STATUSES = new Set([
-  "Trunk branch locked",
-  "Changes requested",
-  "Waiting on PRs in this stack to merge",
-  "Waiting on downstack merge state",
-  "Draft",
-  "Required checks failed",
-  "Undergoing failure detection",
-  "Merge queue failed on current head commit",
-  "Handed off to merge queue...",
-  "Waiting on downstack",
-  "Merge conflicts",
-  "Needs reviewers",
-  "Needs approvals",
-  "Needs restack",
-  "Queued to merge...",
-  "Ready to merge",
-  "Ready to merge as stack",
-  "Rebasing...",
-  "Waiting on CI...",
-  "Stale, needs rebase onto trunk",
-  "Unresolved comments",
-  "Waiting on required CI",
-  "Waiting to merge...",
-]);
+export type Forge = "gh" | "origin";
 
-interface GtPullRequest {
+interface ForgePullRequestQuery {
+  readonly stateField: string;
+  readonly headField: string;
+  readonly baseField: string;
+  readonly states: ReadonlyMap<string, FrontierPrState>;
+}
+
+const FORGE_PULL_REQUEST_QUERIES: Readonly<
+  Record<Forge, ForgePullRequestQuery>
+> = {
+  gh: {
+    stateField: "state",
+    headField: "headRefName",
+    baseField: "baseRefName",
+    states: new Map<string, FrontierPrState>([
+      ["OPEN", "OPEN"],
+      ["MERGED", "MERGED"],
+      ["CLOSED", "CLOSED"],
+    ]),
+  },
+  origin: {
+    stateField: "status",
+    headField: "headRef",
+    baseField: "baseRef",
+    states: new Map<string, FrontierPrState>([
+      ["open", "OPEN"],
+      ["draft", "OPEN"],
+      ["merged", "MERGED"],
+      ["closed", "CLOSED"],
+    ]),
+  },
+};
+
+export function parseForge(value: string): Forge {
+  if (value === "gh" || value === "origin") {
+    return value;
+  }
+  throw new UserError("forge must be gh or origin");
+}
+
+// Bun resolves a command spawned without an env option against its startup
+// PATH, so tests point the store at a fake forge executable instead.
+interface ForgeExecutable {
+  readonly path: string;
+  readonly timeout: number;
+}
+
+interface ForgePullRequest {
   readonly pr: number;
   readonly state: FrontierPrState;
+  readonly branch: string;
+  readonly base: string;
 }
 
-interface GtFrontierEntry extends GtPullRequest {
-  readonly branches: string;
-}
-
-function parseGtPullRequest({
-  branch,
-  detail,
-}: {
-  branch: string;
-  detail: string;
-}): GtPullRequest {
-  const match =
-    /^(?:\[origin\] )?PR #([1-9]\d*)(?: \(([^)\r\n]+)\))?( .+)?$/.exec(
-      detail
-    );
-  const pr = Number(match?.[1] ?? 0);
-  if (match === null || !Number.isSafeInteger(pr)) {
-    throw new UserError(
-      `gt info output has an invalid PR row for branch ${branch}: ${detail}`
-    );
-  }
-  const status = match[2];
-  // A nested-paren status ("Needs approvals (2)") leaves the status group empty.
-  if (status === undefined && match[3]?.startsWith(" (")) {
-    throw new UserError(
-      `gt info output has an invalid PR row for branch ${branch}: ${detail}`
-    );
-  }
-  if (status === "Merged") {
-    return { pr, state: "MERGED" };
-  }
-  if (status === "Closed") {
-    return { pr, state: "CLOSED" };
-  }
-  if (status === undefined || OPEN_GT_PR_STATUSES.has(status)) {
-    return { pr, state: "OPEN" };
-  }
-  throw new UserError(
-    `gt info output has an unknown PR state for branch ${branch}: ${status}`
-  );
-}
-
-function parseGtBranches(raw: string): readonly string[] {
-  const branches: string[] = [];
-  const lines = raw.replace(/\r/g, "").split("\n");
-  for (const [index, line] of lines.entries()) {
-    if (line.length === 0) {
-      continue;
-    }
-    // (?!-): a leading-dash branch would parse as an option to git and gt.
-    const branchMatch =
-      /^(?:│ )*[◯◉] +((?!-)[^\s]+)((?: \([^()\r\n]*\))*)$/.exec(line);
-    if (branchMatch === null) {
-      throw new UserError(
-        `gt log short output has an unparseable line ${index + 1}: ${JSON.stringify(line)}`
-      );
-    }
-    const branch = branchMatch[1] ?? "";
-    if (branches.includes(branch)) {
-      throw new UserError(
-        `gt log short output contains duplicate branch ${branch}`
-      );
-    }
-    branches.push(branch);
-  }
-  const trunk = branches[0];
-  if (trunk === undefined) {
-    throw new UserError("gt log short output did not contain a stack");
-  }
-  return branches.slice(1);
-}
-
-function graphitePullRequest({
-  branch,
-  gt,
+function runTool({
+  command,
+  args,
   repo,
-  timeout,
+  executable,
 }: {
-  branch: string;
-  gt: string;
+  command: string;
+  args: readonly string[];
   repo: string;
-  timeout: number;
-}): GtPullRequest {
-  let raw: string;
+  executable?: ForgeExecutable;
+}): string {
   try {
-    // A colour setting such as FORCE_COLOR in the user's environment must not
-    // break the gt parsers.
-    raw = stripVTControlCharacters(
-      execFileSync(gt, ["--no-interactive", "info", branch], {
-        cwd: repo,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        timeout,
-        killSignal: "SIGKILL",
-      })
-    );
+    return execFileSync(executable?.path ?? command, args, {
+      cwd: repo,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: executable?.timeout,
+      killSignal: "SIGKILL",
+    });
   } catch (error) {
     throw new UserError(
-      `gt info ${branch} failed: ${errorMessage(error)}`
+      `${command} ${args.join(" ")} failed: ${errorMessage(error)}`
     );
   }
-  const rows = raw
-    .replace(/\r/g, "")
-    .split("\n")
-    .filter(
-      (line) =>
-        line.startsWith("PR #") || line.startsWith("[origin] PR #")
-    );
-  if (rows.length === 0) {
+}
+
+function listPullRequests({
+  filter,
+  branch,
+  forge,
+  executable,
+  repo,
+}: {
+  filter: "--head" | "--base";
+  branch: string;
+  forge: Forge;
+  executable: ForgeExecutable;
+  repo: string;
+}): readonly ForgePullRequest[] {
+  const query = FORGE_PULL_REQUEST_QUERIES[forge];
+  const command = `${forge} pr list ${filter} ${branch}`;
+  // Every state is fetched because a merged or closed PR still anchors the
+  // chain, and a draft counts as OPEN.
+  const raw = runTool({
+    command: forge,
+    args: [
+      "pr",
+      "list",
+      filter,
+      branch,
+      "--state",
+      "all",
+      "--json",
+      ["number", query.stateField, query.headField, query.baseField].join(
+        ","
+      ),
+    ],
+    repo,
+    executable,
+  });
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new UserError(`${command} output is not valid JSON`);
+  }
+  if (!isUnknownArray(value)) {
+    throw new UserError(`${command} output is not a JSON array`);
+  }
+  return value.map((row) => {
+    const status = isRecord(row) ? row[query.stateField] : undefined;
+    const state =
+      typeof status === "string" ? (query.states.get(status) ?? null) : null;
+    const head = isRecord(row) ? row[query.headField] : undefined;
+    const base = isRecord(row) ? row[query.baseField] : undefined;
+    if (
+      !isRecord(row) ||
+      typeof row.number !== "number" ||
+      !Number.isSafeInteger(row.number) ||
+      row.number < 1 ||
+      state === null ||
+      typeof head !== "string" ||
+      head.length === 0 ||
+      typeof base !== "string" ||
+      base.length === 0
+    ) {
+      throw new UserError(`${command} output has an invalid PR row`);
+    }
+    return { pr: row.number, state, branch: head, base };
+  });
+}
+
+function branchPullRequest({
+  branch,
+  forge,
+  executable,
+  repo,
+}: {
+  branch: string;
+  forge: Forge;
+  executable: ForgeExecutable;
+  repo: string;
+}): ForgePullRequest {
+  const rows = listPullRequests({
+    filter: "--head",
+    branch,
+    forge,
+    executable,
+    repo,
+  });
+  const row = rows[0];
+  if (row === undefined) {
     throw new UserError(
-      `gt info output branch ${branch} has no pull request; this clone's gt metadata may predate the submit, so resolve the frontier from the stacker's clone or after gt sync`
+      `branch ${branch} has no pull request; open one with ${forge} pr create, or resolve the frontier from a branch whose chain is fully submitted`
     );
   }
   if (rows.length > 1) {
     throw new UserError(
-      `gt info output contains multiple PRs for branch ${branch}`
+      `branch ${branch} has multiple pull requests (${rows.map((item) => `#${item.pr}`).join(", ")}); close the stale ones first`
     );
   }
-  return parseGtPullRequest({ branch, detail: rows[0] ?? "" });
+  return row;
 }
 
-function graphiteFrontier({
-  gt,
+function openChildren({
+  branch,
+  forge,
+  executable,
   repo,
-  timeout,
 }: {
-  gt: string;
+  branch: string;
+  forge: Forge;
+  executable: ForgeExecutable;
   repo: string;
-  timeout: number;
-}): readonly GtFrontierEntry[] {
-  let raw: string;
-  try {
-    raw = stripVTControlCharacters(
-      execFileSync(
-        gt,
-        ["--no-interactive", "log", "short", "--stack", "--reverse"],
-        {
-          cwd: repo,
-          encoding: "utf8",
-          stdio: ["ignore", "pipe", "pipe"],
-          timeout,
-          killSignal: "SIGKILL",
-        }
-      )
-    );
-  } catch (error) {
-    throw new UserError(
-      `gt log short --stack --reverse failed: ${errorMessage(error)}`
-    );
-  }
-  const result = parseGtBranches(raw).map((branch) => ({
-    branches: branch,
-    ...graphitePullRequest({ branch, gt, repo, timeout }),
-  }));
-  if (new Set(result.map((row) => row.pr)).size !== result.length) {
-    throw new UserError("gt info output contains duplicate pull requests");
-  }
-  return result;
+}): readonly ForgePullRequest[] {
+  return listPullRequests({
+    filter: "--base",
+    branch,
+    forge,
+    executable,
+    repo,
+  }).filter((row) => row.state === "OPEN");
+}
+
+function runGit({
+  args,
+  repo,
+}: {
+  args: readonly string[];
+  repo: string;
+}): string {
+  return runTool({ command: "git", args, repo }).trim();
 }
 
 function branchSha({
@@ -1264,41 +1283,104 @@ function branchSha({
   branch: string;
   repo: string;
 }): string {
-  let raw: string;
-  try {
-    raw = execFileSync(
-      "git",
-      ["rev-parse", "--verify", `refs/heads/${branch}^{commit}`],
-      {
-        cwd: repo,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-      }
-    );
-  } catch (error) {
-    throw new UserError(
-      `git rev-parse ${branch} failed: ${errorMessage(error)}`
-    );
-  }
-  const sha = raw.trim();
+  const sha = runGit({
+    args: ["rev-parse", "--verify", `refs/heads/${branch}^{commit}`],
+    repo,
+  });
   if (!/^[0-9a-f]{40,64}$/i.test(sha)) {
     throw new UserError(`git rev-parse ${branch} returned an invalid SHA`);
   }
   return sha;
 }
 
+function currentBranch(repo: string): string {
+  // --short names a branch that shares a tag's name heads/<branch>.
+  return runGit({ args: ["symbolic-ref", "HEAD"], repo }).replace(
+    /^refs\/heads\//,
+    ""
+  );
+}
+
+function trunkBranch(repo: string): string {
+  try {
+    return runGit({
+      args: ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+      repo,
+    }).replace(/^origin\//, "");
+  } catch {
+    // Init-plus-fetch checkouts and local fixtures lack origin/HEAD.
+    return "main";
+  }
+}
+
 function resolveFrontier({
-  gt,
   repo,
-  timeout,
+  forge,
+  executable,
 }: {
-  gt: string;
   repo: string;
-  timeout: number;
+  forge: Forge;
+  executable: ForgeExecutable;
 }): readonly FrontierPr[] {
-  return graphiteFrontier({ gt, repo, timeout }).map((row) => ({
-    ...row,
-    sha: branchSha({ branch: row.branches, repo }),
+  const trunk = trunkBranch(repo);
+  const current = currentBranch(repo);
+  if (current === trunk) {
+    return [];
+  }
+  const seen = new Set([current]);
+  let bottom = branchPullRequest({
+    branch: current,
+    forge,
+    executable,
+    repo,
+  });
+  const chain = [bottom];
+  while (bottom.base !== trunk) {
+    if (seen.has(bottom.base)) {
+      throw new UserError(
+        `pull request base chain loops at branch ${bottom.base}`
+      );
+    }
+    seen.add(bottom.base);
+    bottom = branchPullRequest({
+      branch: bottom.base,
+      forge,
+      executable,
+      repo,
+    });
+    chain.unshift(bottom);
+  }
+  let tip = current;
+  for (;;) {
+    const children = openChildren({ branch: tip, forge, executable, repo });
+    const child = children[0];
+    if (child === undefined) {
+      break;
+    }
+    if (children.length > 1) {
+      throw new UserError(
+        `stack is not linear: branches ${children.map((row) => row.branch).join(", ")} all target ${tip}`
+      );
+    }
+    if (seen.has(child.branch)) {
+      throw new UserError(
+        `pull request base chain loops at branch ${child.branch}`
+      );
+    }
+    seen.add(child.branch);
+    chain.push(child);
+    tip = child.branch;
+  }
+  if (new Set(chain.map((row) => row.pr)).size !== chain.length) {
+    throw new UserError(
+      "pull request base chain contains duplicate pull requests"
+    );
+  }
+  return chain.map((row) => ({
+    pr: row.pr,
+    branches: row.branch,
+    sha: branchSha({ branch: row.branch, repo }),
+    state: row.state,
   }));
 }
 
@@ -1321,14 +1403,14 @@ function validateFrontierPin({
   const extra = actual.filter((pr) => !expectedSet.has(pr));
   const drift: string[] = [];
   if (missing.length > 0) {
-    drift.push(`missing from gt: ${missing.join(",")}`);
+    drift.push(`missing from resolved chain: ${missing.join(",")}`);
   }
   if (extra.length > 0) {
-    drift.push(`extra in gt: ${extra.join(",")}`);
+    drift.push(`extra in resolved chain: ${extra.join(",")}`);
   }
   if (missing.length === 0 && extra.length === 0) {
     drift.push(
-      `order differs: expected ${expected.join(",")}; gt ${actual.join(",")}`
+      `order differs: expected ${expected.join(",")}; resolved ${actual.join(",")}`
     );
   }
   throw new UserError(`frontier pin mismatch: ${drift.join("; ")}`);
@@ -1621,6 +1703,7 @@ export function openStore(
       set: async (params) => {
         await beginWrite();
         const repo = resolve(requiredLine(params.repo, "repo directory"));
+        const forge = parseForge(params.forge ?? "gh");
         const pin =
           params.prs === undefined
             ? undefined
@@ -1630,9 +1713,12 @@ export function openStore(
         }
         const old = await readFrontier(store);
         const prs = resolveFrontier({
-          gt: options.gt ?? "gt",
           repo,
-          timeout: options.gtTimeoutMs ?? GT_TIMEOUT_MS,
+          forge,
+          executable: {
+            path: options.forgePaths?.[forge] ?? forge,
+            timeout: options.forgeTimeoutMs ?? FORGE_TIMEOUT_MS,
+          },
         });
         if (pin !== undefined) {
           validateFrontierPin({

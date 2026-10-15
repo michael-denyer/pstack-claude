@@ -1072,6 +1072,9 @@ interface ForgePullRequestQuery {
   readonly stateField: string;
   readonly headField: string;
   readonly baseField: string;
+  // gh matches --head and --base by branch name alone, so a fork PR with a
+  // stack branch's name would join the chain without this field.
+  readonly crossRepositoryField?: string;
   readonly states: ReadonlyMap<string, FrontierPrState>;
 }
 
@@ -1082,6 +1085,7 @@ const FORGE_PULL_REQUEST_QUERIES: Readonly<
     stateField: "state",
     headField: "headRefName",
     baseField: "baseRefName",
+    crossRepositoryField: "isCrossRepository",
     states: new Map<string, FrontierPrState>([
       ["OPEN", "OPEN"],
       ["MERGED", "MERGED"],
@@ -1175,9 +1179,13 @@ function listPullRequests({
       "--state",
       "all",
       "--json",
-      ["number", query.stateField, query.headField, query.baseField].join(
-        ","
-      ),
+      [
+        "number",
+        query.stateField,
+        query.headField,
+        query.baseField,
+        ...(query.crossRepositoryField ? [query.crossRepositoryField] : []),
+      ].join(","),
     ],
     repo,
     executable,
@@ -1191,12 +1199,16 @@ function listPullRequests({
   if (!isUnknownArray(value)) {
     throw new UserError(`${command} output is not a JSON array`);
   }
-  return value.map((row) => {
+  const rows = value.map((row) => {
     const status = isRecord(row) ? row[query.stateField] : undefined;
     const state =
       typeof status === "string" ? (query.states.get(status) ?? null) : null;
     const head = isRecord(row) ? row[query.headField] : undefined;
     const base = isRecord(row) ? row[query.baseField] : undefined;
+    const crossRepository =
+      isRecord(row) && query.crossRepositoryField
+        ? row[query.crossRepositoryField]
+        : false;
     if (
       !isRecord(row) ||
       typeof row.number !== "number" ||
@@ -1206,12 +1218,16 @@ function listPullRequests({
       typeof head !== "string" ||
       head.length === 0 ||
       typeof base !== "string" ||
-      base.length === 0
+      base.length === 0 ||
+      typeof crossRepository !== "boolean"
     ) {
       throw new UserError(`${command} output has an invalid PR row`);
     }
-    return { pr: row.number, state, branch: head, base };
+    return { pr: row.number, state, branch: head, base, crossRepository };
   });
+  return rows
+    .filter((row) => !row.crossRepository)
+    .map(({ pr, state, branch, base }) => ({ pr, state, branch, base }));
 }
 
 function branchPullRequest({

@@ -129,17 +129,19 @@ const FORGE_FIXTURES: Readonly<
         state: FixtureState;
         head: string;
         base: string;
+        crossRepository?: boolean;
       }) => Record<string, unknown>;
     }
   >
 > = {
   gh: {
-    fields: "number,state,headRefName,baseRefName",
-    row: ({ number, state, head, base }) => ({
+    fields: "number,state,headRefName,baseRefName,isCrossRepository",
+    row: ({ number, state, head, base, crossRepository = false }) => ({
       number,
       state: state === "draft" ? "OPEN" : state.toUpperCase(),
       headRefName: head,
       baseRefName: base,
+      isCrossRepository: crossRepository,
     }),
   },
   origin: {
@@ -160,6 +162,7 @@ function forgeRows(
     state: FixtureState;
     head: string;
     base: string;
+    crossRepository?: boolean;
   }[]
 ): string {
   return JSON.stringify(prs.map((pr) => FORGE_FIXTURES[forge].row(pr)));
@@ -1072,6 +1075,30 @@ promises.readFile = async (path, ...rest) => {
     });
   }
 
+  it("leaves fork pull requests out of the gh chain", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+
+    await withFakeForge({
+      directory,
+      forge: "gh",
+      currentRows: forgeRows("gh", [
+        { number: 11, state: "open", head: "stack/open", base: "stack/closed" },
+        {
+          number: 99,
+          state: "open",
+          head: "stack/open",
+          base: "main",
+          crossRepository: true,
+        },
+      ]),
+      operation: async () => {
+        const { prs } = await store.frontier.set({ repo: stack.repo });
+        expect(prs.map((row) => row.pr)).toEqual([10, 13, 11, 14]);
+      },
+    });
+  });
+
   it("names the missing pull request when a chain branch has none", async () => {
     const { directory, store } = await initializedStore();
     const stack = await makeGitStack(directory);
@@ -1373,7 +1400,7 @@ describe("port guards", () => {
     ["gh pr list --head stack/open", ""],
     [
       "gh pr list --base stack/open",
-      `if [ "$3" = --head ]; then printf '%s\\n' '[{"number":11,"state":"OPEN","headRefName":"stack/open","baseRefName":"main"}]'; exit 0; fi\n`,
+      `if [ "$3" = --head ]; then printf '%s\\n' '[{"number":11,"state":"OPEN","headRefName":"stack/open","baseRefName":"main","isCrossRepository":false}]'; exit 0; fi\n`,
     ],
   ])(
     "fails a frontier set when %s hangs and ignores SIGTERM",

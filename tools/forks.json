@@ -212,7 +212,7 @@
     },
     "plugins/pstack/skills/principle-prove-it-works/SKILL.md": {
       "kind": "policy",
-      "why": "Adds checks that the process behind a result was sound and that a failing check fails for the predicted reason.",
+      "why": "Adds checks that the process behind a result was sound, that a failing check fails for the predicted reason, and that a success report rests on the real state and exit code rather than truncated output.",
       "since": "0.1.0",
       "upstream": "not-proposed"
     },

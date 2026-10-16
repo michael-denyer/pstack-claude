@@ -98,14 +98,22 @@ function checkPiModels(pi, { raw, fail, isObject }) {
   }
 }
 
+// The roles on one tier, as a backticked list.
+const tierRoles = (models, tier) =>
+  models.roles
+    .filter((r) => r.tier === tier)
+    .map((r) => code(r.role))
+    .join(", ");
+
 export function codexModelNamesSection(models) {
-  const strongest = models.roles.filter((r) => r.tier === "strongest");
   return (
-    "Skills name Claude defaults (a single-role default for code/prose/judgment plus a diverse-model panel for " +
-    "diverse-model panels; each model-consuming skill lists its own in a Models section). These slugs do not " +
-    "resolve on Codex. Substitute your configured Codex models:\n\n" +
+    "Skills name Claude defaults (a single-role default for prose and judgment, a worker model for code and " +
+    "exploration, plus a diverse-model panel for diverse-model panels; each model-consuming skill lists its own in a " +
+    "Models section). These slugs do not resolve on Codex. Substitute your configured Codex models:\n\n" +
     `- Single-model roles: your primary Codex model (for example ${code(models.codex.default)}).\n` +
-    `- Roles that default to the strongest Claude model (${strongest.map((r) => code(r.role)).join(", ")}): ` +
+    `- Roles that default to the Claude worker model (${tierRoles(models, "worker")}): ` +
+    `your fast Codex code model (for example ${code(models.codex.worker)}).\n` +
+    `- Roles that default to the strongest Claude model (${tierRoles(models, "strongest")}): ` +
     `your strongest Codex model (for example ${code(models.codex.strongest)}).\n` +
     "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
     "signal comes from model diversity, so use the distinct Codex models available to you. A good default panel " +
@@ -196,7 +204,6 @@ export const roleSkills = (models) => [...new Set(models.roles.map((r) => r.skil
 // Copilot ships no default slugs: the models a Copilot account can reach vary
 // by plan and policy, so the user picks them in setup-pstack.
 export function copilotModelNamesSection(models) {
-  const strongest = models.roles.filter((r) => r.tier === "strongest");
   return (
     "Skills name Claude Code model aliases in their Models sections. Those aliases are not Copilot model IDs, " +
     "and the Copilot build ships no default model IDs: the models an account can reach depend on its plan " +
@@ -220,7 +227,8 @@ export function copilotModelNamesSection(models) {
     "call whose `agent_type` starts with `pstack:` and whose `model` is not one of the sheet's values, and its reason " +
     "lists the saved IDs. Retry with the role's saved model; never retry on another unsaved model. It leaves calls " +
     "with no `model` and other agent types alone.\n" +
-    `- Roles that default to the strongest model (${strongest.map((r) => code(r.role)).join(", ")}): ` +
+    `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose.\n` +
+    `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): ` +
     "the strongest model the user chose.\n" +
     "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
     "signal comes from model diversity, so fill a panel from distinct vendors in the `task` tool's `model` " +

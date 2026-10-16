@@ -51,7 +51,8 @@ describe("parseModels", () => {
     const arena = role(resolved, "arena runners");
     expect(arena.tier).toBe("panel");
     expect(arena.models).toEqual(raw.tiers.panel);
-    expect(role(resolved, "bug-fix").models).toEqual([raw.tiers.strongest]);
+    expect(role(resolved, "bug-fix").models).toEqual([raw.tiers.worker]);
+    expect(role(resolved, "strongest judgment").models).toEqual([raw.tiers.strongest]);
   });
 
   test("a missing top-level key throws naming it", () => {
@@ -59,7 +60,7 @@ describe("parseModels", () => {
     expect(parse((p) => delete p.codex)).toThrow('models.json: "codex" must be an object');
   });
 
-  test.each(["default", "strongest", "panel"])("a missing %s tier throws naming it, since a stamped region renders from it", (tier) => {
+  test.each(["default", "strongest", "worker", "panel"])("a missing %s tier throws naming it, since a stamped region renders from it", (tier) => {
     expect(
       parse((p) => {
         delete p.tiers[tier];

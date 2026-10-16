@@ -2,6 +2,16 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.88 - code and exploration roles run on a Sonnet worker tier, as upstream's do on its fast model
+
+Upstream gives each role one of two defaults at `99743e9`: `claude-opus-5-5-xhigh` for judgment and synthesis, and the fast `grok-4.7-xhigh-fast` for code delegates, explorers, investigators, the reflect tooling reviewer, and swarm workers. The port had run every one of those roles on `opus`, and `bug-fix`, `perf-issue`, and `hillclimb` on `fable`. `plugins/pstack/models.json` gains a `worker` tier, `sonnet`, and those eight roles move to it: `feature, refactoring`, `bug-fix`, `perf-issue`, `hillclimb`, `how explorer`, `why investigators`, `reflect tooling`, and `swarm workers`. The judgment and synthesis roles stay on `opus`. A `reflect` run is now one `sonnet` reviewer and three `opus` agents, upstream's shape.
+
+`bug-fix`, `perf-issue`, and `hillclimb` drop from `fable` to `sonnet`, reversing the 0.9.15 choice. Upstream runs these playbook delegates on its fast model too, and `poteto-mode` still sends the hardest changes to the `strongest judgment` role, which stays on `fable` where upstream names Opus. The four-model panel stays: upstream's two-model panel crosses vendors, and a Claude-only panel gets its diversity from more Claude models. A `pstack-models.md` line still overrides any role.
+
+The Codex block gains a `worker` example, `gpt-6-sol`, the model the Pi table already maps `sonnet` to, and the Codex mapping names the worker roles on their own line. The Copilot setup asks a worker-model question after the default model, and the Copilot mapping names the worker roles. `poteto-mode` sends every code change below the hardest to the worker model.
+
+`principle-prove-it-works` adds one check: before you report success, read the real state and the exit code, because truncated output and your own echo prove nothing. @fisherivco reported it from a `reflect` run (#276). The same issue's proposal to let the model start `reflect` on its own is not taken: upstream marks `reflect` as user-invoked only, and its step 5 files Backlog items to the tracker without waiting.
+
 ## 0.9.87 - worktree audit holds ignored user files and reflog-only commits
 
 The worktree audit called two kinds of worktree `safe` that `git worktree remove` destroys work in. The first held an ignored file that exists nowhere else, such as `.env` or `.claude/settings.local.json`, because the status call skipped ignored files. The second had a commit no branch, tag, or remote reaches, such as one made on a detached HEAD before switching back to the trunk, because the audit checked only the current HEAD. Removing the worktree deletes its HEAD reflog, which leaves that commit for `git gc` to prune.

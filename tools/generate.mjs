@@ -456,6 +456,7 @@ export function regions(models) {
         [
           ["Default", "default"],
           ["Strongest", "strongest"],
+          ["Worker", "worker"],
           ["Panel", "panel"],
         ].map(([label, tier]) => `| ${label} | ${models.roles.filter((r) => r.tier === tier).map((r) => code(r.role)).join(", ")} |`),
     },
@@ -538,7 +539,7 @@ export function applyRegions(file, text, models, { strict = true } = {}) {
   return lines.join("\n");
 }
 
-// A role's "models" names a tier (default, strongest, panel) or lists slugs.
+// A role's "models" names a tier (default, strongest, worker, panel) or lists slugs.
 // A tier resolves to its models and stays on the role as `tier`, so moving a
 // tier is one edit and the Codex mapping can follow the same keys.
 export function resolveModels(models) {
@@ -551,7 +552,7 @@ export function resolveModels(models) {
 }
 
 const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
-const TIERS = ["default", "strongest", "panel"];
+const TIERS = ["default", "strongest", "worker", "panel"];
 
 // Check models.json's shape and resolve its tiers, throwing with the offending
 // role, tier, or slug named. `skillExists(skill)` reports whether a role's

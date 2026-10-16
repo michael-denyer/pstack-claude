@@ -127,13 +127,14 @@ describe("Copilot setup questions", () => {
     const steps = [
       "0. **Session model.**",
       "1. **Default model.**",
-      "2. **Strongest model.**",
-      "3. **Panel model 1 of 3**",
-      "4. **More panel models.**",
-      "5. **Vendor check.**",
-      "6. **Overrides.**",
-      "7. **Session hook.**",
-      "8. **Default effort.**",
+      "2. **Worker model.**",
+      "3. **Strongest model.**",
+      "4. **Panel model 1 of 3**",
+      "5. **More panel models.**",
+      "6. **Vendor check.**",
+      "7. **Overrides.**",
+      "8. **Session hook.**",
+      "9. **Default effort.**",
     ];
     const at = steps.map((step) => sequence.indexOf(step));
     expect(at.every((i) => i >= 0)).toBe(true);

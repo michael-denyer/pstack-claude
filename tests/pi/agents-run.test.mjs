@@ -1,7 +1,7 @@
 // One agent run through the fake ExtensionAPI, with the fake pi as the child:
 // its lifecycle, how its end is classified, its output, and stopping it.
 import { describe, expect, test } from "bun:test";
-import { readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
 import { alive, flag, listAgents, resultText, sleep, useWorld, waitFor } from "./harness.mjs";
@@ -66,6 +66,34 @@ describe("agent tool", () => {
     expect(message.content).toContain("done in bg");
     expect(aliveAtNotice).toBe(false);
     expect((await listAgents(pi, ctx))[0].status).toBe("completed");
+  });
+
+  test("list_agents and the completion notice name the child's transcript, and a resume keeps the same file", async () => {
+    const { w, pi, ctx } = setup({ script: { default: [{ sleep: 300 }, { reply: "done" }] } });
+    const { details } = await pi.call("agent", { description: "watch me", prompt: "go", run_in_background: true }, ctx);
+    await waitFor(async () => (await listAgents(pi, ctx))[0].sessionFile);
+    const [running] = await listAgents(pi, ctx);
+    const [inv] = w.invocations();
+    expect(running.status).toBe("running");
+    expect(dirname(running.sessionFile)).toBe(flag(inv, "--session-dir"));
+    expect(basename(running.sessionFile)).toEndWith(`_${flag(inv, "--session-id")}.jsonl`);
+    expect(existsSync(running.sessionFile)).toBe(true);
+
+    await waitFor(() => pi.messages.length === 1);
+    expect(pi.messages[0].message.content).toContain(`transcript: ${running.sessionFile}`);
+    await pi.call("send_message", { to: details.agentId, message: "again" }, ctx);
+    await waitFor(() => pi.messages.length === 2);
+    expect((await listAgents(pi, ctx))[0].sessionFile).toBe(running.sessionFile);
+  });
+
+  test("list_agents names no transcript for an agent whose session directory holds none", async () => {
+    const { w, pi, ctx } = setup();
+    await pi.call("agent", { description: "no file", prompt: "go" }, ctx);
+    rmSync(flag(w.invocations()[0], "--session-dir"), { recursive: true });
+
+    const [listed] = await listAgents(pi, ctx);
+    expect(listed.status).toBe("completed");
+    expect(listed).not.toHaveProperty("sessionFile");
   });
 
   test("an errored last message, a run without a final message, or a non-zero exit is failed, with the error in the notice", async () => {

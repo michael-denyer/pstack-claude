@@ -55,7 +55,8 @@ const out = (event) => {
 const respond = (command, extra = {}) => out({ type: "response", id: command.id, command: command.type, success: true, ...extra });
 
 let history = [];
-const sessionFile = sessionId && sessionDir ? join(sessionDir, `${sessionId}.fake.jsonl`) : undefined;
+// Pi's file name, with one timestamp so a resume finds the file again as pi does.
+const sessionFile = sessionId && sessionDir ? join(sessionDir, `2026-01-01T00-00-00-000Z_${sessionId}.jsonl`) : undefined;
 if (sessionFile) {
   mkdirSync(sessionDir, { recursive: true });
   if (existsSync(sessionFile)) history = readFileSync(sessionFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));

@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
 
 import { listing, resultText } from "./agent-text.ts";
-import type { AgentRunner } from "./agents.ts";
+import { type AgentRunner, sessionFile } from "./agents.ts";
 import { isForegroundWait } from "./sleep-wait.ts";
 
 const agentParams = Type.Object(
@@ -76,7 +76,7 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
       signal?.addEventListener("abort", onAbort, { once: true });
       const record = await runner.wait(started.agent.id).finally(() => signal?.removeEventListener("abort", onAbort));
       return {
-        content: [{ type: "text", text: resultText(record) }],
+        content: [{ type: "text", text: resultText(record, sessionFile(record.agent)) }],
         details: { agentId: record.agent.id, status: record.status },
         isError: record.status !== "completed",
       };
@@ -104,10 +104,10 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
     label: "List agents",
     exposure: "model-only",
     description:
-      "List every agent this session started with its status. running means the process is alive; completed, failed, and stopped are reported only after the process exited.",
+      "List every agent this session started with its status. running means the process is alive; completed, failed, and stopped are reported only after the process exited. sessionFile is the agent's transcript, once its first message is written: the user can follow it with tail -f, or render a finished one with pi --export.",
     parameters: Type.Object({}, { additionalProperties: false }),
     async execute() {
-      const agents = listing(runner.list());
+      const agents = listing(runner.list(), sessionFile);
       return { content: [{ type: "text", text: JSON.stringify(agents, null, 2) }], details: { agents } };
     },
   });

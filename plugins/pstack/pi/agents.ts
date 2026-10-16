@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
@@ -108,6 +108,17 @@ function saveOutput(identity: AgentIdentity, text: string): Pick<EndedRecord, "f
   } catch (e) {
     return { finalText: `${capped}\n\n(full output not saved: ${(e as Error).message})` };
   }
+}
+
+// Pi names the file <timestamp>_<session id>.jsonl, reopens it on a resume,
+// and writes it only once the first message is in.
+export function sessionFile({ sessionDir, sessionId }: AgentIdentity): string | undefined {
+  let names: string[] = [];
+  try {
+    names = readdirSync(sessionDir);
+  } catch {}
+  const name = names.find((n) => n.endsWith(`_${sessionId}.jsonl`));
+  return name && join(sessionDir, name);
 }
 
 function settle(worktree: Worktree): { kept: boolean; note: string } {
@@ -274,7 +285,7 @@ export class AgentRunner {
     // The model that called stop_agent already has the result, so a stop's
     // notice joins the context without starting another turn.
     if (run.background && run.ending !== "teardown") {
-      this.pi.sendMessage(noticeOf(record), status !== "stopped" ? { triggerTurn: true, deliverAs: "steer" } : { triggerTurn: false });
+      this.pi.sendMessage(noticeOf(record, sessionFile(identity)), status !== "stopped" ? { triggerTurn: true, deliverAs: "steer" } : { triggerTurn: false });
     }
     return record;
   }

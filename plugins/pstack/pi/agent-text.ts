@@ -1,5 +1,6 @@
 // What the model reads about an agent: tool results, completion notices, and
-// the cap on text that stays inline. Pure functions of the persisted record.
+// the cap on text that stays inline. Pure functions of the persisted record
+// and the path of the child's transcript, which the caller looks up.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import type { AgentRecord, EndedRecord } from "./agents.ts";
@@ -15,12 +16,13 @@ export function truncateUtf8(text: string, cap: number): string {
   return buf.subarray(0, end).toString("utf8");
 }
 
-function header({ agent, ...record }: EndedRecord): string {
+function header({ agent, ...record }: EndedRecord, transcript: string | undefined): string {
   const lines = [`agentId: ${agent.id}`, `description: ${agent.description}`, `status: ${record.status}`, `exit code: ${record.exitCode}`];
   if (agent.worktree) {
     const state = record.worktreeKept === false ? "no changes; removed" : `branch ${agent.worktree.branch}`;
     lines.push(`worktree: ${agent.worktree.path} (${state})`);
   }
+  if (transcript) lines.push(`transcript: ${transcript}`);
   return lines.join("\n");
 }
 
@@ -30,11 +32,11 @@ function report(record: EndedRecord): string {
   return `${record.finalText}\n\n[Output truncated at ${OUTPUT_CAP_BYTES / 1024} KB. Full output: ${record.outputFile}]`;
 }
 
-export function resultText(record: EndedRecord): string {
-  return `${header(record)}\n\n${report(record)}`;
+export function resultText(record: EndedRecord, transcript: string | undefined): string {
+  return `${header(record, transcript)}\n\n${report(record)}`;
 }
 
-export function listing(records: AgentRecord[]): object[] {
+export function listing(records: AgentRecord[], transcriptOf: (agent: AgentRecord["agent"]) => string | undefined): object[] {
   return records.map(({ agent, ...r }) => ({
     id: agent.id,
     description: agent.description,
@@ -45,13 +47,14 @@ export function listing(records: AgentRecord[]): object[] {
     startedAt: agent.startedAt,
     endedAt: r.status === "running" ? undefined : r.endedAt,
     worktree: agent.worktree?.path,
+    sessionFile: transcriptOf(agent),
   }));
 }
 
-export function noticeOf(record: EndedRecord): Parameters<ExtensionAPI["sendMessage"]>[0] {
+export function noticeOf(record: EndedRecord, transcript: string | undefined): Parameters<ExtensionAPI["sendMessage"]>[0] {
   return {
     customType: NOTICE_TYPE,
-    content: `pstack agent finished.\n${header(record)}${record.outputFile ? `\nfull output: ${record.outputFile}` : ""}\n\n${report(record)}`,
+    content: `pstack agent finished.\n${header(record, transcript)}${record.outputFile ? `\nfull output: ${record.outputFile}` : ""}\n\n${report(record)}`,
     display: true,
     details: { agentId: record.agent.id, status: record.status, exitCode: record.exitCode, outputFile: record.outputFile },
   };

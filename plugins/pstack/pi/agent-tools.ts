@@ -49,7 +49,7 @@ const SLEEP_BLOCKED =
 // model-only exposure keeps every tool declared to the model even under
 // codemode.mode "only", which would otherwise reach them only through scripts.
 export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void {
-  const lookups = { transcriptOf: sessionFile, activityOf: (agent: Parameters<typeof sessionFile>[0]) => runner.activityOf(agent) };
+  const lookups = { transcriptOf: sessionFile, activityOf: runner.activityOf.bind(runner) };
   // The user's own view: shown, never sent to the model.
   pi.registerCommand("pstack-agents", {
     description: "Show each pstack agent's status, what a running one is doing, and its transcript",

@@ -15,7 +15,7 @@ const names = new Set(agentSkills(skillsDir).map((s) => s.name));
 const principles = new Set([...names].filter((n) => n.startsWith("principle-")));
 
 // Runtime built-ins, the Pi extension's /pstack-agents, and explanatory mentions of Cursor commands.
-const BUILT_IN_SLASH = new Set(["pstack-agents", "loop","run", "verify", "command", "goal", "name", "compact", "clear", "hooks", "fleet", "add-dir", "resume"]);
+const BUILT_IN_SLASH = new Set(["pstack-agents", "loop", "run", "verify", "command", "goal", "name", "compact", "clear", "hooks", "fleet", "add-dir", "resume"]);
 
 function references(text) {
   const found = [];

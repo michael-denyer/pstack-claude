@@ -39,12 +39,21 @@ const HEADER = ["SIZE", "AGE", "MERGED", "DIRTY", "REMOTE", "PR", "LAST_CHAT", "
 // Merged and closed PRs drop out of gh's default open-only listing.
 const GH_PR_LIST = ["pr", "list", "--author", "@me", "--state", "all", "--limit", "1000",
   "--json", "number,state,headRefName,headRefOid"];
+// An ignored path under one of these names is a rebuildable build or cache
+// artifact. Any other ignored path, such as `.env`, may exist nowhere else.
+export const DISPOSABLE = new Set([
+  ".build", ".cache", ".dart_tool", ".DS_Store", ".gradle", ".lake", ".lycheecache", ".mypy_cache", ".next", ".nuxt",
+  ".parcel-cache", ".pytest_cache", ".ruff_cache", ".svelte-kit", ".tox", ".turbo", ".venv", "__pycache__", "build",
+  "coverage", "DerivedData", "dist", "node_modules", "target", "venv",
+]);
 
 export function classify(facts) {
-  const { locked, dirty, pr, recent, ancestry, head } = facts;
+  const { locked, dirty, orphans, pr, recent, ancestry, head } = facts;
   if (locked.known && locked.value !== null) return "hold-locked";
   if (dirty.known && dirty.value.wip > 0) return "hold-wip";
   if (dirty.known && dirty.value.untracked > 0) return "hold-untracked";
+  if (orphans.known && orphans.value > 0) return "hold-reflog";
+  if (dirty.known && dirty.value.ignored > 0) return "hold-ignored";
   if (pr.known && pr.value?.state === "OPEN") return "hold-open-pr";
   if (recent.known && recent.value) return "verify-recent-chat";
   if (Object.values(facts).some((fact) => !fact.known)) return "review";
@@ -221,10 +230,30 @@ function isAncestor(repo, head, trunk) {
   }
 }
 
+// `--ignored=matching` prints an ignored directory once, as `!! node_modules/`,
+// and an ignored file inside a tracked directory by its own path.
 function dirtyState(path) {
-  const lines = git(path, "status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none").split("\n").filter(Boolean);
+  const lines = git(path, "status", "--porcelain", "--untracked-files=all", "--ignored=matching", "--ignore-submodules=none")
+    .split("\n").filter(Boolean);
   const untracked = lines.filter((line) => line.startsWith("??")).length;
-  return { wip: lines.length - untracked, untracked };
+  const ignoredLines = lines.filter((line) => line.startsWith("!!"));
+  const ignored = ignoredLines.filter((line) => {
+    const parts = line.slice(3).replace(/^"|"$/g, "").split("/");
+    return !parts.some((part) => DISPOSABLE.has(part));
+  }).length;
+  return { wip: lines.length - untracked - ignoredLines.length, untracked, ignored };
+}
+
+// Counts commits that only this worktree's HEAD reflog reaches, which
+// `git worktree remove` deletes. A commit a branch reflog also lists, such as
+// a rebased branch's old tip, lives in the shared logs and survives removal.
+function reflogOnly(path, branchLogged) {
+  const visited = new Set(git(path, "rev-list", "--walk-reflogs", "HEAD").split("\n").filter(Boolean));
+  const input = [...visited, ...[...branchLogged].map((sha) => `^${sha}`)].join("\n");
+  // `--not` before `--stdin` leaves the stdin revisions unnegated.
+  return Number(execFileSync("git", ["rev-list", "--count", "--not", "--branches", "--tags", "--remotes", "--stdin"], {
+    cwd: path, encoding: "utf8", input: `${input}\n`, stdio: ["pipe", "pipe", "pipe"], maxBuffer: Infinity,
+  }).trim());
 }
 
 function remoteState(path, branch, head) {
@@ -253,8 +282,13 @@ function sizeKey(label) {
   return Number(match[1]) * 1024 ** (match[2] ? "KMGTPE".indexOf(match[2]) + 1 : 0);
 }
 
-function dirtyLabel({ wip, untracked }) {
-  return [wip > 0 && `wip:${wip}`, untracked > 0 && `untracked:${untracked}`].filter(Boolean).join(",") || "clean";
+function dirtyLabel({ wip, untracked, ignored }, orphans) {
+  return [
+    wip > 0 && `wip:${wip}`,
+    untracked > 0 && `untracked:${untracked}`,
+    ignored > 0 && `ignored:${ignored}`,
+    orphans.known && orphans.value > 0 && `reflog:${orphans.value}`,
+  ].filter(Boolean).join(",") || "clean";
 }
 
 // `--porcelain -z` hands over the lock reason raw, newlines included.
@@ -263,11 +297,12 @@ function lockedLabel(locked) {
   return locked.replace(/\s+/g, " ").trim() || "locked";
 }
 
-function auditWorktree({ path, locked }, { repo, trunk, fetched, prs, chats, now }) {
+function auditWorktree({ path, locked }, { repo, trunk, fetched, prs, chats, branchLogs, now }) {
   const head = probe(() => git(path, "rev-parse", "HEAD"));
   const age = bind(head, () => probe(() => Math.trunc((now - Number(git(path, "log", "-1", "--format=%ct", "HEAD"))) / DAY)));
   const ancestry = bind(head, (sha) => probe(() => isAncestor(repo, sha, trunk)));
   const dirty = probe(() => dirtyState(path));
+  const orphans = bind(head, () => bind(branchLogs, (logged) => probe(() => reflogOnly(path, logged))));
   const branch = probe(() => {
     const name = git(path, "rev-parse", "--abbrev-ref", "HEAD");
     return name === "HEAD" ? null : name;
@@ -276,12 +311,12 @@ function auditWorktree({ path, locked }, { repo, trunk, fetched, prs, chats, now
   const pr = bind(prs, (list) => bind(branch, (name) => known(list.find((entry) => name !== null && entry.headRefName === name) ?? null)));
   const lastChat = chats.get(path);
   const recent = bind(lastChat, (ts) => known(ts !== null && Math.trunc((now - ts) / DAY) <= RECENT_DAYS));
-  const bucket = classify({ trunk: fetched, head, age, ancestry, dirty, remote, pr, recent, locked: known(locked) });
+  const bucket = classify({ trunk: fetched, head, age, ancestry, dirty, orphans, remote, pr, recent, locked: known(locked) });
   return [
     size(path),
     age.known ? `${age.value}d` : "?",
     ancestry.known ? (ancestry.value ? "YES" : "no") : "?",
-    dirty.known ? dirtyLabel(dirty.value) : "unknown",
+    dirty.known ? dirtyLabel(dirty.value, orphans) : "unknown",
     remote.known ? remote.value : "unknown",
     pr.known && pr.value ? `#${pr.value.number}/${pr.value.state}` : "-",
     lastChat.known && lastChat.value !== null ? new Date(lastChat.value * 1000).toISOString().slice(0, 10) : "-",
@@ -346,7 +381,11 @@ export function audit({
     bind(spellings.get(path), () => bind(found, (latest) => known(latest.get(path) ?? null))),
   ]));
 
-  const context = { repo, trunk, fetched, prs, chats, now };
+  const branchLogs = discover(
+    () => new Set(git(repo, "rev-list", "--walk-reflogs", "--branches").split("\n").filter(Boolean)),
+    "could not read branch reflogs; no worktree can reach safe",
+  );
+  const context = { repo, trunk, fetched, prs, chats, branchLogs, now };
   const rows = worktrees.map((worktree) =>
     worktree.prunable
       ? ["-", "?", "-", "-", "-", "-", "-", "prunable", "-", worktree.path]

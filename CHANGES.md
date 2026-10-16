@@ -2,6 +2,12 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.87 - worktree audit holds ignored user files and reflog-only commits
+
+The worktree audit called two kinds of worktree `safe` that `git worktree remove` destroys work in. The first held an ignored file that exists nowhere else, such as `.env` or `.claude/settings.local.json`, because the status call skipped ignored files. The second had a commit no branch, tag, or remote reaches, such as one made on a detached HEAD before switching back to the trunk, because the audit checked only the current HEAD. Removing the worktree deletes its HEAD reflog, which leaves that commit for `git gc` to prune.
+
+The audit now asks `git status` for ignored paths with `--ignored=matching` and counts those outside a named list of build and cache directories (`DISPOSABLE` in `worktree-audit.mjs`: `node_modules`, `.venv`, `__pycache__`, `dist`, `build`, `target`, and others). It prints the count as `ignored:N` and holds the worktree as `hold-ignored`. It also walks the worktree's HEAD reflog and counts commits that no branch, tag, remote, or branch reflog reaches, then prints `reflog:N` and holds it as `hold-reflog`. A branch reflog lives in the shared logs and outlives the worktree, so a rebased branch's old tip does not count. The worktree-cleanup playbook names both labels and the commands that list what they count.
+
 ## 0.9.86 - sync to upstream 99743e9 (v0.15.25): adds /in-your-own-words and /sharpen
 
 The upstream pin moves from `997ffc7` to `99743e9`, upstream v0.15.25, 15 pstack commits. `/in-your-own-words` plays back the user's goal and the problem before work starts, and `/sharpen` aims a task the way a top expert would without overspecifying it. `/poteto-help` routes to both. `/ketchup` answers in about 150 words built on real visuals, and the autopilot ticks and replies catch the operator up through it. `principle-fix-root-causes` proposes a cheap always-on signal after a deep dig. `principle-attack-the-premise` and three other principles state their rules as reasoning, and four skills drop marginal sections. The package now carries 39 public skills and 24 principles.

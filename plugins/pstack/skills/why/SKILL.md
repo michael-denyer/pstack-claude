@@ -104,7 +104,7 @@ After Sources Consulted, if the user's `why` question is a precursor to changing
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in the `pstack-models.md` override sheet overrides each at runtime; `/setup-pstack` writes it and lists its path per runtime.
 
-- why investigators: `sonnet`
+- why investigators: `opus`
 - why synthesizer: `opus`
 
 ## Reasoning effort

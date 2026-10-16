@@ -107,8 +107,8 @@ const tierRoles = (models, tier) =>
 
 export function codexModelNamesSection(models) {
   return (
-    "Skills name Claude defaults (a single-role default for prose and judgment, a worker model for code and " +
-    "exploration, plus a diverse-model panel for diverse-model panels; each model-consuming skill lists its own in a " +
+    "Skills name Claude defaults (a single-role default for code/prose/judgment, a worker model for " +
+    "feature and refactoring code, plus a diverse-model panel for diverse-model panels; each model-consuming skill lists its own in a " +
     "Models section). These slugs do not resolve on Codex. Substitute your configured Codex models:\n\n" +
     `- Single-model roles: your primary Codex model (for example ${code(models.codex.default)}).\n` +
     `- Roles that default to the Claude worker model (${tierRoles(models, "worker")}): ` +

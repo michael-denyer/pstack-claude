@@ -51,7 +51,7 @@ describe("parseModels", () => {
     const arena = role(resolved, "arena runners");
     expect(arena.tier).toBe("panel");
     expect(arena.models).toEqual(raw.tiers.panel);
-    expect(role(resolved, "bug-fix").models).toEqual([raw.tiers.worker]);
+    expect(role(resolved, "feature, refactoring").models).toEqual([raw.tiers.worker]);
     expect(role(resolved, "strongest judgment").models).toEqual([raw.tiers.strongest]);
   });
 

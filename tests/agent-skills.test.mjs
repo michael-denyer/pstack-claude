@@ -286,8 +286,7 @@ describe("agentSkills reads frontmatter as YAML", () => {
 describe("Codex model names", () => {
   test("names a worker and a strongest Codex model for the roles that default to each on Claude", () => {
     const raw = JSON.parse(readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8"));
-    const oneOff = raw.roles.map((r) => (r.role === "swarm workers" ? { ...r, models: ["haiku"] } : r));
-    const section = codexModelNamesSection(resolveModels({ ...raw, roles: oneOff }));
+    const oneOff = raw.roles.map((r) => (r.role === "swarm workers" ? { ...r, models: ["haiku"] } : r));    const section = codexModelNamesSection(resolveModels({ ...raw, roles: oneOff }));
     const lineWith = (text) => section.split("\n").find((line) => line.includes(text));
     const strongestLine = lineWith("strongest Claude model");
     const workerLine = lineWith("Claude worker model");
@@ -297,8 +296,9 @@ describe("Codex model names", () => {
     expect(strongestLine).toContain(`\`${raw.codex.strongest}\``);
     expect(strongestLine).toContain("`strongest judgment`");
     expect(workerLine).toContain(`\`${raw.codex.worker}\``);
-    for (const role of ["feature, refactoring", "bug-fix", "perf-issue", "hillclimb", "reflect tooling"]) {
-      expect(workerLine).toContain(`\`${role}\``);
+    expect(workerLine).toContain("`feature, refactoring`");
+    for (const role of ["bug-fix", "perf-issue", "hillclimb", "reflect tooling"]) {
+      expect(workerLine).not.toContain(`\`${role}\``);
       expect(strongestLine).not.toContain(`\`${role}\``);
     }
     for (const family of raw.available) expect(section).not.toContain(`\`${family}\``);

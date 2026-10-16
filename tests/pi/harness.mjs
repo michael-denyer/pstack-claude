@@ -168,10 +168,10 @@ export function useWorld() {
 }
 
 // A second extension instance over the same world, as after a reload or resume.
-export async function restore(w, entries, reason = "resume") {
+export async function restore(w, entries, reason = "resume", ctx = {}) {
   const pi = fakePi();
   install(pi.api, w.settings);
-  await pi.emit("session_start", { reason }, fakeCtx({ cwd: w.cwd, entries }));
+  await pi.emit("session_start", { reason }, fakeCtx({ cwd: w.cwd, entries, ...ctx }));
   return pi;
 }
 

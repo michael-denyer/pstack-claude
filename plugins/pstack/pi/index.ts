@@ -25,7 +25,10 @@ export function install(pi: ExtensionAPI, settings: Settings): void {
   process.on("exit", onExit);
   // Every entry, not the active branch: an agent started on a branch the user
   // later left is still a process, and its record is the only handle on it.
-  pi.on("session_start", (_event, ctx) => runner.restore(ctx.sessionManager.getEntries()));
+  pi.on("session_start", (_event, ctx) => {
+    runner.attachUi(ctx);
+    runner.restore(ctx.sessionManager.getEntries());
+  });
   pi.on("session_shutdown", async () => {
     process.off("exit", onExit);
     oneShot.dispose();

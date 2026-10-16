@@ -23,8 +23,8 @@ const assistantEndLine = Type.Object({
 const textPart = Type.Object({ type: Type.Literal("text"), text: Type.String() });
 const failedMessage = Type.Object({ errorMessage: Type.String() });
 const settledLine = Type.Object({ type: Type.Literal("agent_settled") });
-const toolStartLine = Type.Object({ type: Type.Literal("tool_execution_start"), toolName: Type.String(), args: Type.Unknown() });
-const toolEndLine = Type.Object({ type: Type.Literal("tool_execution_end"), toolName: Type.String() });
+const toolStartLine = Type.Object({ type: Type.Literal("tool_execution_start"), toolCallId: Type.String(), toolName: Type.String(), args: Type.Unknown() });
+const toolEndLine = Type.Object({ type: Type.Literal("tool_execution_end"), toolCallId: Type.String() });
 // Dialogs block the child until the client answers; a notify or status needs none.
 const dialogLine = Type.Object({
   type: Type.Literal("extension_ui_request"),
@@ -43,7 +43,8 @@ export interface ChildExit {
 }
 
 // What a running child is doing, last event wins. It lives only in this
-// process's memory: nothing writes it to the session, and the model never reads it.
+// process's memory: nothing appends it to the session or sends it as a message,
+// and the model sees it only in a list_agents result.
 export interface Activity {
   // The tool call in flight, or the last one once it ended.
   tool?: { name: string; args: string; running: boolean };
@@ -60,7 +61,7 @@ const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 
 function summarizeArgs(args: unknown): string {
   const fields = typeof args === "object" && args !== null ? (args as Record<string, unknown>) : {};
-  const named = ["command", "path", "file_path", "pattern"].map((key) => fields[key]).find((value) => typeof value === "string");
+  const named = ["command", "pattern", "path", "file_path"].map((key) => fields[key]).find((value) => typeof value === "string");
   return cap(oneLine(named ?? JSON.stringify(args) ?? ""), TOOL_ARGS_CAP);
 }
 
@@ -93,6 +94,9 @@ export class PiChild {
   private errorMessage = "";
   private stderr = "";
   private latest?: Activity;
+  // Tool calls from one message can run in parallel; only the end of the call
+  // shown ends it.
+  private toolCallId?: string;
 
   constructor(command: string, args: string[], opts: { cwd: string; exitGraceMs: number; onActivity?: () => void }, prompt: string) {
     this.exitGraceMs = opts.exitGraceMs;
@@ -239,10 +243,11 @@ export class PiChild {
       if (Value.Check(failedMessage, message)) this.errorMessage = message.errorMessage;
       else this.errorMessage = text ? "" : `(the last assistant message had no text; stop reason: ${String(message.stopReason)})`;
     } else if (Value.Check(toolStartLine, parsed)) {
+      this.toolCallId = parsed.toolCallId;
       this.note({ tool: { name: parsed.toolName, args: summarizeArgs(parsed.args), running: true } });
     } else if (Value.Check(toolEndLine, parsed)) {
-      const current = this.latest?.tool;
-      this.note({ tool: { name: parsed.toolName, args: current?.name === parsed.toolName ? current.args : "", running: false } });
+      const tool = this.latest?.tool;
+      if (tool && parsed.toolCallId === this.toolCallId) this.note({ tool: { ...tool, running: false } });
     } else if (Value.Check(settledLine, parsed)) {
       this.settled = true;
       this.close();

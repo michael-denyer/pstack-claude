@@ -232,7 +232,7 @@ export class AgentRunner {
       worktree,
       startedAt: now(),
     };
-    if (ctx.hasUI && this.settings.depth === 0) this.ui = ctx.ui;
+    this.attachUi(ctx);
     return this.launch(identity, params.prompt, params.run_in_background === true);
   }
 
@@ -262,6 +262,12 @@ export class AgentRunner {
     this.persist(record);
     this.showStatus();
     return record;
+  }
+
+  // From session_start too: a reloaded session can resume an agent with
+  // send_message before any agent call.
+  attachUi(ctx: ExtensionContext): void {
+    if (ctx.hasUI && this.settings.depth === 0) this.ui = ctx.ui;
   }
 
   private showStatus(): void {

@@ -2,7 +2,7 @@
 // status line, and /pstack-agents.
 import { describe, expect, test } from "bun:test";
 
-import { listAgents, useWorld, waitFor } from "./harness.mjs";
+import { listAgents, restore, useWorld, waitFor } from "./harness.mjs";
 
 const setup = useWorld();
 
@@ -33,16 +33,34 @@ describe("agent activity", () => {
     expect(ended).not.toHaveProperty("activity");
   });
 
-  test("path, pattern, and other arguments summarize in that order and are capped", async () => {
-    const long = "x".repeat(200);
-    const { pi, ctx } = setup({
-      script: { default: [{ toolStart: { name: "read", args: { file_path: "/a/b.ts", pattern: "p" } } }, { toolStart: { name: "grep", args: { pattern: "TODO" } } }, { toolStart: { name: "edit", args: { n: 1 } } }, { toolStart: { name: "bash", args: { command: long } } }, { sleep: 30000 }] },
-    });
+  test("a tool call summarizes by command, then pattern, then path, then its JSON, capped at 80 characters", async () => {
+    const ui = recordingUi();
+    const calls = [
+      { name: "bash", args: { command: "ls", pattern: "p", path: "src" } },
+      { name: "grep", args: { pattern: "TODO", path: "src" } },
+      { name: "read", args: { path: "/a/b.ts", file_path: "/x.ts" } },
+      { name: "edit", args: { file_path: "/c.ts" } },
+      { name: "custom", args: { n: 1 } },
+      { name: "bash", args: { command: "x".repeat(200) } },
+    ];
+    const { pi, ctx } = setup({ script: { default: [...calls.map((call) => ({ toolStart: call })), { sleep: 30000 }] }, ctx: { hasUI: true, ui } });
     await launch(pi, ctx);
     await waitFor(async () => (await listAgents(pi, ctx))[0].activity?.tool.args.startsWith("xxx"));
+    const shown = ui.statuses.map((s) => s.text?.replace(/^pstack: 1 running · \S+ /, ""));
+    expect(shown).toEqual(expect.arrayContaining(["bash: ls", "grep: TODO", "read: /a/b.ts", "edit: /c.ts", 'custom: {"n":1}']));
     const { tool } = (await listAgents(pi, ctx))[0].activity;
-    expect(tool.args).toHaveLength(80);
-    expect(tool.args).toEndWith("…");
+    expect(tool.args).toBe(`${"x".repeat(79)}…`);
+  });
+
+  test("parallel tool calls end by call id, so one ending leaves the other running", async () => {
+    const read = (id, path) => ({ toolStart: { name: "read", args: { path }, id } });
+    const { pi, ctx } = setup({ script: { default: [read("c1", "a.ts"), read("c2", "b.ts"), { toolEnd: { name: "read", id: "c1" } }, { sleep: 300 }, { toolEnd: { name: "read", id: "c2" } }, { sleep: 30000 }] } });
+    await launch(pi, ctx);
+    await waitFor(async () => (await listAgents(pi, ctx))[0].activity?.tool.args === "b.ts");
+    await new Promise((r) => setTimeout(r, 100));
+    expect((await listAgents(pi, ctx))[0].activity.tool).toEqual({ name: "read", args: "b.ts", running: true });
+    await waitFor(async () => (await listAgents(pi, ctx))[0].activity.tool.running === false);
+    expect((await listAgents(pi, ctx))[0].activity.tool).toEqual({ name: "read", args: "b.ts", running: false });
   });
 
   test("a tool event missing its fields is skipped and the run still completes", async () => {
@@ -55,7 +73,7 @@ describe("agent activity", () => {
     expect(pi.messages[0].message.content).toContain("survived");
   });
 
-  test("activity never reaches the model's context or the session entries", async () => {
+  test("activity is never sent as a message or written as a session entry", async () => {
     const { pi, ctx } = setup({ script: { default: [lsStep, { reply: "said something" }, { sleep: 30000 }] } });
     await launch(pi, ctx);
     await waitFor(async () => (await listAgents(pi, ctx))[0].activity?.said);
@@ -101,6 +119,18 @@ describe("status line", () => {
     await launch(pi, ctx);
     await waitFor(() => pi.messages.length === 1);
     expect(ui.statuses).toEqual([]);
+  });
+
+  test("shows an agent that send_message resumes after a reload, before any new agent call", async () => {
+    const { w, pi, ctx } = setup({ script: { default: [lsStep, { sleep: 300 }, { reply: "done" }] } });
+    const { details } = await pi.call("agent", { description: "again", prompt: "go" }, ctx);
+    const ui = recordingUi();
+    const reloaded = await restore(w, pi.entries, "reload", { hasUI: true, ui });
+    await reloaded.call("send_message", { to: details.agentId, message: "more" }, ctx);
+
+    await waitFor(() => ui.statuses.some((s) => s.text?.endsWith("bash: ls -la /tmp")));
+    await waitFor(() => reloaded.messages.length === 1);
+    expect(ui.statuses.at(-1)).toEqual({ key: "pstack-agents", text: undefined });
   });
 
   test("clears at session_shutdown", async () => {

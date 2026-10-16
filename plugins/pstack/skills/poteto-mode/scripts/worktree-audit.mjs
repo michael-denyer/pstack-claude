@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Read-only worktree prune audit. Classifies every git worktree by size, merge
-// state, uncommitted work, remote/PR state, and the most recent chat that
+// state, uncommitted work, ignored files outside build and cache directories,
+// commits only its HEAD reflog reaches, remote/PR state, and the most recent chat that
 // operated in it, then prints a table sorted by size with a suggested bucket.
 // Never deletes anything; deletion stays a human-gated step in the playbook.
 //

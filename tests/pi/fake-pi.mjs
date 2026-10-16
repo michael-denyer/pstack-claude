@@ -8,7 +8,9 @@
 // Steps: { reply } emits an assistant message_end ("${prompt}", "${history}"
 // and "${steered}" expand; history is the earlier prompts of the same
 // --session-id, steered the steer messages taken so far); { error } emits a
-// failed assistant message; { raw } writes stdout verbatim; { stderr },
+// failed assistant message; { toolStart: { name, args } } and
+// { toolEnd: "<name>" } emit tool_execution_start and tool_execution_end;
+// { raw } writes stdout verbatim; { stderr },
 // { sleep: ms }, { exit: code } ends the process at once, { spawn: "<kind>" }
 // starts a sleeping process of a kind in SPAWNS below and logs it as
 // "grandchild" with that kind in `as`, { ignoreSigterm: true },
@@ -85,6 +87,8 @@ const STEPS = {
     out({ type: "message_end", message: assistant([{ type: "text", text: expand(text) }]) });
     log({ kind: "reply", pid: process.pid });
   },
+  toolStart: ({ name, args }) => out({ type: "tool_execution_start", toolCallId: "t1", toolName: name, args }),
+  toolEnd: (name) => out({ type: "tool_execution_end", toolCallId: "t1", toolName: name, result: { content: [] }, isError: false }),
   error: (message) => out({ type: "message_end", message: assistant([], { stopReason: "error", errorMessage: message }) }),
   raw: (text) => process.stdout.write(text),
   touch: (file) => writeFileSync(file, "changed\n"),

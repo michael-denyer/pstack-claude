@@ -23,6 +23,8 @@ const assistantEndLine = Type.Object({
 const textPart = Type.Object({ type: Type.Literal("text"), text: Type.String() });
 const failedMessage = Type.Object({ errorMessage: Type.String() });
 const settledLine = Type.Object({ type: Type.Literal("agent_settled") });
+const toolStartLine = Type.Object({ type: Type.Literal("tool_execution_start"), toolName: Type.String(), args: Type.Unknown() });
+const toolEndLine = Type.Object({ type: Type.Literal("tool_execution_end"), toolName: Type.String() });
 // Dialogs block the child until the client answers; a notify or status needs none.
 const dialogLine = Type.Object({
   type: Type.Literal("extension_ui_request"),
@@ -38,6 +40,28 @@ export interface ChildExit {
   // "" when the run ended cleanly.
   errorMessage: string;
   stderr: string;
+}
+
+// What a running child is doing, last event wins. It lives only in this
+// process's memory: nothing writes it to the session, and the model never reads it.
+export interface Activity {
+  // The tool call in flight, or the last one once it ended.
+  tool?: { name: string; args: string; running: boolean };
+  said?: string;
+  // ISO time of the last activity event.
+  at: string;
+}
+
+const TOOL_ARGS_CAP = 80;
+const SAID_CAP = 120;
+
+const cap = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
+
+function summarizeArgs(args: unknown): string {
+  const fields = typeof args === "object" && args !== null ? (args as Record<string, unknown>) : {};
+  const named = ["command", "path", "file_path", "pattern"].map((key) => fields[key]).find((value) => typeof value === "string");
+  return cap(oneLine(named ?? JSON.stringify(args) ?? ""), TOOL_ARGS_CAP);
 }
 
 function assistantText(content: unknown[]): string {
@@ -59,6 +83,7 @@ export class PiChild {
   readonly exited: Promise<ChildExit>;
   private readonly proc: ChildProcessByStdio<Writable, Readable, Readable>;
   private readonly exitGraceMs: number;
+  private readonly onActivity?: () => void;
   private readonly pending = new Map<string, (response: Answer | undefined) => void>();
   private nextId = 0;
   private open = true;
@@ -67,9 +92,11 @@ export class PiChild {
   private finalText = "";
   private errorMessage = "";
   private stderr = "";
+  private latest?: Activity;
 
-  constructor(command: string, args: string[], opts: { cwd: string; exitGraceMs: number }, prompt: string) {
+  constructor(command: string, args: string[], opts: { cwd: string; exitGraceMs: number; onActivity?: () => void }, prompt: string) {
     this.exitGraceMs = opts.exitGraceMs;
+    this.onActivity = opts.onActivity;
     this.proc = spawn(command, args, { cwd: opts.cwd, detached: true, stdio: ["pipe", "pipe", "pipe"] });
     this.pid = this.proc.pid;
     this.proc.stdin.on("error", () => {});
@@ -118,6 +145,15 @@ export class PiChild {
       } else return;
       this.close();
     });
+  }
+
+  get activity(): Activity | undefined {
+    return this.latest;
+  }
+
+  private note(change: Pick<Activity, "tool"> | Pick<Activity, "said">): void {
+    this.latest = { ...this.latest, ...change, at: new Date().toISOString() };
+    this.onActivity?.();
   }
 
   // Resolves with pi's response, or undefined when stdin is closed or the
@@ -196,9 +232,17 @@ export class PiChild {
       // the note; a run that ends on one has no answer, only earlier text.
       const { message } = parsed;
       const text = assistantText(message.content);
-      if (text) this.finalText = text;
+      if (text) {
+        this.finalText = text;
+        this.note({ said: cap(oneLine(text.split("\n")[0]), SAID_CAP) });
+      }
       if (Value.Check(failedMessage, message)) this.errorMessage = message.errorMessage;
       else this.errorMessage = text ? "" : `(the last assistant message had no text; stop reason: ${String(message.stopReason)})`;
+    } else if (Value.Check(toolStartLine, parsed)) {
+      this.note({ tool: { name: parsed.toolName, args: summarizeArgs(parsed.args), running: true } });
+    } else if (Value.Check(toolEndLine, parsed)) {
+      const current = this.latest?.tool;
+      this.note({ tool: { name: parsed.toolName, args: current?.name === parsed.toolName ? current.args : "", running: false } });
     } else if (Value.Check(settledLine, parsed)) {
       this.settled = true;
       this.close();

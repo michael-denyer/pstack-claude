@@ -19,7 +19,7 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 | Dispatch N parallel subagents in one turn | N `agent` calls with `run_in_background: true` in one response |
 | Wait for a subagent result | A foreground `agent` call returns the final text. A background agent's completion arrives as a message naming its id, status, and final text, after your current tool calls or as a new turn when you are idle, so do not poll. |
 | Continue or steer a subagent (`SendMessage`) | `send_message`, addressed by agent id or description |
-| List subagents | `list_agents`. Its `sessionFile` field is the agent's transcript, written once the first message is in. To let the user watch a running agent, give them `tail -f <sessionFile>`; for a finished one, `pi --export <sessionFile>` renders it as HTML. |
+| List subagents | `list_agents`. Its `sessionFile` field is the agent's transcript, written once the first message is in. To let the user watch a running agent, give them `tail -f <sessionFile>`; for a finished one, `pi --export <sessionFile>` renders it as HTML. A running agent's `activity` field gives its current or last tool call and latest message. The user can run `/pstack-agents` for the same view. |
 | Stop a subagent | `stop_agent` |
 | Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | Pi has no task-tracking tool. Keep the `todo.md` checklist poteto-mode describes for that case. |
 | Ask the human a fixed-choice question (`AskUserQuestion`) | `ask_user_question`, same shape. Without an interactive UI (print or JSON mode), and in a child agent, it returns an error, so ask in plain text. |

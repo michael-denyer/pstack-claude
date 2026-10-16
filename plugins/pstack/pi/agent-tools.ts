@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
 
-import { listing, resultText } from "./agent-text.ts";
+import { agentsReport, listing, resultText } from "./agent-text.ts";
 import { type AgentRunner, sessionFile } from "./agents.ts";
 import { isForegroundWait } from "./sleep-wait.ts";
 
@@ -49,6 +49,14 @@ const SLEEP_BLOCKED =
 // model-only exposure keeps every tool declared to the model even under
 // codemode.mode "only", which would otherwise reach them only through scripts.
 export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void {
+  const lookups = { transcriptOf: sessionFile, activityOf: (agent: Parameters<typeof sessionFile>[0]) => runner.activityOf(agent) };
+  // The user's own view: shown, never sent to the model.
+  pi.registerCommand("pstack-agents", {
+    description: "Show each pstack agent's status, what a running one is doing, and its transcript",
+    async handler(_args, ctx) {
+      ctx.ui.notify(agentsReport(runner.list(), lookups), "info");
+    },
+  });
   // Wording alone did not stop models from polling a background agent with
   // sleep, which spends turns and leads them to cut the agent short.
   pi.on("tool_call", (event) => {
@@ -104,10 +112,10 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner): void 
     label: "List agents",
     exposure: "model-only",
     description:
-      "List every agent this session started with its status. running means the process is alive; completed, failed, and stopped are reported only after the process exited. sessionFile is the agent's transcript, once its first message is written: the user can follow it with tail -f, or render a finished one with pi --export.",
+      "List every agent this session started with its status. running means the process is alive; completed, failed, and stopped are reported only after the process exited. sessionFile is the agent's transcript, once its first message is written: the user can follow it with tail -f, or render a finished one with pi --export. A running agent also lists activity: its current or latest tool call and its latest message. The user sees the same with /pstack-agents.",
     parameters: Type.Object({}, { additionalProperties: false }),
     async execute() {
-      const agents = listing(runner.list(), sessionFile);
+      const agents = listing(runner.list(), lookups);
       return { content: [{ type: "text", text: JSON.stringify(agents, null, 2) }], details: { agents } };
     },
   });

@@ -113,12 +113,12 @@ function saveOutput(identity: AgentIdentity, text: string): Pick<EndedRecord, "f
 // Pi names the file <timestamp>_<session id>.jsonl, reopens it on a resume,
 // and writes it only once the first message is in.
 export function sessionFile({ sessionDir, sessionId }: AgentIdentity): string | undefined {
-  let names: string[] = [];
   try {
-    names = readdirSync(sessionDir);
-  } catch {}
-  const name = names.find((n) => n.endsWith(`_${sessionId}.jsonl`));
-  return name && join(sessionDir, name);
+    const name = readdirSync(sessionDir).find((n) => n.endsWith(`_${sessionId}.jsonl`));
+    return name && join(sessionDir, name);
+  } catch {
+    return undefined;
+  }
 }
 
 function settle(worktree: Worktree): { kept: boolean; note: string } {

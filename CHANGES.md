@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.92 - Pi keeps hidden worktree output and quotes transcript paths
+
+On Pi, an agent's worktree is no longer removed as clean when `status.showUntrackedFiles=no` hides its new or ignored files from `git status`. The cleanup check sets `--untracked-files=normal` itself, as the worktree audit already did, and leaves the user's setting alone. The `/pstack-agents` read command now quotes a transcript path that contains spaces, quotes, `$`, or other shell syntax, so `tail -f` and `pi --export` get it as one argument. The `transcript:` line still shows the raw path. @EthanYoQ found and fixed both, in [#284](https://github.com/michael-denyer/pstack-claude/pull/284) and [#285](https://github.com/michael-denyer/pstack-claude/pull/285).
+
 ## 0.9.91 - Calibrate comparison tools
 
 Build the Lever requires known-bad controls for each comparison output and refuses a match when required input is missing.

@@ -149,7 +149,7 @@ const FORGE_FIXTURES: Readonly<
   >
 > = {
   gh: {
-    fields: "number,state,headRefName,baseRefName,headRepository",
+    fields: "number,state,headRefName,baseRefName,headRepository,headRepositoryOwner",
     listArgs: ["--limit", "1000"],
     row: ({ number, state, head, base, repository }, fallback) => ({
       number,
@@ -159,7 +159,11 @@ const FORGE_FIXTURES: Readonly<
       headRepository:
         repository === null
           ? null
-          : { nameWithOwner: repository ?? fallback },
+          : { id: "R_fixture", name: (repository ?? fallback).split("/")[1] },
+      headRepositoryOwner:
+        repository === null
+          ? null
+          : { login: (repository ?? fallback).split("/")[0] },
     }),
   },
   origin: {
@@ -1142,6 +1146,33 @@ promises.readFile = async (path, ...rest) => {
     });
   });
 
+  it.each([undefined, null, {}, { login: "" }, { login: 1 }])(
+    "rejects a gh head repository with a malformed owner %j",
+    async (owner) => {
+      const { directory, store } = await initializedStore();
+      const stack = await makeGitStack(directory);
+      await withFakeForge({
+        directory,
+        forge: "gh",
+        currentRows: JSON.stringify([
+          {
+            number: 11,
+            state: "OPEN",
+            headRefName: "stack/open",
+            baseRefName: "main",
+            headRepository: { id: "R_fixture", name: "widgets" },
+            headRepositoryOwner: owner,
+          },
+        ]),
+        operation: async () => {
+          await expect(store.frontier.set({ repo: stack.repo })).rejects.toThrow(
+            "gh pr list --head stack/open output has an invalid PR row"
+          );
+        },
+      });
+    }
+  );
+
   it("names the pull requests it left out when a chain branch has only those", async () => {
     const { directory, store } = await initializedStore();
     const stack = await makeGitStack(directory);
@@ -1533,7 +1564,7 @@ describe("port guards", () => {
     ["gh pr list --head stack/open", ""],
     [
       "gh pr list --base stack/open",
-      `if [ "$3" = --head ]; then printf '%s\\n' '[{"number":11,"state":"OPEN","headRefName":"stack/open","baseRefName":"main","headRepository":{"nameWithOwner":"${FIXTURE_REPOSITORY}"}}]'; exit 0; fi\n`,
+      `if [ "$3" = --head ]; then printf '%s\\n' '[{"number":11,"state":"OPEN","headRefName":"stack/open","baseRefName":"main","headRepository":{"name":"widgets"},"headRepositoryOwner":{"login":"acme"}}]'; exit 0; fi\n`,
     ],
   ])(
     "fails a frontier set when %s hangs and ignores SIGTERM",

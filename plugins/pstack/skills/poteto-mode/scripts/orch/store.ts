@@ -1073,7 +1073,7 @@ interface ForgePullRequestQuery {
   readonly headField: string;
   readonly baseField: string;
   // gh matches --head and --base by branch name alone, so the chain keeps only
-  // PRs whose head repository, read from this field as { nameWithOwner } or
+  // PRs whose head repository, paired with headRepositoryOwner.login or
   // null for a deleted fork, is the one the checkout pushes to.
   readonly headRepositoryField?: string;
   // gh lists 30 pull requests unless told otherwise.
@@ -1153,8 +1153,14 @@ function headRepository(
   if (value === null) {
     return null;
   }
-  return isRecord(value) && typeof value.nameWithOwner === "string"
-    ? value.nameWithOwner.toLowerCase()
+  const owner = row.headRepositoryOwner;
+  return isRecord(value) &&
+    typeof value.name === "string" &&
+    value.name.length > 0 &&
+    isRecord(owner) &&
+    typeof owner.login === "string" &&
+    owner.login.length > 0
+    ? `${owner.login}/${value.name}`.toLowerCase()
     : undefined;
 }
 
@@ -1219,7 +1225,9 @@ function listPullRequests({
         query.stateField,
         query.headField,
         query.baseField,
-        ...(query.headRepositoryField ? [query.headRepositoryField] : []),
+        ...(query.headRepositoryField
+          ? [query.headRepositoryField, "headRepositoryOwner"]
+          : []),
       ].join(","),
     ],
     repo,

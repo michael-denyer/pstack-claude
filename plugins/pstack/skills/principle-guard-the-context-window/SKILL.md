@@ -1,6 +1,6 @@
 ---
 name: principle-guard-the-context-window
-description: "Apply when context is filling up: large outputs, long files, repeated reads, fan-out planning. Route bulk to subagents; keep summaries in the main thread, not raw payloads."
+description: "Apply before streaming CI output or broad MCP tool discovery, especially with an exact deep link, and when large outputs, long files, repeated reads, or fan-out planning threaten context. Bound output before execution; keep summaries in the main thread."
 user-invocable: false
 ---
 

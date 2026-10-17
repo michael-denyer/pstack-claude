@@ -1,6 +1,6 @@
 ---
 name: principle-explain-the-number
-description: "Apply before you trust, report, or act on a number you measured: a speedup, a regression, a throughput, a latency, or an eval result. Find what limits it, and rule out that it measured something other than the work you think."
+description: "Apply before interpreting test timing, changing timeout thresholds, or trusting a measured speedup, regression, throughput, latency, or eval result. Check machine contention and other limiting resources before treating the number as evidence."
 user-invocable: false
 ---
 

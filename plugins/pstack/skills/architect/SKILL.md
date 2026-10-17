@@ -37,6 +37,8 @@ Design it twice. Require at least two structurally distinct candidates before sy
 
 Screen every candidate against [`references/design-red-flags.md`](references/design-red-flags.md) before synthesis. Assume the next contributor is an agent that sees only the files it opened, copies the nearest example, and takes the shortest path that compiles. Prefer the design where a change that looks right from one file is right for the whole repo.
 
+For a bounded query, state its eligibility scope, where the candidate or result limit applies, what server work it bounds, and whether the cap can omit eligible results or underfill the response.
+
 Compare viable candidates on interface depth. Prefer the design that hides more complexity behind a smaller, simpler public surface. A rich interface can keep call chains short by concentrating capability instead of scattering it across layers.
 
 Arena returns one synthesized design package. Its synthesis decision fills the rationale's "Synthesis decision" section.

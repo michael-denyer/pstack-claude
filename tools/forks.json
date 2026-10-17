@@ -2,7 +2,7 @@
   "pstack": {
     "plugins/pstack/skills/architect/SKILL.md": {
       "kind": "policy",
-      "why": "Requires comparing accepted deviations with the saved sketch and rationale, and updating them, before each implementation unit closes.",
+      "why": "Requires bounded-query scope and cost semantics during candidate screening and reconciliation of accepted deviations with the saved design before each implementation unit closes.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
@@ -208,6 +208,18 @@
       "kind": "policy",
       "why": "Adds the review-required, behind-base, and merge-blocked gate reasons, the landing revision on open PR facts and in the ready proof, the head repository of an open PR, the default-branch reader method, deadline, spawn-failed, snapshot-changed, and invalid-stack query failures, the mergeability-unknown wait reason, and the no-checks reading (a none-reported fast path, a no-rollup page, the ci-none state, the ci-unreported first sighting, and the checks-unreported wait reason).",
       "since": "0.9.24",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/principle-explain-the-number/SKILL.md": {
+      "kind": "policy",
+      "why": "Extends discovery to test timing, timeout changes, and machine contention before measured numbers are trusted.",
+      "since": "0.9.91",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/principle-guard-the-context-window/SKILL.md": {
+      "kind": "policy",
+      "why": "Extends discovery to streaming CI output and broad MCP tool metadata before their payloads enter context.",
+      "since": "0.9.91",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/principle-prove-it-works/SKILL.md": {

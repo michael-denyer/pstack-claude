@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.93 - orch reads gh head repositories on gh before 2.80
+
+`orch frontier set` no longer rejects every gh pull request row as invalid on gh before 2.80.0, whose `headRepository` carries only `id` and `name`. The gh query now asks for `headRepositoryOwner` too and builds the head repository from the owner's login and the repository name, as `watch-pr` already does, so it reads the same on every gh version. A malformed owner still fails the row, and a deleted fork still drops out of the chain. @newinh found and fixed it in [#288](https://github.com/michael-denyer/pstack-claude/pull/288).
+
 ## 0.9.92 - Pi keeps hidden worktree output and quotes transcript paths
 
 On Pi, an agent's worktree is no longer removed as clean when `status.showUntrackedFiles=no` hides its new or ignored files from `git status`. The cleanup check sets `--untracked-files=normal` itself, as the worktree audit already did, and leaves the user's setting alone. The `/pstack-agents` read command now quotes a transcript path that contains spaces, quotes, `$`, or other shell syntax, so `tail -f` and `pi --export` get it as one argument. The `transcript:` line still shows the raw path. @EthanYoQ found and fixed both, in [#284](https://github.com/michael-denyer/pstack-claude/pull/284) and [#285](https://github.com/michael-denyer/pstack-claude/pull/285).

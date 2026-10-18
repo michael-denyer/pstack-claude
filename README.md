@@ -81,7 +81,7 @@ To update, run `git pull` in the clone, then run the `for` loop again to link sk
 
 pstack routes tasks to `poteto-mode` automatically. At session start, a hook injects an instruction that points the agent at it: the plugin's hook on Claude Code, Codex, and GitHub Copilot, and the pstack extension on Pi. Codex runs the hook only after you trust it through `/hooks`. Other harnesses have no hook.
 
-Run `setup-pstack` (`/pstack:setup-pstack` in Claude Code and the Copilot CLI) to turn automatic routing on or off, change model defaults, or set a reasoning effort per role (`arena runners: opus @xhigh, fable @max`).
+Run `setup-pstack` to turn automatic routing on or off, change model defaults, or set a reasoning effort per role (`arena runners: opus @xhigh, fable @max`).
 
 ## Getting started
 

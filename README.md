@@ -11,9 +11,7 @@ For concurrency bugs and invariants that tests cannot reach, see the separate [a
 ## Install
 
 <details>
-<summary>Claude Code, Codex, Pi, GitHub Copilot, and other harnesses</summary>
-
-### Claude Code
+<summary><strong>Claude Code</strong></summary>
 
 Run in Claude Code:
 
@@ -22,7 +20,11 @@ Run in Claude Code:
 /plugin install pstack@pstack-claude
 ```
 
-### Codex
+</details>
+
+<a id="codex"></a>
+<details>
+<summary><strong>Codex</strong></summary>
 
 Run in your terminal:
 
@@ -31,7 +33,10 @@ codex plugin marketplace add michael-denyer/pstack-claude
 codex plugin add pstack@pstack-claude
 ```
 
-### Pi
+</details>
+
+<details>
+<summary><strong>Pi</strong></summary>
 
 Run in your terminal:
 
@@ -41,7 +46,10 @@ pi install git:github.com/michael-denyer/pstack-claude
 
 The package loads the skills and the pstack Pi extension, which adds the subagent, question, and wake-up tools the skills use, plus `/loop` and the routing instruction. Invoke a skill with `/skill:<name>`.
 
-### GitHub Copilot
+</details>
+
+<details>
+<summary><strong>GitHub Copilot</strong></summary>
 
 Run in your terminal:
 
@@ -54,7 +62,11 @@ This installs pstack for the Copilot CLI and the GitHub Copilot app, which share
 
 The Copilot build is tested on Copilot CLI 1.0.87 through 1.0.92. On those versions the routing hook's context reaches the session alongside other plugins' session-start context. If a later version keeps only one plugin's context, `setup-pstack` offers a [standing instruction](plugins/pstack/skills/setup-pstack/copilot.md#wire-it-in) for `~/.copilot/copilot-instructions.md` instead. On 1.0.92, once the CLI caches its computer-use experiment assignment, `copilot -p` sessions list no plugin skills and a `skill` call returns "Skill not found". Interactive sessions, the hooks, and the agents are unaffected.
 
-### Other harnesses
+</details>
+
+<a id="other-harnesses"></a>
+<details>
+<summary><strong>Other harnesses</strong></summary>
 
 OpenCode (the CLI and the desktop app), Gemini CLI, Prime Agent, and skills-only Codex installs read skills from `~/.agents/skills/`. Run in your terminal:
 
@@ -70,13 +82,13 @@ done
 
 To update, run `git pull` in the clone, then run the `for` loop again to link skills added since the last run. These installs have no routing hook, so ask for `poteto-mode` by name or add a standing instruction to the harness's instruction file. See [shared installation](docs/reference.md#shared-skills-installation) for per-harness notes and uninstalling.
 
+</details>
+
 ### Configure
 
 pstack routes tasks to `poteto-mode` automatically. At session start, a hook injects an instruction that points the agent at it: the plugin's hook on Claude Code, Codex, and GitHub Copilot, and the pstack extension on Pi. Codex runs the hook only after you trust it through `/hooks`. Other harnesses have no hook.
 
 Run `setup-pstack` to turn automatic routing on or off, change model defaults, or set a reasoning effort per role (`arena runners: opus @xhigh, fable @max`).
-
-</details>
 
 ## Getting started
 

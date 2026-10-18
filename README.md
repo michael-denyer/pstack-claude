@@ -8,9 +8,12 @@ Tell `poteto-mode` your goal and it will invoke the correct workflow for the tas
 
 For concurrency bugs and invariants that tests cannot reach, see the separate [agent-formal-verify](https://github.com/michael-denyer/agent-formal-verify) plugin, which adds TLA+ model checking and Lean proofs.
 
-<a id="install"></a>
 <details>
-<summary><strong>Install</strong></summary>
+<summary>
+
+## Install
+
+</summary>
 
 ### Claude Code
 

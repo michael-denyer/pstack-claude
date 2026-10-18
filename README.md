@@ -10,7 +10,8 @@ For concurrency bugs and invariants that tests cannot reach, see the separate [a
 
 ## Install
 
-### Claude Code
+<details>
+<summary><strong>Claude Code</strong></summary>
 
 Run in Claude Code:
 
@@ -19,7 +20,11 @@ Run in Claude Code:
 /plugin install pstack@pstack-claude
 ```
 
-### Codex
+</details>
+
+<a id="codex"></a>
+<details>
+<summary><strong>Codex</strong></summary>
 
 Run in your terminal:
 
@@ -27,6 +32,8 @@ Run in your terminal:
 codex plugin marketplace add michael-denyer/pstack-claude
 codex plugin add pstack@pstack-claude
 ```
+
+</details>
 
 <details>
 <summary><strong>Pi</strong></summary>

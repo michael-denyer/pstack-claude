@@ -96,7 +96,7 @@ No skill file carries a Pi line. poteto-mode's Platform Adaptation section point
 | `create-verification-skill` | The generated skill lands under `.claude/skills/verify/` on Claude Code. Write it where Pi discovers project skills, `.pi/skills/verify/` or `.agents/skills/verify/`, instead. The app-driving harness is platform-neutral. |
 | `maintain-verification-skill` | The parallel per-feature source readers map to background `agent` calls. The project-local skill lives under `.pi/skills/` or `.agents/skills/`, not `.claude/skills/`. |
 | `create-formal-verification-skill` | Write the generated skill where Pi discovers project skills, `.pi/skills/<area>/` or `.agents/skills/<area>/`, named for the area it verifies. The verifier and its run command are platform-neutral. |
-| `maintain-formal-verification-skill` | Find the formal verification skill under `.pi/skills/` or `.agents/skills/`, not `.claude/skills/`. |
+| `maintain-formal-verification-skill` | Project skills, the formal verification skill among them, live under `.pi/skills/` or `.agents/skills/`. |
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
 | `automate-me` | `plugin-dev:skill-development` resolves through the skills table above. The workspace's transcripts are its Pi sessions directory (see Tool actions). Pi does not discover `.claude/skills/`, so write the mode skill to `.pi/skills/<handle>-mode/SKILL.md` or `.agents/skills/<handle>-mode/SKILL.md` instead. |
 | `architect` | The runner panel goes through the **arena** skill, so its `agent` fan-out and model aliases apply here too. |

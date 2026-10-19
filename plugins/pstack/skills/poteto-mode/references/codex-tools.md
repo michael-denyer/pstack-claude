@@ -84,6 +84,8 @@ Affected skill entry points and the optional Codex slash stubs point here. Most 
 | `teach` | Running `how` and `why` in parallel maps to `spawn_agent` fan-out; image generation uses the configured Codex equivalent. |
 | `create-verification-skill` | The generated skill lands under `.claude/skills/verify/` on Claude Code; write it to Codex's project-skill location instead. The app-driving harness is platform-neutral. |
 | `maintain-verification-skill` | The parallel per-feature source readers map to `spawn_agent` fan-out; the project-local skill lives under Codex's skills location, not `.claude/skills/`. |
+| `create-formal-verification-skill` | Write the generated skill to Codex's project-skill location, named for the area it verifies. The verifier and its run command are platform-neutral. |
+| `maintain-formal-verification-skill` | Find the formal verification skill under Codex's project-skill location, not `.claude/skills/`. |
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
 | `automate-me` | `plugin-dev:skill-development` resolves through the skills table above. |
 | `architect` | The runner panel goes through the **arena** skill, so its `spawn_agent` fan-out and model substitution apply here too. |

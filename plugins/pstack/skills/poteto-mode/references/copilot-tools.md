@@ -126,6 +126,8 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | `automate-me` | Mode skills live in the Copilot skill locations below; transcripts come from Transcripts above; `plugin-dev:skill-development` resolves through the skills table. |
 | `create-verification-skill` | The generated skill lands under `.claude/skills/verify/` on Claude Code; on Copilot write it to `.github/skills/verify/`. The app-driving harness is platform-neutral. |
 | `maintain-verification-skill` | The parallel per-feature source readers map to `task` fan-out; the project-local skill lives under `.github/skills/`, not `.claude/skills/`. |
+| `create-formal-verification-skill` | On Copilot write the generated skill to `.github/skills/<area>/`, named for the area it verifies. The verifier and its run command are platform-neutral. |
+| `maintain-formal-verification-skill` | Find the formal verification skill under `.github/skills/`, not `.claude/skills/`. |
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above; in the app, `save_session_automation` is the cadence. |
 
 ## Vendored scripts

@@ -25,6 +25,7 @@ Check the state that changes the answer, and mention it only when it does:
 
 - For model or routing questions, identify the runtime and installation type, then read [`setup-pstack`](../setup-pstack/SKILL.md#other-runtimes) for the sheet's location and how that runtime loads it. Check that configuration before saying whether defaults or overrides apply.
 - No project `verify` or `verify-*` skill or other app harness means agents have no scripted way to drive the app. Mention `/create-verification-skill` when the question is about proving a change works.
+- No formal verification skill in the project means no property is checked past what tests reach. Mention `/create-formal-verification-skill` when the question is about a race, an invariant, or another case tests rarely hit. When one exists and the code it covers changed after the commit it records as last in sync, mention `/maintain-formal-verification-skill` if the question touches that code.
 
 When the model sheet is missing and it matters, ask whether the user wants to pick a model for each role and a default effort now. It matters when the user is new, the question is about setup or cost, or the answer depends on which models run. Ask at most once per chat. If the need is also unclear, ask both questions together. Offer two choices:
 
@@ -34,7 +35,7 @@ When the model sheet is missing and it matters, ask whether the user wants to pi
 ## Get set up
 
 1. Identify the user's runtime and whether they want a native plugin/package or skills-only installation. Read its section in the [README](https://github.com/michael-denyer/pstack-claude/blob/main/README.md#install) or [shared installation reference](https://github.com/michael-denyer/pstack-claude/blob/main/docs/reference.md#shared-skills-installation), then give the matching install command.
-2. Read [`/setup-pstack`](../setup-pstack/SKILL.md), including its Other runtimes table, before explaining model choices, effort, sheet loading, or automatic routing. For a bundled routing hook or extension, use its persistent `session hook: off` setting in the current runtime's sheet to turn routing off.
+2. Read [`/setup-pstack`](../setup-pstack/SKILL.md), including its Other runtimes table, before explaining model choices, effort, sheet loading, or automatic routing. For a bundled routing hook or extension, use its persistent `session hook: off` setting in the current runtime's sheet to turn routing off. After the model sheet, it offers once each to generate a verification skill and a formal verification skill for the project, unless the project already has one.
 3. Offer a first task prompt with a goal and a check that can pass or fail, per [`references/prompting.md`](references/prompting.md). Use the current runtime's invocation syntax from the [slash-command reference](https://github.com/michael-denyer/pstack-claude/blob/main/docs/reference.md#slash-commands).
 
 Before giving runtime-specific instructions or adapting a recipe, read the [Codex mapping](../poteto-mode/references/codex-tools.md) or [Pi mapping](../poteto-mode/references/pi-tools.md) when applicable. Their routing sections cover hook trust, extension loading, and skills-only installs. For other runtimes, use the [runtime support reference](https://github.com/michael-denyer/pstack-claude/blob/main/docs/reference.md#runtime-support).
@@ -60,7 +61,7 @@ The default answer is `/poteto-mode`, which runs most of the others when its ste
 | Know why code is shaped this way, or where a number came from | [`/why`](../why/SKILL.md) |
 | Understand a change or subsystem, explained plainly | [`/teach`](../teach/SKILL.md) |
 | Catch up on their own recent work on a topic | [`/recall`](../recall/SKILL.md) |
-| Catch up on what changed in this chat since their last message, in a few plain sentences and small visuals, with enough context to decide each action item | [`/ketchup`](../ketchup/SKILL.md) |
+| Catch up on what changed in this chat since their last message, in plain words and small visuals, with every item waiting on them listed and decidable from the reply alone | [`/ketchup`](../ketchup/SKILL.md) |
 | Know what a small diff could break outside itself | [`/blast-radius`](../blast-radius/SKILL.md) |
 | Settle types and module shape before code that crosses a function boundary | [`/architect`](../architect/SKILL.md) |
 | Get several attempts at one brief, merged into the best one | [`/arena`](../arena/SKILL.md) |
@@ -74,6 +75,8 @@ The default answer is `/poteto-mode`, which runs most of the others when its ste
 | Hear the last reply again in plain words | [`/bro`](../bro/SKILL.md) |
 | Give agents a scripted way to drive the app and prove behavior | [`/create-verification-skill`](../create-verification-skill/SKILL.md) |
 | Bring a verification skill and its feature map back in line with the app | [`/maintain-verification-skill`](../maintain-verification-skill/SKILL.md) |
+| Formally verify a race, invariant, or other property that tests rarely reach | [`/create-formal-verification-skill`](../create-formal-verification-skill/SKILL.md) |
+| Bring a formal verification back in line after the code it covers changed, and learn whether a failure is drift or a bug | [`/maintain-formal-verification-skill`](../maintain-formal-verification-skill/SKILL.md) |
 | Vet a performance number before reporting or acting on it | [`/benchmark-checklist`](../benchmark-checklist/SKILL.md) |
 | Run a large or cross-cutting change, or one to review after stepping away | [`/figure-it-out`](../figure-it-out/SKILL.md) |
 | Keep a decision log during a run, and review it afterward | [`/show-me-your-work`](../show-me-your-work/SKILL.md) |

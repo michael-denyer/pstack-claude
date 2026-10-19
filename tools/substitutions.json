@@ -17,6 +17,12 @@
       "rationale": "the port's create-verification-skill writes a project skill named verify (#71)"
     },
     {
+      "pattern": "Write a project-local skill with frontmatter that names the area and says when to use it.",
+      "files": "^skills/create-formal-verification-skill/SKILL\\.md$",
+      "replacement": "Write a project-local skill with frontmatter that names the area and says when to use it. Name the skill for the area, never `verify`, which is the driver skill `/create-verification-skill` writes.",
+      "rationale": "the port's create-verification-skill writes a project skill named verify (#71), so a formal skill must not take that name"
+    },
+    {
       "pattern": "The system prompt names the workspace's `agent-transcripts/` directory.",
       "replacement": "Claude Code stores them at `~/.claude/projects/<encoded-cwd>/*.jsonl`, where `<encoded-cwd>` is the workspace's working directory with `/` → `-`.",
       "rationale": "Claude Code's system prompt does not name a transcripts directory, so the port names the path and its encoding"

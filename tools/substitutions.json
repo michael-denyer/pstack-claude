@@ -19,14 +19,20 @@
     {
       "pattern": "Write a project-local skill with frontmatter that names the area and says when to use it.",
       "files": "^skills/create-formal-verification-skill/SKILL\\.md$",
-      "replacement": "Write a project-local skill with frontmatter that names the area and says when to use it. Name the skill for the area, never `verify` or a `verify-` prefix, which belong to the driver skill `/create-verification-skill` writes.",
-      "rationale": "the port's create-verification-skill writes a project skill named verify, and older generators wrote verify-* (#71), so a formal skill must not take either name"
+      "replacement": "Write a project-local skill with frontmatter that names the area and says when to use it. Name the skill for the area, never `verify` or a `verify-` prefix, which belong to the driver skill `/create-verification-skill` writes. On Claude Code it lives at `.claude/skills/<area>/SKILL.md`.",
+      "rationale": "the port's create-verification-skill writes a project skill named verify, and older generators wrote verify-* (#71), so a formal skill must not take either name; the Codex, Copilot, and Pi mappings give their runtimes' paths, and this gives Claude Code's"
     },
     {
       "pattern": "A verify skill has no fixed name, so find it by what it does: a project skill that runs a model checker, a prover, or another verifier against named code.",
       "files": "^skills/maintain-formal-verification-skill/SKILL\\.md$",
       "replacement": "A verify skill has no fixed name, so find it by what it does: a project skill that runs a model checker, a prover, or another verifier against named code. The project `verify` skill that `/create-verification-skill` writes drives the app and is not one.",
       "rationale": "the port's driver skill is named verify (#71), so the formal maintainer must not take it for a formal check"
+    },
+    {
+      "regex": "\\bverify skill\\b",
+      "files": "^skills/(create|maintain)-formal-verification-skill/SKILL\\.md$",
+      "replacement": "formal verification skill",
+      "rationale": "the port's driver skill is named verify (#71), so upstream's generic \"verify skill\" for the formal skill reads as the driver; must follow the two formal rules above, whose patterns contain it"
     },
     {
       "pattern": "The system prompt names the workspace's `agent-transcripts/` directory.",

@@ -110,7 +110,9 @@ function renderBlocker(blocker: T.MergeBlocker | StatusQueryBlocker): string {
           ? "restore or remove the closed PR from the queued stack"
           : blocker.reason === "draft-pr"
             ? "mark the PR ready for review before waiting for the merge queue"
-            : "resolve the changes-requested review before waiting for the merge queue";
+            : blocker.reason === "github-blocked"
+              ? "inspect GitHub merge requirements before rearming the watcher"
+              : "resolve the changes-requested review before waiting for the merge queue";
       return [
         `BLOCKER: ${blocker.reason}`,
         `pr=${blocker.pr.number}`,

@@ -419,3 +419,58 @@ it("uses the specified retry floor and cap", () => {
   expect(queryBackoffSeconds(1, 2)).toBe(120);
   expect(queryBackoffSeconds(60, 4)).toBe(300);
 });
+
+describe("GitHub blocked before required checks register", () => {
+  const skipped = [
+    { ...passingCheck("audit"), kind: "skipped" as const, reportedState: "SKIPPED" },
+    { ...passingCheck("contract"), kind: "skipped" as const, reportedState: "SKIPPED" },
+  ] as const;
+  const snapshot = (reader: GitHubReader) => readSnapshot({
+    reader, context: context(1), pendingHistory: "omit", allowDraft: false,
+  });
+
+  for (const checks of [skipped, [passingCheck("registered-first")]] as const) {
+    it(`does not report ready from ${checks.length} visible checks while GitHub blocks merging`, async () => {
+      const row = await snapshot(fakeReader({ facts: { mergeStateStatus: "BLOCKED", reviewDecision: null }, fastPath: { kind: "checks", checks } }));
+      expect(classifyPr(row)).toMatchObject({ kind: "blocker", blocker: { kind: "merge-gate", reason: "github-blocked" } });
+      const state = applyQueueSnapshot(createQueueState([context(1)], 0), row, 0, options).state;
+      expect(evaluateQueue(state, options)).toMatchObject({ kind: "blocker", blocker: { kind: "merge-gate", reason: "github-blocked" } });
+    });
+  }
+
+  for (const [facts, expected] of [
+    [{ isDraft: true }, { kind: "merge-gate", reason: "draft-pr" }],
+    [{ reviewDecision: "CHANGES_REQUESTED" as const }, { kind: "merge-gate", reason: "changes-requested" }],
+    [{ mergeable: "CONFLICTING" as const }, { kind: "merge-conflicts" }],
+  ] as const) {
+    it(`preserves ${expected.kind} precedence`, async () => {
+      const row = await snapshot(fakeReader({ facts: { mergeStateStatus: "BLOCKED", ...facts } }));
+      expect(classifyPr(row)).toMatchObject({ kind: "blocker", blocker: expected });
+    });
+  }
+
+  it("preserves review-thread and failed-check precedence", async () => {
+    const row = await snapshot(fakeReader({ facts: { mergeStateStatus: "BLOCKED" }, threads: [{ id: "thread", firstComment: null, isBugbot: false, bugbotReviewPasses: 0 }] }));
+    expect(classifyPr(row)).toMatchObject({ kind: "blocker", blocker: { kind: "review-threads" } });
+    const failed = await snapshot(fakeReader({ facts: { mergeStateStatus: "BLOCKED" }, fastPath: { kind: "checks", checks: [failedCheck()] } }));
+    expect(classifyPr(failed)).toMatchObject({ kind: "blocker", blocker: { kind: "failing-checks" } });
+  });
+
+  it("keeps registered pending checks waiting in the queue", async () => {
+    const row = await snapshot(fakeReader({ facts: { mergeStateStatus: "BLOCKED" }, fastPath: { kind: "checks", checks: [pendingCheck()] } }));
+    expect(classifyPr(row).kind).toBe("waiting");
+    const state = applyQueueSnapshot(createQueueState([context(1)], 0), row, 0, options).state;
+    expect(evaluateQueue(state, options)).toMatchObject({ kind: "waiting", reason: { kind: "pending-checks" } });
+  });
+
+  it("accepts a later clean observation and preserves unknown-state behavior", async () => {
+    const blocked = await snapshot(fakeReader({ facts: { mergeStateStatus: "BLOCKED" } }));
+    expect(classifyPr(blocked).kind).toBe("blocker");
+    const clean = await snapshot(fakeReader({ facts: { headRefOid: "new-head", baseRefOid: "new-base" }, commitRollups: [{ oid: "new-head", state: "SUCCESS" }] }));
+    expect(classifyPr(clean)).toMatchObject({ kind: "ready", pr: { proof: { revision: { headRefOid: "new-head", baseRefOid: "new-base" } } } });
+    const state = applyQueueSnapshot(createQueueState([context(1)], 0), clean, 0, options).state;
+    expect(evaluateQueue(state, options)).toMatchObject({ kind: "waiting", reason: { kind: "merge-queue" } });
+    const unknown = await snapshot(fakeReader({ facts: { mergeStateStatus: "UNKNOWN" } }));
+    expect(classifyPr(unknown).kind).toBe("ready");
+  });
+});

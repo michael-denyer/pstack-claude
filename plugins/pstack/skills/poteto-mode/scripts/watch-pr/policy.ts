@@ -178,11 +178,14 @@ function gateReason(
   row: T.PrSnapshot,
   allowDraft: boolean,
 ): T.MergeGateReason | null {
-  if (row.kind === "merged") return null;
-  if (row.kind === "closed") return "closed-without-merge";
+  if (row.kind !== "open")
+    return row.kind === "closed" ? "closed-without-merge" : null;
   if (row.facts.isDraft && !allowDraft) return "draft-pr";
-  return row.facts.reviewDecision === "CHANGES_REQUESTED"
-    ? "changes-requested"
+  if (row.facts.reviewDecision === "CHANGES_REQUESTED")
+    return "changes-requested";
+  return row.ci.kind === "ci-clean" &&
+    row.facts.mergeStateStatus === "BLOCKED"
+    ? "github-blocked"
     : null;
 }
 function gateBlocker(

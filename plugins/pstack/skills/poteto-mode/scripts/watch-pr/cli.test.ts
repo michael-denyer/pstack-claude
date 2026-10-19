@@ -223,3 +223,12 @@ describe("main", () => {
     expect(reader.calls).toEqual([]);
   });
 });
+
+it("reports an unexplained GitHub block as a merge gate instead of READY", async () => {
+  const reader = fakeReader({ facts: { mergeStateStatus: "BLOCKED", reviewDecision: null }, fastPath: { kind: "checks", checks: [ { ...passingCheck("audit"), kind: "skipped", reportedState: "SKIPPED" }, { ...passingCheck("contract"), kind: "skipped", reportedState: "SKIPPED" } ] } });
+  const harness = testRuntime(reader);
+  expect(await main(["--owner", "owner", "--repo", "repo", "--pr", "1"], harness.runtime)).toBe(6);
+  const verdict = JSON.parse(harness.stdout[0]);
+  expect(verdict).toMatchObject({ kind: "BLOCKER", exitCode: 6, blocker: { kind: "merge-gate", reason: "github-blocked" } });
+  expect(renderPretty(verdict)).toContain("inspect GitHub merge requirements");
+});

@@ -180,7 +180,8 @@ export interface MergedPr {
 export type MergeGateReason =
   | "closed-without-merge"
   | "draft-pr"
-  | "changes-requested";
+  | "changes-requested"
+  | "github-blocked";
 export type MergeBlocker =
   | {
       readonly kind: "merge-conflicts";

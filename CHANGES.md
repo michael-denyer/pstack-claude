@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.94 - formal verification skills
+
+Sync to upstream `7b353f7` (v0.15.27 and later). Two skills are new. `/create-formal-verification-skill` picks the property in the repo where a bug costs the most and tests reach the least, verifies it with the tool that fits (TLA+ by default for ordering bugs, a code-level verifier or a proof otherwise), shows each property failing on a broken variant, and leaves a project-local skill that the next agent reruns. That skill records the files it covers and the commit it was last confirmed against. `/maintain-formal-verification-skill` finds the commits that touched the covered code since then, updates the model, harness, or properties, reruns, and says whether each failure is drift in the verification or a bug in the code. Both are model-invocable, as every public skill in the port is.
+
+The port's `/create-verification-skill` writes a project skill named `verify`, so a new substitution rule tells `/create-formal-verification-skill` to name its skill for the area it verifies and never `verify`. `/setup-pstack` gains a step 10 that offers the formal skill once, after the verification-skill offer, and `/poteto-help` mentions both skills when a question is about a race, an invariant, or drifted formal checks. The Codex, Pi, and Copilot mappings say where each runtime keeps the generated skill. The README now says how the built-in skill relates to the separate [agent-formal-verify](https://github.com/michael-denyer/agent-formal-verify) plugin.
+
+The sync also carries upstream's wording updates to `/ketchup`, `/sharpen`, `/typescript-best-practices`, and the `/poteto-help` recipes.
+
 ## 0.9.93 - orch reads gh head repositories on gh before 2.80
 
 `orch frontier set` no longer rejects every gh pull request row as invalid on gh before 2.80.0, whose `headRepository` carries only `id` and `name`. The gh query now asks for `headRepositoryOwner` too and builds the head repository from the owner's login and the repository name, as `watch-pr` already does, so it reads the same on every gh version. A malformed owner still fails the row, and a deleted fork still drops out of the chain. @newinh found and fixed it in [#288](https://github.com/michael-denyer/pstack-claude/pull/288).

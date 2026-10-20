@@ -158,12 +158,11 @@ export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile
 // the built-in general-purpose type, which has no agent file.
 export function loadAgentTypes(settings: Pick<Settings, "pluginRoot">): Map<string, AgentDefinition> {
   const types = new Map<string, AgentDefinition>([[GENERAL_PURPOSE, { body: "" }]]);
-  for (const dir of ["agents", "effort-agents"]) {
-    const full = join(settings.pluginRoot, dir);
-    if (!existsSync(full)) continue;
-    for (const file of readdirSync(full).filter((f) => f.endsWith(".md")).sort()) {
+  const dir = join(settings.pluginRoot, "agents");
+  if (existsSync(dir)) {
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
       const type = `pstack:${basename(file, ".md")}`;
-      types.set(type, parseAgentFile(readFileSync(join(full, file), "utf8")));
+      types.set(type, parseAgentFile(readFileSync(join(dir, file), "utf8")));
     }
   }
   return types;

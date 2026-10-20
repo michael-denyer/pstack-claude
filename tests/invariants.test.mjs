@@ -61,6 +61,14 @@ describe("static plugin invariants", () => {
     expect(() => check(root)).toThrow("plugins/pstack/plugin.json exists");
   });
 
+  test("an agents list in the Claude plugin manifest fails", () => {
+    const root = plugin((r) => {
+      mkdirSync(join(r, ".claude-plugin"), { recursive: true });
+      writeFileSync(join(r, ".claude-plugin/plugin.json"), '{"agents": ["./agents/a.md"]}\n');
+    });
+    expect(() => check(root)).toThrow('has an "agents" list');
+  });
+
   test("disable-model-invocation on a skill fails and names the file", () => {
     const root = plugin((r) => skill(r, "flagged", "disable-model-invocation: true\n"));
     expect(() => check(root)).toThrow(/skills\/flagged\/SKILL\.md: disable-model-invocation: true breaks/);
@@ -123,13 +131,13 @@ describe("static plugin invariants", () => {
     'subagent_type: "pstack:poteto-agent"',
     "subagent_type: pstack:poteto-agent",
     "subagent_type: `pstack:poteto-agent`",
-    'subagent_type: "poteto-agent-high"',
+    'subagent_type: "poteto-agent-extra"',
     "subagent_type: poteto-agent_v2",
     "subagent_type: poteto-agent.local",
     "subagent_type: poteto-agentX",
     "subagent_type: poteto-agent.2",
-    "subagent_type: poteto-agent-high_v2",
-    "subagent_type: poteto-agent-high.local",
+    "subagent_type: poteto-agent-extra_v2",
+    "subagent_type: poteto-agent-extra.local",
     "my_subagent_type: poteto-agent",
     "my\\_subagent_type: poteto-agent",
     "presubagent_type: poteto-agent",

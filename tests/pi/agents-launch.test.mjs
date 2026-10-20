@@ -71,6 +71,7 @@ describe("agent tool", () => {
     for (const t of ["general-purpose", "pstack:poteto-agent", "pstack:comment-sicko"]) {
       expect(err.message).toContain(t);
     }
+    expect(err.message).not.toContain("effort-");
     expect(w.invocations()).toEqual([]);
   });
 

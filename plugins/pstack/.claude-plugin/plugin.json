@@ -27,21 +27,5 @@
     "opencode",
     "gemini-cli",
     "prime-agent"
-  ],
-  "agents": [
-    "./agents/comment-sicko.md",
-    "./agents/poteto-agent.md",
-    "./agents/thermo-nuclear-code-quality-review-subagent.md",
-    "./agents/thermo-nuclear-review-subagent.md",
-    "./effort-agents/effort-high.md",
-    "./effort-agents/effort-low.md",
-    "./effort-agents/effort-max.md",
-    "./effort-agents/effort-medium.md",
-    "./effort-agents/effort-xhigh.md",
-    "./effort-agents/poteto-agent-high.md",
-    "./effort-agents/poteto-agent-low.md",
-    "./effort-agents/poteto-agent-max.md",
-    "./effort-agents/poteto-agent-medium.md",
-    "./effort-agents/poteto-agent-xhigh.md"
   ]
 }

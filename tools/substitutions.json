@@ -482,7 +482,7 @@
       "pattern": "pick the reasoning level and speed the job needs. The `/setup-pstack` budget sets each role's starting level, xhigh by default.",
       "files": "^skills/poteto-mode/SKILL\\.md$",
       "replacement": "pick the reasoning level the job needs, set as [Reasoning effort](#reasoning-effort) describes. The role's `@level`, or the sheet's `default effort` line, sets its starting level, and `session` starts from the session's level.",
-      "rationale": "the port's per-spawn effort lever is the override sheet's @level and the effort agents, not a slug suffix"
+      "rationale": "the port's per-spawn effort lever is the override sheet's @level and the Agent call's effort parameter, not a slug suffix"
     },
     {
       "pattern": "Use fast mode only when the job is urgent, meaning CI or trunk is red or a person is blocked on the result right now. Otherwise use standard speed, the same slug without `-fast`.",

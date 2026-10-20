@@ -21,7 +21,6 @@
 //     -> setup-pstack's Models section and override-sheet block, and interrogate's reviewer table
 //     -> the "## Model names" section of each runtime's mapping file
 //        (poteto-mode/references/codex-tools.md, pi-tools.md, copilot-tools.md)
-//     -> one effort agent pair per level in plugins/pstack/effort-agents/
 //   the Per-skill notes table in poteto-mode/references/codex-tools.md
 //     -> the Codex preamble under the first heading of each listed skill's SKILL.md,
 //        and the codex-tools.md pointer in the prompt stub of every other public skill
@@ -31,9 +30,6 @@
 //   plugins/pstack/models.json's roles, again
 //     -> the role list in setup-pstack's scripts/sheet.awk, which checks a Copilot sheet
 //     -> the list of skills that dispatch on role models in hooks/session-start-copilot.md
-//   plugins/pstack/{agents,effort-agents}/*.md -> the "agents" list in
-//     plugins/pstack/.claude-plugin/plugin.json (a list replaces the default
-//     agents/ directory, so it names every agent)
 //   plugins/pstack/agents/comment-sicko.md, LICENSE, LICENSE-cursor-team-kit,
 //   and NOTICE-skills.md
 //     -> portable copies under poteto-mode/references/{agents,licenses}/
@@ -67,7 +63,6 @@ import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, wa
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const EFFORT_AGENTS = `${PLUGIN}/effort-agents`;
 const PROMPT_RUNTIMES = RUNTIMES.filter((runtime) => runtime.prompts);
 
 const VERSIONED_MANIFESTS = [
@@ -94,7 +89,6 @@ export const PORTABLE_ASSETS = [
 // runs through, so no hand-written file may live in one.
 export const OWNED_DIRS = [
   ...PROMPT_RUNTIMES.map((runtime) => runtime.prompts),
-  EFFORT_AGENTS,
   `${SKILLS}/poteto-mode/references/agents`,
   `${SKILLS}/poteto-mode/references/licenses`,
 ];
@@ -214,6 +208,12 @@ export function validatePluginLayout(pluginRoot) {
   // directory instead.
   if (existsSync(join(pluginRoot, "plugin.json"))) {
     throw new Error(`${PLUGIN}/plugin.json exists; Codex then skips the hooks .codex-plugin/plugin.json names (#265)`);
+  }
+  // An "agents" list replaces Claude Code's default agents/ directory, so it
+  // would drop every agent it fails to name.
+  const manifest = join(pluginRoot, ".claude-plugin/plugin.json");
+  if (existsSync(manifest) && Object.hasOwn(JSON.parse(readFileSync(manifest, "utf8")), "agents")) {
+    throw new Error(`${PLUGIN}/.claude-plugin/plugin.json has an "agents" list; Claude Code registers agents/ by default (#293)`);
   }
   // #58: a plugin's agents register under the plugin namespace, so a dispatch
   // of the bare name errors at runtime with "Agent type 'x' not found".
@@ -680,10 +680,8 @@ export function modelsSection(roles) {
   );
 }
 
-// An override value may name a reasoning effort after its slug. Claude Code has
-// no per-call effort parameter, but a subagent definition's `effort` frontmatter
-// overrides the session's effort, so each level ships as an agent the role is
-// dispatched through, with the model still passed on the call.
+// An override value may name a reasoning effort after its slug. Every runtime
+// takes the level as a field on the dispatch.
 export function effortSection(levels, defaultEffort) {
   return (
     "A role value in the override sheet may name a reasoning effort after its model, as in `opus @xhigh`. " +
@@ -692,54 +690,21 @@ export function effortSection(levels, defaultEffort) {
     `and ${code(defaultEffort)} when the sheet has no such line. \`session\` sets no effort, so the dispatch ` +
     "is the usual one. Strip the suffix before reading the model: `inherit-parent` or `auto` still omits `model` " +
     "at every level, and a model name is passed as `model`. " +
-    "On Claude Code, a level picks the effort agent from the `subagent_type` you would otherwise use. " +
-    "`pstack:poteto-agent` becomes `subagent_type: \"pstack:poteto-agent-<level>\"`. " +
-    "`general-purpose`, or no `subagent_type`, becomes `subagent_type: \"pstack:effort-<level>\"`. " +
-    "The effort agents set only `effort`, so the model you pass still decides the model. " +
-    "On Codex, pass the level as `spawn_agent`'s `reasoning_effort` and keep the usual instructions."
+    "Pass the level as the dispatch's effort field and keep the `subagent_type` you would otherwise use. " +
+    "That is `effort` on the Claude Code `Agent` call and `reasoning_effort` on Codex's `spawn_agent`."
   );
 }
 
-// The effort agents: one general-purpose worker and one poteto-agent per level.
-// The poteto variants carry poteto-agent's body. Their descriptions name
-// pstack:poteto-agent instead of copying its routing contract, so only the
-// base agent reads as the delegate /poteto-mode runs spawn. A description is
-// written unquoted, so it must not open with a backtick: strict YAML rejects it.
-export function effortAgents(levels, potetoAgent) {
-  const { body } = parseFrontmatter(potetoAgent);
-  return levels.flatMap((level) => [
-    {
-      name: `effort-${level}`,
-      text:
-        `---\nname: effort-${level}\ndescription: pstack subagent with the full tool set that runs at ${level} reasoning effort. ` +
-        `Its system prompt is this file, not the built-in \`general-purpose\` prompt. Dispatched in place of ` +
-        `\`general-purpose\` when a pstack role's override names \`@${level}\`. The caller passes the model.\n` +
-        `effort: ${level}\n---\n\n# pstack subagent (${level} effort)\n\n` +
-        "Do the task in your prompt. You have the full tool set. " +
-        "The effort level changes how long you reason, not the task.\n",
-    },
-    {
-      name: `poteto-agent-${level}`,
-      text:
-        `---\nname: poteto-agent-${level}\ndescription: Runs \`pstack:poteto-agent\` at ${level} reasoning effort. ` +
-        `Dispatched in place of \`pstack:poteto-agent\` when a pstack role's override names \`@${level}\`. The caller passes the model.\n` +
-        `effort: ${level}\n---\n` + body,
-    },
-  ]);
-}
-
-const AGENT_DIRS = ["agents", "effort-agents"];
-
-// Every agent file the plugin ships, as plugin.json's "agents" list names them.
+// Every agent file the plugin ships. Claude Code registers the agents/
+// directory by default, so plugin.json carries no "agents" list.
 export function pluginAgentPaths(pluginRoot) {
-  return AGENT_DIRS.flatMap((dir) =>
-    existsSync(join(pluginRoot, dir))
-      ? readdirSync(join(pluginRoot, dir))
-          .filter((f) => f.endsWith(".md"))
-          .sort()
-          .map((f) => `./${dir}/${f}`)
-      : [],
-  );
+  const dir = join(pluginRoot, "agents");
+  return existsSync(dir)
+    ? readdirSync(dir)
+        .filter((f) => f.endsWith(".md"))
+        .sort()
+        .map((f) => `./agents/${f}`)
+    : [];
 }
 
 // Claude Code's loader tolerates frontmatter that strict YAML rejects, so an
@@ -756,10 +721,6 @@ export function validateAgentFrontmatter(pluginRoot) {
     }
   });
   if (failures.length) throw new Error(`agent frontmatter is not readable YAML:\n${failures.join("\n")}`);
-}
-
-export function stampAgentPaths(manifestText, paths) {
-  return JSON.stringify({ ...JSON.parse(manifestText), agents: paths }, null, 2) + "\n";
 }
 
 export function setupModelsSection(models) {
@@ -784,7 +745,7 @@ export function overrideSheetBlock(models) {
     "A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); " +
     "an alias entry in a panel list still counts toward that panel's fan-out. " +
     "A model may carry a reasoning effort, as in `opus @xhigh` (levels: " + models.efforts.join(", ") + "); " +
-    "the role then runs through the pstack effort agent of that level, each entry of a panel list on its own. " +
+    "the role's subagent then runs at that level, each entry of a panel list on its own. " +
     "`default effort` sets the level for a value without one; `session` keeps the parent session's effort. " +
     "`session hook: off` stops the Claude Code or Codex SessionStart hook, or the pstack Pi extension, from injecting the poteto-mode mandate; " +
     "any other value, or no line, leaves it on.\n\n" +
@@ -947,14 +908,6 @@ export function plan(root, models) {
       put(`${runtime.prompts}/${skill.name}.md`, promptStub(skill, runtime, { preamble }));
     }
   }
-  const agents = effortAgents(models.efforts, read(`${PLUGIN}/agents/poteto-agent.md`));
-  for (const agent of agents) put(`${EFFORT_AGENTS}/${agent.name}.md`, agent.text);
-  stamp(`${PLUGIN}/.claude-plugin/plugin.json`, (text) =>
-    stampAgentPaths(text, [
-      ...pluginAgentPaths(join(root, PLUGIN)).filter((path) => path.startsWith("./agents/")),
-      ...agents.map((agent) => `./effort-agents/${agent.name}.md`).sort(),
-    ]),
-  );
   for (const dir of OWNED_DIRS) {
     const outer = OWNED_DIRS.find((other) => dir.startsWith(`${other}/`));
     if (outer) throw new Error(`generator-owned directory ${dir} is nested inside ${outer}`);

@@ -27,13 +27,11 @@ import {
   deriveSkill,
   loadLeadLines,
   noteSkills,
-  effortAgents,
   effortSection,
   OWNED_DIRS,
   plan,
   PORTABLE_ASSETS,
   problems,
-  stampAgentPaths,
   stampLeadLine,
   fenceUnder,
   loadModels,
@@ -455,7 +453,7 @@ describe("deriveSkill", () => {
   test("appends the Reasoning effort section after the Models section", () => {
     const out = deriveSkill("plugins/pstack/skills/how/SKILL.md", front("disable-model-invocation: true\n"), models, leads);
     expect(out.indexOf("## Models")).toBeLessThan(out.indexOf("## Reasoning effort"));
-    expect(out).toContain("subagent_type: \"pstack:effort-<level>\"");
+    expect(out).toContain("`effort` on the Claude Code `Agent` call");
   });
 
   test("stamps a file's lead line in its own paragraph under the first heading", () => {
@@ -542,58 +540,23 @@ describe("lead lines", () => {
   });
 });
 
-describe("effort agents", () => {
-  const poteto = "---\nname: poteto-agent\ndescription: Routing contract.\n---\n\n# Poteto subagent\n\nRead the skill.\n";
-  const agents = effortAgents(["high", "max"], poteto);
-
-  test("one general-purpose and one poteto agent per level, each setting only effort", () => {
-    expect(agents.map((a) => a.name)).toEqual(["effort-high", "poteto-agent-high", "effort-max", "poteto-agent-max"]);
-    for (const agent of agents) {
-      const level = agent.name.split("-").at(-1);
-      expect(agent.text).toContain(`\nname: ${agent.name}\n`);
-      expect(agent.text).toContain(`\neffort: ${level}\n---\n`);
-      expect(agent.text).not.toMatch(/^model:/m);
-    }
-  });
-
-  test("the poteto variant carries poteto-agent's body verbatim", () => {
-    expect(agents[1].text.endsWith("---\n\n# Poteto subagent\n\nRead the skill.\n")).toBe(true);
-    expect(agents[1].text.match(/^---$/gm)).toHaveLength(2);
-  });
-
-  test("the poteto variant's description defers to pstack:poteto-agent rather than copying its routing contract", () => {
-    const description = agents[1].text.match(/^description: (.*)$/m)[1];
-    expect(description).toContain("in place of `pstack:poteto-agent`");
-    expect(description).not.toContain("Routing contract.");
-  });
-
-  test("every agent's frontmatter reads back as YAML", () => {
-    for (const agent of agents) {
-      expect(parseFrontmatter(agent.text).data.name).toBe(agent.name);
-    }
-  });
-
+describe("effort section", () => {
   const pluginRoot = join(fileURLToPath(new URL("..", import.meta.url)), "plugins/pstack");
 
-  test("plugin.json lists both hand-written and generated agents", () => {
-    const listed = JSON.parse(readFileSync(join(pluginRoot, ".claude-plugin/plugin.json"), "utf8")).agents;
-    expect(listed).toContain("./agents/poteto-agent.md");
-    expect(listed).toContain("./effort-agents/effort-high.md");
+  test("plugin.json carries no agents list, so Claude Code registers agents/ by default", () => {
+    expect(JSON.parse(readFileSync(join(pluginRoot, ".claude-plugin/plugin.json"), "utf8"))).not.toHaveProperty("agents");
   });
 
-  test("stamping the agents list keeps every other manifest field", () => {
-    const text = '{\n  "name": "pstack",\n  "version": "1.0.0"\n}\n';
-    const out = stampAgentPaths(text, ["./agents/a.md"]);
-    expect(JSON.parse(out)).toEqual({ name: "pstack", version: "1.0.0", agents: ["./agents/a.md"] });
-    expect(stampAgentPaths(out, ["./agents/a.md"])).toBe(out);
+  test("no effort-agents directory ships", () => {
+    expect(existsSync(join(pluginRoot, "effort-agents"))).toBe(false);
   });
 
-  test("the stamped section names every level, the default, both dispatch targets, and the Codex parameter", () => {
+  test("the stamped section names every level, the default, and the effort field of Claude Code and Codex", () => {
     const text = effortSection(["low", "max"], "high");
     for (const level of ["low", "max", "high"]) expect(text).toContain(`\`${level}\``);
-    expect(text).toContain('subagent_type: "pstack:effort-<level>"');
-    expect(text).toContain('subagent_type: "pstack:poteto-agent-<level>"');
+    expect(text).toContain("`effort` on the Claude Code `Agent` call");
     expect(text).toContain("`reasoning_effort`");
+    expect(text).not.toContain("effort-<level>");
   });
 });
 
@@ -616,7 +579,7 @@ describe("plan, changes, apply", () => {
   const snapshot = (dir) => Object.fromEntries(walk(dir).map((path) => [path, readFileSync(path, "utf8")]));
   const quiet = { log: () => {} };
   const STUB = "plugins/pstack/.codex-plugin/prompts/tdd.md";
-  const STRAY = "plugins/pstack/effort-agents/stray.md";
+  const STRAY = "plugins/pstack/skills/poteto-mode/references/agents/stray.md";
 
   test("the working tree is what the plan says", () => {
     expect(changes(repoRoot, plan(repoRoot))).toEqual([]);
@@ -763,8 +726,8 @@ describe("plan, changes, apply", () => {
       ],
       [
         OWNED_DIRS,
-        "plugins/pstack/effort-agents/nested",
-        "generator-owned directory plugins/pstack/effort-agents/nested is nested inside plugins/pstack/effort-agents",
+        "plugins/pstack/skills/poteto-mode/references/agents/nested",
+        "generator-owned directory plugins/pstack/skills/poteto-mode/references/agents/nested is nested inside plugins/pstack/skills/poteto-mode/references/agents",
       ],
     ];
     for (const [list, entry, message] of cases) {
@@ -810,13 +773,8 @@ describe("plan, changes, apply", () => {
 
   test("two producers on one path compose", () => {
     const root = repoCopy();
-    const manifest = "plugins/pstack/.claude-plugin/plugin.json";
     const skill = "plugins/pstack/skills/how/SKILL.md";
     const text = (rel) => readFileSync(join(root, rel), "utf8");
-    writeFileSync(
-      join(root, manifest),
-      JSON.stringify({ ...JSON.parse(text(manifest)), version: "0.0.1", agents: [] }, null, 2) + "\n",
-    );
     writeFileSync(
       join(root, skill),
       text(skill)
@@ -824,7 +782,7 @@ describe("plan, changes, apply", () => {
         .replace(/^- how explorer: .*$/m, "- how explorer: stale"),
     );
     const { files } = plan(root);
-    for (const rel of [manifest, skill]) expect(files[rel]).toBe(readFileSync(join(repoRoot, rel), "utf8"));
+    expect(files[skill]).toBe(readFileSync(join(repoRoot, skill), "utf8"));
   });
 
   test("plan refuses a path two producers write whole with different text", () => {

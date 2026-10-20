@@ -4,7 +4,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { defaultSettings, loadAgentTypes, readSheet } from "../../plugins/pstack/pi/config.ts";
+import { checkEffort, defaultSettings, loadAgentTypes, readSheet } from "../../plugins/pstack/pi/config.ts";
 import { chmodDeniesReads } from "../session-hook-sheets.mjs";
 
 test("depth comes from the reader on each use and PI_CODING_AGENT_DIR moves the sheet", () => {
@@ -17,17 +17,17 @@ test("depth comes from the reader on each use and PI_CODING_AGENT_DIR moves the 
   expect(defaultSettings(() => 0, {}).agentDir).toBe(join(homedir(), ".pi", "agent"));
 });
 
-test("an agent file's effort is checked against the efforts list in models.json", () => {
+test("an agent file loads as pstack:<name> with its body and model, and an effort is checked against models.json", () => {
   const root = mkdtempSync(join(tmpdir(), "pstack-agents-"));
   try {
     const models = { available: [], efforts: ["low"], pi: { fallback: "anthropic", models: {} } };
     writeFileSync(join(root, "models.json"), JSON.stringify(models));
     mkdirSync(join(root, "agents"));
-    writeFileSync(join(root, "agents", "slow.md"), "---\neffort: low\n---\nbody\n");
+    writeFileSync(join(root, "agents", "slow.md"), "---\nmodel: opus\n---\nbody\n");
     const settings = { pluginRoot: root, modelsFile: join(root, "models.json") };
-    expect(loadAgentTypes(settings).get("pstack:slow")).toEqual({ body: "body", model: undefined, effort: "low" });
-    writeFileSync(join(root, "agents", "slow.md"), "---\neffort: medium\n---\nbody\n");
-    expect(() => loadAgentTypes(settings)).toThrow('pstack:slow: effort "medium" is not one of low');
+    expect(loadAgentTypes(settings).get("pstack:slow")).toEqual({ body: "body", model: "opus" });
+    expect(checkEffort("low", settings)).toBe("low");
+    expect(() => checkEffort("medium", settings)).toThrow('effort "medium" is not one of low');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

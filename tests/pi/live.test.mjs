@@ -243,19 +243,19 @@ suite("pstack on live pi", () => {
   );
 
   test(
-    "effort: pstack:effort-high runs the child at thinking high with the effort agent as its system prompt",
+    "effort: the effort parameter runs a pstack:poteto-agent child at thinking high with the poteto-agent body as its system prompt",
     async () => {
       await withParent(async (parent) => {
         await parent.run(
-          'Make one agent tool call in the foreground with subagent_type "pstack:effort-high", description "effort", prompt "Reply with exactly one word: done". Then reply with exactly one word: ok.',
+          'Make one agent tool call in the foreground with subagent_type "pstack:poteto-agent", effort "high", description "effort", prompt "Reply with exactly one word: done". Then reply with exactly one word: ok.',
         );
         const record = agentByDescription(await parent.sessionFile(), "effort").at(-1);
-        expect(record).toMatchObject({ status: "completed", agent: { subagentType: "pstack:effort-high", thinking: "high" } });
+        expect(record).toMatchObject({ status: "completed", agent: { subagentType: "pstack:poteto-agent", thinking: "high" } });
         const child = childEntries(record);
         const levels = child.filter((e) => e.type === "thinking_level_change").map((e) => e.thinkingLevel);
         expect(levels.at(-1)).toBe("high");
         const childSections = sections(child);
-        expect(childSections.addendum).toContain(agentBody("effort-agents/effort-high.md"));
+        expect(childSections.addendum).toContain(agentBody("agents/poteto-agent.md"));
         expect(childSections[SHEET_KEY]).toBe(tagged(SHEET_KEY, SHEET));
         expect(childSections[MANDATE_KEY]).toBeUndefined();
       });

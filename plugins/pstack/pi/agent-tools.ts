@@ -12,13 +12,19 @@ const agentParams = Type.Object(
     subagent_type: Type.Optional(
       Type.String({
         description:
-          "Agent definition to run: general-purpose (default), pstack:poteto-agent, pstack:comment-sicko, pstack:thermo-nuclear-review-subagent, pstack:thermo-nuclear-code-quality-review-subagent, pstack:poteto-agent-<level>, or pstack:effort-<level>.",
+          "Agent definition to run: general-purpose (default), pstack:poteto-agent, pstack:comment-sicko, pstack:thermo-nuclear-review-subagent, or pstack:thermo-nuclear-code-quality-review-subagent.",
       }),
     ),
     model: Type.Optional(
       Type.String({
         description:
           "Optional model for this agent: a family name (opus, fable, sonnet, haiku) or a full provider/id. If omitted, the agent runs on the parent's model.",
+      }),
+    ),
+    effort: Type.Optional(
+      Type.String({
+        description:
+          "Reasoning effort for this agent, one of the levels in models.json (low, medium, high, xhigh, max). If omitted, the agent runs at the parent's thinking level.",
       }),
     ),
     run_in_background: Type.Optional(Type.Boolean({ description: "Return at once; a completion notice arrives when the agent exits." })),

@@ -130,7 +130,6 @@ export const GENERAL_PURPOSE = "general-purpose";
 interface AgentDefinition {
   body: string;
   model?: string;
-  effort?: string;
 }
 
 export function frontmatter(text: string): { fields: Map<string, string>; body: string } {
@@ -143,26 +142,28 @@ export function frontmatter(text: string): { fields: Map<string, string>; body: 
   return { fields, body: (m?.[2] ?? text).trim() };
 }
 
-function parseAgentFile(type: string, text: string, efforts: string[]): AgentDefinition {
+function parseAgentFile(text: string): AgentDefinition {
   const { fields, body } = frontmatter(text);
-  const effort = fields.get("effort");
-  if (effort !== undefined && !efforts.includes(effort)) {
-    throw new Error(`${type}: effort "${effort}" is not one of ${efforts.join(", ")}`);
-  }
-  return { body, model: fields.get("model") || undefined, effort };
+  return { body, model: fields.get("model") || undefined };
+}
+
+// The agent tool's effort parameter: one of models.json's levels.
+export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile">): string {
+  const { efforts } = readModels(settings.modelsFile);
+  if (!efforts.includes(effort)) throw new Error(`effort "${effort}" is not one of ${efforts.join(", ")}`);
+  return effort;
 }
 
 // Claude Code registers each plugin agent file as pstack:<file name>, beside
 // the built-in general-purpose type, which has no agent file.
-export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "modelsFile">): Map<string, AgentDefinition> {
-  const { efforts } = readModels(settings.modelsFile);
+export function loadAgentTypes(settings: Pick<Settings, "pluginRoot">): Map<string, AgentDefinition> {
   const types = new Map<string, AgentDefinition>([[GENERAL_PURPOSE, { body: "" }]]);
   for (const dir of ["agents", "effort-agents"]) {
     const full = join(settings.pluginRoot, dir);
     if (!existsSync(full)) continue;
     for (const file of readdirSync(full).filter((f) => f.endsWith(".md")).sort()) {
       const type = `pstack:${basename(file, ".md")}`;
-      types.set(type, parseAgentFile(type, readFileSync(join(full, file), "utf8"), efforts));
+      types.set(type, parseAgentFile(readFileSync(join(full, file), "utf8")));
     }
   }
   return types;

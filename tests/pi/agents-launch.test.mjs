@@ -1,6 +1,6 @@
 // What the agent tool registers and the child command a call produces.
 import { describe, expect, test } from "bun:test";
-import { chmodSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
@@ -59,8 +59,6 @@ describe("agent tool", () => {
     const files = {
       "pstack:poteto-agent": "agents/poteto-agent.md",
       "pstack:comment-sicko": "agents/comment-sicko.md",
-      "pstack:poteto-agent-high": "effort-agents/poteto-agent-high.md",
-      "pstack:effort-low": "effort-agents/effort-low.md",
     };
     for (const type of Object.keys(files)) await pi.call("agent", { description: type, prompt: "x", subagent_type: type }, ctx);
     expect(w.invocations().map((inv) => inv.systemPrompt)).toEqual(Object.values(files).map(agentBody));
@@ -70,23 +68,34 @@ describe("agent tool", () => {
     const { w, pi, ctx } = setup();
     const err = await pi.call("agent", { description: "x", prompt: "x", subagent_type: "poteto-agent" }, ctx).catch((e) => e);
     expect(err.message).toContain('Unknown subagent_type "poteto-agent"');
-    for (const t of ["general-purpose", "pstack:poteto-agent", "pstack:comment-sicko", "pstack:effort-high", "pstack:poteto-agent-xhigh"]) {
+    for (const t of ["general-purpose", "pstack:poteto-agent", "pstack:comment-sicko"]) {
       expect(err.message).toContain(t);
     }
     expect(w.invocations()).toEqual([]);
   });
 
-  test("an effort agent passes its body as a 0600 system prompt file and its effort as --thinking; others run at the parent's level", async () => {
+  test("the effort parameter passes --thinking to any agent type, keeps a pstack agent's body as a 0600 system prompt file, and no effort runs at the parent's level", async () => {
     const { w, pi, ctx } = setup();
-    await pi.call("agent", { description: "e", prompt: "x", subagent_type: "pstack:effort-xhigh" }, ctx);
+    await pi.call("agent", { description: "e", prompt: "x", subagent_type: "general-purpose", effort: "xhigh" }, ctx);
+    await pi.call("agent", { description: "p", prompt: "x", subagent_type: "pstack:poteto-agent", effort: "high" }, ctx);
     await pi.call("agent", { description: "g", prompt: "x", subagent_type: "general-purpose" }, ctx);
-    const [effort, general] = w.invocations();
+    const [effort, poteto, general] = w.invocations();
 
     expect(flag(effort, "--thinking")).toBe("xhigh");
-    expect(effort.systemPrompt).toBe(agentBody("effort-agents/effort-xhigh.md"));
-    expect(statSync(flag(effort, "--append-system-prompt")).mode & 0o777).toBe(0o600);
+    expect(flag(effort, "--append-system-prompt")).toBeNull();
+    expect(flag(poteto, "--thinking")).toBe("high");
+    expect(poteto.systemPrompt).toBe(agentBody("agents/poteto-agent.md"));
+    expect(statSync(flag(poteto, "--append-system-prompt")).mode & 0o777).toBe(0o600);
     expect(flag(general, "--thinking")).toBe("medium");
     expect(flag(general, "--append-system-prompt")).toBeNull();
+  });
+
+  test("an unknown effort is an error naming the valid levels, and no child starts or state is written", async () => {
+    const { w, pi, ctx } = setup();
+    const err = await pi.call("agent", { description: "x", prompt: "x", effort: "turbo" }, ctx).catch((e) => e);
+    expect(err.message).toContain('effort "turbo" is not one of low, medium, high, xhigh, max');
+    expect(w.invocations()).toEqual([]);
+    expect(existsSync(join(w.agentDir, "pstack", "parent-session"))).toBe(false);
   });
 
   test("a resume whose system prompt file is gone writes it again, since pi would append the missing path as the prompt text", async () => {

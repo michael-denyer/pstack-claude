@@ -11,7 +11,7 @@ describe("send_message", () => {
     const { w, pi, ctx } = setup({ script: { default: [{ reply: "seen: ${history}; now: ${prompt}" }] } });
     const first = await pi.call(
       "agent",
-      { description: "reviewer", prompt: "first task", subagent_type: "pstack:effort-high", model: "fable" },
+      { description: "reviewer", prompt: "first task", subagent_type: "general-purpose", effort: "high", model: "fable" },
       ctx,
     );
     const sent = await pi.call("send_message", { to: "reviewer", message: "follow up" }, ctx);

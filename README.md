@@ -13,7 +13,7 @@ For concurrency bugs and invariants that tests cannot reach, `/create-formal-ver
 <details>
 <summary><strong>Claude Code</strong></summary>
 
-Run in Claude Code:
+Run in Claude Code 2.1.292 or later:
 
 ```text
 /plugin marketplace add michael-denyer/pstack-claude

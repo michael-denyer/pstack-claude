@@ -40,7 +40,7 @@ body:
     id: runtime-version
     attributes:
       label: Runtime version and operating system
-      placeholder: "Claude Code 2.1.267 on macOS 15.5"
+      placeholder: "Claude Code 2.1.296 on macOS 15.5"
     validations:
       required: true
   - type: textarea

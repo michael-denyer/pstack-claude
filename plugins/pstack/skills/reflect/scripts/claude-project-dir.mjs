@@ -3,22 +3,27 @@
 //
 //   node claude-project-dir.mjs [workspace]
 //
-// The directory is <config>/projects/<name>, where <config> is
+// Pass the directory the session started in; it defaults to the current
+// directory. The directory is <config>/projects/<name>, where <config> is
 // $CLAUDE_CONFIG_DIR or ~/.claude. Claude Code derives <name> from the
 // workspace path by turning every character other than an ASCII letter or digit
 // into "-". A name longer than 200 characters keeps its first 200 and gains "-"
 // and a base-36 hash of the path. $CLAUDE_CODE_PROJECT_DIR_NAME replaces <name>
-// when $CLAUDE_CONFIG_DIR is set too. If the derived directory is missing, the
-// one directory that shares the first 200 characters is taken instead, so a hash
-// that changes in a later Claude Code release still resolves. Exits 1 when no
-// directory exists.
+// when $CLAUDE_CONFIG_DIR is set too and the name is 1 to 64 letters, digits,
+// "_" or "-" other than a Windows reserved device name. If the derived
+// directory is missing, the one directory that shares the first 200 characters
+// is taken instead, so a hash that changes in a later Claude Code release still
+// resolves. Exits 1 when no directory exists.
 import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const MAX_NAME = 200;
+// The names Claude Code 2.1.296 accepts from CLAUDE_CODE_PROJECT_DIR_NAME.
+const CHOSEN_NAME = /^[A-Za-z0-9_-]{1,64}$/;
+const RESERVED_NAME = /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;
 
 // Claude Code 2.1.296's string hash, a 32-bit Java-style hash.
 function hash(text) {
@@ -34,8 +39,11 @@ export function projectDirName(workspace) {
 }
 
 export function projectDir(workspace, env = process.env) {
-  const projects = join(env.CLAUDE_CONFIG_DIR || join(env.HOME || homedir(), ".claude"), "projects");
-  const name = (env.CLAUDE_CONFIG_DIR && env.CLAUDE_CODE_PROJECT_DIR_NAME) || projectDirName(workspace);
+  const config = env.CLAUDE_CONFIG_DIR?.trim();
+  const projects = join(config || join(env.HOME || homedir(), ".claude"), "projects");
+  const chosen = config ? env.CLAUDE_CODE_PROJECT_DIR_NAME : undefined;
+  const valid = chosen && CHOSEN_NAME.test(chosen) && !RESERVED_NAME.test(chosen);
+  const name = valid ? chosen : projectDirName(workspace);
   const derived = join(projects, name);
   if (existsSync(derived)) return derived;
   if (name.length <= MAX_NAME) return null;
@@ -44,12 +52,23 @@ export function projectDir(workspace, env = process.env) {
   return matches.length === 1 ? join(projects, matches[0]) : null;
 }
 
+// Claude Code names a session by its start directory's real path, and keeps the
+// path as given when that directory has since been removed.
+function resolvedPath(path) {
+  try {
+    return realpathSync(path);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    return resolve(path);
+  }
+}
+
 function main(argv) {
   if (argv.length > 1) {
     console.error("usage: claude-project-dir.mjs [workspace]");
     return 2;
   }
-  const workspace = argv[0] ? realpathSync(argv[0]) : process.cwd();
+  const workspace = argv[0] ? resolvedPath(argv[0]) : process.cwd();
   const dir = projectDir(workspace);
   if (!dir) {
     console.error(`no Claude Code transcripts directory for ${workspace}`);

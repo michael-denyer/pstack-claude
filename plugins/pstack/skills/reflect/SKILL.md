@@ -19,10 +19,10 @@ Invoke when the user says "reflect" or "/reflect". Skip when the conversation is
 
 Before fanning out, find this conversation's transcript in Claude Code's per-project transcripts directory at `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/`. Do not glob across `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`. That crosses workspace boundaries and reads private chats from unrelated projects.
 
-Run the finder at `skills/reflect/scripts/find-transcript.mjs` under the installed plugin with the projects directory and a fragment of the conversation's opening user prompt. `claude-project-dir.mjs` beside it prints the projects directory for the directory the session started in:
+Run the finder at `skills/reflect/scripts/find-transcript.mjs` under the installed plugin with the projects directory and a fragment of the conversation's opening user prompt. `claude-project-dir.mjs` beside it prints the projects directory. Pass it the primary working directory your system prompt names, the directory the session started in, because the shell may have changed directory since:
 
 ```bash
-dir=$(node <plugin>/skills/reflect/scripts/claude-project-dir.mjs) && node <plugin>/skills/reflect/scripts/find-transcript.mjs "$dir" "<opening prompt fragment>"
+dir=$(node <plugin>/skills/reflect/scripts/claude-project-dir.mjs "<primary working directory>") && node <plugin>/skills/reflect/scripts/find-transcript.mjs "$dir" "<opening prompt fragment>"
 ```
 
 It covers the three layouts (flat `<id>.jsonl`, nested `<id>/<id>.jsonl`, subagent `<parent>/subagents/<child>.jsonl`), newest first, and prints the first path whose opening typed prompt carries the fragment. Do not reimplement the scan by hand: the first line of a transcript is session metadata, not a message, a session that starts with `/clear` or a `!` shell command records that command's wrapper and output as `user` records before the prompt, and files run to several megabytes, so the finder streams each candidate and stops at its first typed `user` record. If the line exits 1, write a tight digest of the session and pass that instead. It lists, one line each in turn order, the user's prompts and corrections, the tool calls and their results, and the files touched. It states no diagnosis, verdict, or cause. The reviewers judge the session, not your conclusions about it.

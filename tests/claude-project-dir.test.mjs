@@ -59,6 +59,24 @@ describe("projectDir", () => {
     );
   });
 
+  test("ignores a CLAUDE_CODE_PROJECT_DIR_NAME Claude Code would reject", () => {
+    const config = configDir("-srv-app", "my.proj", "nul", "x".repeat(65));
+    for (const chosen of ["my.proj", "NUL", "x".repeat(65), ""]) {
+      expect(projectDir("/srv/app", { CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_PROJECT_DIR_NAME: chosen })).toBe(
+        join(config, "projects", "-srv-app"),
+      );
+    }
+  });
+
+  test("trims CLAUDE_CONFIG_DIR, and treats a blank one as unset", () => {
+    const config = configDir("-srv-app");
+    expect(projectDir("/srv/app", { CLAUDE_CONFIG_DIR: ` ${config} ` })).toBe(join(config, "projects", "-srv-app"));
+    const home = mkdtempSync(join(tmpdir(), "claude-home-"));
+    fixtures.push(home);
+    mkdirSync(join(home, ".claude", "projects", "-srv-app"), { recursive: true });
+    expect(projectDir("/srv/app", { CLAUDE_CONFIG_DIR: " ", HOME: home })).toBe(join(home, ".claude", "projects", "-srv-app"));
+  });
+
   test("falls back to the one long directory that shares the first 200 characters", () => {
     const changedHash = `${LONG_NAME.slice(0, 201)}zzzzz`;
     const config = configDir(changedHash);
@@ -83,5 +101,9 @@ describe.skipIf(noNode)("claude-project-dir.mjs", () => {
     const missing = spawnSync("node", [script, config], { env, encoding: "utf8" });
     expect(missing.status).toBe(1);
     expect(missing.stderr).toContain("no Claude Code transcripts directory");
+    const removed = join(workspace, "removed");
+    mkdirSync(join(config, "projects", projectDirName(removed)));
+    const gone = spawnSync("node", [script, removed], { env, encoding: "utf8" });
+    expect([gone.status, gone.stdout.trim()]).toEqual([0, join(config, "projects", projectDirName(removed))]);
   });
 });

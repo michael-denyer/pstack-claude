@@ -51,7 +51,7 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | F01 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects` transcripts | `find-transcript.mjs` reads Pi sessions and follows the active branch | script | `a Pi session's opening prompt is the first user message on the branch that ends at the last entry` | VERIFIED |
 | F07 | Own transcript as evidence | Same reader; `worktree-audit.mjs` scans Pi session roots | script | `a Pi session in a second transcripts root marks the worktree it ran in as a recent chat` | n/a |
 | F02 | `.claude/skills/` project and user skills | `.pi/skills/` or `.agents/skills/` | mapping | pi-tools.md `create-verification-skill` note | n/a |
-| F03 | `~/.claude/plugins/` install path | Skill files load from the Pi package directory that `pi list` shows | mapping | pi-tools.md `reflect` note | n/a |
+| F03 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/` install path | Skill files load from the Pi package directory that `pi list` shows | mapping | pi-tools.md `reflect` note | n/a |
 | F04 | `~/.claude/orchestrate/<slug>/` store | A plain directory, used unchanged | native | orchestrate playbook | n/a |
 | F05 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/shell-snapshots/` cleanup advice | Cleanup advice only | n/a | worktree-cleanup playbook | n/a |
 | F06 | `.claude/worktrees` | The extension uses the same path | extension | `keeps a worktree with changes and reports its path and branch` | n/a |

@@ -36,7 +36,7 @@
     },
     {
       "pattern": "The system prompt names the workspace's `agent-transcripts/` directory.",
-      "replacement": "Claude Code stores them at `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/*.jsonl`, where `<encoded-cwd>` is the workspace's working directory with `/` → `-`.",
+      "replacement": "Claude Code stores them at `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/*.jsonl`, where `<encoded-cwd>` is the workspace's working directory with each character other than a letter or digit turned into `-`.",
       "rationale": "Claude Code's system prompt does not name a transcripts directory, so the port names the path and its encoding"
     },
     {
@@ -369,6 +369,11 @@
       "rationale": "the reviewer table is stamped from the panel in models.json, so the prose names no label run that a panel change would make wrong"
     },
     {
+      "pattern": "~/.cursor/skills/",
+      "replacement": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/",
+      "rationale": "Claude Code reads user skills from its config directory; must precede the .cursor/skills/ rule, whose pattern it contains"
+    },
+    {
       "pattern": ".cursor/skills/",
       "replacement": ".claude/skills/",
       "rationale": "personal skills directory"
@@ -390,8 +395,8 @@
     },
     {
       "pattern": "~/.cursor/plugins/",
-      "replacement": "~/.claude/plugins/",
-      "rationale": "Claude Code installs plugins under ~/.claude/plugins/"
+      "replacement": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/",
+      "rationale": "Claude Code installs plugins under ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/"
     },
     {
       "pattern": ".cursor-plugin/plugin.json",

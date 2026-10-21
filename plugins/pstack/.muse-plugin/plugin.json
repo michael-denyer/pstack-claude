@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "pstack",
   "displayName": "pstack (Muse port)",
-  "version": "0.9.98",
+  "version": "0.9.99",
   "description": "If you want to go fast, go deep first. pstack helps you write less, but higher quality code. Rigorous agent workflows you can parallelize with confidence. Muse port of the Claude Code plugin; skills are shared, tool names resolve via skills/poteto-mode/references/muse-tools.md. Original pstack by Lauren Tan (poteto).",
   "compat": {
     "source": "native",

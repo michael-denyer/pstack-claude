@@ -12,17 +12,19 @@ const SPELLING = "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/";
 const SLASH_ONLY_ENCODING = /`\/` → `-`|leading slash dropped/;
 const HISTORY = new Set(["CHANGES.md"]);
 
-const linesMatching = (pattern) =>
-  walk(repoRoot)
-    .filter((file) => {
-      const rel = relative(repoRoot, file);
-      return !HISTORY.has(rel) && rel.split(sep)[0] !== "tests";
-    })
-    .flatMap((file) =>
-      readFileSync(file, "utf8")
-        .split("\n")
-        .flatMap((line, i) => (pattern.test(line.replaceAll(SPELLING, "")) ? [`${relative(repoRoot, file)}:${i + 1}`] : [])),
-    );
+function linesMatching(pattern) {
+  const hits = [];
+  for (const file of walk(repoRoot)) {
+    const rel = relative(repoRoot, file);
+    if (HISTORY.has(rel) || rel.split(sep)[0] === "tests") continue;
+    readFileSync(file, "utf8")
+      .split("\n")
+      .forEach((line, i) => {
+        if (pattern.test(line.replaceAll(SPELLING, ""))) hits.push(`${rel}:${i + 1}`);
+      });
+  }
+  return hits;
+}
 
 test("Claude Code's projects, shell-snapshots, skills, and plugins paths read ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/", () => {
   expect(linesMatching(CLAUDE_DIR)).toEqual([]);

@@ -36,7 +36,8 @@ export function projectDirName(workspace) {
 export function projectDir(workspace, env = process.env) {
   const projects = join(env.CLAUDE_CONFIG_DIR || join(env.HOME || homedir(), ".claude"), "projects");
   const name = (env.CLAUDE_CONFIG_DIR && env.CLAUDE_CODE_PROJECT_DIR_NAME) || projectDirName(workspace);
-  if (existsSync(join(projects, name))) return join(projects, name);
+  const derived = join(projects, name);
+  if (existsSync(derived)) return derived;
   if (name.length <= MAX_NAME) return null;
   const prefix = `${name.slice(0, MAX_NAME)}-`;
   const matches = existsSync(projects) ? readdirSync(projects).filter((entry) => entry.startsWith(prefix)) : [];

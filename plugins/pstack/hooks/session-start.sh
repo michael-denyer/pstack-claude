@@ -39,9 +39,10 @@ fi
 
 # GitHub Copilot parses stdout as one JSON object. Its sheet sits outside
 # Copilot's path sandbox, so the hook checks the sheet and adds its role lines
-# to the mandate, and the agent never reads the file.
+# to the mandate, and the agent never reads the file. The hooks directory goes
+# through the environment, since awk expands backslash escapes in a -v value.
 if [ "$1" = copilot ]; then
-  printf '%s\n' "$normalized" | LC_ALL=C awk -v found="$found" -v hooks="${COPILOT_PLUGIN_ROOT}/hooks" \
+  printf '%s\n' "$normalized" | PSTACK_HOOKS="${COPILOT_PLUGIN_ROOT}/hooks" LC_ALL=C awk -v found="$found" \
     -f "${COPILOT_PLUGIN_ROOT}/hooks/json.awk" \
     -f "${COPILOT_PLUGIN_ROOT}/skills/setup-pstack/scripts/sheet.awk" \
     -f "${COPILOT_PLUGIN_ROOT}/hooks/copilot-context.awk"
@@ -52,7 +53,7 @@ fi
 # mechanism, so the hook adds the sheet's known role lines to the Muse
 # mandate itself, rebuilt from their checked values.
 if [ "$1" = muse ]; then
-  printf '%s\n' "$normalized" | LC_ALL=C awk -v found="$found" -v hooks="${MUSE_PLUGIN_ROOT}/hooks" \
+  printf '%s\n' "$normalized" | PSTACK_HOOKS="${MUSE_PLUGIN_ROOT}/hooks" LC_ALL=C awk -v found="$found" \
     -f "${MUSE_PLUGIN_ROOT}/skills/setup-pstack/scripts/sheet.awk" \
     -f "${MUSE_PLUGIN_ROOT}/hooks/muse-context.awk"
   exit 0

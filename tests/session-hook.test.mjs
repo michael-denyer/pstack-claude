@@ -339,3 +339,33 @@ describe("Muse SessionStart context", () => {
     expect(named.filter((name) => !skills.has(name))).toEqual([]);
   });
 });
+
+// awk expands escapes in a -v value, so a hooks directory passed that way
+// turns `\t` in the plugin root into a tab and the mandate files go unread.
+describe("a plugin root with a backslash", () => {
+  test("loads the same Copilot and Muse context as any other root", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "pstack-hook-"));
+    const root = join(tmp, "back\\tslash", "pstack");
+    try {
+      for (const dir of ["hooks", "skills/setup-pstack/scripts"]) cpSync(join(pluginRoot, dir), join(root, dir), { recursive: true });
+      const run = (runtime, rootVar, from) =>
+        spawnSync("sh", [join(from, "hooks/session-start.sh"), runtime], {
+          env: { PATH: process.env.PATH, HOME: tmp, [rootVar]: from },
+          encoding: "utf8",
+        });
+      for (const [runtime, rootVar] of [["copilot", "COPILOT_PLUGIN_ROOT"], ["muse", "MUSE_PLUGIN_ROOT"]]) {
+        const expected = run(runtime, rootVar, pluginRoot);
+        expect(expected.stdout).toContain("poteto-mode");
+        const got = run(runtime, rootVar, root);
+        expect({ runtime, status: got.status, out: got.stdout, err: got.stderr }).toEqual({
+          runtime,
+          status: 0,
+          out: expected.stdout,
+          err: "",
+        });
+      }
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});

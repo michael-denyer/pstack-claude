@@ -1,7 +1,8 @@
 # Prints the GitHub Copilot SessionStart output: one JSON object whose
 # additionalContext is the poteto-mode mandate with the Copilot notes inside its
 # closing tag. Run after json.awk and setup-pstack's sheet.awk, with the sheet
-# as input and -v hooks=<this directory> found=<1 when the sheet exists>.
+# as input, -v found=<1 when the sheet exists>, and PSTACK_HOOKS=<this
+# directory> in the environment.
 # Only a valid sheet's known role lines reach the context, rebuilt from their
 # checked values, so no other text in the sheet does.
 { sheet_add($0) }
@@ -31,7 +32,7 @@ END {
 
 # The file's text without its trailing newline.
 function text(name,    file, line, s, first) {
-  file = hooks "/" name
+  file = ENVIRON["PSTACK_HOOKS"] "/" name
   s = ""
   first = 1
   while ((getline line < file) > 0) {

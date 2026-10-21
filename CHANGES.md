@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.97 - Hooks load from a plugin root with a backslash
+
+The Copilot and Muse SessionStart hooks pass their hooks directory to awk through `PSTACK_HOOKS` in the environment instead of `-v`. awk expands backslash escapes in a `-v` value, so a plugin root holding `\t` or `\\`, as a Windows-style path does, pointed awk at a directory that does not exist. The hooks then exited 0 with the mandate missing: Copilot sent `{"additionalContext":"\n\n\n\n"}`, and Muse sent only the sheet's role lines. Closes [#296](https://github.com/michael-denyer/pstack-claude/issues/296).
+
 ## 0.9.96 - Muse port
 
 pstack now ships a Muse build. The native plugin manifest under `.muse-plugin/` lists every shared skill and a `SessionStart` hook that injects the poteto-mode mandate in Muse wording once the user approves the plugin's hooks. Muse surfaces each user-invocable skill as a slash command itself, so the build ships no command templates. The plugin's four agent files register as Muse agent definitions, and role effort suffixes pass as a Workflow child's `effort`, the Muse form of the dispatch effort field 0.9.95 standardized on. A new `muse-tools.md` mapping resolves Claude tool names, subagents, transcripts, and Muse model IDs, and `models.json` gains a `muse` block with a model per tier. `setup-pstack` writes the Muse sheet under the Muse config directory, which the hook reads directly. The generator owns the manifest's skill list and the Muse preambles, so the build stays in step with the tree. The Muse hook keeps each usable sheet line through the same `sheet_problems()` check the Copilot hooks use. @LuckyProtein built the port in [#295](https://github.com/michael-denyer/pstack-claude/pull/295).

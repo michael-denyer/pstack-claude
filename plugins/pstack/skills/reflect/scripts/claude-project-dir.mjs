@@ -45,12 +45,10 @@ export function projectDirName(workspace) {
 
 function sessionDir(projects, sessionId) {
   if (!sessionId || !SESSION_ID.test(sessionId) || !existsSync(projects)) return null;
-  const found = readdirSync(projects, { withFileTypes: true }).find(
-    (entry) =>
-      entry.isDirectory() &&
-      (existsSync(join(projects, entry.name, `${sessionId}.jsonl`)) || existsSync(join(projects, entry.name, sessionId))),
-  );
-  return found ? join(projects, found.name) : null;
+  const dirs = readdirSync(projects, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(projects, entry.name));
+  return dirs.find((dir) => existsSync(join(dir, `${sessionId}.jsonl`)) || existsSync(join(dir, sessionId))) ?? null;
 }
 
 export function projectDir(workspace, env = process.env) {

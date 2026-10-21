@@ -36,7 +36,7 @@
     },
     {
       "pattern": "The system prompt names the workspace's `agent-transcripts/` directory.",
-      "replacement": "Claude Code stores them at `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/*.jsonl`. Run `node <plugin>/skills/reflect/scripts/claude-project-dir.mjs \"<primary working directory>\"`, with the primary working directory your system prompt names, to print that directory rather than building `<encoded-cwd>` by hand.",
+      "replacement": "Claude Code stores them at `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/*.jsonl`. Run `node <plugin>/skills/reflect/scripts/claude-project-dir.mjs` to print this session's directory rather than building `<encoded-cwd>` by hand.",
       "rationale": "Claude Code's system prompt does not name a transcripts directory, so the port names the path and the script that prints it"
     },
     {
@@ -390,7 +390,7 @@
     },
     {
       "regex": "the active workspace's `agent-transcripts/` directory(?: \\(the system prompt names (?:the|this) path\\))?",
-      "replacement": "Claude Code's per-project transcripts directory at `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/`, which `node <plugin>/skills/reflect/scripts/claude-project-dir.mjs \"<primary working directory>\"` prints",
+      "replacement": "Claude Code's per-project transcripts directory at `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/`, which `node <plugin>/skills/reflect/scripts/claude-project-dir.mjs` prints",
       "rationale": "Cursor's system prompt names its agent-transcripts directory; Claude Code's does not, so the port names the path"
     },
     {

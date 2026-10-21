@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -68,13 +68,24 @@ describe("projectDir", () => {
     }
   });
 
-  test("trims CLAUDE_CONFIG_DIR, and treats a blank one as unset", () => {
-    const config = configDir("-srv-app");
-    expect(projectDir("/srv/app", { CLAUDE_CONFIG_DIR: ` ${config} ` })).toBe(join(config, "projects", "-srv-app"));
-    const home = mkdtempSync(join(tmpdir(), "claude-home-"));
-    fixtures.push(home);
-    mkdirSync(join(home, ".claude", "projects", "-srv-app"), { recursive: true });
-    expect(projectDir("/srv/app", { CLAUDE_CONFIG_DIR: " ", HOME: home })).toBe(join(home, ".claude", "projects", "-srv-app"));
+  test("finds this session's directory by CLAUDE_CODE_SESSION_ID after the shell moves to another project", () => {
+    const id = "9a212143-d801-496d-b0ce-50ad2a68b9a2";
+    const config = configDir("-srv-app", "-Users-you-start", "-Users-you-nested");
+    writeFileSync(join(config, "projects", "-Users-you-start", `${id}.jsonl`), "");
+    const env = { CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_SESSION_ID: id };
+    expect(projectDir("/srv/app", env)).toBe(join(config, "projects", "-Users-you-start"));
+    rmSync(join(config, "projects", "-Users-you-start", `${id}.jsonl`));
+    mkdirSync(join(config, "projects", "-Users-you-nested", id));
+    expect(projectDir("/srv/app", env)).toBe(join(config, "projects", "-Users-you-nested"));
+  });
+
+  test("derives the name when the session id is unknown or not a file name", () => {
+    const config = configDir("-srv-app", "..");
+    for (const id of ["0f0f0f0f-0000-0000-0000-000000000000", "../projects", ""]) {
+      expect(projectDir("/srv/app", { CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_SESSION_ID: id })).toBe(
+        join(config, "projects", "-srv-app"),
+      );
+    }
   });
 
   test("falls back to the one long directory that shares the first 200 characters", () => {
@@ -95,7 +106,7 @@ describe.skipIf(noNode)("claude-project-dir.mjs", () => {
   test("prints the directory for the current workspace, or exits 1", () => {
     const workspace = realpathSync(configDir());
     const config = configDir(projectDirName(workspace));
-    const env = { ...process.env, CLAUDE_CONFIG_DIR: config };
+    const env = { ...process.env, CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_SESSION_ID: "" };
     const found = spawnSync("node", [script], { cwd: workspace, env, encoding: "utf8" });
     expect([found.status, found.stdout.trim()]).toEqual([0, join(config, "projects", projectDirName(workspace))]);
     const missing = spawnSync("node", [script, config], { env, encoding: "utf8" });

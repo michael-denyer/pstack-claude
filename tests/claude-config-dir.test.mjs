@@ -45,3 +45,9 @@ test("Claude Code's config paths read ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/, and 
 test("<encoded-cwd> turns every character other than a letter or digit into -", () => {
   expect(linesMatching(SLASH_ONLY_ENCODING)).toEqual([]);
 });
+
+// The system prompt's primary working directory follows the shell, so a
+// directory argument can name another project; the script finds the session by id.
+test("skills run claude-project-dir.mjs without a directory argument", () => {
+  expect(linesMatching(/claude-project-dir\.mjs\\?"? +\\?"/)).toEqual([]);
+});

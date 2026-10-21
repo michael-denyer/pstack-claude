@@ -2,10 +2,10 @@
 # mandate, then the saved model choices when the sheet has any. Run after
 # setup-pstack's sheet.awk, with the sheet as input, -v found=<1 when the
 # sheet exists>, and PSTACK_HOOKS=<this directory> in the environment.
-# Only known role lines whose
-# entries are model IDs or aliases reach the output, rebuilt from their
-# checked values, so no other text in the sheet does. Unlike the Copilot
-# sheet check, a panel of one vendor is fine here: Muse serves one family.
+# Only known role lines whose entries are model IDs or aliases reach the
+# output, rebuilt from their checked values, so no other text in the sheet
+# does. Unlike the Copilot sheet check, a panel of one vendor is fine here:
+# Muse serves one family.
 { sheet_add($0) }
 
 END {

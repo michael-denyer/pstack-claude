@@ -201,7 +201,7 @@ describe("applySubstitutions", () => {
     [
       "skills/reflect/references/judgment-reviewer.md",
       "plugin-installed paths under `~/.cursor/plugins/`)\n- `Task` prompts that name a skill path",
-      "plugin-installed paths under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/`)\n- `Agent` prompts that name a skill path",
+      "plugin-installed paths under `${CLAUDE_CODE_PLUGIN_CACHE_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins}/`)\n- `Agent` prompts that name a skill path",
     ],
     [
       "skills/show-me-your-work/SKILL.md",
@@ -256,7 +256,7 @@ describe("applySubstitutions", () => {
     [
       "agents/poteto-agent.md",
       "search `~/.cursor/plugins/` for a file whose path ends in `skills/poteto-mode/SKILL.md`. If more than one file matches, use the copy whose `.cursor-plugin/plugin.json` has the highest `version`.",
-      "search `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/` for a file whose path ends in `skills/poteto-mode/SKILL.md`. If more than one file matches, use the copy whose `.claude-plugin/plugin.json` has the highest `version`.",
+      "search `${CLAUDE_CODE_PLUGIN_CACHE_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins}/` for a file whose path ends in `skills/poteto-mode/SKILL.md`. If more than one file matches, use the copy whose `.claude-plugin/plugin.json` has the highest `version`.",
     ],
   ])("%s: an upstream sentence takes the port's one form", (rel, upstream, port) => {
     const { text } = applySubstitutions(upstream, RULES.substitutions, rel);

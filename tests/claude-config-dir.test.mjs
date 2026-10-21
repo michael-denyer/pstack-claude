@@ -6,9 +6,21 @@ import { fileURLToPath } from "node:url";
 import { walk } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const CLAUDE_DIR =
-  /(?:\.claude|CLAUDE_CONFIG_DIR)\}?\/(?:projects|shell-snapshots)\b|(?:~|(?<![A-Z_])HOME\}?|CLAUDE_CONFIG_DIR\}?)\/(?:\.claude\}?\/)?(?:skills|plugins)\b/;
-const SPELLING = "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/";
+const PLUGINS = "${CLAUDE_CODE_PLUGIN_CACHE_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins}/";
+const CONFIG = "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/";
+// CONFIG becomes this marker, so a plugins path that skips PLUGINS still shows.
+const AT_CONFIG = "\0/";
+const CLAUDE_DIR = new RegExp(
+  [
+    /(?:\.claude|CLAUDE_CONFIG_DIR)\}?\/(?:projects|shell-snapshots)\b/,
+    /(?:~|(?<![A-Z_])HOME\}?|CLAUDE_CONFIG_DIR\}?)\/(?:\.claude\}?\/)?(?:skills|plugins)\b/,
+    /\0\/plugins\b/,
+    // pstack's own orchestrate store and setup-pstack's resolved include line stay under ~/.claude.
+    /(?:~|(?<![A-Z_])\$\{?HOME\}?)\/\.claude\/(?!orchestrate\b|pstack-models\.md\b)/,
+  ]
+    .map((pattern) => pattern.source)
+    .join("|"),
+);
 const SLASH_ONLY_ENCODING = /`\/` → `-`|leading slash dropped/;
 const HISTORY = new Set(["CHANGES.md"]);
 
@@ -20,13 +32,13 @@ function linesMatching(pattern) {
     readFileSync(file, "utf8")
       .split("\n")
       .forEach((line, i) => {
-        if (pattern.test(line.replaceAll(SPELLING, ""))) hits.push(`${rel}:${i + 1}`);
+        if (pattern.test(line.replaceAll(PLUGINS, "").replaceAll(CONFIG, AT_CONFIG))) hits.push(`${rel}:${i + 1}`);
       });
   }
   return hits;
 }
 
-test("Claude Code's projects, shell-snapshots, skills, and plugins paths read ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/", () => {
+test("Claude Code's config paths read ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/, and plugins honour CLAUDE_CODE_PLUGIN_CACHE_DIR", () => {
   expect(linesMatching(CLAUDE_DIR)).toEqual([]);
 });
 

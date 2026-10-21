@@ -76,7 +76,21 @@ describe("projectDir", () => {
     expect(projectDir("/srv/app", env)).toBe(join(config, "projects", "-Users-you-start"));
     rmSync(join(config, "projects", "-Users-you-start", `${id}.jsonl`));
     mkdirSync(join(config, "projects", "-Users-you-nested", id));
+    writeFileSync(join(config, "projects", "-Users-you-nested", id, `${id}.jsonl`), "");
     expect(projectDir("/srv/app", env)).toBe(join(config, "projects", "-Users-you-nested"));
+  });
+
+  // Claude Code's Workflow tool keeps <id>/workflows/ under the shell's current project.
+  test("skips another project's <id>/ directory that holds no transcript", () => {
+    const id = "784a5677-0000-0000-0000-000000000000";
+    // Both orders, so the result cannot depend on the order readdir lists them in.
+    for (const [decoy, home] of [["-Users-you-aaa", "-Users-you-zzz"], ["-Users-you-zzz", "-Users-you-aaa"]]) {
+      const config = configDir(`${decoy}/${id}/workflows/scripts`, home);
+      writeFileSync(join(config, "projects", home, `${id}.jsonl`), "");
+      expect(projectDir("/srv/app", { CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_SESSION_ID: id })).toBe(
+        join(config, "projects", home),
+      );
+    }
   });
 
   test("derives the name when the session id is unknown or not a file name", () => {
@@ -116,5 +130,17 @@ describe.skipIf(noNode)("claude-project-dir.mjs", () => {
     mkdirSync(join(config, "projects", projectDirName(removed)));
     const gone = spawnSync("node", [script, removed], { env, encoding: "utf8" });
     expect([gone.status, gone.stdout.trim()]).toEqual([0, join(config, "projects", projectDirName(removed))]);
+  });
+
+  test("prints this session's directory without an argument, and the named workspace's with one", () => {
+    const id = "1b2c3d4e-0000-0000-0000-000000000000";
+    const workspace = realpathSync(configDir());
+    const config = configDir("-Users-you-start", projectDirName(workspace));
+    writeFileSync(join(config, "projects", "-Users-you-start", `${id}.jsonl`), "");
+    const env = { ...process.env, CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_SESSION_ID: id };
+    const session = spawnSync("node", [script], { cwd: workspace, env, encoding: "utf8" });
+    expect([session.status, session.stdout.trim()]).toEqual([0, join(config, "projects", "-Users-you-start")]);
+    const named = spawnSync("node", [script, workspace], { env, encoding: "utf8" });
+    expect([named.status, named.stdout.trim()]).toEqual([0, join(config, "projects", projectDirName(workspace))]);
   });
 });

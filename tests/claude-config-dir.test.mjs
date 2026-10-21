@@ -46,8 +46,8 @@ test("<encoded-cwd> turns every character other than a letter or digit into -", 
   expect(linesMatching(SLASH_ONLY_ENCODING)).toEqual([]);
 });
 
-// The system prompt's primary working directory follows the shell, so a
-// directory argument can name another project; the script finds the session by id.
-test("skills run claude-project-dir.mjs without a directory argument", () => {
-  expect(linesMatching(/claude-project-dir\.mjs\\?"? +\\?"/)).toEqual([]);
+// The system prompt's primary working directory follows the shell, so passing it
+// can name another project; without an argument the script finds the session by id.
+test("skills never pass the primary working directory to claude-project-dir.mjs", () => {
+  expect(linesMatching(/claude-project-dir\.mjs +\\?"<primary working directory>/)).toEqual([]);
 });

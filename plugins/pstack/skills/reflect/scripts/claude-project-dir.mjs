@@ -5,10 +5,11 @@
 //
 // The directory is <config>/projects/<name>, where <config> is
 // $CLAUDE_CONFIG_DIR or ~/.claude. Claude Code sets $CLAUDE_CODE_SESSION_ID in
-// its shell, so the directory holding <id>.jsonl or <id>/ is this session's,
-// wherever the shell has moved since; only directory names are read. Without a
-// session id, <name> is derived from the workspace, the current directory by
-// default, which must be the directory the session started in. Claude Code
+// its shell, so the directory holding <id>.jsonl or <id>/<id>.jsonl is this
+// session's, wherever the shell has moved since; only names are read. With a
+// workspace argument, or without a session id, <name> is derived from the
+// workspace, the current directory by default, which must be the directory the
+// session started in. Claude Code
 // derives <name> from that path by turning every character other than an ASCII
 // letter or digit into "-". A name longer than 200 characters keeps its first 200 and gains "-"
 // and a base-36 hash of the path. $CLAUDE_CODE_PROJECT_DIR_NAME replaces <name>
@@ -48,7 +49,11 @@ function sessionDir(projects, sessionId) {
   const dirs = readdirSync(projects, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => join(projects, entry.name));
-  return dirs.find((dir) => existsSync(join(dir, `${sessionId}.jsonl`)) || existsSync(join(dir, sessionId))) ?? null;
+  // A bare <id>/ is not enough: Claude Code's Workflow tool creates one under
+  // the shell's current project, which may be another project.
+  const transcript = (dir) =>
+    existsSync(join(dir, `${sessionId}.jsonl`)) || existsSync(join(dir, sessionId, `${sessionId}.jsonl`));
+  return dirs.find(transcript) ?? null;
 }
 
 export function projectDir(workspace, env = process.env) {
@@ -84,7 +89,9 @@ function main(argv) {
     return 2;
   }
   const workspace = argv[0] ? resolvedPath(argv[0]) : process.cwd();
-  const dir = projectDir(workspace);
+  // A directory argument asks for that workspace's sessions, not this session's.
+  const env = argv[0] ? { ...process.env, CLAUDE_CODE_SESSION_ID: undefined, CLAUDE_CODE_PROJECT_DIR_NAME: undefined } : process.env;
+  const dir = projectDir(workspace, env);
   if (!dir) {
     console.error(`no Claude Code transcripts directory for ${workspace}`);
     return 1;

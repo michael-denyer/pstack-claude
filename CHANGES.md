@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.102 - The skill link validator keeps angle-bracket destinations
+
+`tools/validate-skills.mjs` now reads a Markdown link destination written in angle brackets, such as `[text](<path with spaces.md>)`, as the path inside the brackets. It used to check the brackets as part of the path, so a link to an existing file was reported as broken. No skill content changed. `tests/agent-skills.test.mjs` covers the case.
+
 ## 0.9.101 - The transcripts directory script finds the session by its id
 
 `claude-project-dir.mjs` now finds this session's transcripts directory from `CLAUDE_CODE_SESSION_ID`, which Claude Code sets in its shell. It returns the directory under `projects/` that holds `<id>.jsonl` or `<id>/<id>.jsonl`, and reads only names. A bare `<id>/` does not count, because Claude Code's Workflow tool creates one under the shell's current project. In 0.9.100 the skills passed the system prompt's primary working directory, and that label follows the shell rather than the directory the session started in. After the agent moved into a worktree, `recall`, `automate-me`, `reflect`, `show-me-your-work`, and the Eval and Session pickup playbooks got exit 1. After a move into another project with transcripts of its own, they read that project's chats. The skills now run the script without an argument. A test fails if any of them passes the primary working directory again. Session pickup passes an earlier session's start directory when that session started somewhere else.

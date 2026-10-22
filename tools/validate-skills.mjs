@@ -25,7 +25,11 @@ export function markdownFiles(dir) {
 
 function markdownTargets(text) {
   const targets = [];
-  for (const [, raw] of text.matchAll(/\]\(([^)\n]*)\)/g)) targets.push(destination(raw));
+  // Parentheses inside <...> belong to the destination, not the inline
+  // link's closing delimiter. Keep that form intact for destination().
+  for (const [, raw] of text.matchAll(/\]\(([ \t]*<[^<>\r\n]*>[^)\n]*|[^)\n]*)\)/g)) {
+    targets.push(destination(raw));
+  }
   for (const [, raw] of text.matchAll(/^\s{0,3}\[(?!\^)[^\]\n]+\]:\s*(.+)$/gm)) {
     targets.push(destination(raw));
   }

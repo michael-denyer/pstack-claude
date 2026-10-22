@@ -9,8 +9,9 @@
 //
 // Without a transcripts path it scans every runtime's transcripts directory
 // that exists: Claude Code's projects under $CLAUDE_CONFIG_DIR, Codex's sessions
-// and archived_sessions under $CODEX_HOME, and Pi's sessions and pstack subagent
-// sessions under $PI_CODING_AGENT_DIR (defaults: ~/.claude, ~/.codex, ~/.pi/agent).
+// and archived_sessions under $CODEX_HOME, Pi's sessions and pstack subagent
+// sessions under $PI_CODING_AGENT_DIR, and OMP's sessions under the same env
+// var or ~/.omp/agent (defaults: ~/.claude, ~/.codex, ~/.pi/agent, ~/.omp/agent).
 //
 // Every probe yields a Fact, { known: true, value } or { known: false }. A hold
 // bucket needs only its own fact; `safe` needs every fact known.
@@ -88,9 +89,10 @@ export function defaultTranscriptRoots({ env = process.env, home = homedir(), st
   const claude = join(env.CLAUDE_CONFIG_DIR || join(home, ".claude"), "projects");
   const codex = env.CODEX_HOME || join(home, ".codex");
   const piAgent = env.PI_CODING_AGENT_DIR || join(home, ".pi", "agent");
+  const ompAgent = env.PI_CODING_AGENT_DIR || join(home, ".omp", "agent");
   const copilot = join(env.COPILOT_HOME || join(home, ".copilot"), "session-state");
-  const found = [claude, join(codex, "sessions"), join(codex, "archived_sessions"),
-    join(piAgent, "sessions"), join(piAgent, "pstack"), copilot].filter((root) => {
+  const found = [...new Set([claude, join(codex, "sessions"), join(codex, "archived_sessions"),
+    join(piAgent, "sessions"), join(piAgent, "pstack"), join(ompAgent, "sessions"), copilot])].filter((root) => {
       try {
         return stat(root, { throwIfNoEntry: false }) !== undefined;
       } catch (error) {

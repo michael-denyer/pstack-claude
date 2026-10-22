@@ -662,6 +662,13 @@ describe("default transcripts roots", () => {
     expect(roots({ env: {}, exists })).toEqual([claude, "/home/u/.copilot/session-state"]);
   });
 
+  test("OMP's sessions, under PI_CODING_AGENT_DIR when set", () => {
+    const present = new Set([claude, "/pi/sessions", "/home/u/.omp/agent/sessions"]);
+    const exists = (path) => present.has(path);
+    expect(roots({ env: { PI_CODING_AGENT_DIR: "/pi" }, exists })).toEqual([claude, "/pi/sessions"]);
+    expect(roots({ env: {}, exists })).toEqual([claude, "/home/u/.omp/agent/sessions"]);
+  });
+
   test("Claude Code's directory when no runtime directory exists, so the audit warns about it", () => {
     expect(roots({ env: {}, exists: () => false })).toEqual([claude]);
   });

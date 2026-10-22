@@ -6,9 +6,11 @@
 // Prints the newest matching path, or exits 1 with "no transcript". Covers
 // Claude Code's three layouts under one per-project directory (flat
 // <id>.jsonl, nested <id>/<id>.jsonl, subagent <id>/subagents/<child>.jsonl)
-// Pi's <iso>_<id>.jsonl under its per-cwd sessions directory, and GitHub
-// Copilot's <id>/events.jsonl under its session-state directory, told apart by
-// Pi's session header line and Copilot's session.start event. Each candidate is
+// Pi's <iso>_<id>.jsonl under its per-cwd sessions directory, OMP's
+// <timestamp>_<id>.jsonl whose title slot precedes the same session header,
+// and GitHub Copilot's <id>/events.jsonl under its session-state directory,
+// told apart by Pi's session header line and Copilot's session.start event.
+// Each candidate is
 // streamed line by line; a Claude Code or Copilot transcript is abandoned at its
 // first typed user record. Copilot searches compare the session header's cwd
 // with the workspace (the current directory by default) before reading user
@@ -81,6 +83,10 @@ const LOCAL_COMMAND = /^\s*<(?:command-name|local-command-stdout|bash-input)>/u;
 // A Pi session opens with this header line; Claude Code transcripts never do.
 const isPiHeader = (record) =>
   record?.type === "session" && Number.isInteger(record.version) && typeof record.cwd === "string";
+// OMP writes a fixed-width title slot before the Pi-shaped session header in
+// every current session file. The slot's JSON is a normal title record; the
+// padding that fills the fixed width stays after it on the same line.
+const isOmpTitleSlot = (record) => record?.type === "title" && typeof record.title === "string";
 // A Codex rollout opens with its session metadata.
 const isCodexHeader = (record) => record?.type === "session_meta";
 
@@ -169,6 +175,13 @@ export async function openingPrompt(path, workspace) {
     const records = parsed(jsonlLines(stream));
     const { value: head, done } = await records.next();
     if (done) return null;
+    if (isOmpTitleSlot(head)) {
+      const { value: header, done: noHeader } = await records.next();
+      if (noHeader) return null;
+      // After the title slot, an OMP session has Pi's header and entries.
+      if (isPiHeader(header)) return await piOpening(records);
+      return await claudeOpening(prepend(header, records));
+    }
     const [, read] = READERS.find(([matches]) => matches(head));
     return await read(head, records, path, workspace);
   } finally {

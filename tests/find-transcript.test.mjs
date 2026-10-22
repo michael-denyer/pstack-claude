@@ -224,6 +224,35 @@ describe("find-transcript", () => {
     expect(await findTranscript(dir, "issue 59")).toBe(pi);
   });
 
+  // OMP's layout: <sessions>/<encoded-cwd>/<timestamp>_<id>.jsonl. A
+  // fixed-width title slot precedes the Pi-shaped session header.
+  const ompTitle = JSON.stringify({ type: "title", title: "review the release lanes", titleSource: "auto" });
+
+  test("an OMP session's title slot is skipped and its Pi-shaped branch is read", async () => {
+    const dir = tempDir();
+    const path = transcript(
+      dir,
+      "--work-repo--/2026-10-01T00-00-00-000Z_s-1.jsonl",
+      [ompTitle, piHeader, piMessage("u1", null, "user", "review issue 59 on OMP"), piMessage("a1", "u1", "assistant", "on it")],
+      100,
+    );
+    expect(await openingPrompt(path)).toBe("review issue 59 on OMP");
+  });
+
+  test("findTranscript finds an OMP session among Claude transcripts in the same tree", async () => {
+    const dir = tempDir();
+    transcript(dir, "claude.jsonl", [meta, user("review issue 59")], 100);
+    const omp = transcript(dir, "omp.jsonl", [ompTitle, piHeader, piMessage("u1", null, "user", "review issue 59 on OMP")], 200);
+    expect(await findTranscript(dir, "on OMP")).toBe(omp);
+    expect(await findTranscript(dir, "issue 59")).toBe(omp);
+  });
+
+  test("an OMP title slot with no session header has no opening prompt", async () => {
+    const dir = tempDir();
+    const path = transcript(dir, "empty.jsonl", [ompTitle], 100);
+    expect(await openingPrompt(path)).toBeNull();
+  });
+
   // Copilot's layout: <session-state>/<id>/events.jsonl, a session.start event,
   // then one event per line with each typed prompt as a user.message.
   const copilotStart = JSON.stringify({ type: "session.start", data: { sessionId: "c1", context: { cwd: process.cwd() } } });

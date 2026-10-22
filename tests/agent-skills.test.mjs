@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -159,6 +160,67 @@ describe("shared Agent Skills tree", () => {
 
     try {
       expect(() => validateSkillsTree(root)).not.toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ["parentheses", "[guide](<references/guide(v1).md>)", "guide(v1).md"],
+    ["spaces and a title", '[guide]( \t<references/guide (v1).md> "Guide (v1)")', "guide (v1).md"],
+    ["an unmatched parenthesis", "[guide](<references/guide).md>)", "guide).md"],
+    ["query and fragment", "[guide](<references/guide(v1).md?download=1#section>)", "guide(v1).md"],
+    ["percent encoding", "[guide](references/guide%28v1%29.md)", "guide(v1).md"],
+    ["reference definition", '[guide][ref]\n[ref]: <references/guide(v1).md> "Guide"', "guide(v1).md"],
+  ])("local link destinations preserve %s", (_name, markdown, filename) => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-skills-links-"));
+    try {
+      const skill = join(root, "example");
+      const references = join(skill, "references");
+      mkdirSync(references, { recursive: true });
+      writeFileSync(join(references, filename), "# Guide\n");
+      writeFileSync(join(skill, "SKILL.md"), `${markdown}\n`);
+      expect(() => validateSkillsTree(root)).not.toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ["missing(v1).md", "missing"],
+    ["missing (v1).md", "missing"],
+    ["missing%GG(v1).md", "invalid URI encoding"],
+    ["../../outside(v1).md", "escapes skills tree"],
+  ])("an invalid angle-bracket target still fails: %s", (target, reason) => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-skills-links-"));
+    try {
+      mkdirSync(join(root, "example"));
+      writeFileSync(join(root, "example/SKILL.md"), `[guide](<${target}>)\n`);
+      expect(() => validateSkillsTree(root)).toThrow(`example/SKILL.md -> ${target} (${reason})`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("the link validator CLI accepts angle-bracket paths without hiding a later missing link", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-skills-links-"));
+    const cli = join(repoRoot, "tools/validate-skills.mjs");
+    try {
+      writeFileSync(join(root, "guide(v1).md"), "# Guide\n");
+      const markdown = '[guide](<guide(v1).md> "Guide") [external](<https://example.com/guide(v1)>)';
+      writeFileSync(join(root, "SKILL.md"), `${markdown}\n`);
+      const valid = spawnSync("node", [cli, root], { encoding: "utf8" });
+      expect(valid.error).toBeUndefined();
+      expect(valid.status).toBe(0);
+      expect(valid.stderr).toBe("");
+      expect(valid.stdout).toContain("ok: local markdown links stay inside");
+
+      writeFileSync(join(root, "SKILL.md"), `${markdown} [missing](missing.md)\n`);
+      const invalid = spawnSync("node", [cli, root], { encoding: "utf8" });
+      expect(invalid.error).toBeUndefined();
+      expect(invalid.status).toBe(1);
+      expect(invalid.stderr).toContain("SKILL.md -> missing.md (missing)");
+      expect(invalid.stderr).not.toContain("guide(v1).md (missing)");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

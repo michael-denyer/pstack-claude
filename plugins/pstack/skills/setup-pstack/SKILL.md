@@ -11,6 +11,8 @@ On GitHub Copilot, read the [platform mapping](../poteto-mode/references/copilot
 
 On Muse, read the [platform mapping](../poteto-mode/references/muse-tools.md), including its per-skill notes, before following this skill.
 
+On OMP, read the [platform mapping](../poteto-mode/references/omp-tools.md), including its Models section, before following this skill. OMP keeps its model choices in native roles, not in a pstack sheet.
+
 On GitHub Copilot, follow [the Copilot setup](copilot.md) in place of steps 1, 3, 4, and 7 and step 6's header.
 
 On another runtime, read [Other runtimes](#other-runtimes) below for where the sheet lives and how it loads; the steps are the same.
@@ -45,7 +47,7 @@ Then ask for the default reasoning effort, the `default effort` line. It is `ses
 
 ### 4. Choose whether the session hook routes tasks
 
-On Claude Code and Codex, the plugin's `SessionStart` hook injects the poteto-mode mandate on startup, resume, clear, and compact. Codex asks the user to trust plugin hooks through `/hooks` before running them. On Pi, the pstack extension adds the same mandate to the system prompt at every agent start. On Muse, the native plugin's `SessionStart` hook injects the mandate once the user approves the plugin's hooks with `muse plugins approve pstack`. Ask whether to keep the hook. The default is on. The answer is the `session hook` line in the current runtime's sheet: `on` or `off`. With no sheet or no line, the hook injects. The line is inert on other runtimes.
+On Claude Code and Codex, the plugin's `SessionStart` hook injects the poteto-mode mandate on startup, resume, clear, and compact. Codex asks the user to trust plugin hooks through `/hooks` before running them. On Pi, the pstack extension adds the same mandate to the system prompt at every agent start. On Muse, the native plugin's `SessionStart` hook injects the mandate once the user approves the plugin's hooks with `muse plugins approve pstack`. Ask whether to keep the hook. The default is on. The answer is the `session hook` line in the current runtime's sheet: `on` or `off`. With no sheet or no line, the hook injects. The line is inert on other runtimes. OMP has no pstack hook, so use the standing instruction in its mapping instead.
 
 ### 5. Validate
 
@@ -53,7 +55,7 @@ Every real slug written must be in the detected set. `inherit-parent` and `auto`
 
 ### 6. Write the override sheet
 
-Write the current runtime's sheet with the shape below. Overwrite the whole file so re-runs stay idempotent.
+Write the current runtime's sheet with the shape below. Overwrite the whole file so re-runs stay idempotent. On OMP, do not write this sheet; set the native roles in OMP's model Roles view or in `modelRoles` and `task.agentModelOverrides`, as the [OMP mapping](../poteto-mode/references/omp-tools.md#models) describes.
 
 ```markdown
 # pstack model configuration
@@ -90,6 +92,8 @@ On Codex, paste the model rows and the `default effort` line into `<codex-home>/
 
 On Muse, no include line is needed: the plugin hook reads the sheet directly and injects its role lines at session start. It runs only after the user approves the plugin's hooks, so name `muse plugins approve pstack` when the hook has not run yet.
 
+On OMP, no include line is needed. OMP reads `modelRoles` and `task.agentModelOverrides` from `~/.omp/agent/config.yml` natively. Add the standing instruction from the [OMP mapping](../poteto-mode/references/omp-tools.md#session-routing) to `~/.omp/agent/AGENTS.md` if it is not already there.
+
 ### 8. Confirm
 
 Tell the user where the override was written, how its model rows load, and whether the plugin hook is on. Re-running this skill updates the override sheet.
@@ -113,6 +117,7 @@ The role lines are the same everywhere. What differs is the sheet path, how the 
 | Pi | `pstack-models.md` in the Pi agent directory, `$PI_CODING_AGENT_DIR` or `~/.pi/agent` | read by the pstack Pi extension, model rows and hook setting both; no include line | `pi --list-models`, see [pi-tools.md](../poteto-mode/references/pi-tools.md#model-names) and its `setup-pstack` note | extension contract tested offline; live results in the repository's `docs/pi-equivalence.md` |
 | GitHub Copilot (CLI and app) | `${COPILOT_HOME:-~/.copilot}/pstack-models.md` | the plugin hook checks it and injects its role lines at session start; skills-only installs read it with `view` | the `task` tool's `model` enum, see [copilot-tools.md](../poteto-mode/references/copilot-tools.md#model-names) | hook contract tested; CLI install smoke-tested |
 | Muse | `${XDG_CONFIG_HOME:-~/.config}/muse/pstack-models.md` | the plugin hook reads it and injects its role lines at session start, once hooks are approved; no include line | the model catalog (`muse model-profile show <model>` names each one), see [muse-tools.md](../poteto-mode/references/muse-tools.md#model-names) | hook contract tested; plugin install verified |
+| OMP | no pstack sheet: native `modelRoles` and `task.agentModelOverrides` in `~/.omp/agent/config.yml` | native config; no include line and no pstack hook | `omp models --kind chat`, see [omp-tools.md](../poteto-mode/references/omp-tools.md#models) | from OMP 18.12.6 docs; discovery checked live |
 | opencode | `~/.config/opencode/pstack-models.md` | add the path to the `instructions` array in `opencode.json` | the `models` slash command in the session | from published docs, no live session |
 | Gemini CLI | `~/.gemini/pstack-models.md` | `@~/.gemini/pstack-models.md` in `~/.gemini/GEMINI.md` | the `model` slash command in the session | from published docs, no live session |
 | Prime Agent | no documented sheet path; Prime's configuration chooses models | | | no live session |

@@ -48,6 +48,30 @@ The package loads the skills and the pstack Pi extension, which adds the subagen
 
 </details>
 
+<a id="omp"></a>
+<details>
+<summary><strong>OMP</strong></summary>
+
+OMP discovers the shared skills from a custom directory. It already has the subagent, question, todo, and `/loop` tools the skills use, so it needs no pstack extension.
+
+```shell
+git clone https://github.com/michael-denyer/pstack-claude
+```
+
+Add the clone's absolute `plugins/pstack/skills` path to the existing list in `~/.omp/agent/config.yml`:
+
+```yaml
+skills:
+  customDirectories:
+    - /absolute/path/to/pstack-claude/plugins/pstack/skills
+```
+
+Keep the entries already in that list. Start a new session, then add the standing instruction from the [OMP mapping](plugins/pstack/skills/poteto-mode/references/omp-tools.md#session-routing) to `~/.omp/agent/AGENTS.md`. OMP has no pstack routing hook; the instruction is the route. Invoke a skill with `/skill:<name>` or read it with `omp read skill://<name>/SKILL.md`.
+
+Configure models through OMP's native `modelRoles` and `task.agentModelOverrides`; the [mapping](plugins/pstack/skills/poteto-mode/references/omp-tools.md#models) gives the role map. OMP does not use a pstack model sheet.
+
+</details>
+
 <details>
 <summary><strong>GitHub Copilot</strong></summary>
 

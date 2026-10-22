@@ -61,6 +61,7 @@ All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only i
 | Claude Code | Install the marketplace plugin (Claude Code 2.1.292 or later). Skills use Claude tool names and model defaults; the plugin installs automatic routing. |
 | Codex | Install the native plugin through the repository's marketplace and trust its hook through `/hooks`. The [Codex mapping](../plugins/pstack/skills/poteto-mode/references/codex-tools.md) translates Claude tools and model names. Shared skill symlinks were also detected in a live session. |
 | Pi | Install the repository as a Pi package with `pi install`. The [Pi extension](../plugins/pstack/pi/index.ts) registers the subagent, question, and wake-up tools and `/loop`, and the [Pi mapping](../plugins/pstack/skills/poteto-mode/references/pi-tools.md) translates Claude tools and model names. The [equivalence table](pi-equivalence.md) records each Claude Code mechanism and how it was verified on Pi 1.1. |
+| OMP | Add the clone's skills directory to `skills.customDirectories`. OMP's native `task`, `ask`, `todo`, `wait`, and `/loop` cover the skills, and the [OMP mapping](../plugins/pstack/skills/poteto-mode/references/omp-tools.md) translates Claude tools, subagents, transcripts, and model roles. OMP has no pstack routing hook; see [OMP](#omp). |
 | GitHub Copilot | Install the plugin through the repository's marketplace; the CLI and the GitHub Copilot app share it. The [Copilot mapping](../plugins/pstack/skills/poteto-mode/references/copilot-tools.md) translates Claude tools, paths, and model roles, and maps app-only tools to CLI fallbacks. Install, routing, agent dispatch, and first-run setup are smoke-tested on the CLI; see [GitHub Copilot](#github-copilot). |
 | Muse | Install the native plugin bundle with `muse plugins install`, then approve its hooks and agent definitions with `muse plugins approve pstack`. The [Muse mapping](../plugins/pstack/skills/poteto-mode/references/muse-tools.md) translates Claude tools, subagents, transcripts, and model roles. See [Muse](#muse). |
 | Prime Agent | Its documentation describes shared-directory discovery; it has not been tested in a live session. Choose tools and models through Prime's configuration. |
@@ -146,6 +147,18 @@ The extension supplies what Pi lacks natively, under the Claude Code names the s
 - At every agent start it adds the routing instruction, the override sheet `~/.pi/agent/pstack-models.md`, and a pointer to the Pi mapping to the system prompt.
 
 Family names such as `opus` resolve through the `pi` block of [`models.json`](../plugins/pstack/models.json) to model IDs for the provider the Pi session runs on. A ChatGPT sign-in (`openai`, or the legacy `openai-codex`) gets OpenAI models, and Anthropic or any other provider gets Claude models. Pi warns that Anthropic bills Claude used through Pi per token, as extra usage, even on a Claude subscription, and every subagent pstack starts adds to that bill. Run pstack in Claude Code to stay within a Claude plan's limits. A `pi models:` line in the sheet remaps any family name. The [Pi mapping](../plugins/pstack/skills/poteto-mode/references/pi-tools.md) lists every translation, and the [equivalence table](pi-equivalence.md) records what was verified and how.
+
+### OMP
+
+OMP is a Pi-derived harness. It already has the subagent, question, todo, and `/loop` tools the skills use, so pstack ships no OMP extension and no OMP plugin manifest. Install the shared skills by adding the clone's absolute `plugins/pstack/skills` directory to `skills.customDirectories` in `~/.omp/agent/config.yml`, as the [README](../README.md#omp) shows. OMP scans that directory one level deep, so point it at the `skills` root.
+
+The [OMP mapping](../plugins/pstack/skills/poteto-mode/references/omp-tools.md) translates Claude tools to OMP's `read`, `write`, `edit`, `bash`, `eval`, `grep`, `glob`, `task`, `ask`, `todo`, `wait`, and `web_search`, and describes the batch task shape (`context` plus `tasks[]`, with `task` and `solutionSpace` on each item). It also maps subagents, `/loop`, project skills under `.omp/skills/`, and transcripts under `~/.omp/agent/sessions/`.
+
+OMP's native model roles are the model authority: set `modelRoles` and `task.agentModelOverrides` in `~/.omp/agent/config.yml`. A task item has no model field, except for `seance`; use agent overrides or distinct agent files for a diverse panel. OMP does not use a pstack model sheet. The [mapping's Models section](../plugins/pstack/skills/poteto-mode/references/omp-tools.md#models) gives the role and effort map.
+
+OMP has no pstack `SessionStart` hook. Add the standing instruction from the [mapping's Session routing section](../plugins/pstack/skills/poteto-mode/references/omp-tools.md#session-routing) to `~/.omp/agent/AGENTS.md` or a project `AGENTS.md`. Without it, request `poteto-mode` by name.
+
+On OMP 18.12.6, all 65 skills were discovered from the custom directory, `omp read skill://poteto-mode/SKILL.md` resolved, and the native task schema matched the mapping. The transcript and worktree scripts read OMP's title-slot sessions and `~/.omp/agent/sessions` directory. Delegation through a live model call is not part of CI.
 
 ### GitHub Copilot
 

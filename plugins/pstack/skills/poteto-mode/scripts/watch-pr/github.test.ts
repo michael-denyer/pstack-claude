@@ -41,6 +41,54 @@ const numbers = (stack: readonly PrContext[]): number[] =>
   stack.map((pr) => Number(pr.number));
 
 describe("checks fallback chain", () => {
+  it.each(["SUCCESS", "FAILURE", "CANCELLED", "NEUTRAL", "SKIPPED"])(
+    "reads the final %s conclusion when gh still reports a check in progress",
+    async (conclusion) => {
+      const check = mapRollupNode({
+        __typename: "CheckRun",
+        name: "ci",
+        status: "IN_PROGRESS",
+        conclusion,
+      });
+      if (!check) throw new Error("Missing check.");
+      const reader = fakeReader({
+        fastPath: { kind: "checks", checks: [pendingCheck()] },
+        rollupPages: [{ kind: "contexts", checks: [check], endCursor: null }],
+      });
+      const read = reported(await resolveChecks(reader, context));
+      expect(read.source).toBe("graphql-rollup");
+      expect(read.checks[0].kind).toBe(
+        conclusion === "SUCCESS"
+          ? "passed"
+          : conclusion === "NEUTRAL" || conclusion === "SKIPPED"
+            ? "skipped"
+            : "failed"
+      );
+    }
+  );
+
+  it("keeps a check pending until it has a final conclusion", async () => {
+    const reader = fakeReader({
+      fastPath: { kind: "checks", checks: [pendingCheck()] },
+      rollupPages: [
+        { kind: "contexts", checks: [pendingCheck()], endCursor: null },
+      ],
+    });
+    expect(reported(await resolveChecks(reader, context)).checks[0].kind).toBe(
+      "pending"
+    );
+  });
+
+  it("does not drop known pending or failed checks when the rollup is empty", async () => {
+    const checks = [pendingCheck(), failedCheck("other")];
+    const reader = fakeReader({ fastPath: { kind: "checks", checks } });
+    expect(
+      reported(await resolveChecks(reader, context)).checks.map(
+        (check) => check.kind
+      )
+    ).toEqual(["pending", "failed"]);
+  });
+
   it("uses a non-empty fast-path result without a rollup query", async () => {
     const reader = fakeReader({
       fastPath: { kind: "checks", checks: [passingCheck("fast")] },
@@ -213,6 +261,11 @@ describe("rollup node mapping", () => {
   it("maps terminal and non-terminal CheckRun states fail closed", () => {
     const cases = [
       ["IN_PROGRESS", null, "pending", "PENDING"],
+      ["IN_PROGRESS", "SUCCESS", "passed", "SUCCESS"],
+      ["IN_PROGRESS", "FAILURE", "failed", "FAILURE"],
+      ["IN_PROGRESS", "CANCELLED", "failed", "FAILURE"],
+      ["IN_PROGRESS", "TIMED_OUT", "failed", "FAILURE"],
+      ["IN_PROGRESS", "FUTURE_VALUE", "failed", "FAILURE"],
       ["COMPLETED", "SUCCESS", "passed", "SUCCESS"],
       ["COMPLETED", "NEUTRAL", "skipped", "NEUTRAL"],
       ["COMPLETED", "SKIPPED", "skipped", "SKIPPED"],

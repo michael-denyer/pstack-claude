@@ -351,7 +351,7 @@ export function mapRollupNode(value: unknown): T.Check | null {
       typeof object.conclusion === "string"
         ? object.conclusion.toUpperCase()
         : "";
-    if (status !== "COMPLETED")
+    if (status !== "COMPLETED" && !conclusion)
       return gateOr("pending", { ...details, link }, "PENDING");
     if (conclusion === "SUCCESS")
       return { ...details, link, kind: "passed", reportedState: "SUCCESS" };
@@ -745,7 +745,8 @@ export async function resolveChecks(
 ): Promise<T.CheckRead> {
   const fast = await reader.checksFastPath(context);
   const direct = fast.kind === "checks" ? nonEmpty(fast.checks) : null;
-  if (direct !== null)
+  // gh hides conclusions behind stale in-flight statuses; the rollup retains both.
+  if (direct !== null && !direct.some((check) => check.kind === "pending"))
     return { kind: "reported", source: "gh-pr-checks", checks: direct };
   const checks: T.Check[] = [];
   const cursors = new Set<string>();
@@ -764,6 +765,8 @@ export async function resolveChecks(
   const fallback = nonEmpty(checks);
   if (fallback !== null)
     return { kind: "reported", source: "graphql-rollup", checks: fallback };
+  if (direct !== null)
+    return { kind: "reported", source: "gh-pr-checks", checks: direct };
   // Both reads have to say it. A null rollup beside a failed fast path can be a
   // credential that cannot see checks, and a rollup that exists but maps to no
   // check can hold a context type this reader does not know.

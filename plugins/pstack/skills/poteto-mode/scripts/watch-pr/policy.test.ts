@@ -111,6 +111,7 @@ describe("snapshot query planning", () => {
       "pullRequest",
       "reviewThreadPage:null",
       "checksFastPath",
+      "checkRollupPage:null",
       "pullRequest",
     ]);
   });

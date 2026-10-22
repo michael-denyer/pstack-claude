@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.102 - Final check conclusions survive stale GitHub status
+
+The PR watcher reads final check conclusions from the full GraphQL rollup when `gh pr checks` still reports an in-flight status. A completed success no longer waits forever, failures still block, and a check without a conclusion remains pending. Empty rollups preserve the fast path's known checks. Regression tests and a live read-only before/after check cover the contradictory status/conclusion response.
+
 ## 0.9.101 - The transcripts directory script finds the session by its id
 
 `claude-project-dir.mjs` now finds this session's transcripts directory from `CLAUDE_CODE_SESSION_ID`, which Claude Code sets in its shell. It returns the directory under `projects/` that holds `<id>.jsonl` or `<id>/<id>.jsonl`, and reads only names. A bare `<id>/` does not count, because Claude Code's Workflow tool creates one under the shell's current project. In 0.9.100 the skills passed the system prompt's primary working directory, and that label follows the shell rather than the directory the session started in. After the agent moved into a worktree, `recall`, `automate-me`, `reflect`, `show-me-your-work`, and the Eval and Session pickup playbooks got exit 1. After a move into another project with transcripts of its own, they read that project's chats. The skills now run the script without an argument. A test fails if any of them passes the primary working directory again. Session pickup passes an earlier session's start directory when that session started somewhere else.

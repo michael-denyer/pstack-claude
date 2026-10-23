@@ -2,6 +2,18 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.104 - create-project-guide and maintain-project-guide write down what the code can't show
+
+Two new skills give agents the project knowledge they can't read from the code.
+
+`/create-project-guide` reads the repo first and asks the user only what the repo can't show, in one batch with a recommended answer for each question. It sorts every fact before writing it. A fact the repo already states gets a link to the manifest or config. One a tool could enforce goes to the `correct` skill as a check. A short judgment rule goes in `correct`'s rule table, a procedure becomes a project-local skill, and a choice among alternatives becomes a decision record. Only knowledge no tool can hold becomes prose, in at most three short docs: `product.md` for purpose, users, and non-goals, `domain.md` for terms and invariants, and `constraints.md` for limits and data policy. Every claim names its source. The skill links each doc from the project's agent instruction file in one line, then asks a fresh subagent a few newcomer questions to prove a cold agent finds the answers.
+
+`/maintain-project-guide` is the upkeep pass. Read-only subagents check each claim against its source, using `git blame` to tell whether the source changed after the claim was written. Stale claims are fixed, facts the repo now states become links, enforceable ones go to `correct`, and user answers whose code changed are asked again in one batch. A contradiction between the code and the guide is fixed only when the guide is stale. A regression or a changed decision goes to the user. The pass ends clean, blocked, or with one PR of corrections.
+
+Both skills are port-only, so they need no fork entry. `docs/reference.md` and `poteto-help` list them, `poteto-help` mentions `/create-project-guide` when agents keep missing context, and `NOTICE.md` records them as independently authored.
+
+**Verified.** `bun tools/generate.mjs --check` passes with 87 generated files current, including the two new Codex prompt stubs and the Muse skill list. Markdownlint reports no errors in the six changed Markdown files. The sync dry-run at the pinned SHA prints 47 forked and 87 unchanged, as at 0.9.102, and lists both skills as port-only. `bun test tests/` passes 1306 tests. The three installed Pi child startup tests time out, as they do on an unchanged 0.9.102 checkout. Neither skill has been run on a real project yet, and the behavioral leg did not run.
+
 ## 0.9.102 - The skill link validator keeps angle-bracket destinations
 
 `tools/validate-skills.mjs` now reads a Markdown link destination written in angle brackets, such as `[text](<path with spaces.md>)`, as the path inside the brackets. It used to check the brackets as part of the path, so a link to an existing file was reported as broken. No skill content changed. `tests/agent-skills.test.mjs` covers the case.

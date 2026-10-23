@@ -87,6 +87,14 @@ When you scrap:
 
 The caller's usage is written first and the type sketch derived from it. One file with new types and signatures for small changes. Module map plus type definitions for larger work. The rationale ships alongside, shaped per `references/rationale-template.md`, including the usage sketch and the synthesis decision.
 
+When the design settles a one-way door, keep its rationale in the repo as a decision record. A one-way door gets costly to undo once code, data, or other teams depend on it, such as a storage engine, a wire or file format, a public API, or which module owns a piece of state. A design a later change can reshape without a migration keeps its rationale with the change only.
+
+1. Use the decisions directory the project already keeps, with its numbering and format. When it has none, create `docs/adr/`.
+2. Save the rationale there as the next numbered record, such as `0004-ledger-storage.md`, with its status (`Accepted`) and the date under the title. Commit it with the change that implements it. Phase D reconciles this file, not a copy.
+3. List every record in the directory's index, its README unless the project names another file. Give each record one line that links its title to the file, states its status, and names what was chosen over what.
+4. Once the change merges, a record changes only its status. A later decision gets a new record. When it replaces an earlier one, set the earlier status to `Superseded by NNNN` in that record and in the index.
+5. Check that the project's agent instruction file, such as `AGENTS.md` or `CLAUDE.md`, links the index in one line. Add the line when it is missing. Agents never open an index nothing links.
+
 ## Models
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in the `pstack-models.md` override sheet overrides each at runtime; `/setup-pstack` writes it and lists its path per runtime.

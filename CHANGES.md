@@ -2,6 +2,18 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.103 - architect keeps one-way-door decisions as records, and correct says where docs go
+
+`architect` now keeps the rationale of a one-way-door design in the project as a numbered decision record. A one-way door is a choice that gets costly to undo once code, data, or other teams depend on it. The agent uses the project's existing decisions directory, or creates `docs/adr/`, and commits the record with the change. Each record gets one line in the directory's index with its status. A replaced record is marked `Superseded by NNNN`, and nothing else in it changes after merge. The agent also checks that the project's agent instruction file links the index in one line. Before this, the rationale shipped with the change and had no home once the PR merged. The next agent could not find why a shape was chosen, or tell a reversed decision from a current one.
+
+`correct` step 4 now says where a judgment-call doc goes. Short rules stay in the agent instruction file. A topic that outgrows it gets its own doc, which the instruction file links in one line. For a fact a manifest or config already holds, such as the stack and its versions, the agent links the file instead of restating it.
+
+This adapts a proposal to add `docs/steering/` and `docs/adr/` folders to every project. The steering folder is left out. Agent runtimes load their own instruction files and not that folder, it would hold a second copy of the project's rules, and nothing would catch its prose going stale. `recall` already sweeps the locations a project's instruction file names, and `why` already searches for decision records.
+
+Both are `policy` forks. `tools/forks.json` widens the `architect` entry's reason and adds `correct`.
+
+**Verified.** `bun tools/generate.mjs --check` passes, and markdownlint reports no errors in the three changed Markdown files. The sync dry-run at the pinned SHA prints 48 forked and 86 unchanged, against 47 and 87 at 0.9.102. On a clean checkout `bun test tests/` passes 1305 tests. The three installed Pi child startup tests time out there and on an unchanged 0.9.102 checkout alike. `tests/log.test.mjs` also failed once, while a sync dry-run loaded the machine, and passes 11 of 11 on its own. No eval compared agent behavior before and after the change, and the behavioral leg did not run.
+
 ## 0.9.102 - The skill link validator keeps angle-bracket destinations
 
 `tools/validate-skills.mjs` now reads a Markdown link destination written in angle brackets, such as `[text](<path with spaces.md>)`, as the path inside the brackets. It used to check the brackets as part of the path, so a link to an existing file was reported as broken. No skill content changed. `tests/agent-skills.test.mjs` covers the case.

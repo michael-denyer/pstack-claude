@@ -2,7 +2,7 @@
   "pstack": {
     "plugins/pstack/skills/architect/SKILL.md": {
       "kind": "policy",
-      "why": "Requires comparing accepted deviations with the saved sketch and rationale, and updating them, before each implementation unit closes.",
+      "why": "Requires comparing accepted deviations with the saved sketch and rationale, and updating them, before each implementation unit closes, and keeps a one-way-door rationale as a numbered decision record, listed with its status in an index the agent instruction file links.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
@@ -22,6 +22,12 @@
       "kind": "policy",
       "why": "Adds a /bro and say-it-plainly trigger to the description.",
       "since": "0.9.10",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/correct/SKILL.md": {
+      "kind": "policy",
+      "why": "Tells step 4 to put each doc where agents load it, a topic doc linked from the agent instruction file in one line, and to link a manifest rather than restate it.",
+      "since": "0.9.103",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/create-verification-skill/SKILL.md": {

@@ -47,9 +47,9 @@ Arena returns one synthesized design package. Its synthesis decision fills the r
 
 Default: proceed directly to implementation with the synthesized design. No human checkpoint.
 
-Opt in to a checkpoint when the invoker explicitly asks: "/architect with checkpoint," "stop and show me before implementing," or similar. Then surface the synthesized design and pause for sign-off. When the request authorizes planning only, the checkpoint is required and Phase D waits for implementation authorization.
+Opt in to a checkpoint when the invoker explicitly asks: "/architect with checkpoint," "stop and show me before implementing," or similar. Then surface the synthesized design and pause for sign-off. When the request authorizes planning only, the checkpoint is required and Phase D waits for implementation authorization. Planning-only authorization does not authorize repository writes or commits. Keep the synthesis in chat unless the request separately authorizes a repository artifact.
 
-The synthesis can ship as its own commit either way, as the "scaffold first" mode of the **foundational-thinking** principle skill. Planned and scoped breakage during fill-in is fine, per the **outcome-oriented-execution** principle skill. For adversarial pressure on the design before implementing, run the **interrogate** skill on the synthesized sketch.
+When repository writes are authorized, the synthesis can ship as its own commit, as the "scaffold first" mode of the **foundational-thinking** principle skill. Planned and scoped breakage during fill-in is fine, per the **outcome-oriented-execution** principle skill. For adversarial pressure on the design before implementing, run the **interrogate** skill on the synthesized sketch.
 
 If the human pushes back on the shape (in a checkpoint or after the fact), treat that as Phase A evidence. Re-ground and re-run Phase B before writing more code.
 
@@ -85,7 +85,7 @@ When you scrap:
 
 ## Outputs
 
-The caller's usage is written first and the type sketch derived from it. One file with new types and signatures for small changes. Module map plus type definitions for larger work. The rationale ships alongside, shaped per `references/rationale-template.md`, including the usage sketch and the synthesis decision.
+With repository-write authorization, write the caller's usage first and derive the type sketch from it. Use one file with new types and signatures for small changes. Use a module map plus type definitions for larger work. Ship the rationale alongside, shaped per `references/rationale-template.md`, including the usage sketch and the synthesis decision. Without that authorization, return the same package in chat and write no repository files.
 
 ## Models
 

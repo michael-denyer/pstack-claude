@@ -14,8 +14,8 @@ When Explore runs first, write nothing in it except change artifacts the request
 
 `tasks.md` is the task list, and its checkboxes are the task state. Repeat until every task is checked:
 
-1. Follow the installed Apply workflow, including its start-of-apply reads. Between tasks, refresh its instructions and act on the returned task at its returned location as Apply directs.
-2. Take the first unchecked task whose earlier tasks are done. File order is dependency order. Independent ready tasks may run in parallel under the existing delegate and worktree rules.
+1. Follow the installed Apply workflow, including its start-of-apply reads. Between tasks, refresh its instructions, context files, task statuses, and source locations. The loop owner selects from those refreshed pending tasks under step 2.
+2. Take an unchecked task whose explicit dependencies and natural prerequisites in `tasks.md` are complete. When more than one task is ready, file order breaks ties. Independent ready tasks may run in parallel under the existing delegate and worktree rules.
 3. Do the work the task names with the matching playbook steps that apply to it, including a keep-or-revert decision about that task's own change, and run the task's own check. Preserve incremental commits and committed-base worktree rules. A playbook step that another task names runs in that task. Change-level steps, such as review and same-surface verification no task names, are not repeated per task. Rerun any check whose evidence a later fix invalidates. Defer only PR publication and delivery to closure.
 4. Check the task's box only after its verification passes on the real artifact. If its evidence later fails, uncheck the box and say why.
 

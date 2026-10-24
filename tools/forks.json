@@ -2,7 +2,7 @@
   "pstack": {
     "plugins/pstack/skills/architect/SKILL.md": {
       "kind": "policy",
-      "why": "Requires comparing accepted deviations with the saved sketch and rationale before each implementation unit closes, preserves planning-only authorization, and routes changes to observable behavior or acceptance back to the requirements owner.",
+      "why": "Requires comparing accepted deviations with the saved sketch and rationale before each implementation unit closes, keeps planning-only output out of the repository unless a separate authorization permits it, and routes changes to observable behavior or acceptance back to the requirements owner.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },

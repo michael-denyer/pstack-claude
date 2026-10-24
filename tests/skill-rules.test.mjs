@@ -1,8 +1,3 @@
-// Port-local rules live in files the port has forked, which tools/sync.mjs
-// three-way merges: a clean merge is written, and a conflict is written with
-// markers for a human to resolve. A rule dropped in either reads as a clean
-// sync, so each one is pinned here by the sentence that carries it, with the
-// issue or PR that earned it.
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -165,6 +160,26 @@ const rules = [
     source: "OpenSpec composition: planning does not authorize implementation",
     file: "architect/SKILL.md",
     phrase: "When the request authorizes planning only, the checkpoint is required and Phase D waits for implementation authorization.",
+  },
+  {
+    source: "OpenSpec composition: planning does not authorize repository writes",
+    file: "architect/SKILL.md",
+    phrase: "Planning-only authorization does not authorize repository writes or commits.",
+  },
+  {
+    source: "OpenSpec composition: Apply refreshes state before owner selection",
+    file: "poteto-mode/references/openspec-integration.md",
+    phrase: "The loop owner selects from those refreshed pending tasks under step 2.",
+  },
+  {
+    source: "OpenSpec composition: tasks follow recorded dependencies",
+    file: "poteto-mode/references/openspec-integration.md",
+    phrase: "explicit dependencies and natural prerequisites in `tasks.md` are complete",
+  },
+  {
+    source: "OpenSpec composition: planning-only architect output stays in chat",
+    file: "architect/SKILL.md",
+    phrase: "Without that authorization, return the same package in chat and write no repository files.",
   },
   {
     source: "OpenSpec composition: do not freeze mutable task files",

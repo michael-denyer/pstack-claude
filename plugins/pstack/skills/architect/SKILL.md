@@ -47,15 +47,15 @@ Arena returns one synthesized design package. Its synthesis decision fills the r
 
 Default: proceed directly to implementation with the synthesized design. No human checkpoint.
 
-Opt in to a checkpoint when the invoker explicitly asks: "/architect with checkpoint," "stop and show me before implementing," or similar. Then surface the synthesized design and pause for sign-off.
+Opt in to a checkpoint when the invoker explicitly asks: "/architect with checkpoint," "stop and show me before implementing," or similar. Then surface the synthesized design and pause for sign-off. When the request authorizes planning only, the checkpoint is required and Phase D waits for implementation authorization. Planning-only authorization does not authorize repository writes or commits. Keep the synthesis in chat unless the request separately authorizes a repository artifact.
 
-The synthesis can ship as its own commit either way, as the "scaffold first" mode of the **foundational-thinking** principle skill. Planned and scoped breakage during fill-in is fine, per the **outcome-oriented-execution** principle skill. For adversarial pressure on the design before implementing, run the **interrogate** skill on the synthesized sketch.
+When repository writes are authorized, the synthesis can ship as its own commit, as the "scaffold first" mode of the **foundational-thinking** principle skill. Planned and scoped breakage during fill-in is fine, per the **outcome-oriented-execution** principle skill. For adversarial pressure on the design before implementing, run the **interrogate** skill on the synthesized sketch.
 
 If the human pushes back on the shape (in a checkpoint or after the fact), treat that as Phase A evidence. Re-ground and re-run Phase B before writing more code.
 
 ## Phase D: Implement against the sketch
 
-Replace `not implemented` bodies with code, pseudocode with logic. The synthesized sketch is the contract. Deviations from it are signal to surface, not friction to absorb silently. If a function needs a parameter the sketch didn't anticipate, ask whether the sketch was wrong, the requirement was missed, or the implementation is overreaching.
+Replace `not implemented` bodies with code, pseudocode with logic. The synthesized sketch is the contract. Deviations from it are signal to surface, not friction to absorb silently. If a function needs a parameter the sketch didn't anticipate, ask whether the sketch was wrong, the requirement was missed, or the implementation is overreaching. A deviation that changes observable behavior or acceptance goes to whoever owns the requirements before the sketch absorbs it.
 
 Before closing each implementation unit or handing its contract to the next worker, compare accepted deviations with the saved behavior contracts, interfaces, and responsibility assignments. Once the appropriate owner or review process accepts a change, update the affected parts of the existing sketch and rationale. Record the acceptance source there. A change from raising an error to returning a refusal must update the outcome contract before the next unit begins.
 
@@ -85,7 +85,7 @@ When you scrap:
 
 ## Outputs
 
-The caller's usage is written first and the type sketch derived from it. One file with new types and signatures for small changes. Module map plus type definitions for larger work. The rationale ships alongside, shaped per `references/rationale-template.md`, including the usage sketch and the synthesis decision.
+With repository-write authorization, write the caller's usage first and derive the type sketch from it. Use one file with new types and signatures for small changes. Use a module map plus type definitions for larger work. Ship the rationale alongside, shaped per `references/rationale-template.md`, including the usage sketch and the synthesis decision. Without that authorization, return the same package in chat and write no repository files.
 
 ## Models
 

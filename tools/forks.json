@@ -2,7 +2,7 @@
   "pstack": {
     "plugins/pstack/skills/architect/SKILL.md": {
       "kind": "policy",
-      "why": "Requires comparing accepted deviations with the saved sketch and rationale, and updating them, before each implementation unit closes.",
+      "why": "Requires comparing accepted deviations with the saved sketch and rationale before each implementation unit closes, keeps planning-only output out of the repository unless a separate authorization permits it, and routes changes to observable behavior or acceptance back to the requirements owner.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
@@ -36,9 +36,15 @@
       "since": "0.9.71",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/figure-it-out/SKILL.md": {
+      "kind": "policy",
+      "why": "Adds conditional OpenSpec context and authorization routing for direct entry and mid-run discoveries.",
+      "since": "0.9.102",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/poteto-mode/SKILL.md": {
       "kind": "policy",
-      "why": "Adds the Claude Code, Codex, Pi, GitHub Copilot, and Muse Platform Adaptation section with its task-tool and todo.md fallback (per task slug when sessions share a checkout), the run-or-verify driver line, the deploy-platform and defect-severity triggers, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it points the Agent-call defaults at the Models section with full tool access and the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and describes Autopilot-full as stopping at merge-ready for the operator's click.",
+      "why": "Adds the Claude Code, Codex, Pi, GitHub Copilot, and Muse Platform Adaptation section with its task-tool and todo.md fallback (per task slug when sessions share a checkout), the run-or-verify driver line, the deploy-platform and defect-severity triggers, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it points the Agent-call defaults at the Models section with full tool access and the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and describes Autopilot-full as stopping at merge-ready for the operator's click. Adds conditional OpenSpec routing through a shared composition contract.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },
@@ -92,7 +98,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/pause-safely.md": {
       "kind": "policy",
-      "why": "Writes the resume note to the canonical checkpoint directory and preserves artifacts the user asked to keep across the resume.",
+      "why": "Writes the resume note to the canonical checkpoint directory, preserves artifacts the user asked to keep, and stores OpenSpec resume state as text instead of linking mutable task files.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },

@@ -7,6 +7,8 @@ description: "Design an auditable playbook when no narrower one fits: a large mi
 
 When the task matches no playbook, design one. The deliverable before any code is the workflow itself: a sequence of phases that scales rigor to the task, runs the scientific method, and leaves a decision trail a human can audit after stepping away.
 
+When the request or a project rule selects OpenSpec, the work belongs to an OpenSpec change, or the run would benefit from a durable contract in a project with an OpenSpec root, read [OpenSpec integration](../poteto-mode/references/openspec-integration.md) before framing or writing. Apply its scope and authorization rules to each phase and mid-run discovery.
+
 ## Start
 
 Open a todolist whose first item is to read the Principles section of the **poteto-mode** skill. Then add the phases below as todos.

@@ -1,5 +1,7 @@
 ### Pause safely
 
+For an OpenSpec change, write the change name, its root, and the last verified task as plain text or code spans in the resume note. Do not link mutable task files or create another progress store.
+
 **You own a clean stop. Leave a checkpoint a cold-start agent can resume from.** This is explicit only. On "keep going", "going to bed, keep going", or "don't stop", do not pause.
 
 1. Stop at a safe boundary. Finish the current atomic step or back out of it. Start nothing new, and cancel any nested subagents.

@@ -19,7 +19,7 @@ When Explore runs first, write nothing in it except change artifacts the request
 3. Do the work the task names with the matching playbook steps that apply to it, including a keep-or-revert decision about that task's own change, and run the task's own check. Preserve incremental commits and committed-base worktree rules. A playbook step that another task names runs in that task. Change-level steps, such as review and same-surface verification no task names, are not repeated per task. Rerun any check whose evidence a later fix invalidates. Defer only PR publication and delivery to closure.
 4. Check the task's box only after its verification passes on the real artifact. If its evidence later fails, uncheck the box and say why.
 
-Closure triggers from Opening a PR and poteto-mode's Non-negotiables apply to the change's commits and landing: `/deslop` before commit, `/no-comments` before review, the live-agent roster before a local merge, and `/technical-writing` with `/unslop` for commit bodies and prose. Apply's completion does not replace them.
+Closure triggers from Opening a PR and poteto-mode's Non-negotiables apply to every commit and to landing, including a delegate's commits. Before each commit, invoke `/deslop`, then write the commit body with `/technical-writing` and `/unslop`. Name these in every code delegate's brief. Finish `/no-comments` before the independent review starts, and list live agents before a local merge. Apply's completion does not replace them.
 
 Only the owner running this loop edits `tasks.md`. Delegates and parallel worktrees return code and evidence. pstack todos, plans, decision trails, and ledgers record pstack work, not task state.
 

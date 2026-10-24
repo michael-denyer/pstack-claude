@@ -13,6 +13,10 @@ These skills use Claude Code tool names (the `Skill` tool, the `Agent` tool, `As
 
 Use the session's task-tracking tools for the todolist. On Claude Code these are `TaskCreate` and `TaskUpdate`, or `TodoWrite` when configured. Availability depends on the model; `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` enables them through the environment or a project's `.claude/settings.local.json` `env` block. See the [task-tool documentation](https://code.claude.com/docs/en/tools-reference#task-tool-availability). If no task-tracking tool is available, keep an uncommitted `todo.md` Markdown checklist in the work dir, next to the decision trail, with the playbook steps verbatim and each `skip: <reason>` line. When several sessions share the checkout, name it `.audit/<task-slug>.todo.md`, beside that session's `.audit/<task-slug>.tsv` trail, so they never write one file.
 
+## OpenSpec integration
+
+When the request or a project rule selects OpenSpec, the work belongs to an OpenSpec change, or the work would benefit from a durable contract in a project with an OpenSpec root, read [OpenSpec integration](references/openspec-integration.md) before planning, writing, or dispatching a playbook, including Figure it out. Keep that contract through nested playbooks and handoffs. Otherwise use the ordinary pstack flow.
+
 ## Non-negotiables
 
 The Principles section below grounds every trigger. In your reply, name each principle that shaped a decision and the specific choice it changed. Cite only principles whose leaf SKILL.md you read this session.

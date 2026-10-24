@@ -151,6 +151,26 @@ const rules = [
     file: "reflect/SKILL.md",
     phrase: "Add nothing beside a transcript path",
   },
+  {
+    source: "OpenSpec composition: route through one shared contract",
+    file: "poteto-mode/SKILL.md",
+    phrase: "Keep that contract through nested playbooks and handoffs.",
+  },
+  {
+    source: "OpenSpec composition: direct figure-it-out entry",
+    file: "figure-it-out/SKILL.md",
+    phrase: "Apply its scope and authorization rules to each phase and mid-run discovery.",
+  },
+  {
+    source: "OpenSpec composition: planning does not authorize implementation",
+    file: "architect/SKILL.md",
+    phrase: "When the request authorizes planning only, the checkpoint is required and Phase D waits for implementation authorization.",
+  },
+  {
+    source: "OpenSpec composition: do not freeze mutable task files",
+    file: "poteto-mode/playbooks/pause-safely.md",
+    phrase: "Do not link mutable task files or create another progress store.",
+  },
 ];
 
 describe("port-local skill rules", () => {

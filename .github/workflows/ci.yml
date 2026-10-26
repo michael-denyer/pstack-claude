@@ -92,6 +92,10 @@ jobs:
             bun tools/sync.mjs "$component" "$sha" --dry-run | tee "$RUNNER_TEMP/sync-$component.txt" || failed=1
           done <<< "$components"
           exit "$failed"
+      # Rules are shared by every component, so one run checks them all.
+      - name: Check every substitution rule matches upstream at the pins
+        if: ${{ !cancelled() }}
+        run: bun tools/sync.mjs --check-rules
       # Annotates rather than fails: generated edits and declared forks are
       # legitimate, but a reviewer should see every upstream skill file a PR
       # touches. A port-only file, from the dry runs above, has no upstream.

@@ -2,6 +2,7 @@
 // Sync this port forward to a new upstream SHA.
 //
 //   bun tools/sync.mjs <component> <new-sha> [--dry-run]
+//   bun tools/sync.mjs --check-rules
 //
 // Reads tools/upstream.json (remote, per-component pin, and the `exclude`
 // list of upstream paths the port deliberately does not carry) and
@@ -171,6 +172,24 @@ export function applySubstitutions(text, rules, rel = "") {
     if (n) counts.set(rule.key, (counts.get(rule.key) ?? 0) + n);
   }
   return { text: out, counts };
+}
+
+// The keys of `rules` that match no file in any of `trees`, each an upstream
+// directory with its component's `exclude` list. The rules run in order, as in
+// a sync, so a rule whose text an earlier rule already rewrote matches nothing.
+// Like a sync, this never reads through a symlink.
+export function unmatchedRules(rules, trees) {
+  const matched = new Set();
+  for (const { dir, exclude } of trees) {
+    for (const file of walk(dir)) {
+      const rel = relative(dir, file);
+      if (isExcluded(rel, exclude) || lstatSync(file).isSymbolicLink()) continue;
+      const raw = readFileSync(file);
+      if (isBinary(rel, raw)) continue;
+      for (const key of applySubstitutions(raw.toString("utf8"), rules, rel).counts.keys()) matched.add(key);
+    }
+  }
+  return rules.map((rule) => rule.key).filter((key) => !matched.has(key));
 }
 
 // An entry is a literal `token` or a `regex`; either fails the line it matches.
@@ -502,8 +521,39 @@ function pathsOtherComponentsCarry(clone, components, component) {
     );
 }
 
+// A rule that only an older pin needed is dead weight. Text that upstream may
+// bring back belongs on the denylist, which fails the sync that reintroduces it.
+function checkRules() {
+  const upstream = JSON.parse(readFileSync(join(repo, "tools/upstream.json"), "utf8"));
+  const { substitutions } = parseSubstitutions(
+    JSON.parse(readFileSync(join(repo, "tools/substitutions.json"), "utf8")),
+  );
+  const scratch = mkdtempSync(join(tmpdir(), "pstack-sync-"));
+  try {
+    console.log(`cloning ${upstream.remote} ...`);
+    const clone = join(scratch, "clone");
+    git(["clone", "--filter=blob:none", upstream.remote, clone]);
+    const trees = Object.entries(upstream.components).map(([component, spec]) => {
+      const dest = join(scratch, component);
+      git(["-C", clone, "worktree", "add", "--detach", dest, spec.sha]);
+      return { dir: join(dest, spec.upstreamPath), exclude: spec.exclude ?? [] };
+    });
+    const unmatched = unmatchedRules(substitutions, trees);
+    if (unmatched.length) {
+      console.error(`\nFAIL: substitution rules that match no upstream file at the pinned SHAs; delete each from tools/substitutions.json, or move text upstream may bring back to the denylist, then rerun:`);
+      for (const key of unmatched) console.error(`  ${key}`);
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`\nok: each of the ${substitutions.length} substitution rules matches upstream at the pinned SHAs`);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
+  if (args.length === 1 && args[0] === "--check-rules") return checkRules();
   const dryRun = args.includes("--dry-run");
   const [component, newSha, ...stray] = args.filter((a) => a !== "--dry-run");
   const upstreamPath = join(repo, "tools/upstream.json");
@@ -512,6 +562,7 @@ function main() {
   if (stray.length || !spec || !newSha?.match(/^[0-9a-f]{7,40}$/)) {
     for (const arg of stray) console.error(`unexpected argument: ${JSON.stringify(arg)}`);
     console.error(`usage: bun tools/sync.mjs <${Object.keys(upstream.components).join("|")}> <new-sha> [--dry-run]`);
+    console.error("       bun tools/sync.mjs --check-rules");
     process.exit(2);
   }
   const { substitutions, denylist } = parseSubstitutions(

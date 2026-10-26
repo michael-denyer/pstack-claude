@@ -100,11 +100,6 @@
       "rationale": "the menu description names the plugin agent by its file name"
     },
     {
-      "pattern": "Spawn `Task` with `subagent_type: \"Comment Sicko\"`",
-      "replacement": "Spawn an `Agent` with `subagent_type: \"pstack:comment-sicko\"`",
-      "rationale": "plugin agents register under the plugin namespace by file name (#58); must precede the `Task` rule"
-    },
-    {
       "pattern": "Comment Sicko",
       "files": "^skills/no-comments/",
       "replacement": "comment-sicko",
@@ -151,11 +146,6 @@
       "rationale": "the worker default is stamped into the Models section"
     },
     {
-      "pattern": "Use the `interrogate reviewers` line in `~/.cursor/rules/pstack-models.mdc`,",
-      "replacement": "Use the `interrogate reviewers` line in the `pstack-models.md` override sheet (`/setup-pstack` lists its path per runtime),",
-      "rationale": "interrogate has no Models section to name the sheet's home, so the sentence points at setup-pstack; must precede the sheet-path rule"
-    },
-    {
       "pattern": "(usually `.cursor/skills/verify-*/`)",
       "replacement": "(`.claude/skills/verify/`, or `.claude/skills/verify-*/` from an older generator)",
       "rationale": "a project skill named verify replaces Claude Code's user-only bundled /verify (#71); must precede the .cursor/skills/ rule"
@@ -196,16 +186,6 @@
       "rationale": "a skill-relative path does not resolve from the working directory"
     },
     {
-      "pattern": "Fan out N parallel cloud workers.",
-      "replacement": "Fan out N parallel workers.",
-      "rationale": "Claude Code subagents run on this machine"
-    },
-    {
-      "pattern": "not the cloud concurrency limit.",
-      "replacement": "not the number that run at once.",
-      "rationale": "Claude Code has no cloud concurrency limit"
-    },
-    {
       "pattern": "`environment: \"cloud\"`, `run_in_background: true`, and the step ",
       "replacement": "`run_in_background: true`, and the step ",
       "rationale": "the Agent tool has no environment parameter"
@@ -219,21 +199,6 @@
       "pattern": "When a worker must start from a non-default pushed branch, pass `cloud_base_branch`.",
       "replacement": "When a worker must start from a non-default branch, check that branch out in the worker's own worktree and name the worktree path in its brief.",
       "rationale": "the Agent tool has no base-branch parameter"
-    },
-    {
-      "pattern": "A local root arms each tick as a real terminal `/loop`. The loop uses a monitored-shell 30-minute sleep and emits an output-notification sentinel. A cloud root uses the existing cloud-sleeper wake chain instead.",
-      "replacement": "Arm each tick as a real `/loop` in dynamic mode, which schedules its own wake-up rather than blocking on a sleep.",
-      "rationale": "Claude Code's /loop schedules its own wake-up; there is no cloud root"
-    },
-    {
-      "pattern": "re-read this playbook from trunk with `git show origin/main:pstack/skills/poteto-mode/playbooks/autopilot-full.md`",
-      "replacement": "re-read this playbook from disk (`skills/poteto-mode/playbooks/autopilot-full.md` under the installed plugin)",
-      "rationale": "the installed plugin, not an upstream checkout, is what the session runs"
-    },
-    {
-      "pattern": "re-read this playbook from trunk with `git show origin/main:pstack/skills/poteto-mode/playbooks/autopilot-stack.md`",
-      "replacement": "re-read this playbook from disk (`skills/poteto-mode/playbooks/autopilot-stack.md` under the installed plugin)",
-      "rationale": "same, for the stack playbook"
     },
     {
       "pattern": "Bugbot or the agentic security review commented",
@@ -254,11 +219,6 @@
       "pattern": "`/deslop` from `cursor-team-kit`",
       "replacement": "`/deslop`",
       "rationale": "same skill, in the PR checklist"
-    },
-    {
-      "pattern": "Cloud-agent PR tools default to draft, so set `draft: false` on every PR creation call.",
-      "replacement": "Some PR tools default to draft, so check every creation call.",
-      "rationale": "Claude Code has no cloud-agent PR tool"
     },
     {
       "pattern": "~/.cursor/rules/pstack-models.mdc",
@@ -289,11 +249,6 @@
       "pattern": "control skill",
       "replacement": "driver skill",
       "rationale": "driver selection lives in poteto-mode/SKILL.md Non-negotiables; preserve the older generator trigger in its local description"
-    },
-    {
-      "pattern": "restart Cursor",
-      "replacement": "restart Claude Code",
-      "rationale": "the host application"
     },
     {
       "regex": "\\(default `(?:claude|gpt|grok|gemini|composer)-[^`]+`\\)",
@@ -368,12 +323,6 @@
       "rationale": "Claude Code names models by family, not by slug prefix"
     },
     {
-      "regex": "the Reviewer A(?:/[B-Z])+ labels below",
-      "files": "^skills/interrogate/SKILL\\.md$",
-      "replacement": "the Reviewer labels below",
-      "rationale": "the reviewer table is stamped from the panel in models.json, so the prose names no label run that a panel change would make wrong"
-    },
-    {
       "pattern": "~/.cursor/skills/",
       "replacement": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/",
       "rationale": "Claude Code reads user skills from its config directory; must precede the .cursor/skills/ rule, whose pattern it contains"
@@ -382,11 +331,6 @@
       "pattern": ".cursor/skills/",
       "replacement": ".claude/skills/",
       "rationale": "personal skills directory"
-    },
-    {
-      "pattern": ".cursor/rules/",
-      "replacement": "CLAUDE.md imports",
-      "rationale": "Claude Code has no auto-applied rules directory; inclusion is explicit via CLAUDE.md"
     },
     {
       "pattern": "`~/.cursor/projects/*/`",
@@ -459,24 +403,9 @@
       "rationale": "Claude Code bundles its own babysit skill with the same trigger words"
     },
     {
-      "pattern": "One Cursor cloud agent per PR",
-      "replacement": "One background subagent per PR, in its own worktree,",
-      "rationale": "Claude Code runs subagents locally; a worktree per writer gives the isolation a cloud VM gave"
-    },
-    {
-      "pattern": "arm a `/goal` with the full program objective. The goal continues across turns",
-      "replacement": "write the full program objective into the standing orders and restate it in your todolist. That objective stands across turns",
-      "rationale": "Cursor's /goal has no Claude Code equivalent"
-    },
-    {
       "pattern": "bugbot comments",
       "replacement": "review-bot comments",
       "rationale": "the port routes any automated PR-review bot, not only Cursor's Bugbot"
-    },
-    {
-      "pattern": "skeptical Bugbot triage",
-      "replacement": "skeptical review-bot triage",
-      "rationale": "same routing, in the autopilot owner loop"
     },
     {
       "regex": " A refused `composer-\\*` entry runs on (?:`[^`]+`|Reviewer B's default)\\.",
@@ -697,6 +626,10 @@
     {
       "token": "cloud-sleeper",
       "hint": "Cursor's cloud wake chain; Claude Code's /loop schedules its own wake-up"
+    },
+    {
+      "token": "restart Cursor",
+      "hint": "Cursor is the host application upstream; say restart Claude Code, or add a substitution rule for the phrase"
     }
   ]
 }

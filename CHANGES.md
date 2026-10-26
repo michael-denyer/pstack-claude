@@ -14,6 +14,10 @@ The README now says that Claude Code leaves auto-update off for third-party mark
 
 Measured with `bun tools/sync.mjs pstack e73df47`: 83 files unchanged, 38 excluded, 4 updated, 28 added, 5 merged, and 6 conflicts, each resolved by hand as described above. Upstream renumbered the `swarm` step that names the worker model from 4 to 3, so the substitution for that sentence is now two rules that leave the step number out and match either text.
 
+`bun tools/sync.mjs --check-rules` derives every component at its pin and fails naming each substitution rule that matches no upstream file, and the Fork registry CI job runs it. Rules written for an older pin's sentences used to stay after upstream reworded them, because a dry run at the pin writes no file and so prints no substitution counts. The 14 such rules are gone, and `restart Cursor`, the one generic phrase among them, is now on the denylist, so a sync that brings it back fails. (#314)
+
+A new CI job runs `/statechart`'s 150 `node:test` cases with the TLC jar that `TLC_TOOL` pins, checked against its sha256. It gave 146 pass, 4 skip, 0 fail. On macOS the suite had 17 failures, all in the tests. 13 compared paths under `os.tmpdir()`, which macOS keeps under the `/var` symlink, so a child's resolved working directory and the unresolved `TMPDIR` disagreed. 4 injected rename failures through `LD_PRELOAD`, which macOS ignores. The test file now resolves `TMPDIR` first and skips the rename cases outside Linux, a declared policy fork, and the suite gives 140 pass, 10 skip, 0 fail on macOS. (#315)
+
 ## 0.9.102 - The skill link validator keeps angle-bracket destinations
 
 `tools/validate-skills.mjs` now reads a Markdown link destination written in angle brackets, such as `[text](<path with spaces.md>)`, as the path inside the brackets. It used to check the brackets as part of the path, so a link to an existing file was reported as broken. No skill content changed. `tests/agent-skills.test.mjs` covers the case.

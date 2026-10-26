@@ -261,7 +261,7 @@
     "plugins/pstack/skills/statechart/scripts/test/statechart.test.mjs": {
       "kind": "policy",
       "why": "Resolves TMPDIR before the tests compare paths, because macOS keeps its temp folder under the /var symlink, and skips the rename cases outside Linux, where LD_PRELOAD has no effect, so the suite passes on macOS.",
-      "since": "0.9.104",
+      "since": "0.9.103",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/tdd/SKILL.md": {

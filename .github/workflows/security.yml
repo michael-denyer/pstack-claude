@@ -30,7 +30,7 @@ jobs:
       #
       # Do not add --include-git-root. With it the checkout's .git counts as a
       # package, so a scan that finds no lockfile exits 0. Without it that scan
-      # exits 128 and fails the step, and both bun.lock files are still scanned.
+      # exits 128 and fails the step, and every bun.lock file is still scanned.
       #
       # The v2.5.1 tag is mutable, so the digest is what actually pins this.
       # Resolved with: docker buildx imagetools inspect ghcr.io/google/osv-scanner:v2.5.1

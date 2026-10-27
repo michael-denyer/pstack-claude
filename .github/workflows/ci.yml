@@ -205,34 +205,34 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The Node the suite was measured on. It imports crc32 from node:zlib,
-      # which needs Node 20.15, or 22.2 and later.
+      # The Node the suite was measured on. It runs the TypeScript sources
+      # directly, which needs Node 22.18, or 23.6 and later.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24.22.1"
           package-manager-cache: false
-      # TLC_TOOL pins the release and checksum the skill installs with mise,
-      # so the job checks the same jar.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.4"
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      # TLC_TOOL in run.ts pins the release and checksum the skill installs
+      # with mise, so the job checks the same jar.
       - name: Download TLC
         env:
           TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar
         run: |
           set -eo pipefail
-          pin=$(node --input-type=module -e 'import { TLC_TOOL } from "./tlc-tools.mjs"; const [, sum, version] = TLC_TOOL.match(/sha256:([0-9a-f]{64})\]@(\S+)$/); console.log(version, sum);')
+          pin=$(node -e 'const [, sum, version] = require("fs").readFileSync("run.ts", "utf8").match(/const TLC_TOOL =\s*"[^"]*sha256:([0-9a-f]{64})\]@([^"]+)"/); console.log(version, sum);')
           read -r version sum <<< "$pin"
           curl --fail --location --output "$TLA2TOOLS" "https://github.com/tlaplus/tlaplus/releases/download/v$version/tla2tools.jar"
           echo "$sum  $TLA2TOOLS" | sha256sum --check
-      # The suite skips its PNG cases when the renderer cannot install, so a
-      # failed install fails here instead.
-      - name: Install the renderer
-        env:
-          XDG_CACHE_HOME: ${{ runner.temp }}/xdg
-        run: node --input-type=module -e 'import { loadRenderer } from "./render.mjs"; await loadRenderer();'
+      # The render tests install Pele and Mermaid with npm under XDG_CACHE_HOME.
       - name: Test
         env:
           TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar
           XDG_CACHE_HOME: ${{ runner.temp }}/xdg
-        run: JAVA="$(command -v java)" node --test test/statechart.test.mjs
+        run: JAVA="$(command -v java)" npm test
 
   shellcheck:
     name: Shell scripts

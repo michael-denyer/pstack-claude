@@ -15,7 +15,7 @@ Run the installed command by its full path when it is not on PATH. Inspect emits
 
 Only exit 0 with `kind: cancelled` permits the planned topology operation. `changed`, `not-open`, and `still-pending` return exit 1 with the observed record. `unavailable` returns exit 1 with the read or mutation failure. Missing fields and unsupported APIs never mean an absent request. Reconcile those outcomes before rewriting; do not replace the saved record merely to bypass a mismatch.
 
-Establish the affected dependency chain and coordinate its topology writer first. Inspect and cancel each affected PR, including descendants whose context will change; leave unrelated PRs alone. Cancellation is an observed condition, not a lock against another actor rearming afterward. If state changes, stop and reconcile. Origin must supply an equivalent validated operation through its installed service; this command is GitHub-specific and must not be presented as Origin support.
+Establish the affected dependency chain and coordinate with the owner of each branch the operation rewrites first. Inspect and cancel each affected PR, including descendants whose context will change; leave unrelated PRs alone. Cancellation is an observed condition, not a lock against another actor rearming afterward. If state changes, stop and reconcile. Origin must supply an equivalent validated operation through its installed service; this command is GitHub-specific and must not be presented as Origin support.
 
 ## Preserve concurrent writes and child changes
 

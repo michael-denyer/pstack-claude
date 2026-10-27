@@ -1,6 +1,6 @@
 ---
 name: statechart
-description: show a behavior as a Mermaid statechart generated from a TLA+ model, with each bug TLC finds as a numbered path, or turn an agreed chart into a TLA+ skeleton
+description: check a TLA+ model and draw it as a Mermaid statechart, with the shortest path to each state that breaks a rule
 disable-model-invocation: true
 ---
 

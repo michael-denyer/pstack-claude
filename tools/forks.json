@@ -261,7 +261,7 @@
     "plugins/pstack/skills/statechart/scripts/test/cli.test.ts": {
       "kind": "policy",
       "why": "Resolves the temp folder before the symlinked-launcher test computes its relative link, because macOS keeps that folder under the /var symlink and the link would otherwise miss the launcher, so the suite passes on macOS.",
-      "since": "0.9.104",
+      "since": "0.9.105",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/tdd/SKILL.md": {

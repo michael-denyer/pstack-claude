@@ -2,11 +2,11 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.104 - PSTACK_NO_ASK_TOOL leaves ask_user_question to another extension
+## 0.9.104 - pi ask tool: off leaves ask_user_question to another extension
 
-The Pi extension registered `ask_user_question` unconditionally, which collides with any other extension that registers the same tool name: Pi reports a conflict diagnostic for the pair, and the later registration is dead code. Installed beside a dedicated ask-user-question package that the user prefers, there was no way to hand the name over. The extension now skips its `ask_user_question` registration when the `PSTACK_NO_ASK_TOOL` environment variable is set to a non-empty value, and registers it as before when the variable is absent or empty. The flag reaches `Settings` as `askTool`, so a test can drive either mode without touching the environment.
+The Pi extension registered `ask_user_question` unconditionally. Pi refuses to start when two extensions register the same tool name, so an install beside another extension that provides `ask_user_question`, such as a dedicated ask-user-question package, exited 1 with `Tool "ask_user_question" conflicts with <path>` before any session began. A `pi ask tool: off` line in the Pi override sheet now makes the extension skip that registration and leave the name to the other extension; without the line it registers the tool as before. The line follows the `session hook: off` grammar, so only that exact line counts. The sheet rides in the system prompt, so the model sees that another extension owns the tool, and `/setup-pstack` on Pi adds the line when the user runs such an extension. @toomanyopenfiles found and fixed this in [#318](https://github.com/michael-denyer/pstack-claude/pull/318).
 
-`tests/pi/config.test.mjs` covers the variable-to-settings seam, and `tests/pi/interaction.test.mjs` proves a settings without the tool installs the other tools and nothing named `ask_user_question`. The T13 row of `docs/pi-equivalence.md` and the `AskUserQuestion` row of `pi-tools.md` note the switch. The default is unchanged, so an install that does not set the variable sees no difference.
+`tests/pi/config.test.mjs` pins the line's grammar, and `tests/pi/interaction.test.mjs` proves that an install whose sheet has the line registers the other tools and nothing named `ask_user_question`. `docs/reference.md` and the T13 row of `docs/pi-equivalence.md` document the line, and `pi-tools.md` covers it in the `AskUserQuestion` row and the `setup-pstack` note.
 
 ## 0.9.103 - sync to upstream e73df47 (v0.15.32): adds /statechart and /ketchup-video
 

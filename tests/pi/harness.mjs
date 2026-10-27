@@ -111,7 +111,6 @@ export function world({ script = {}, sheet = null } = {}) {
     modelsFile,
     agentDir,
     pi: { command: fakePiBin, args: [scriptFile, logFile] },
-    askTool: true,
     depth: 0,
     killGraceMs: 300,
     exitGraceMs: 1500,

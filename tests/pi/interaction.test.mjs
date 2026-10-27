@@ -151,8 +151,8 @@ describe("ask_user_question", () => {
     }]);
   });
 
-  test("PSTACK_NO_ASK_TOOL installs without the tool, so another extension can own the name", () => {
-    const { pi } = setup({ settings: { askTool: false } });
+  test("pi ask tool: off in the sheet installs without the tool, so another extension can own the name", () => {
+    const { pi } = setup({ sheet: "bug-fix: opus\npi ask tool: off\n" });
     expect(pi.tools.has("ask_user_question")).toBe(false);
     expect(pi.tools.has("schedule_wakeup")).toBe(true);
   });

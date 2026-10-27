@@ -4,7 +4,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { checkEffort, defaultSettings, loadAgentTypes, readSheet } from "../../plugins/pstack/pi/config.ts";
+import { checkEffort, defaultSettings, loadAgentTypes, parseSheet, readSheet } from "../../plugins/pstack/pi/config.ts";
 import { chmodDeniesReads } from "../session-hook-sheets.mjs";
 
 test("depth comes from the reader on each use and PI_CODING_AGENT_DIR moves the sheet", () => {
@@ -17,9 +17,11 @@ test("depth comes from the reader on each use and PI_CODING_AGENT_DIR moves the 
   expect(defaultSettings(() => 0, {}).agentDir).toBe(join(homedir(), ".pi", "agent"));
 });
 
-test("PSTACK_NO_ASK_TOOL turns the ask tool off and an unset variable keeps it on", () => {
-  expect(defaultSettings(() => 0, {}).askTool).toBe(true);
-  expect(defaultSettings(() => 0, { PSTACK_NO_ASK_TOOL: "1" }).askTool).toBe(false);
+test("only an exact pi ask tool: off line turns the ask tool off", () => {
+  expect(parseSheet("bug-fix: opus\r\npi ask tool: off\r\n").askToolOff).toBe(true);
+  for (const sheet of ["bug-fix: opus\n", "pi ask tool: on\n", "pi ask tool: off \n", "ask tool: off\n", "session hook: off\n"]) {
+    expect({ sheet, off: parseSheet(sheet).askToolOff }).toEqual({ sheet, off: false });
+  }
 });
 
 test("an agent file loads as pstack:<name> with its body and model, and an effort is checked against models.json", () => {

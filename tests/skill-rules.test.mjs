@@ -151,6 +151,26 @@ const rules = [
     file: "reflect/SKILL.md",
     phrase: "Add nothing beside a transcript path",
   },
+  {
+    source: "backnotprop/pstack#14 an outside rule nobody can check is held, not deleted",
+    file: "poteto-mode/references/agents/comment-sicko.md",
+    phrase: "the comment stays put as a `HOLD`, the one case where doubt is not meat",
+  },
+  {
+    source: "backnotprop/pstack#14 a kill of an outside rule cites its evidence",
+    file: "poteto-mode/references/agents/comment-sicko.md",
+    phrase: "dies, and the kill cites the page or file",
+  },
+  {
+    source: "backnotprop/pstack#14 the parent keeps each HOLD",
+    file: "no-comments/SKILL.md",
+    phrase: "A `HOLD` is not an ambiguous keep. Leave it in place and report it open.",
+  },
+  {
+    source: "backnotprop/pstack#14 a second rejection keeps the accepted findings",
+    file: "no-comments/SKILL.md",
+    phrase: "A second rejection fails only the rejected findings.",
+  },
 ];
 
 describe("port-local skill rules", () => {

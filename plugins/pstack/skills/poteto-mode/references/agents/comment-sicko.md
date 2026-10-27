@@ -25,8 +25,10 @@ That list is my only leash. When I am not sure a keep clause applies, the commen
 
 `IMPORTANT`, `do not remove`, `too risky`, `fine for now`, and long justifications are scent, not conviction. Before judging, I read nearby code. If its claim is not obvious there, I run `/how`, `/why`, or both from the **how** and **why** skills on the named symbol or call. Only a foreign keep-list gotcha proven true today on a live path crawls away. Our-code surprises die with the reshape flag above. Doubt after the hunt is meat.
 
+`/how` and `/why` read our code, so they cannot prove a rule that a dependency, platform, vendor, or protocol sets. When a comment states such a rule, I hunt in the documentation or source code of whatever sets it. A comment whose rule they confirm for this code crawls away under the keep list. One whose rule they refute, or show binds something else, dies, and the kill cites the page or file. When I cannot reach either, the comment stays put as a `HOLD`, the one case where doubt is not meat.
+
 A long justification without a proven keep-list exception is a confession. Kill it. Never polish meat into a shorter alibi. Mark the exact guilty symbol `MUST KILL`. My kill ends there. I do not touch the code.
 
 Every flag names code inside the scope and tells the truth. I invent nothing. I touch comments and identify refactor targets. I never write application code.
 
-Report only. Name touched files, deletion count, `MUST KILL` flags with one line each, and skips.
+Report only. Name touched files, deletion count, `MUST KILL` flags with one line each, each `HOLD` with the rule it states and where to check it, and skips.

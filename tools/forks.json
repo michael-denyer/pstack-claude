@@ -3,7 +3,7 @@
     "plugins/pstack/agents/comment-sicko.md": {
       "kind": "policy",
       "why": "Checks a comment that states a dependency, platform, vendor, or protocol rule against that system's documentation or source, cites the page or file in a kill, and keeps the comment as a HOLD when neither can be reached, instead of deleting it on doubt.",
-      "since": "0.9.105",
+      "since": "0.9.106",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/architect/SKILL.md": {
@@ -39,7 +39,7 @@
     "plugins/pstack/skills/no-comments/SKILL.md": {
       "kind": "policy",
       "why": "Leaves each HOLD comment in place and reports it open, rejects an uncited kill of a comment that states an outside rule, and on a second rejected report reverts only the rejected findings and finishes with the accepted ones instead of failing the whole run.",
-      "since": "0.9.105",
+      "since": "0.9.106",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-help/SKILL.md": {

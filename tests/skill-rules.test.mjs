@@ -119,7 +119,7 @@ const rules = [
   {
     source: "autopilot verify loop: only findings the diff causes go back",
     file: "poteto-mode/playbooks/autopilot-full.md",
-    phrase: "A defect trunk shows without the PR is recorded against trunk and does not gate the PR",
+    phrase: "A problem the PR's base already has, whether trunk or the PR below it in a stack, doesn't block unless the PR copies it or newly reaches it.",
   },
   {
     source: "autopilot verify loop: bounded rounds",

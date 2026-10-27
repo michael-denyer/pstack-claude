@@ -18,7 +18,7 @@
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
 //   available slugs, and one block per RUNTIMES row: Codex equivalents, Pi IDs)
 //     -> each model-consuming skill's "## Models" and "## Reasoning effort" sections
-//     -> setup-pstack's Models section and override-sheet block, and interrogate's reviewer table
+//     -> setup-pstack's Models section and override-sheet block
 //     -> the "## Model names" section of each runtime's mapping file
 //        (poteto-mode/references/codex-tools.md, pi-tools.md, copilot-tools.md)
 //   the Per-skill notes table in poteto-mode/references/codex-tools.md
@@ -384,12 +384,6 @@ function sheetRoles(models) {
   ];
 }
 
-function requiredRole(models, label) {
-  const role = models.roles.find((r) => r.role === label);
-  if (!role) throw new Error(`models.json: no "${label}" role, which a stamped region renders from`);
-  return role;
-}
-
 // Every generator-owned region: the file it lives in (repo-relative), how to
 // find it, and what it renders from the model policy. Adding a stamped region
 // means adding a row here; the stray-slug scan exempts exactly these spans.
@@ -400,23 +394,14 @@ export function regions(models) {
     if (!rolesBySkill.has(r.skill)) rolesBySkill.set(r.skill, []);
     rolesBySkill.get(r.skill).push(r);
   }
-  const reviewers = requiredRole(models, "interrogate reviewers").models;
   return [
-    ...[...rolesBySkill]
-      .filter(([skill]) => skill !== "interrogate")
-      .map(([skill, roles]) => ({
-        file: skillFile(skill),
-        name: "Models section",
-        locate: section("Models"),
-        appendHeading: "## Models",
-        render: () => blankPadded(modelsSection(roles)),
-      })),
-    {
-      file: skillFile("interrogate"),
-      name: "reviewer table",
-      locate: tableRows("| Subagent | Default model |", "| Reviewer "),
-      render: () => reviewers.map((m, i) => `| Reviewer ${String.fromCharCode(65 + i)} | ${code(m)} |`),
-    },
+    ...[...rolesBySkill].map(([skill, roles]) => ({
+      file: skillFile(skill),
+      name: "Models section",
+      locate: section("Models"),
+      appendHeading: "## Models",
+      render: () => blankPadded(modelsSection(roles)),
+    })),
     ...[...rolesBySkill].map(([skill]) => ({
       file: skillFile(skill),
       name: "Reasoning effort section",

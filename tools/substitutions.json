@@ -128,10 +128,10 @@
       "rationale": "the cross-judge pool defaults to the stamped runners"
     },
     {
-      "regex": "With no family match, use `(?:claude|gpt|grok|gemini|composer)-[^`]+`\\.",
+      "regex": " With the default pool, a Claude parent gets `(?:claude|gpt|grok|gemini|composer)-[^`]+`\\. A parent from any other family gets `(?:claude|gpt|grok|gemini|composer)-[^`]+` first\\.",
       "files": "^skills/arena/SKILL\\.md$",
-      "replacement": "With no family match, use the single-role default in [Models](#models).",
-      "rationale": "the fallback model is the stamped single-role default"
+      "replacement": "",
+      "rationale": "the stamped defaults hold one Claude Code family per model name, so pool order already picks the first default from another family"
     },
     {
       "regex": "use `(?:claude|gpt|grok|gemini|composer)-[^`]+`(?:(?:,| and|, and) `(?:claude|gpt|grok|gemini|composer)-[^`]+`)*\\.",
@@ -244,6 +244,11 @@
       "pattern": "Task subagent",
       "replacement": "`Agent` subagent",
       "rationale": "same tool, named bare before the word subagent; the port writes the tool name in backticks"
+    },
+    {
+      "pattern": "a Task error",
+      "replacement": "an `Agent` error",
+      "rationale": "same tool, named bare before the word error; the port writes the tool name in backticks"
     },
     {
       "pattern": "control skill",
@@ -500,12 +505,6 @@
       "rationale": "the playbook runs from the installed plugin, and the user's trunk is not pstack's"
     },
     {
-      "pattern": "re-reads both playbooks from trunk",
-      "files": "^skills/poteto-mode/playbooks/",
-      "replacement": "re-reads both playbooks from disk under the installed plugin",
-      "rationale": "the playbooks run from the installed plugin, and the user's trunk is not pstack's"
-    },
-    {
       "pattern": "Assume the VM dies.",
       "replacement": "Assume the owner's session dies.",
       "rationale": "Claude Code subagents run on this machine, not on cloud VMs"
@@ -588,8 +587,12 @@
       "hint": "Cursor's built-in skill-authoring skill; Claude Code's equivalent is the plugin-dev:skill-development skill"
     },
     {
-      "regex": "\\bTask (?:subagent|tool|schema|`model`)",
+      "regex": "\\bTask (?:subagent|tool|schema|error|`model`)",
       "hint": "Cursor's subagent tool named bare; Claude Code's is the `Agent` tool. Add a substitution rule for the phrase"
+    },
+    {
+      "token": "re-reads both playbooks from trunk",
+      "hint": "the playbooks run from the installed plugin, and the user's trunk is not pstack's; rewrite it as re-reading them from disk under the installed plugin"
     },
     {
       "token": "generalPurpose",

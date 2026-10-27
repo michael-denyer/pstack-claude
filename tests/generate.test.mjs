@@ -120,11 +120,6 @@ describe("regions", () => {
     );
   });
 
-  test("a policy without the interrogate reviewers role throws naming it", () => {
-    const roles = models.roles.filter((r) => r.role !== "interrogate reviewers");
-    expect(() => regions({ ...models, roles })).toThrow('models.json: no "interrogate reviewers" role');
-  });
-
   test("applyRegions leaves a file the generator does not own untouched", () => {
     const text = "# other\n\n## Models\n\nprose\n";
     expect(applyRegions("plugins/pstack/skills/other/SKILL.md", text, models)).toBe(text);
@@ -443,11 +438,16 @@ describe("deriveSkill", () => {
   });
 
   test("leaves a region whose anchor upstream lacks unstamped instead of throwing", () => {
-    const text = front("disable-model-invocation: true\n") + "no reviewer table here\n";
-    const out = deriveSkill("plugins/pstack/skills/interrogate/SKILL.md", text, models, leads);
-    expect(out.startsWith(front("", "interrogate") + "no reviewer table here\n")).toBe(true);
-    expect(out).not.toContain("| Reviewer A");
-    expect(out).toContain("\n## Reasoning effort\n\nA role value in");
+    const text = front("disable-model-invocation: true\n") + "no override sheet here\n";
+    const out = deriveSkill("plugins/pstack/skills/setup-pstack/SKILL.md", text, models, leads);
+    expect(out).toBe(front("", "setup-pstack") + "no override sheet here\n");
+  });
+
+  test("appends and stamps interrogate's Models section with the reviewer panel", () => {
+    const out = deriveSkill("plugins/pstack/skills/interrogate/SKILL.md", front("disable-model-invocation: true\n"), models, leads);
+    expect(out).toContain("body\n\n## Models\n\nRole defaults, stamped from");
+    expect(out).toContain("- interrogate reviewers:");
+    expect(out.indexOf("## Models")).toBeLessThan(out.indexOf("## Reasoning effort"));
   });
 
   test("appends the Reasoning effort section after the Models section", () => {

@@ -14,7 +14,7 @@ export function install(pi: ExtensionAPI, settings: Settings): void {
   const scheduler = new Scheduler(pi);
   const oneShot = registerOneShot(pi, settings, runner);
   registerAgentTools(pi, runner);
-  registerAsk(pi, oneShot);
+  if (settings.askTool) registerAsk(pi, oneShot);
   registerSchedule(pi, scheduler, oneShot);
   registerPromptSections(pi, settings);
   registerPathSkills(pi, settings);

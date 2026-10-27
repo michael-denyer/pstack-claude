@@ -2,6 +2,12 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.104 - PSTACK_NO_ASK_TOOL leaves ask_user_question to another extension
+
+The Pi extension registered `ask_user_question` unconditionally, which collides with any other extension that registers the same tool name: Pi reports a conflict diagnostic for the pair, and the later registration is dead code. Installed beside a dedicated ask-user-question package that the user prefers, there was no way to hand the name over. The extension now skips its `ask_user_question` registration when the `PSTACK_NO_ASK_TOOL` environment variable is set to a non-empty value, and registers it as before when the variable is absent or empty. The flag reaches `Settings` as `askTool`, so a test can drive either mode without touching the environment.
+
+`tests/pi/config.test.mjs` covers the variable-to-settings seam, and `tests/pi/interaction.test.mjs` proves a settings without the tool installs the other tools and nothing named `ask_user_question`. The T13 row of `docs/pi-equivalence.md` and the `AskUserQuestion` row of `pi-tools.md` note the switch. The default is unchanged, so an install that does not set the variable sees no difference.
+
 ## 0.9.103 - sync to upstream e73df47 (v0.15.32): adds /statechart and /ketchup-video
 
 The upstream pin moves from `7b353f7` to `e73df47`, upstream v0.15.32, 18 pstack commits. `/statechart` draws how a system moves between states as a Mermaid statechart generated from a TLA+ model, with each bug TLC finds as a numbered path, and also turns an agreed chart into a TLA+ skeleton. Its first run installs TLC and Java with mise, about 305 MB. `/ketchup-video` gives the `/ketchup` catch-up as a short silent video of slides, with the waiting calls as text under it. `/create-formal-verification-skill` now tells the skill it generates to read each TLA+ result with `/statechart`, and `/poteto-help` routes to both new skills. The package now carries 43 public skills and 24 principles.

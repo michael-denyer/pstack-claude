@@ -17,6 +17,11 @@ test("depth comes from the reader on each use and PI_CODING_AGENT_DIR moves the 
   expect(defaultSettings(() => 0, {}).agentDir).toBe(join(homedir(), ".pi", "agent"));
 });
 
+test("PSTACK_NO_ASK_TOOL turns the ask tool off and an unset variable keeps it on", () => {
+  expect(defaultSettings(() => 0, {}).askTool).toBe(true);
+  expect(defaultSettings(() => 0, { PSTACK_NO_ASK_TOOL: "1" }).askTool).toBe(false);
+});
+
 test("an agent file loads as pstack:<name> with its body and model, and an effort is checked against models.json", () => {
   const root = mkdtempSync(join(tmpdir(), "pstack-agents-"));
   try {

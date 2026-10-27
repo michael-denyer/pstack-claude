@@ -151,6 +151,12 @@ describe("ask_user_question", () => {
     }]);
   });
 
+  test("PSTACK_NO_ASK_TOOL installs without the tool, so another extension can own the name", () => {
+    const { pi } = setup({ settings: { askTool: false } });
+    expect(pi.tools.has("ask_user_question")).toBe(false);
+    expect(pi.tools.has("schedule_wakeup")).toBe(true);
+  });
+
   test("a child agent refuses ask_user_question even though rpc mode reports a UI", async () => {
     const { pi, ctx } = setup({ settings: { depth: 1 }, ctx: { mode: "rpc", hasUI: true, ui: {} } });
     const err = await pi.call("ask_user_question", { questions: [q()] }, ctx).catch((e) => e);

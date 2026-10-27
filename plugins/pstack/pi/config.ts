@@ -18,6 +18,9 @@ export interface Settings {
   modelsFile: string;
   agentDir: string;
   pi: { command: string; args: string[] };
+  // Whether this install registers ask_user_question. PSTACK_NO_ASK_TOOL turns
+  // it off, so another extension can own the tool name without a conflict.
+  askTool: boolean;
   // Layers below the main session: 0 there, 1 in its agents, and so on.
   readonly depth: number;
   killGraceMs: number;
@@ -46,6 +49,7 @@ export function defaultSettings(readDepth: () => number, env: NodeJS.ProcessEnv 
     modelsFile: join(pluginRoot, "models.json"),
     agentDir: env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
     pi: piInvocation(),
+    askTool: !env.PSTACK_NO_ASK_TOOL,
     get depth() {
       return readDepth();
     },

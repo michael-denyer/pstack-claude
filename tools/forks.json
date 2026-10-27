@@ -2,7 +2,7 @@
   "pstack": {
     "plugins/pstack/agents/comment-sicko.md": {
       "kind": "policy",
-      "why": "Checks a comment that states a dependency, platform, vendor, or protocol rule against that system's documentation or source, cites the page or file in a kill, and keeps the comment as a HOLD when neither can be reached, instead of deleting it on doubt.",
+      "why": "Sends a comment that states a dependency, platform, vendor, or protocol rule to that system's documentation or source code, makes each kill of one cite the page or file and list it in the report, and marks the comment HOLD when that hunt cannot settle the rule, where the keep list alone would delete it on doubt.",
       "since": "0.9.106",
       "upstream": "not-proposed"
     },
@@ -38,7 +38,7 @@
     },
     "plugins/pstack/skills/no-comments/SKILL.md": {
       "kind": "policy",
-      "why": "Leaves each HOLD comment in place and reports it open, rejects an uncited kill of a comment that states an outside rule, and on a second rejected report reverts only the rejected findings and finishes with the accepted ones instead of failing the whole run.",
+      "why": "Treats a HOLD that names its dependency, platform, vendor, or protocol rule and where to check it as settled for the run, restores as a HOLD any kill of such a comment without a refuting page or file, and limits a second rejected report's failure to that report's findings so the accepted work still lands.",
       "since": "0.9.106",
       "upstream": "not-proposed"
     },

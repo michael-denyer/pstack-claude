@@ -164,12 +164,17 @@ const rules = [
   {
     source: "backnotprop/pstack#14 the parent keeps each HOLD",
     file: "no-comments/SKILL.md",
-    phrase: "A `HOLD` is not an ambiguous keep. Leave it in place and report it open.",
+    phrase: "and where to check it is not an ambiguous keep. Leave it in place and report it open.",
   },
   {
     source: "backnotprop/pstack#14 a second rejection keeps the accepted findings",
     file: "no-comments/SKILL.md",
-    phrase: "A second rejection fails only the rejected findings.",
+    phrase: "fail `/no-comments` for that report's rejected findings, not for the run.",
+  },
+  {
+    source: "backnotprop/pstack#14 an outside-rule kill needs a refuting citation",
+    file: "no-comments/SKILL.md",
+    phrase: "unless the report cites a documentation page or source file that refutes the rule",
   },
 ];
 

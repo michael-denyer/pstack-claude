@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.110 - GPT-6.1 Sol is the Codex default and panel Sol
+
+The Codex single-model example is `gpt-6.1-sol`, the model the Pi tables map `opus` to, and the Codex panel example is `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`. The worker example stays `gpt-6-sol`, the model the Pi tables map `sonnet` to.
+
 ## 0.9.109 - GPT-6.1 Terra joins the Codex panel
 
 The Codex panel example is `gpt-6-astra`, `gpt-6-sol`, `gpt-6.1-terra`, `gpt-6-luna`, so a ChatGPT panel has four models like the Claude panel. The Pi tables are unchanged, because Pi's model catalog does not list `gpt-6.1-terra`.

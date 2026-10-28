@@ -128,7 +128,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/bootstrap.ts": {
       "kind": "policy",
-      "why": "Exits with a clear message when run without bun and installs production dependencies without re-executing itself.",
+      "why": "Exits with a clear message when run without bun and installs production dependencies only.",
       "since": "0.9.11",
       "upstream": "not-proposed"
     },

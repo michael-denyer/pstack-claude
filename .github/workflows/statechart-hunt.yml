@@ -1,0 +1,63 @@
+name: Statechart hunt
+
+# Spike. Runs the statechart suite repeatedly on the CI runner under a watchdog
+# that prints every Node process's stack when a run exceeds its limit. Not for
+# main.
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/statechart-hunt.yml
+      - .github/scripts/statechart-hunt.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: statechart-hunt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hunt:
+    name: Statechart hunt ${{ matrix.job }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        job: [1, 2, 3, 4, 5, 6, 7, 8]
+    defaults:
+      run:
+        working-directory: plugins/pstack/skills/statechart/scripts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.22.1"
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.4"
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download TLC
+        env:
+          TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar
+        run: |
+          set -eo pipefail
+          pin=$(node -e 'const [, sum, version] = require("fs").readFileSync("run.ts", "utf8").match(/const TLC_TOOL =\s*"[^"]*sha256:([0-9a-f]{64})\]@([^"]+)"/); console.log(version, sum);')
+          read -r version sum <<< "$pin"
+          curl --fail --location --output "$TLA2TOOLS" "https://github.com/tlaplus/tlaplus/releases/download/v$version/tla2tools.jar"
+          echo "$sum  $TLA2TOOLS" | sha256sum --check
+      - name: Hunt
+        env:
+          TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar
+          XDG_CACHE_HOME: ${{ runner.temp }}/xdg
+          HUNT_REPORTS: ${{ runner.temp }}/reports
+          HUNT_LOGS: ${{ runner.temp }}/logs
+          HUNT_RUNS: "3"
+          HUNT_LIMIT: "600"
+        run: JAVA="$(command -v java)" bash "$GITHUB_WORKSPACE/.github/scripts/statechart-hunt.sh"

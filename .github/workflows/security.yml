@@ -54,7 +54,7 @@ jobs:
       # which this repo does not have; annotations put findings on the diff
       # instead. version defaults to "latest" — pinned so a zizmor release
       # cannot change what this gate means.
-      - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+      - uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
         with:
           version: "1.29.0"
           advanced-security: false

@@ -8,6 +8,14 @@ Tell `poteto-mode` your goal and it will invoke the correct workflow for the tas
 
 For concurrency bugs and invariants that tests cannot reach, `/create-formal-verification-skill` picks the riskiest property in your code, verifies it with a tool that fits, and leaves a project skill the next agent reruns. The separate [agent-formal-verify](https://github.com/michael-denyer/agent-formal-verify) plugin goes deeper on the method, with guided TLA+ model checking, Lean proofs, and Kani for Rust.
 
+## Translated for Claude Code before install
+
+The upstream marketplace also installs pstack in Claude Code, as `pstack@cursor-plugins`. That copy keeps the Cursor skills unchanged. In 23 of its 58 skills, the first line tells Claude to read [`docs/harness/claude-code.md`](https://github.com/cursor/plugins/blob/c742dd6/harness/pstack/claude-code/docs/harness/claude-code.md), a 1,600-token table of Cursor tool names, subagent fields, model names, and paths, and to apply it while the task runs. Each `poteto-agent` delegate reads `poteto-mode` in full, and that skill carries the same line, so every delegate reads the table again in its own context.
+
+This port translates once, when it syncs from upstream. `tools/sync.mjs` rewrites Cursor names with the 99 rules in [`tools/substitutions.json`](tools/substitutions.json), and a sync that leaves one of the 27 denylisted Cursor terms in a file fails with the file and line. The installed skills name `Agent`, `AskUserQuestion`, `pstack:poteto-agent`, and Claude models directly. No session spends a tool call or tokens on a translation table, and no mapping depends on the model applying it correctly partway through a task. The port also adds the SessionStart hook that routes tasks to `poteto-mode`. Upstream's Claude Code copy has no hooks.
+
+Upstream's approach keeps one copy of each skill for both Cursor and Claude Code, and the table is the price of that. The counts are from cursor/plugins at `c742dd6`, with tokens counted by the o200k tokenizer, so Claude's own count differs.
+
 ## Install
 
 <details>

@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.111 - GPT-6.1 Sol replaces GPT-6 Sol everywhere
+
+The Codex worker example and the `sonnet` entry of the Pi `openai` and `openai-codex` tables move from `gpt-6-sol` to `gpt-6.1-sol`. GPT-6.1 Sol is the newer Sol and costs less than GPT-6 Sol, so no role has a reason to stay on the older model. `models.json` no longer names `gpt-6-sol`.
+
 ## 0.9.110 - GPT-6.1 Sol is the Codex default and panel Sol
 
 The Codex single-model example is `gpt-6.1-sol`, the model the Pi tables map `opus` to, and the Codex panel example is `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`. The worker example stays `gpt-6-sol`, the model the Pi tables map `sonnet` to.

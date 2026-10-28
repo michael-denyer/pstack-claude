@@ -10,7 +10,7 @@ For concurrency bugs and invariants that tests cannot reach, `/create-formal-ver
 
 ## Built for Claude Code
 
-Unlike upstream's Cursor-first [Claude Code install](https://github.com/cursor/plugins/tree/c742dd6/harness/pstack/claude-code), this port translates the skills for Claude Code before installation. Agents use Claude Code tools and models directly, without spending tokens on a runtime translation table or relying on the model to apply it correctly. A SessionStart hook also routes tasks to `poteto-mode`.
+This port translates upstream's Cursor skills for Claude Code before installation. [Upstream's Claude Code install](https://github.com/cursor/plugins/tree/c742dd6/harness/pstack/claude-code) asks agents to translate Cursor names at runtime, using extra tokens and relying on them to apply the mapping correctly. This port also adds a SessionStart hook that routes tasks to `poteto-mode`.
 
 ## Install
 

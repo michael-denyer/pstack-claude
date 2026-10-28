@@ -91,7 +91,7 @@ function sectionsAtLevel(lines, prefix) {
 }
 const sections = sectionsAtLevel(lines, "## ");
 const find = (title) => sections.find((s) => s.title === title);
-const bodyText = (s) => s.body.map((l) => l.text).join("\n");
+const bodyText = (s) => s.body.filter((l) => !l.code).map((l) => l.text).join("\n");
 const boxes = (ls) => ls.filter((l) => !l.code && BOX.test(l.text)).map((l) => ({ n: l.n, text: l.text.match(BOX)[1] }));
 
 const h1 = lines.findIndex((l) => !l.code && l.text.startsWith("# "));
@@ -187,7 +187,7 @@ for (const pr of prSections) {
 		if (gate.rest.startsWith("None.")) {
 			if (gateBoxes.length) fail(gate.n, `${pr.title}: Review gate says None but has boxes`);
 		} else {
-			const text = gate.lines.map((l) => l.text).join("\n");
+			const text = gate.lines.filter((l) => !l.code).map((l) => l.text).join("\n");
 			if (gateBoxes.length === 0) fail(gate.n, `${pr.title}: Review gate has no box`);
 			for (const word of ["screenshot", "video", "operator"]) {
 				if (!text.includes(word)) fail(gate.n, `${pr.title}: Review gate lacks "${word}"`);

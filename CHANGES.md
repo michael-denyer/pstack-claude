@@ -2,6 +2,12 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.107 - Exclude fenced examples from plan requirements
+
+`check-plan.mjs` no longer counts text inside a fenced example toward the required plan guidance, program markers, or review-gate evidence. A plan whose only verification rule or review evidence appears in an example now fails the check. Regression tests cover all three sections.
+
+The Claude Code configuration tests scan tracked and non-ignored files, so session backups under `.remember/` no longer produce false failures.
+
 ## 0.9.106 - /no-comments holds comments on dependency and platform rules it cannot settle
 
 [backnotprop/pstack#14](https://github.com/backnotprop/pstack/issues/14), filed by @yasuyuki, reports a `/no-comments` run that marked a correct Cargo comment for deletion, one saying that profile settings come only from the workspace root. The same run ended when a second report was rejected, before any accepted edit landed. The comment-sicko prompt deletes a comment whenever it is unsure a keep clause applies, and it named no source to check a dependency's rule against.

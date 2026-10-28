@@ -134,7 +134,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/check-plan.mjs": {
       "kind": "port-feature",
-      "why": "Checks for the port's plan skeleton markers (standing orders, installed-plugin reads, an hourly cadence, the configured swarm workers model), requires a box under each program task and under Close the program, opens and closes a code fence at any indentation so a fence inside a list item counts, and strips a leading byte-order mark before parsing.",
+      "why": "Checks for the port's plan skeleton markers (standing orders, installed-plugin reads, an hourly cadence, the configured swarm workers model), requires a box under each program task and under Close the program, excludes fenced examples from required section and review-gate text, opens and closes a code fence at any indentation so a fence inside a list item counts, and strips a leading byte-order mark before parsing.",
       "since": "0.9.19",
       "upstream": "not-proposed"
     },

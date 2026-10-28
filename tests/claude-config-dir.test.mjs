@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { relative, sep } from "node:path";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { walk } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const PLUGINS = "${CLAUDE_CODE_PLUGIN_CACHE_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins}/";
@@ -24,11 +24,13 @@ const CLAUDE_DIR = new RegExp(
 const SLASH_ONLY_ENCODING = /`\/` → `-`|leading slash dropped/;
 const HISTORY = new Set(["CHANGES.md"]);
 
-function linesMatching(pattern) {
+function linesMatching(pattern, root = repoRoot) {
   const hits = [];
-  for (const file of walk(repoRoot)) {
-    const rel = relative(repoRoot, file);
-    if (HISTORY.has(rel) || rel.split(sep)[0] === "tests") continue;
+  const files = execFileSync("git", ["-C", root, "ls-files", "--cached", "--others", "--exclude-standard", "-z"], { encoding: "utf8" });
+  for (const rel of files.split("\0").filter(Boolean)) {
+    if (HISTORY.has(rel) || rel.split("/")[0] === "tests") continue;
+    const file = join(root, rel);
+    if (!existsSync(file)) continue;
     readFileSync(file, "utf8")
       .split("\n")
       .forEach((line, i) => {
@@ -37,6 +39,22 @@ function linesMatching(pattern) {
   }
   return hits;
 }
+
+test("the scan includes tracked and untracked source, but not ignored session backups", () => {
+  const root = mkdtempSync(join(tmpdir(), "pstack-config-scan-"));
+  try {
+    execFileSync("git", ["init", "-q", root]);
+    writeFileSync(join(root, ".gitignore"), ".remember/\n");
+    writeFileSync(join(root, "tracked.md"), "bad path\n");
+    execFileSync("git", ["-C", root, "add", "tracked.md"]);
+    writeFileSync(join(root, "new.md"), "bad path\n");
+    mkdirSync(join(root, ".remember"));
+    writeFileSync(join(root, ".remember", "backup.tar"), "bad path\n");
+    expect(linesMatching(/bad path/, root).sort()).toEqual(["new.md:1", "tracked.md:1"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("Claude Code's config paths read ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/, and plugins honour CLAUDE_CODE_PLUGIN_CACHE_DIR", () => {
   expect(linesMatching(CLAUDE_DIR)).toEqual([]);

@@ -31,7 +31,7 @@
     "default": "gpt-6-sol",
     "strongest": "gpt-6-astra",
     "worker": "gpt-6-sol",
-    "panel": ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"]
+    "panel": ["gpt-6-astra", "gpt-6-sol", "gpt-6.1-terra", "gpt-6-luna"]
   },
   "pi": {
     "fallback": "anthropic",

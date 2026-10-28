@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.109 - GPT-6.1 Terra joins the Codex panel
+
+The Codex panel example is `gpt-6-astra`, `gpt-6-sol`, `gpt-6.1-terra`, `gpt-6-luna`, so a ChatGPT panel has four models like the Claude panel. The Pi tables are unchanged, because Pi's model catalog does not list `gpt-6.1-terra`.
+
 ## 0.9.108 - watch-pr, ship-pr, and orch run on the first call after an update
 
 `bootstrap.ts` runs the calling script again in a new Bun process after it installs `commander`, as upstream's does. The port had dropped that step in 0.9.23, so the first run after each plugin update imported `commander` in the process that had just installed it. Bun did not find the new `node_modules`, and the run failed with `Cannot find package 'commander'` unless Bun's auto-install fetched the package from the registry. The failure reproduced on macOS and Windows 11 with Bun 1.4.4 under `bun --no-install`. `watch-pr/fresh-install.test.ts` runs each entry point that way from a copy of the scripts with no `node_modules`. [#326](https://github.com/michael-denyer/pstack-claude/issues/326), filed by @Thanaen, found the cause.

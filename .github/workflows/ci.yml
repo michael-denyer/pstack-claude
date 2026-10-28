@@ -228,11 +228,15 @@ jobs:
           curl --fail --location --output "$TLA2TOOLS" "https://github.com/tlaplus/tlaplus/releases/download/v$version/tla2tools.jar"
           echo "$sum  $TLA2TOOLS" | sha256sum --check
       # The render tests install Pele and Mermaid with npm under XDG_CACHE_HOME.
+      # The watchdog dumps every Node process's stack when the suite runs past
+      # 12 minutes, twice the 260 to 391 s that 24 runner runs took, and well
+      # inside the job limit above.
       - name: Test
         env:
           TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar
           XDG_CACHE_HOME: ${{ runner.temp }}/xdg
-        run: JAVA="$(command -v java)" npm test
+          WATCHDOG_REPORTS: ${{ runner.temp }}/reports
+        run: JAVA="$(command -v java)" bash "$GITHUB_WORKSPACE/.github/scripts/statechart-watchdog.sh"
 
   shellcheck:
     name: Shell scripts

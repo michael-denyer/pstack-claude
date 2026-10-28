@@ -2,8 +2,9 @@
 # Runs the statechart suite under a watchdog. When npm test runs past
 # WATCHDOG_LIMIT seconds, the watchdog sends SIGUSR2 to every node process so
 # that --report-on-signal writes a diagnostic report, prints each report's stack
-# and active handles, prints the models the differential test left on disk, and
-# exits 3. Otherwise it exits with npm test's status.
+# and active handles, names each process that wrote none, prints the models the
+# differential test left on disk, and exits 3. Otherwise it exits with npm
+# test's status.
 #
 # CI run 40648025189 attempt 1 sat 16 minutes in differential.test.ts with the
 # compiler worker alive and no Java process, then hit the job limit, which left
@@ -11,7 +12,8 @@
 # that names the stuck process, its stack when it is idle, its CPU time when it
 # is busy, and the model it was given.
 limit=${WATCHDOG_LIMIT:-720}
-reports=${WATCHDOG_REPORTS:-${TMPDIR:-/tmp}/statechart-watchdog/reports}
+tmp=${TMPDIR:-/tmp}
+reports=${WATCHDOG_REPORTS:-$tmp/statechart-watchdog/reports}
 node_command='^(/[^ ]*/)?node( |$)'
 mkdir -p "$reports"
 export NODE_OPTIONS="--report-on-signal --report-directory=$reports"
@@ -52,8 +54,8 @@ while kill -0 "$pid" 2>/dev/null; do
       echo "=== no report from pid $p, so it is busy in synchronous JavaScript: $(ps -o args= -p "$p" | cut -c1-200)"
     done
     echo "=== temp folders"
-    ls -d "${TMPDIR:-/tmp}"/statechart-* 2>/dev/null
-    for dir in "${TMPDIR:-/tmp}"/statechart-differential-*; do
+    ls -d "$tmp"/statechart-* 2>/dev/null
+    for dir in "$tmp"/statechart-differential-*; do
       [ -d "$dir" ] || continue
       for f in "$dir"/*.tla "$dir"/*.cfg "$dir"/view.mjs; do
         [ -e "$f" ] || continue
@@ -67,4 +69,3 @@ while kill -0 "$pid" 2>/dev/null; do
   sleep 10
 done
 wait "$pid"
-exit $?

@@ -565,7 +565,7 @@ describe("effort section", () => {
   test("session effort defers to the Codex mapping instead of instructing it to omit the field", () => {
     const text = effortSection(["low", "max"], "session");
     expect(text).toContain("On Codex, follow the platform mapping for `session`");
-    expect(text).not.toContain("`session` sets no effort");
+    expect(text).not.toContain("`session` sets no effort, so the dispatch is the usual one");
   });
 });
 

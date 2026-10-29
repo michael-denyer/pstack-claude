@@ -4,7 +4,7 @@ This file is the release changelog, with one `## <version> - <title>` entry per 
 
 ## 0.9.112 - Preserve Codex session effort on explicit models
 
-Codex dispatches now pass the task-adjusted session effort explicitly when it is known. Omitting `reasoning_effort` while selecting a model can use that model's default instead of the parent's level. When the current session level is unavailable, the mapping asks for a level or reports that inheritance is not assured. Generated effort and setup descriptions point to the Codex mapping. Fixes [#331](https://github.com/michael-denyer/pstack-claude/issues/331).
+Codex now passes the task-adjusted effort as `reasoning_effort` on every `spawn_agent` dispatch, `session` included. Omitting it while selecting a model can run the child at that model's default instead of the parent's level. When the session context does not show the current level, the dispatch omits the field and says the child's effort may differ. The generated Reasoning effort sections state the Claude Code rule for `session` and leave every other runtime to its platform mapping. Fixes [#331](https://github.com/michael-denyer/pstack-claude/issues/331).
 
 ## 0.9.111 - GPT-6.1 Sol replaces GPT-6 Sol everywhere
 

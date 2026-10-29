@@ -562,10 +562,9 @@ describe("effort section", () => {
     expect(text).not.toContain("effort-<level>");
   });
 
-  test("session effort defers to the Codex mapping instead of instructing it to omit the field", () => {
+  test("session effort outside Claude Code defers to the platform mapping", () => {
     const text = effortSection(["low", "max"], "session");
-    expect(text).toContain("On Codex, follow the platform mapping for `session`");
-    expect(text).not.toContain("`session` sets no effort, so the dispatch is the usual one");
+    expect(text).toContain("On other runtimes, follow the platform mapping for `session`");
   });
 });
 

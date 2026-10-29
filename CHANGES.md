@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.112 - Preserve Codex session effort on explicit models
+
+Codex dispatches now pass the task-adjusted session effort explicitly when it is known. Omitting `reasoning_effort` while selecting a model can use that model's default instead of the parent's level. When the current session level is unavailable, the mapping asks for a level or reports that inheritance is not assured. Generated effort and setup descriptions point to the Codex mapping. Fixes [#331](https://github.com/michael-denyer/pstack-claude/issues/331).
+
 ## 0.9.111 - GPT-6.1 Sol replaces GPT-6 Sol everywhere
 
 The Codex worker example and the `sonnet` entry of the Pi `openai` and `openai-codex` tables move from `gpt-6-sol` to `gpt-6.1-sol`. GPT-6.1 Sol is the newer Sol and costs less than GPT-6 Sol, so no role has a reason to stay on the older model. `models.json` no longer names `gpt-6-sol`.

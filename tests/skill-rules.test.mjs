@@ -12,6 +12,16 @@ const skillsDir = fileURLToPath(new URL("../plugins/pstack/skills", import.meta.
 
 const rules = [
   {
+    source: "#331 Codex session effort with an explicit model",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase: "pass the final level as `reasoning_effort`",
+  },
+  {
+    source: "#331 unknown Codex session effort",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase: "Do not guess the session's effort",
+  },
+  {
     source: "#71 callable driver policy",
     file: "poteto-mode/SKILL.md",
     phrase: "fall back to `run` when the repo has none",

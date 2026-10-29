@@ -561,6 +561,12 @@ describe("effort section", () => {
     expect(text).toContain("`reasoning_effort`");
     expect(text).not.toContain("effort-<level>");
   });
+
+  test("session effort defers to the Codex mapping instead of instructing it to omit the field", () => {
+    const text = effortSection(["low", "max"], "session");
+    expect(text).toContain("On Codex, follow the platform mapping for `session`");
+    expect(text).not.toContain("`session` sets no effort");
+  });
 });
 
 describe("plan, changes, apply", () => {

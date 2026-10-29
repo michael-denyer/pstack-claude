@@ -672,8 +672,8 @@ export function effortSection(levels, defaultEffort) {
     "A role value in the override sheet may name a reasoning effort after its model, as in `opus @xhigh`. " +
     "Levels on Claude Code: " + codeList(levels) + ". Which ones apply depends on the model. " +
     "A value without `@` takes the sheet's `default effort` line, a level or `session`, " +
-    `and ${code(defaultEffort)} when the sheet has no such line. \`session\` sets no effort, so the dispatch ` +
-    "is the usual one. Strip the suffix before reading the model: `inherit-parent` or `auto` still omits `model` " +
+    `and ${code(defaultEffort)} when the sheet has no such line. On Claude Code, \`session\` sets no effort. ` +
+    "On Codex, follow the platform mapping for `session`. Strip the suffix before reading the model: `inherit-parent` or `auto` still omits `model` " +
     "at every level, and a model name is passed as `model`. " +
     "Pass the level as the dispatch's effort field and keep the `subagent_type` you would otherwise use. " +
     "That is `effort` on the Claude Code `Agent` call and `reasoning_effort` on Codex's `spawn_agent`. " +
@@ -732,7 +732,7 @@ export function overrideSheetBlock(models) {
     "an alias entry in a panel list still counts toward that panel's fan-out. " +
     "A model may carry a reasoning effort, as in `opus @xhigh` (levels: " + models.efforts.join(", ") + "); " +
     "the role's subagent then runs at that level, each entry of a panel list on its own. " +
-    "`default effort` sets the level for a value without one; `session` keeps the parent session's effort. " +
+    "`default effort` sets the level for a value without one; `session` starts from the parent session's effort (on Codex, see the platform mapping). " +
     "`session hook: off` stops the Claude Code, Codex, or Muse SessionStart hook, or the pstack Pi extension, from injecting the poteto-mode mandate; " +
     "any other value, or no line, leaves it on.\n\n" +
     rows +

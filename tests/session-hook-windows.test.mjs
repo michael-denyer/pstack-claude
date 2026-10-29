@@ -99,4 +99,17 @@ describe.skipIf(process.platform !== "win32" && !required)("Windows Codex Sessio
     expect(result.out).toBe("");
     expect(result.err).not.toBe("");
   });
+
+  for (const arg of ["cursor", ""]) {
+    test(`fails on runtime argument ${JSON.stringify(arg)}`, () => {
+      const script = join(pluginRoot, "hooks/session-start.ps1");
+      const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, ...(arg ? [arg] : [])];
+      const r = spawnSync("powershell.exe", args, { encoding: "utf8" });
+      expect({ status: r.status, out: r.stdout, err: r.stderr.trimEnd() }).toEqual({
+        status: 2,
+        out: "",
+        err: `session-start.ps1: unknown runtime '${arg}' (expected codex)`,
+      });
+    });
+  }
 });

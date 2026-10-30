@@ -7,7 +7,8 @@ sheet=$1
 utf16=false
 if [ "$(od -An -tx1 -N2 "$sheet" | tr -d ' ')" = fffe ]; then
   # A sheet iconv cannot decode counts as missing, and iconv's message stays
-  # off the hook's stderr.
+  # off the hook's stderr. The check runs here because the pipeline below
+  # exits with sed's status, not iconv's.
   iconv -f UTF-16LE -t UTF-8 "$sheet" >/dev/null 2>&1 || exit 1
   utf16=true
 fi

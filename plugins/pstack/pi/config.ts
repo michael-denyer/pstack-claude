@@ -82,6 +82,9 @@ export function parseSheet(text: string): Sheet {
   };
 }
 
+// ignoreBOM keeps the byte-order mark, so parseSheet drops exactly one, as for UTF-8.
+const utf16le = new TextDecoder("utf-16le", { fatal: true, ignoreBOM: true });
+
 export function readSheet(agentDir: string): Sheet | undefined {
   let bytes: Buffer;
   try {
@@ -99,9 +102,6 @@ export function readSheet(agentDir: string): Sheet | undefined {
     return undefined;
   }
 }
-
-// ignoreBOM keeps the byte-order mark, so parseSheet drops exactly one, as for UTF-8.
-const utf16le = new TextDecoder("utf-16le", { fatal: true, ignoreBOM: true });
 
 // The parts of models.json the extension reads; the generator checks the rest.
 const modelsConfig = Type.Object({

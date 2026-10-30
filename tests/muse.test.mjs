@@ -59,9 +59,10 @@ describe("Muse manifest", () => {
     expect(manifest.capabilities.commands).toEqual([]);
   });
 
-  test("stampMuseManifest rewrites the skill list and leaves the hook alone", () => {
+  test("stampMuseManifest rewrites the skill list and the hooks", () => {
     const stale = structuredClone(manifest);
     stale.capabilities.skills = [];
+    stale.capabilities.hooks = [];
     const stamped = JSON.parse(stampMuseManifest(JSON.stringify(stale), { skills: ["how", "poteto-mode"] }));
     expect(stamped.capabilities.skills).toEqual([
       { id: "how", path: "skills/how/SKILL.md", enabledDefault: true },

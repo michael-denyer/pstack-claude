@@ -13,5 +13,8 @@ if [ ! -f "$sheet" ] || [ ! -r "$sheet" ]; then
   exit 1
 fi
 dir=$(cd "$(dirname "$0")" && pwd)
-normalized=$(sh "$dir/read-sheet.sh" "$sheet")
+if ! normalized=$(sh "$dir/read-sheet.sh" "$sheet"); then
+  echo "sheet invalid: cannot decode $sheet"
+  exit 1
+fi
 printf '%s\n' "$normalized" | LC_ALL=C awk -f "$dir/sheet.awk" -f "$dir/check-sheet.awk"

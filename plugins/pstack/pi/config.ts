@@ -82,9 +82,6 @@ export function parseSheet(text: string): Sheet {
   };
 }
 
-// ignoreBOM keeps the byte-order mark, so parseSheet drops exactly one, as for UTF-8.
-const utf16le = new TextDecoder("utf-16le", { fatal: true, ignoreBOM: true });
-
 export function readSheet(agentDir: string): Sheet | undefined {
   let bytes: Buffer;
   try {
@@ -97,7 +94,9 @@ export function readSheet(agentDir: string): Sheet | undefined {
   // sheet that is not valid UTF-16 LE counts as absent, as in the session hooks.
   if (bytes[0] !== 0xff || bytes[1] !== 0xfe) return parseSheet(bytes.toString("utf8"));
   try {
-    return parseSheet(utf16le.decode(bytes));
+    // ignoreBOM keeps the byte-order mark, so parseSheet drops exactly one, as for
+    // UTF-8. A Node built without ICU throws here, and the sheet counts as absent.
+    return parseSheet(new TextDecoder("utf-16le", { fatal: true, ignoreBOM: true }).decode(bytes));
   } catch {
     return undefined;
   }

@@ -2,6 +2,9 @@
 # Decode the sheet once, before any consumer interprets its lines. PowerShell
 # 5.1 writes UTF-16LE; other writers may add a UTF-8 BOM or CRLF line endings.
 set -eu
+# The tools below then treat the sheet as bytes, as sheet.awk does. Under a
+# UTF-8 locale, macOS tr stops at a byte that is not UTF-8.
+export LC_ALL=C
 sheet=$1
 [ -f "$sheet" ] && [ -r "$sheet" ] || exit 1
 utf16=false

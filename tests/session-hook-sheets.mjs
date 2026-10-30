@@ -3,9 +3,10 @@
 // UTF-8, or UTF-16 LE when it starts with that byte-order mark, which is what
 // Windows PowerShell 5.1's `>` writes. A leading byte-order mark is dropped,
 // lines end at LF, and one CR before the LF is dropped; any other CR is part of
-// the line. Only a line that is then exactly `session hook: off` disables
-// injection. A sheet that cannot be read as a file leaves injection on, as a
-// missing sheet does.
+// the line, and so is a NUL. Only a line that is then exactly
+// `session hook: off` disables injection. A sheet that cannot be read as a
+// file, or that starts with the UTF-16 LE byte-order mark but is not valid
+// UTF-16 LE, leaves injection on, as a missing sheet does.
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 
 export const UNREADABLE = Symbol("unreadable sheet");
@@ -22,6 +23,12 @@ export const sheetCases = [
   { name: "off with CRLF endings", sheet: "bug-fix: configured-model\r\nsession hook: off\r\n", off: true },
   { name: "off after a byte-order mark", sheet: "﻿session hook: off\n", off: true },
   { name: "off in UTF-16 LE after a byte-order mark", sheet: Buffer.from("﻿session hook: off\r\n", "utf16le"), off: true },
+  { name: "off in UTF-16 LE with an odd byte count", sheet: Buffer.concat([Buffer.from("﻿session hook: off\n", "utf16le"), Buffer.from([0x0a])]), off: false },
+  { name: "off in UTF-16 LE after an unpaired surrogate", sheet: Buffer.from("﻿\ud800\nsession hook: off\n", "utf16le"), off: false },
+  { name: "off in UTF-16 LE after two byte-order marks", sheet: Buffer.from("﻿﻿session hook: off\n", "utf16le"), off: false },
+  { name: "off in UTF-16 LE without a byte-order mark", sheet: Buffer.from("session hook: off\n", "utf16le"), off: false },
+  { name: "a NUL inside off", sheet: "session hook: o\u0000ff\n", off: false },
+  { name: "off after a line holding a NUL", sheet: "bug-fix: m\u0000\nsession hook: off\n", off: true },
   { name: "a CR before the LF and another after off", sheet: "session hook: off\r\r\n", off: false },
   { name: "lone CRs around off", sheet: "a\rsession hook: off\r", off: false },
   { name: "a CR inside off", sheet: "session hook: o\rff\n", off: false },
@@ -81,6 +88,8 @@ export const roleCases = [
   { name: "an entry starting with a dot", sheet: "bug-fix: .m\n", roles: [] },
   { name: "an uppercase model ID", sheet: "bug-fix: Muse-1\n", roles: [] },
   { name: "UTF-16 LE after a byte-order mark", sheet: Buffer.from("\ufeffbug-fix: m-1\r\ndefault effort: max\r\n", "utf16le"), roles: ["bug-fix: m-1", "default effort: max"] },
+  { name: "UTF-16 LE with an odd byte count", sheet: Buffer.concat([Buffer.from("\ufeffbug-fix: m-1\n", "utf16le"), Buffer.from([0x0a])]), roles: [] },
+  { name: "a NUL inside an entry", sheet: "bug-fix: m-\u00001\n", roles: [] },
 ];
 
 // Write a case's sheet at path; UNREADABLE puts a directory there instead, and

@@ -205,8 +205,8 @@ jobs:
     name: Statechart scripts (${{ matrix.group }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Node runs the tests in one file one at a time, and corpus.test.ts alone
-    # took 180 s on its own runner, 390 s beside the other files. The two
+    # Node runs the tests in one file one at a time, and corpus.test.ts took
+    # 180 s on its own runner and 390 s beside the other files. The two
     # slowest files each get a runner, and the rest share one, so a new test
     # file lands in the rest.
     strategy:
@@ -250,8 +250,8 @@ jobs:
           echo "$sum  $TLA2TOOLS" | sha256sum --check
       # The render tests install Pele and Mermaid with npm under XDG_CACHE_HOME.
       # The watchdog dumps every Node process's stack when a group runs past
-      # 12 minutes, four times the 180 s that corpus.test.ts took on its own
-      # runner, and well inside the job limit above.
+      # 12 minutes, four times the 121 to 180 s each group took in two runs,
+      # and well inside the job limit above.
       - name: Test
         env:
           TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar

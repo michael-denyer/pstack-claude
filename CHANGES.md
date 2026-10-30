@@ -2,6 +2,12 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.114 - Read malformed UTF-16 sheets the same way in every session hook
+
+The shell, PowerShell, and Pi readers of the model sheet now agree on malformed input. A sheet that starts with the UTF-16 LE byte-order mark but has an odd byte count or an unpaired surrogate counts as missing in all three, so the session hook stays on and adds no role lines. Before, PowerShell and Pi decoded such a sheet loosely and could read `session hook: off` from it. The shell hook no longer prints `iconv`'s error on that sheet. A NUL byte is now part of its line in the shell too, so a line holding one never matches. Before, the shell dropped NUL bytes, which made a UTF-16 sheet without a byte-order mark read as `session hook: off`. The cases are in `sheetCases` and `roleCases`, which every hook's suite runs. Closes [#335](https://github.com/michael-denyer/pstack-claude/issues/335).
+
+setup-pstack's Other runtimes section now names the Muse plugin among the runtimes whose hooks read the `session hook` line ([#336](https://github.com/michael-denyer/pstack-claude/issues/336)).
+
 ## 0.9.113 - Resolve Codex session effort from active-turn metadata
 
 Codex's `session` effort now uses a helper to read the current thread's active-turn effort before applying task adjustments and passing `reasoning_effort` explicitly. It rejects completed turns, other threads, and missing or ambiguous metadata. On hosts without that runtime log, the mapping requires an explicit effort choice before dispatching; omitting the field can use the selected model's default. Setup and generated descriptions state this requirement. [#331](https://github.com/michael-denyer/pstack-claude/issues/331) remains open for validation across Codex hosts.

@@ -74,15 +74,16 @@ switch -CaseSensitive ($Runtime) {
     }
 }
 
-# A missing or unreadable sheet leaves $sheetLines null and the hook on, as
-# session-start.sh does. Decoding itself never fails here, unlike iconv in
-# read-sheet.sh, so malformed UTF-16 reads differently (#335).
+# A missing, unreadable, or undecodable sheet leaves $sheetLines null and the
+# hook on, as session-start.sh does.
 $sheetLines = $null
 if (Test-Path -LiteralPath $sheet -PathType Leaf) {
     try {
         $bytes = [System.IO.File]::ReadAllBytes($sheet)
         # Windows PowerShell 5.1's `>` writes UTF-16 LE with a byte-order mark.
-        $encoding = if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) { [System.Text.Encoding]::Unicode } else { [System.Text.UTF8Encoding]::new($false) }
+        # The decoder throws where iconv in read-sheet.sh fails: on an odd byte
+        # count or an unpaired surrogate.
+        $encoding = if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) { [System.Text.UnicodeEncoding]::new($false, $false, $true) } else { [System.Text.UTF8Encoding]::new($false) }
         $sheetLines = ($encoding.GetString($bytes) -replace '^\uFEFF', '') -split "`n" | ForEach-Object { $_ -replace "`r$", '' }
     } catch { }
 }

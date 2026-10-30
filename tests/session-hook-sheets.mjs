@@ -29,6 +29,7 @@ export const sheetCases = [
   { name: "off in UTF-16 LE without a byte-order mark", sheet: Buffer.from("session hook: off\n", "utf16le"), off: false },
   { name: "a NUL inside off", sheet: "session hook: o\u0000ff\n", off: false },
   { name: "off after a line holding a NUL", sheet: "bug-fix: m\u0000\nsession hook: off\n", off: true },
+  { name: "off after a byte that is not UTF-8", sheet: Buffer.concat([Buffer.from("note: caf"), Buffer.from([0xe9]), Buffer.from("\nsession hook: off\n")]), off: true },
   { name: "a CR before the LF and another after off", sheet: "session hook: off\r\r\n", off: false },
   { name: "lone CRs around off", sheet: "a\rsession hook: off\r", off: false },
   { name: "a CR inside off", sheet: "session hook: o\rff\n", off: false },

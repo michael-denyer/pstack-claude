@@ -33,6 +33,17 @@ const invalid = (problems) => ({ status: 1, out: `sheet invalid: ${problems}\n`,
 describe("check-sheet.sh", () => {
   test("passes a sheet with every role", () => expect(check(sheet())).toEqual(ok));
 
+  test("reports a sheet it cannot decode", () => {
+    const oddUtf16 = Buffer.concat([Buffer.from(`\ufeff${sheet()}`, "utf16le"), Buffer.from([0x0a])]);
+    expect(check(oddUtf16)).toEqual(invalid(`cannot decode ${sheetPath}`));
+  });
+
+  // macOS tr stops at a byte that is not UTF-8 when the locale is UTF-8.
+  test("reads every line of a sheet with a byte that is not UTF-8, in a UTF-8 locale", () => {
+    const latin1 = Buffer.concat([Buffer.from("# caf"), Buffer.from([0xe9]), Buffer.from(`\n${sheet()}`)]);
+    expect(check(latin1, { LC_ALL: "en_US.UTF-8" })).toEqual(ok);
+  });
+
   test("passes a sheet with aliases, efforts, and a default effort", () => {
     const set = { [roles[0]]: "inherit-parent", [roles[1]]: "auto", [roles[2]]: "claude-sonnet-5 @high" };
     expect(check(sheet(set, ["default effort: session"]))).toEqual(ok);

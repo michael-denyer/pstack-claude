@@ -202,13 +202,23 @@ jobs:
         run: bunx prettier@3.6.2 --check .
 
   statechart:
-    name: Statechart scripts
+    name: Statechart scripts (${{ matrix.group }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Node runs the tests in one file one at a time, and corpus.test.ts alone
+    # took 180 s on its own runner, 390 s beside the other files. The two
+    # slowest files each get a runner, and the rest share one, so a new test
+    # file lands in the rest.
     strategy:
       fail-fast: false
       matrix:
-        file: [chart, cli, config-fuzz, corpus, differential, messages, pipeline, plain-tlc, render, tlc-out]
+        include:
+          - group: corpus
+            files: corpus
+          - group: differential
+            files: differential
+          - group: rest
+            files: "!(corpus|differential)"
     defaults:
       run:
         working-directory: plugins/pstack/skills/statechart/scripts
@@ -239,16 +249,20 @@ jobs:
           curl --fail --location --output "$TLA2TOOLS" "https://github.com/tlaplus/tlaplus/releases/download/v$version/tla2tools.jar"
           echo "$sum  $TLA2TOOLS" | sha256sum --check
       # The render tests install Pele and Mermaid with npm under XDG_CACHE_HOME.
-      # The watchdog dumps every Node process's stack when the suite runs past
-      # 12 minutes, twice the 260 to 391 s that 24 runner runs took, and well
-      # inside the job limit above.
+      # The watchdog dumps every Node process's stack when a group runs past
+      # 12 minutes, four times the 180 s that corpus.test.ts took on its own
+      # runner, and well inside the job limit above.
       - name: Test
         env:
           TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar
           XDG_CACHE_HOME: ${{ runner.temp }}/xdg
           WATCHDOG_REPORTS: ${{ runner.temp }}/reports
-          FILE: test/${{ matrix.file }}.test.ts
-        run: JAVA="$(command -v java)" bash "$GITHUB_WORKSPACE/.github/scripts/statechart-watchdog.sh" node --disable-warning=ExperimentalWarning --test "$FILE"
+          FILES: ${{ matrix.files }}
+        run: |
+          shopt -s extglob failglob
+          # shellcheck disable=SC2206 # FILES is a glob to expand here
+          files=(test/$FILES.test.ts)
+          JAVA="$(command -v java)" bash "$GITHUB_WORKSPACE/.github/scripts/statechart-watchdog.sh" node --disable-warning=ExperimentalWarning --test "${files[@]}"
 
   shellcheck:
     name: Shell scripts

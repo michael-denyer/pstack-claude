@@ -19,7 +19,12 @@ const rules = [
   {
     source: "#331 unknown Codex session effort",
     file: "poteto-mode/references/codex-tools.md",
-    phrase: "Do not guess the session's effort",
+    phrase: "Do not substitute an omitted `reasoning_effort` for the missing starting level.",
+  },
+  {
+    source: "#331 resolve active Codex effort before dispatch",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase: "run `node <poteto-mode-dir>/scripts/codex-session-effort.mjs` before dispatching",
   },
   {
     source: "#71 callable driver policy",

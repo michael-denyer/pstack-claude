@@ -2,9 +2,9 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.112 - Preserve Codex session effort on explicit models
+## 0.9.112 - Resolve Codex session effort from active-turn metadata
 
-Codex now passes the task-adjusted effort as `reasoning_effort` on every `spawn_agent` dispatch, `session` included. Omitting it while selecting a model can run the child at that model's default instead of the parent's level. When the session context does not show the current level, the dispatch omits the field and says the child's effort may differ. The generated Reasoning effort sections state the Claude Code rule for `session` and leave every other runtime to its platform mapping. Fixes [#331](https://github.com/michael-denyer/pstack-claude/issues/331).
+Codex's `session` effort now uses a helper to read the current thread's active-turn effort before applying task adjustments and passing `reasoning_effort` explicitly. It rejects completed turns, other threads, and missing or ambiguous metadata. On hosts without that runtime log, the mapping requires an explicit effort choice before dispatching; omitting the field can use the selected model's default. Setup and generated descriptions state this requirement. [#331](https://github.com/michael-denyer/pstack-claude/issues/331) remains open for validation across Codex hosts.
 
 ## 0.9.111 - GPT-6.1 Sol replaces GPT-6 Sol everywhere
 

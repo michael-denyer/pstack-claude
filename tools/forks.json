@@ -254,7 +254,7 @@
     },
     "plugins/pstack/skills/setup-pstack/SKILL.md": {
       "kind": "port-feature",
-      "why": "Writes the override sheet at each runtime's own path, loaded by @-include on Claude Code, pasted into AGENTS.md on Codex, and read directly by the Muse plugin hook since none has Cursor's always-applied rules, replaces Cursor's budget step with a default effort and per-role effort levels, adds the SessionStart hook toggle and names the Pi extension as a reader of it, lists every runtime's sheet path in a table, routes GitHub Copilot to copilot.md, and numbers its verification and formal verification offers as steps 9 and 10.",
+      "why": "Writes the override sheet at each runtime's own path, loaded by @-include on Claude Code, pasted into AGENTS.md on Codex, and read directly by the Muse plugin hook since none has Cursor's always-applied rules, replaces Cursor's budget step with a default effort and per-role effort levels and explains Codex's active-turn metadata requirement for session effort, adds the SessionStart hook toggle and names the Pi extension as a reader of it, lists every runtime's sheet path in a table, routes GitHub Copilot to copilot.md, and numbers its verification and formal verification offers as steps 9 and 10.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },

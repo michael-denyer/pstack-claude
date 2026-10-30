@@ -11,6 +11,10 @@
 # a bare "operation was canceled". This step turns the next stall into a log
 # that names the stuck process, its stack when it is idle, its CPU time when it
 # is busy, and the model it was given.
+#
+# Arguments, when given, replace npm test as the command, so CI can run one
+# group of test files per job.
+[ $# -gt 0 ] || set -- npm test
 limit=${WATCHDOG_LIMIT:-720}
 tmp=${TMPDIR:-/tmp}
 reports=${WATCHDOG_REPORTS:-$tmp/statechart-watchdog/reports}
@@ -18,11 +22,11 @@ node_command='^(/[^ ]*/)?node( |$)'
 mkdir -p "$reports"
 export NODE_OPTIONS="--report-on-signal --report-directory=$reports"
 start=$(date +%s)
-npm test &
+"$@" &
 pid=$!
 while kill -0 "$pid" 2>/dev/null; do
   if [ $(( $(date +%s) - start )) -gt "$limit" ]; then
-    echo "::error::npm test ran past ${limit}s; dumping every node process"
+    echo "::error::$* ran past ${limit}s; dumping every node process"
     echo "=== processes"
     ps -eo pid,ppid,pgid,etime,time,stat,args
     # Node 24 names its main thread MainThread, so pgrep -x node finds nothing.

@@ -205,6 +205,10 @@ jobs:
     name: Statechart scripts
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        file: [chart, cli, config-fuzz, corpus, differential, messages, pipeline, plain-tlc, render, tlc-out]
     defaults:
       run:
         working-directory: plugins/pstack/skills/statechart/scripts
@@ -243,7 +247,8 @@ jobs:
           TLA2TOOLS: ${{ runner.temp }}/tla2tools.jar
           XDG_CACHE_HOME: ${{ runner.temp }}/xdg
           WATCHDOG_REPORTS: ${{ runner.temp }}/reports
-        run: JAVA="$(command -v java)" bash "$GITHUB_WORKSPACE/.github/scripts/statechart-watchdog.sh"
+          FILE: test/${{ matrix.file }}.test.ts
+        run: JAVA="$(command -v java)" bash "$GITHUB_WORKSPACE/.github/scripts/statechart-watchdog.sh" node --disable-warning=ExperimentalWarning --test "$FILE"
 
   shellcheck:
     name: Shell scripts

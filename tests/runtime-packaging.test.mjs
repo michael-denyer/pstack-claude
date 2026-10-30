@@ -52,12 +52,11 @@ describe("validateMuseManifest", () => {
     capabilities: {
       skills: [{ id: "poteto-mode", path: "skills/poteto-mode/SKILL.md", enabledDefault: true }],
       commands: [],
-      hooks: MUSE_HOOKS.map(({ id, command }) => ({ id, event: "SessionStart", command })),
     },
   };
   const files = new Set(["skills/poteto-mode/SKILL.md", "models.json", ...MUSE_HOOKS.map(({ script }) => script)].map((rel) => `plugins/pstack/${rel}`));
   const pathExists = (rel) => files.has(rel);
-  test("needs the Claude Code name, native compat, existing paths, and the SessionStart hook pair", () => {
+  test("needs the Claude Code name, native compat, existing paths, and each hook script", () => {
     expect(() => validateMuseManifest(ok, { claude, pathExists })).not.toThrow();
     expect(() => validateMuseManifest({ ...ok, name: "other" }, { claude, pathExists })).toThrow(
       'name "other" != Claude Code manifest name "pstack"',
@@ -69,31 +68,12 @@ describe("validateMuseManifest", () => {
     const badPath = structuredClone(ok);
     badPath.capabilities.skills[0].path = "skills/nope/SKILL.md";
     expect(() => validateMuseManifest(badPath, { claude, pathExists })).toThrow("is not a file in the plugin");
-    const noHook = structuredClone(ok);
-    noHook.capabilities.hooks = [];
-    expect(() => validateMuseManifest(noHook, { claude, pathExists })).toThrow("expected 2 SessionStart hooks, found 0");
-    const shOnly = structuredClone(ok);
-    shOnly.capabilities.hooks = shOnly.capabilities.hooks.slice(0, 1);
-    expect(() => validateMuseManifest(shOnly, { claude, pathExists })).toThrow("expected 2 SessionStart hooks, found 1");
-    const wrongArg = structuredClone(ok);
-    wrongArg.capabilities.hooks[0].command = ["sh", "hooks/session-start.sh", "claude"];
-    expect(() => validateMuseManifest(wrongArg, { claude, pathExists })).toThrow('not ["sh","hooks/session-start.sh","muse"]');
-    const noWindowsArg = structuredClone(ok);
-    noWindowsArg.capabilities.hooks[1].command = noWindowsArg.capabilities.hooks[1].command.slice(0, -1);
-    expect(() => validateMuseManifest(noWindowsArg, { claude, pathExists })).toThrow('"hooks/session-start.ps1","muse"]');
     const noScript = (rel) => rel !== "plugins/pstack/hooks/session-start.ps1" && pathExists(rel);
-    expect(() => validateMuseManifest(ok, { claude, pathExists: noScript })).toThrow('"session-start-windows" command is');
+    expect(() => validateMuseManifest(ok, { claude, pathExists: noScript })).toThrow(
+      '"session-start-windows" runs hooks/session-start.ps1, which is not in the plugin',
+    );
     const noModels = (rel) => rel !== "plugins/pstack/models.json" && pathExists(rel);
     expect(() => validateMuseManifest(ok, { claude, pathExists: noModels })).toThrow("reads models.json, which is not in the plugin");
-  });
-
-  test("rejects a hook command that leaves the plugin or is not an argv list", () => {
-    const everywhere = () => true;
-    for (const command of [["sh", "../../tests/copilot-smoke.sh", "muse"], "sh hooks/session-start.sh muse"]) {
-      const bad = structuredClone(ok);
-      bad.capabilities.hooks[0].command = command;
-      expect(() => validateMuseManifest(bad, { claude, pathExists: everywhere })).toThrow('"session-start" command is');
-    }
   });
 
   test("rejects a command whose id duplicates a skill id", () => {

@@ -107,11 +107,24 @@ export function stampMuseManifest(text, { skills }) {
   return JSON.stringify(manifest, null, 2) + "\n";
 }
 
-const MUSE_HOOK = ["sh", "hooks/session-start.sh", "muse"];
+// Muse's native hook schema takes one command argv per hook, with no
+// per-OS variant, and rejects a `commandWindows`-style field. One argv
+// cannot spawn on every OS: Windows has no `sh` unless Git's usr\bin lands
+// on the harness PATH, and Unix has no powershell.exe. The manifest
+// therefore declares a pair, the shell script and the PowerShell script,
+// and each stands down on the OS the other owns.
+export const MUSE_HOOKS = [
+  { id: "session-start", script: "hooks/session-start.sh", command: ["sh", "hooks/session-start.sh", "muse"] },
+  {
+    id: "session-start-windows",
+    script: "hooks/session-start.ps1",
+    command: ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "hooks/session-start.ps1", "muse"],
+  },
+];
 
 // The Muse build is a native Muse plugin bundle: its manifest keeps the
 // Claude Code plugin's name, and every capability path it lists exists in the
-// package. The SessionStart hook runs the shared hook script with `muse`.
+// package. The SessionStart hooks print the Muse context.
 export function validateMuseManifest(manifest, { claude, pathExists }) {
   const at = `${PLUGIN}/.muse-plugin/plugin.json`;
   if (manifest.name !== claude.name) throw new Error(`${at}: name "${manifest.name}" != Claude Code manifest name "${claude.name}"`);
@@ -141,13 +154,20 @@ export function validateMuseManifest(manifest, { claude, pathExists }) {
   }
   const hooks = manifest.capabilities?.hooks ?? [];
   const sessionStart = hooks.filter((hook) => hook.event === "SessionStart");
-  if (sessionStart.length !== 1) throw new Error(`${at}: expected one SessionStart hook, found ${sessionStart.length}`);
-  // The manifest's hook command is hand-written, not stamped, so it must be
-  // exactly the shared script inside the plugin, run with `muse`.
-  const command = JSON.stringify(sessionStart[0].command);
-  if (command !== JSON.stringify(MUSE_HOOK) || !pathExists(`${PLUGIN}/${MUSE_HOOK[1]}`)) {
-    throw new Error(`${at}: SessionStart hook command is ${command}, not ${JSON.stringify(MUSE_HOOK)}`);
+  if (sessionStart.length !== MUSE_HOOKS.length) {
+    throw new Error(`${at}: expected ${MUSE_HOOKS.length} SessionStart hooks, found ${sessionStart.length}`);
   }
+  // The hook commands are hand-written, not stamped, so each must name
+  // exactly its script inside the plugin.
+  for (const { id, script, command: wanted } of MUSE_HOOKS) {
+    const command = JSON.stringify(sessionStart.find((hook) => hook.id === id)?.command);
+    if (command !== JSON.stringify(wanted) || !pathExists(`${PLUGIN}/${script}`)) {
+      throw new Error(`${at}: SessionStart hook "${id}" command is ${command}, not ${JSON.stringify(wanted)}`);
+    }
+  }
+  // The PowerShell hook reads the roles from models.json at runtime, where
+  // sheet.awk has them stamped in.
+  if (!pathExists(`${PLUGIN}/models.json`)) throw new Error(`${at}: hooks/session-start.ps1 reads models.json, which is not in the plugin`);
 }
 
 // The pstack Pi extension resolves each Claude alias a skill names through the

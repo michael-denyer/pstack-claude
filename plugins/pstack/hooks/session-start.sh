@@ -17,6 +17,12 @@ case "${1:-}" in
     reader="${COPILOT_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
   muse)
+    # On Windows the manifest's PowerShell hook owns Muse. `uname -s` names a
+    # Windows sh, busybox-w32's as Windows_NT, and OS covers one without uname.
+    case "$(uname -s 2>/dev/null || true)" in
+      MINGW*|MSYS*|CYGWIN*|Windows_NT) exit 0 ;;
+    esac
+    [ "${OS:-}" != Windows_NT ] || exit 0
     sheet="${XDG_CONFIG_HOME:-$HOME/.config}/muse/pstack-models.md"
     reader="${MUSE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;

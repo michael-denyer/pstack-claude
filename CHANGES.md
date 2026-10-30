@@ -2,9 +2,17 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.112 - Resolve Codex session effort from active-turn metadata
+## 0.9.113 - Resolve Codex session effort from active-turn metadata
 
 Codex's `session` effort now uses a helper to read the current thread's active-turn effort before applying task adjustments and passing `reasoning_effort` explicitly. It rejects completed turns, other threads, and missing or ambiguous metadata. On hosts without that runtime log, the mapping requires an explicit effort choice before dispatching; omitting the field can use the selected model's default. Setup and generated descriptions state this requirement. [#331](https://github.com/michael-denyer/pstack-claude/issues/331) remains open for validation across Codex hosts.
+
+## 0.9.112 - The Muse SessionStart hook runs on Windows without sh
+
+The Muse plugin now declares two SessionStart hooks, so Muse on Windows gets the mandate and the sheet's usable role lines when the harness PATH has no `sh`. `session-start` runs the shared shell script, and `session-start-windows` runs `hooks/session-start.ps1 muse`. Muse's native hook schema takes one command per hook and rejects a per-OS variant such as `commandWindows`, so each hook stands down on the OS the other owns. On a machine without one of the two programs, that hook records a failed spawn at session start and the other delivers the context. @LuckyProtein found and fixed this in [#332](https://github.com/michael-denyer/pstack-claude/pull/332).
+
+`session-start.ps1` takes the runtime name, as `session-start.sh` does, and serves Codex and Muse through one sheet decoder. The decoder now drops one leading byte-order mark, as the shell reader and Pi do, and the script compares sheet text ordinally, as the shell hook compares bytes. PowerShell's `-ccontains` compares by culture, and under ICU globalization, as in pwsh 7, it skips zero-width characters. A `session hook: off` line after a second byte-order mark or a zero-width space used to turn off only the Codex Windows hook; every hook now keeps it on.
+
+**Verified.** `tests/session-hook-sheets.mjs` adds `roleCases`, 35 sheets with the role lines each one adds, and the shell and PowerShell Muse suites both run them. `tests/session-hook-windows.test.mjs` runs the PowerShell hook under `PSTACK_REQUIRE_WINDOWS_HOOK=1` with only the PowerShell directory on PATH, over `sheetCases`, `roleCases`, the XDG and USERPROFILE sheet paths, and the Linux stand-down. `tests/session-hook.test.mjs` covers the shell script standing down under a Windows `uname`. On PowerShell 7.6.9, under both ICU and invariant globalization, `session-start.ps1` prints the same bytes as `session-start.sh` for both runtimes on 59 sheets.
 
 ## 0.9.111 - GPT-6.1 Sol replaces GPT-6 Sol everywhere
 

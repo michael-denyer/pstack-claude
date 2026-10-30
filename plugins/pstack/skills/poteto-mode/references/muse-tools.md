@@ -54,7 +54,7 @@ Pass a role's model where the dispatch takes one: a Workflow child's `model`, or
 
 ## Session routing hook
 
-The native pstack Muse plugin bundles a `SessionStart` hook that injects the poteto-mode mandate in Muse wording, plus the saved role lines from the Muse sheet when the sheet has any. Muse runs plugin hooks only after the user approves them (`muse plugins approve pstack`), so a fresh install routes nothing until then. The hook reads `session hook` from the Muse sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/SKILL.md#other-runtimes); `session hook: off` disables injection.
+The native pstack Muse plugin bundles a `SessionStart` hook that injects the poteto-mode mandate in Muse wording, plus the saved role lines from the Muse sheet when the sheet has any. The manifest declares it twice, as `session-start` for the shell script and `session-start-windows` for the PowerShell script, and each stands down on the OS the other owns. On a machine without `sh` or without `powershell.exe`, that hook records a failed spawn at session start and the other delivers the context. Muse runs plugin hooks only after the user approves them (`muse plugins approve pstack`), so a fresh install routes nothing until then. Both hooks read `session hook` from the Muse sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/SKILL.md#other-runtimes); `session hook: off` disables injection.
 
 A skills-only installation does not include the hook. Request `poteto-mode` explicitly or add a standing instruction to `AGENTS.md` in that case.
 

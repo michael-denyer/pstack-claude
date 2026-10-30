@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { agentSkills } from "../tools/generate.mjs";
+import { MUSE_HOOKS } from "../tools/runtimes.mjs";
 import { roleCases, sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
@@ -276,7 +277,9 @@ const museMandate = readFileSync(join(pluginRoot, "hooks/session-start-muse.md")
 const museSheetNote = readFileSync(join(pluginRoot, "hooks/session-start-muse-sheet.md"), "utf8");
 
 // Muse declares the hook inline in its native manifest and runs it with
-// MUSE_PLUGIN_ROOT set; its stdout is plain additional context.
+// MUSE_PLUGIN_ROOT set; its stdout is plain additional context. The argv is
+// the one the generator stamps into the manifest.
+const museCommand = MUSE_HOOKS.find((hook) => hook.id === "session-start").command;
 function runMuseHook(sheet, env = {}, plugin = pluginRoot) {
   const home = mkdtempSync(join(tmpdir(), "pstack-hook-"));
   const config = env.XDG_CONFIG_HOME ?? join(home, ".config");
@@ -286,7 +289,9 @@ function runMuseHook(sheet, env = {}, plugin = pluginRoot) {
     writeSheet(join(dir, "pstack-models.md"), sheet);
   }
   try {
-    const r = spawnSync("sh", [join(plugin, "hooks/session-start.sh"), "muse"], {
+    const [program, ...args] = museCommand;
+    const r = spawnSync(program, args, {
+      cwd: plugin,
       env: { PATH: process.env.PATH, HOME: home, MUSE_PLUGIN_ROOT: plugin, ...env },
       encoding: "utf8",
     });

@@ -44,11 +44,13 @@ jobs:
         run: bun install --frozen-lockfile
       # The runner's first Windows PowerShell launch takes from 2.5 s to over
       # 10 s, and the run steps above use pwsh, so without this step that cost
-      # lands in the first test. Paid here, it leaves the 10 s timeout to catch
-      # a hook launch that is slow every time.
+      # lands in the first test. The first ConvertFrom-Json, which the Muse hook
+      # runs on models.json, took 1.5 s to over 10 s in the first Muse test
+      # with a sheet. Paid here, both leave the 10 s timeout to catch a hook
+      # launch that is slow every time.
       - name: Warm up Windows PowerShell
         shell: powershell
-        run: exit 0
+        run: "'{}' | ConvertFrom-Json | Out-Null"
       - name: Test Windows session hooks
         run: bun test --timeout 10000 tests/session-hook-windows.test.mjs
         env:

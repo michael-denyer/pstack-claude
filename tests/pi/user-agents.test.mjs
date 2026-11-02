@@ -1,6 +1,6 @@
 // Agent definitions read from pstack-agents in the Pi agent directory as well as the plugin's agents/.
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { agentBody, flag, listAgents, useWorld, waitFor } from "./harness.mjs";
@@ -52,24 +52,32 @@ describe("user agent definitions", () => {
     expect(w.invocations()).toEqual([]);
   });
 
-  test("a missing folder, a file that is not .md, and a directory or dangling link named like an agent file add nothing", async () => {
+  test("a missing folder, and an entry that is not a readable .md file or has a colon in its name, add nothing and break no shipped type", async () => {
     const { w, pi, ctx } = setup();
     await pi.call("agent", { description: "a", prompt: "x", subagent_type: "pstack:poteto-agent" }, ctx);
     mkdirSync(join(userDir(w), "dir.md"), { recursive: true });
     writeUserAgent(w, "notes.txt", "not an agent\n");
     symlinkSync(join(w.agentDir, "nowhere"), join(userDir(w), "dangling.md"));
+    symlinkSync(join(userDir(w), "loop.md"), join(userDir(w), "loop.md"));
+    writeUserAgent(w, "locked.md", "Locked.\n");
+    chmodSync(join(userDir(w), "locked.md"), 0o000);
+    writeUserAgent(w, "pstack:extra.md", "Extra.\n");
+    await pi.call("agent", { description: "b", prompt: "x", subagent_type: "pstack:poteto-agent" }, ctx);
     const err = await pi.call("agent", { description: "x", prompt: "x", subagent_type: "notes" }, ctx).catch((e) => e);
     const types = validTypes(err);
     expect(types).toContain("pstack:poteto-agent");
-    for (const skipped of ["notes", "dir", "dangling"]) expect(types).not.toContain(skipped);
-    expect(w.invocations()).toHaveLength(1);
+    for (const skipped of ["notes", "dir", "dangling", "loop", "locked", "pstack:extra"]) expect(types).not.toContain(skipped);
+    expect(w.invocations()).toHaveLength(2);
   });
 
-  test("a pstack-agents that is a file is skipped, not an error", async () => {
+  test("a pstack-agents that is a file or a looping link is skipped, not an error", async () => {
     const { w, pi, ctx } = setup();
     writeFileSync(userDir(w), "a file where the folder belongs");
     await pi.call("agent", { description: "p", prompt: "x", subagent_type: "pstack:poteto-agent" }, ctx);
-    expect(w.invocations()).toHaveLength(1);
+    rmSync(userDir(w));
+    symlinkSync(userDir(w), userDir(w));
+    await pi.call("agent", { description: "q", prompt: "x", subagent_type: "pstack:poteto-agent" }, ctx);
+    expect(w.invocations()).toHaveLength(2);
   });
 
   test("a resume whose system prompt file is gone writes it again from the user file", async () => {

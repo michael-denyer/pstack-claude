@@ -179,17 +179,36 @@ export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile
 // file under its bare name. A user file only adds a type, never replaces one.
 export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "agentDir">): Map<string, AgentDefinition> {
   const types = new Map<string, AgentDefinition>([[GENERAL_PURPOSE, { body: "" }]]);
-  const folders = [
-    { dir: join(settings.pluginRoot, "agents"), prefix: "pstack:" },
-    { dir: join(settings.agentDir, USER_AGENTS_DIR), prefix: "" },
-  ];
-  for (const { dir, prefix } of folders) {
-    if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) continue;
-    // statSync follows links and skips a directory or dangling link named like an agent file.
-    for (const file of readdirSync(dir).filter((f) => f.endsWith(".md") && statSync(join(dir, f), { throwIfNoEntry: false })?.isFile()).sort()) {
-      const type = `${prefix}${basename(file, ".md")}`;
-      if (!types.has(type)) types.set(type, parseAgentFile(readFileSync(join(dir, file), "utf8")));
+  const dir = join(settings.pluginRoot, "agents");
+  if (existsSync(dir)) {
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
+      const type = `pstack:${basename(file, ".md")}`;
+      types.set(type, parseAgentFile(readFileSync(join(dir, file), "utf8")));
     }
   }
+  for (const [type, text] of userAgentFiles(join(settings.agentDir, USER_AGENTS_DIR))) {
+    if (!types.has(type)) types.set(type, parseAgentFile(text));
+  }
   return types;
+}
+
+// Each readable .md file in the user's folder, by bare name. A name with a colon,
+// which Claude Code keeps for plugin agents, an entry that is not a readable file,
+// and a folder that cannot be listed are skipped, so the user's folder never
+// breaks the plugin's agent types.
+function userAgentFiles(dir: string): [string, string][] {
+  let files: string[];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith(".md") && !f.includes(":")).sort();
+  } catch {
+    return [];
+  }
+  return files.flatMap((file): [string, string][] => {
+    const path = join(dir, file);
+    try {
+      return statSync(path).isFile() ? [[basename(file, ".md"), readFileSync(path, "utf8")]] : [];
+    } catch {
+      return [];
+    }
+  });
 }

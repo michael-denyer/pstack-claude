@@ -45,9 +45,12 @@ describe("user agent definitions", () => {
     writeUserAgent(w, "notes.txt", "not an agent\n");
     symlinkSync(join(w.agentDir, "nowhere"), join(w.settings.userAgentsDir, "dangling.md"));
     const err = await pi.call("agent", { description: "x", prompt: "x", subagent_type: "pstack:notes" }, ctx).catch((e) => e);
-    expect(err.message.split("Valid types: ")[1]).toBe(
-      "general-purpose, pstack:comment-sicko, pstack:poteto-agent, pstack:thermo-nuclear-code-quality-review-subagent, pstack:thermo-nuclear-review-subagent.",
-    );
+    // The plugin's own agent files come and go; only what the skipped entries would have added is pinned.
+    const list = err.message.split("Valid types: ")[1];
+    expect(list.startsWith("general-purpose, ")).toBe(true);
+    expect(list).toContain("pstack:poteto-agent");
+    expect(list.endsWith(".")).toBe(true);
+    for (const skipped of ["notes", "dir", "dangling"]) expect(list).not.toContain(`pstack:${skipped}`);
     expect(w.invocations()).toHaveLength(1);
   });
 

@@ -12,7 +12,7 @@ const agentParams = Type.Object(
     subagent_type: Type.Optional(
       Type.String({
         description:
-          "Agent definition to run: general-purpose (default), pstack:poteto-agent, pstack:comment-sicko, pstack:thermo-nuclear-review-subagent, or pstack:thermo-nuclear-code-quality-review-subagent, or pstack:<name> for an agent file in the user agents folder.",
+          "Agent definition to run: general-purpose (default), pstack:poteto-agent, pstack:comment-sicko, pstack:thermo-nuclear-review-subagent, pstack:thermo-nuclear-code-quality-review-subagent, or pstack:<name> for an agent file in the user agents folder.",
       }),
     ),
     model: Type.Optional(

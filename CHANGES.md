@@ -2,6 +2,16 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.119 - Pi user agents, agent file effort, and permission asks from Pi agents
+
+Three changes to the Pi extension's `agent` tool, all from @foreztgump.
+
+A `.md` file in `pstack-agents` in the Pi agent directory now adds an agent type under its file name, with no `pstack:` prefix, as a Claude Code user agent has no plugin prefix. A user file never replaces an existing type, so `poteto-agent.md` adds `poteto-agent` beside `pstack:poteto-agent`. A hidden file, an entry that cannot be read, and a name with a colon are skipped, so the folder never breaks the plugin's own types. The extension does not read Pi's `agents` folder, where other subagent extensions keep files whose `tools:` allowlists it would not apply. It ignores a user file's `tools:`, `disallowedTools:`, and `isolation:` fields, so pass `readonly: true` or `isolation: "worktree"` on the call ([#351](https://github.com/michael-denyer/pstack-claude/pull/351)).
+
+An agent file's `effort:` is now the default when the call passes no `effort`, and `model: inherit` runs the agent on the parent's model. As on Claude Code, the call's `model` and `effort` win. The plugin's own agent files set neither field, so pstack's skills run as before ([#352](https://github.com/michael-denyer/pstack-claude/pull/352)).
+
+Each child `pi` process now has `PI_SUBAGENT_PARENT_SESSION` set to the session that started it. With `@gotgenes/pi-permission-system` installed globally, a child's permission ask goes to that session's prompt. Before, the extension cancelled the child's own dialog, and the ask was logged as the user's refusal ([#353](https://github.com/michael-denyer/pstack-claude/pull/353)).
+
 ## 0.9.118 - Name the SessionStart hook in Codex and Claude Code
 
 The Codex and Claude Code SessionStart hooks now carry the `statusMessage` the Muse hooks already had, `Loading pstack routing`. Codex titles a hook with that field in its hook review list, which `/hooks` and the startup prompt's "Review hooks" option open, and shows it while the hook runs. Before, the list showed a generic label, so a user approving the hook could not tell it was pstack's. Codex's trust check hashes the whole plugin, so it asks for review after every pstack update; from this release the review list names the hook. Claude Code shows the same text while the hook runs. @teddychan reported it ([#354](https://github.com/michael-denyer/pstack-claude/issues/354)).

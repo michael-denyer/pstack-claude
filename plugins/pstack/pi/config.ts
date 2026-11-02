@@ -161,7 +161,9 @@ export function frontmatter(text: string): { fields: Map<string, string>; body: 
 
 function parseAgentFile(text: string): AgentDefinition {
   const { fields, body } = frontmatter(text);
-  return { body, model: fields.get("model") || undefined, effort: fields.get("effort") || undefined };
+  // Claude Code's `model: inherit` runs the agent on the parent's model, as no model does.
+  const model = fields.get("model");
+  return { body, model: model && model !== "inherit" ? model : undefined, effort: fields.get("effort") || undefined };
 }
 
 // The agent tool's effort parameter: one of models.json's levels.

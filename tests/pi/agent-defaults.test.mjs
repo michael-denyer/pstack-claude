@@ -41,6 +41,12 @@ describe("agent file defaults", () => {
     expect(w.invocations().map((inv) => flag(inv, "--model"))).toEqual(["gw/file-model", "gw/sheet-opus", "gw/explicit"]);
   });
 
+  test("Claude Code's model: inherit in the file runs the agent on the parent's model", async () => {
+    const { w, pi, ctx } = withAgents({ copied: "model: inherit" });
+    await run(pi, ctx, "copied");
+    expect(w.invocations().map((inv) => flag(inv, "--model"))).toEqual(["anthropic/parent-model"]);
+  });
+
   test("a resume keeps the file's effort", async () => {
     const { w, pi, ctx } = withAgents({ slow: "effort: high" });
     await run(pi, ctx, "slow");

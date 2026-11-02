@@ -111,7 +111,7 @@ describe("agent tool", () => {
     expect(statSync(flag(second, "--append-system-prompt")).mode & 0o777).toBe(0o600);
   });
 
-  test("a resume whose system prompt file is gone and whose type no longer has one fails, and no child starts", async () => {
+  test("a resume whose system prompt file is gone and whose type no longer has one fails, no child starts, and the agent keeps its completed record", async () => {
     const { w, pi, ctx } = setup();
     await pi.call("agent", { description: "p", prompt: "first", subagent_type: "pstack:poteto-agent" }, ctx);
     rmSync(join(w.agentDir, "pstack", "parent-session", "prompts"), { recursive: true });
@@ -122,7 +122,8 @@ describe("agent tool", () => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toContain('its type "pstack:removed" no longer provides one');
     expect(w.invocations()).toHaveLength(1);
-    expect((await listAgents(resumed, ctx)).map((a) => a.status)).toEqual(["failed"]);
+    expect((await listAgents(resumed, ctx)).map((a) => a.status)).toEqual(["completed"]);
+    expect(resumed.entries).toEqual([]);
   });
 
   test("a system prompt file that cannot be written fails the launch before a worktree or its branch is made", async () => {

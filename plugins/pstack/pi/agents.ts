@@ -249,9 +249,12 @@ export class AgentRunner {
       this.ensureSystemPrompt(identity);
       if (identity.worktree) ensureWorktree(identity.worktree);
     } catch (e) {
-      const failed: EndedRecord = { agent: identity, status: "failed", exitCode: null, endedAt: now(), finalText: (e as Error).message };
-      this.agents.set(identity.id, { kind: "ended", record: failed });
-      this.persist(failed);
+      // A resume that cannot launch leaves the agent's record as its last run ended.
+      if (!this.agents.has(identity.id)) {
+        const failed: EndedRecord = { agent: identity, status: "failed", exitCode: null, endedAt: now(), finalText: (e as Error).message };
+        this.agents.set(identity.id, { kind: "ended", record: failed });
+        this.persist(failed);
+      }
       throw e;
     }
     const { command, args } = this.settings.pi;

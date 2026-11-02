@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.117 - Give the no-comments reviewer a model role
+
+`no-comments` now reads its model from a `no-comments reviewer` line in the `pstack-models.md` sheet and passes it to `comment-sicko`. It was the one other skill that, like `thermos` before 0.9.115, spawned a plugin agent with no model, so the sheet could not reach it. The role defaults to the `default` tier (`opus`). On GitHub Copilot, a sheet written before this release lacks the new line, so, as with 0.9.115, the next skill that needs a role model runs `setup-pstack` first and offers each saved model as `(current)`.
+
 ## 0.9.116 - Run statechart on Windows
 
 `statechart` now runs on Windows. It used to spawn `/bin/sh` to kill the TLC worker and clean up after it, which Windows Node cannot find, so the command crashed with `spawn /bin/sh ENOENT` once TLC finished. On Windows it now kills the worker's process tree with `taskkill`, and a small Node janitor, `janitor.ts`, takes over the `/bin/sh` janitor's cleanup. The worker's `TEMP` and `TMP` now point at the command's temp folder, as `TMPDIR` already did, because Node on Windows reads only those two. Before, TLC's working folder landed in `%TEMP%`, where cleanup after Ctrl-C did not reach it. TLC on Windows also ends each output line with `\r\n`, and the message reader kept the `\r`, so no message closed and a broken rule read as "its output names no rule that broke". The reader now drops a trailing `\r`. A `windows-latest` CI job charts the `MediaPlayer` corpus spec and diffs its `report.md` and `chart.mmd` against the Linux ones. @Adamya05 reported both failures with a patch ([#345](https://github.com/michael-denyer/pstack-claude/issues/345)).

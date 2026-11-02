@@ -29,6 +29,7 @@ function sheet_roles(roles, panel,    n) {
   roles[++n] = "architect runners"
   roles[++n] = "interrogate reviewers"
   roles[++n] = "thermos reviewers"
+  roles[++n] = "no-comments reviewer"
   panel["arena runners"] = 1
   panel["arena cross-judge pool"] = 1
   panel["architect runners"] = 1

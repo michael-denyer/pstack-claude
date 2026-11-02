@@ -209,9 +209,13 @@ export class AgentRunner {
     const def = types.get(type);
     if (!def) throw new Error(`Unknown subagent_type "${type}". Valid types: ${[...types.keys()].join(", ")}.`);
     const parentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
-    const model = resolveModel(params.model ?? def.model, this.settings, readSheet(this.settings.agentDir), parentModel);
+    // An agent file's pin beats the call: a full provider/id in `model`, and any `effort`. The pi models: sheet
+    // only maps family names, so it never touches a pin. Without a pin the call decides, then the file's default.
+    const pinnedModel = def.model?.includes("/") ? def.model : undefined;
+    const model = resolveModel(pinnedModel ?? params.model ?? def.model, this.settings, readSheet(this.settings.agentDir), parentModel);
     // Claude Code subagents without an effort run at the session's effort.
-    const thinking = params.effort === undefined ? this.pi.getThinkingLevel() : checkEffort(params.effort, this.settings);
+    const effort = def.effort ?? params.effort;
+    const thinking = effort === undefined ? this.pi.getThinkingLevel() : checkEffort(effort, this.settings);
 
     const id = `a${randomBytes(8).toString("hex")}`;
     const state = join(this.settings.agentDir, PSTACK_STATE_DIR, ctx.sessionManager.getSessionId());

@@ -145,7 +145,11 @@ export const GENERAL_PURPOSE = "general-purpose";
 
 interface AgentDefinition {
   body: string;
+  // A full provider/id pins the agent's model. A family name or inherit-parent
+  // is only the default for a call that names no model.
   model?: string;
+  // Pins the agent's reasoning effort, one of models.json's levels.
+  effort?: string;
 }
 
 export function frontmatter(text: string): { fields: Map<string, string>; body: string } {
@@ -160,7 +164,7 @@ export function frontmatter(text: string): { fields: Map<string, string>; body: 
 
 function parseAgentFile(text: string): AgentDefinition {
   const { fields, body } = frontmatter(text);
-  return { body, model: fields.get("model") || undefined };
+  return { body, model: fields.get("model") || undefined, effort: fields.get("effort") || undefined };
 }
 
 // The agent tool's effort parameter: one of models.json's levels.

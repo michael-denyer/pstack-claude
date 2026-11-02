@@ -40,10 +40,11 @@ function expandSlash(pi: ExtensionAPI, text: string): string {
   if (!m || !command || named.some((c) => c.source === "extension")) return text;
   try {
     const { sourceInfo } = command;
+    if (!sourceInfo || (command.source === "skill" && !command.name.startsWith("skill:"))) return text;
     const body = frontmatter(readFileSync(sourceInfo.path, "utf8")).body;
     if (command.source === "prompt") return fillArgs(body, words(m[2] ?? ""));
     const args = (m[2] ?? "").trim();
-    const block = `<skill name="${command.name.slice(6)}" location="${sourceInfo.path}">\nReferences are relative to ${sourceInfo.baseDir}.\n\n${body}\n</skill>`;
+    const block = `<skill name="${command.name.slice("skill:".length)}" location="${sourceInfo.path}">\nReferences are relative to ${sourceInfo.baseDir}.\n\n${body}\n</skill>`;
     return args ? `${block}\n\n${args}` : block;
   } catch {
     return text;

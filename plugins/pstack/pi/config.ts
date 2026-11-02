@@ -195,14 +195,14 @@ export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "agentDir
   return types;
 }
 
-// Each readable .md file in the user's folder, by bare name. A name with a colon,
-// which Claude Code keeps for plugin agents, an entry that is not a readable file,
-// and a folder that cannot be listed are skipped, so the user's folder never
-// breaks the plugin's agent types.
+// Each readable .md file in the user's folder, by bare name. A hidden file, such
+// as a macOS ._ sidecar, a name with a colon, which Claude Code keeps for plugin
+// agents, an entry that is not a readable file, and a folder that cannot be
+// listed are skipped, so the user's folder never breaks the plugin's agent types.
 function userAgentFiles(dir: string): [string, string][] {
   let files: string[];
   try {
-    files = readdirSync(dir).filter((f) => f.endsWith(".md") && !f.includes(":")).sort();
+    files = readdirSync(dir).filter((f) => f.endsWith(".md") && !f.startsWith(".") && !f.includes(":")).sort();
   } catch {
     return [];
   }

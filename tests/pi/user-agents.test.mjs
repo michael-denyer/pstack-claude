@@ -52,7 +52,7 @@ describe("user agent definitions", () => {
     expect(w.invocations()).toEqual([]);
   });
 
-  test("a missing folder, and an entry that is not a readable .md file or has a colon in its name, add nothing and break no shipped type", async () => {
+  test("a missing folder, and an entry that is not a readable .md file, is hidden, or has a colon in its name, add nothing and break no shipped type", async () => {
     const { w, pi, ctx } = setup();
     await pi.call("agent", { description: "a", prompt: "x", subagent_type: "pstack:poteto-agent" }, ctx);
     mkdirSync(join(userDir(w), "dir.md"), { recursive: true });
@@ -62,11 +62,13 @@ describe("user agent definitions", () => {
     writeUserAgent(w, "locked.md", "Locked.\n");
     chmodSync(join(userDir(w), "locked.md"), 0o000);
     writeUserAgent(w, "pstack:extra.md", "Extra.\n");
+    writeUserAgent(w, "._scout.md", "AppleDouble sidecar.\n");
+    writeUserAgent(w, ".md", "Nameless.\n");
     await pi.call("agent", { description: "b", prompt: "x", subagent_type: "pstack:poteto-agent" }, ctx);
     const err = await pi.call("agent", { description: "x", prompt: "x", subagent_type: "notes" }, ctx).catch((e) => e);
     const types = validTypes(err);
     expect(types).toContain("pstack:poteto-agent");
-    for (const skipped of ["notes", "dir", "dangling", "loop", "locked", "pstack:extra"]) expect(types).not.toContain(skipped);
+    for (const skipped of ["notes", "dir", "dangling", "loop", "locked", "pstack:extra", "._scout", ""]) expect(types).not.toContain(skipped);
     expect(w.invocations()).toHaveLength(2);
   });
 

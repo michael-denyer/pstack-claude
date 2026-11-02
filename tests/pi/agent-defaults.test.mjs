@@ -1,26 +1,22 @@
 // An agent file's model and effort are defaults below the call's parameters, as on Claude Code.
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { describe, expect, test } from "bun:test";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { fixtureModels, flag, useWorld } from "./harness.mjs";
 
 const setup = useWorld();
-const roots = [];
-afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
 
-// A plugin root holding only these agent files; the extension reads nothing else from it at install.
 function withAgents(files, options = {}) {
-  const pluginRoot = realpathSync(mkdtempSync(join(tmpdir(), "pstack-defaults-")));
-  roots.push(pluginRoot);
-  mkdirSync(join(pluginRoot, "agents"));
-  for (const [name, frontmatter] of Object.entries(files)) writeFileSync(join(pluginRoot, "agents", `${name}.md`), `---\n${frontmatter}\n---\nbody of ${name}\n`);
-  return setup({ ...options, settings: { pluginRoot } });
+  const world = setup(options);
+  const dir = join(world.w.agentDir, "pstack-agents");
+  mkdirSync(dir);
+  for (const [name, frontmatter] of Object.entries(files)) writeFileSync(join(dir, `${name}.md`), `---\n${frontmatter}\n---\nbody of ${name}\n`);
+  return world;
 }
 
 const run = async (pi, ctx, type, params = {}) => {
-  await pi.call("agent", { description: type, prompt: "x", subagent_type: `pstack:${type}`, ...params }, ctx);
+  await pi.call("agent", { description: type, prompt: "x", subagent_type: type, ...params }, ctx);
 };
 
 describe("agent file defaults", () => {

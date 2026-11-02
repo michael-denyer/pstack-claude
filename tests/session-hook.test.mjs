@@ -82,8 +82,8 @@ describe("SessionStart hook", () => {
     expect(sessionStart.copilot.matcher).toBe("startup|resume|clear|compact");
   });
 
-  // Codex lists a hook without a statusMessage as "Unnamed hook" when it asks
-  // the user to trust it.
+  // Codex shows a hook without a statusMessage under a generic label when it
+  // asks the user to trust it.
   test("names the hook for Claude Code and Codex", () => {
     expect(sessionStart.claude.hooks[0].statusMessage).toBe(SESSION_START_STATUS);
     expect(sessionStart.codex.hooks[0].statusMessage).toBe(SESSION_START_STATUS);

@@ -148,6 +148,8 @@ export function resolveModel(
 export const GENERAL_PURPOSE = "general-purpose";
 
 interface AgentDefinition {
+  // The agent file it was read from; general-purpose has none.
+  file?: string;
   body: string;
   model?: string;
   effort?: string;
@@ -163,11 +165,11 @@ export function frontmatter(text: string): { fields: Map<string, string>; body: 
   return { fields, body: (m?.[2] ?? text).trim() };
 }
 
-function parseAgentFile(text: string): AgentDefinition {
+function parseAgentFile(file: string, text: string): AgentDefinition {
   const { fields, body } = frontmatter(text);
   // Claude Code's `model: inherit` runs the agent on the parent's model, as no model does.
   const model = fields.get("model");
-  return { body, model: model && model !== "inherit" ? model : undefined, effort: fields.get("effort") || undefined };
+  return { file, body, model: model && model !== "inherit" ? model : undefined, effort: fields.get("effort") || undefined };
 }
 
 // The agent tool's effort parameter: one of models.json's levels.
@@ -186,11 +188,12 @@ export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "agentDir
   if (existsSync(dir)) {
     for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
       const type = `pstack:${basename(file, ".md")}`;
-      types.set(type, parseAgentFile(readFileSync(join(dir, file), "utf8")));
+      const path = join(dir, file);
+      types.set(type, parseAgentFile(path, readFileSync(path, "utf8")));
     }
   }
-  for (const [type, text] of userAgentFiles(join(settings.agentDir, USER_AGENTS_DIR))) {
-    if (!types.has(type)) types.set(type, parseAgentFile(text));
+  for (const [type, def] of userAgentFiles(join(settings.agentDir, USER_AGENTS_DIR))) {
+    if (!types.has(type)) types.set(type, def);
   }
   return types;
 }
@@ -199,17 +202,17 @@ export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "agentDir
 // as a macOS ._ sidecar, a name with a colon, which Claude Code keeps for plugin
 // agents, an entry that is not a readable file, and a folder that cannot be
 // listed are skipped, so the user's folder never breaks the plugin's agent types.
-function userAgentFiles(dir: string): [string, string][] {
+function userAgentFiles(dir: string): [string, AgentDefinition][] {
   let files: string[];
   try {
     files = readdirSync(dir).filter((f) => f.endsWith(".md") && !f.startsWith(".") && !f.includes(":")).sort();
   } catch {
     return [];
   }
-  return files.flatMap((file): [string, string][] => {
+  return files.flatMap((file): [string, AgentDefinition][] => {
     const path = join(dir, file);
     try {
-      return statSync(path).isFile() ? [[basename(file, ".md"), readFileSync(path, "utf8")]] : [];
+      return statSync(path).isFile() ? [[basename(file, ".md"), parseAgentFile(path, readFileSync(path, "utf8"))]] : [];
     } catch {
       return [];
     }

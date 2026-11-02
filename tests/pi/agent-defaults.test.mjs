@@ -51,10 +51,15 @@ describe("agent file defaults", () => {
     expect(w.invocations().map((inv) => flag(inv, "--thinking"))).toEqual(["high", "high"]);
   });
 
-  test("a file effort that is not a level is an error naming the levels, and no child starts", async () => {
-    const { w, pi, ctx } = withAgents({ bad: "effort: turbo" });
-    const err = await run(pi, ctx, "bad").catch((e) => e);
-    expect(err.message).toContain(`effort "turbo" is not one of ${fixtureModels.efforts.join(", ")}`);
+  test("a bad effort or model from an agent file is an error that names the file, the same value on the call is not, and no child starts", async () => {
+    const { w, pi, ctx } = withAgents({ slow: "effort: turbo", odd: "model: gpt9", plain: "description: none" });
+    const file = (name) => join(w.agentDir, "pstack-agents", `${name}.md`);
+    const message = async (type, params) => (await run(pi, ctx, type, params).catch((e) => e)).message;
+    const levels = `effort "turbo" is not one of ${fixtureModels.efforts.join(", ")}`;
+    expect(await message("slow")).toBe(`${file("slow")}: ${levels}`);
+    expect(await message("odd")).toStartWith(`${file("odd")}: Unknown model "gpt9".`);
+    expect(await message("plain", { effort: "turbo" })).toBe(levels);
+    expect(await message("plain", { model: "gpt9" })).toStartWith('Unknown model "gpt9".');
     expect(w.invocations()).toEqual([]);
   });
 });

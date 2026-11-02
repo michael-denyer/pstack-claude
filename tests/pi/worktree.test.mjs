@@ -6,7 +6,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSyn
 import { dirname, join } from "node:path";
 
 import { ensureWorktree, planWorktree, settleWorktree } from "../../plugins/pstack/pi/worktree.ts";
-import { gitRepo, resultText, useWorld, waitFor } from "./harness.mjs";
+import { gitRepo, resultText, useWorld } from "./harness.mjs";
 
 const setup = useWorld();
 
@@ -254,16 +254,17 @@ describe("worktree isolation", () => {
     expect(existsSync(join(path, "partial"))).toBe(true);
   });
 
-  test("a resume whose worktree cannot be re-created fails with a notice", async () => {
+  test("a resume whose worktree cannot be re-created fails, and the agent keeps its completed record", async () => {
     const { w, pi, ctx } = setup({ script: { default: [{ touch: "kept" }, { reply: "ok" }] } });
     gitRepo(w.cwd);
     const { details } = await pi.call("agent", { description: "w", prompt: "first", isolation: "worktree" }, ctx);
     rmSync(w.invocations()[0].cwd, { recursive: true, force: true });
+    const completed = pi.entries.at(-1).data;
 
     const err = await pi.call("send_message", { to: details.agentId, message: "again" }, ctx).catch((e) => e);
     expect(err.message).toContain("git worktree add");
-    await waitFor(() => pi.entries.at(-1).data.status === "failed");
-    expect(pi.entries.at(-1).data.finalText).toContain("git worktree add");
+    expect(completed.status).toBe("completed");
+    expect(pi.entries.at(-1).data).toEqual(completed);
     expect(w.invocations()).toHaveLength(1);
   });
 

@@ -18,7 +18,7 @@ const agentParams = Type.Object(
     model: Type.Optional(
       Type.String({
         description:
-          "Optional model for this agent: a family name (opus, fable, sonnet, haiku) or a full provider/id. If omitted, the agent runs on the parent's model.",
+          "Optional model for this agent: a family name (opus, fable, sonnet, haiku) or a full provider/id. If omitted, the agent runs on its agent file's model, else on the parent's model.",
       }),
     ),
     effort: Type.Optional(

@@ -38,7 +38,7 @@
     },
     "plugins/pstack/skills/no-comments/SKILL.md": {
       "kind": "policy",
-      "why": "Treats a HOLD that names its dependency, platform, vendor, or protocol rule and where to check it as settled for the run, restores as a HOLD any kill of such a comment without a refuting page or file, and limits a second rejected report's failure to that report's findings so the accepted work still lands.",
+      "why": "Treats a HOLD that names its dependency, platform, vendor, or protocol rule and where to check it as settled for the run, restores as a HOLD any kill of such a comment without a refuting page or file, and limits a second rejected report's failure to that report's findings so the accepted work still lands. Sets comment-sicko's model from the no-comments reviewer line in pstack-models.md.",
       "since": "0.9.106",
       "upstream": "not-proposed"
     },
@@ -270,10 +270,34 @@
       "since": "0.9.41",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/statechart/scripts/frontends/messages.ts": {
+      "kind": "policy",
+      "why": "Drops the \\r that TLC on Windows leaves at the end of each line, so an end-of-message line closes its message there too.",
+      "since": "0.9.116",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/run.ts": {
+      "kind": "policy",
+      "why": "Kills the worker's process tree with taskkill on Windows, which has no /bin/sh and no process groups.",
+      "since": "0.9.116",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/statechart.ts": {
+      "kind": "policy",
+      "why": "Spawns janitor.ts on Windows in place of the /bin/sh janitor, points the worker's TEMP and TMP at its temp folder as TMPDIR already is, and hides the windows of the detached worker and janitor.",
+      "since": "0.9.116",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/statechart/scripts/test/cli.test.ts": {
       "kind": "policy",
       "why": "Resolves the temp folder before the symlinked-launcher test computes its relative link, because macOS keeps that folder under the /var symlink and the link would otherwise miss the launcher, so the suite passes on macOS.",
       "since": "0.9.105",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/test/messages.test.ts": {
+      "kind": "policy",
+      "why": "Adds a test that TLC's output with Windows line ends reads as it does with Unix ones.",
+      "since": "0.9.116",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/tdd/SKILL.md": {
@@ -306,6 +330,12 @@
       "kind": "policy",
       "why": "Adds a Report Format section requiring one summary report plus one detail file per subsystem or reviewer.",
       "since": "0.9.11",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/thermos/SKILL.md": {
+      "kind": "port-feature",
+      "why": "Sets both reviewers' model from the thermos reviewers line in pstack-models.md, so the override sheet reaches them.",
+      "since": "0.9.115",
       "upstream": "not-proposed"
     }
   }

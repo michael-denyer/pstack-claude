@@ -94,10 +94,10 @@ const runChild = (file: string, args: string[], options: { cwd: string; env: Nod
 
 export const killGroup = (pid: number) =>
   new Promise((resolve) =>
-    spawn("/bin/sh", ["-c", 'kill -s KILL -- "-$1"', "sh", String(pid)], { stdio: "ignore" }).on(
-      "exit",
-      resolve,
-    ),
+    (process.platform === "win32"
+      ? spawn("taskkill", ["/T", "/F", "/PID", String(pid)], { stdio: "ignore", windowsHide: true })
+      : spawn("/bin/sh", ["-c", 'kill -s KILL -- "-$1"', "sh", String(pid)], { stdio: "ignore" })
+    ).on("exit", resolve),
   );
 
 export const messageOf = (error: unknown) =>

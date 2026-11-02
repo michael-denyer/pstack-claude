@@ -14,7 +14,7 @@ import { writeSheet } from "../session-hook-sheets.mjs";
 export const pluginRoot = fileURLToPath(new URL("../../plugins/pstack/", import.meta.url));
 const fakePiBin = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
 
-const fixtureModels = {
+export const fixtureModels = {
   available: ["opus", "fable", "sonnet", "haiku"],
   efforts: ["low", "medium", "high", "xhigh", "max"],
   pi: {

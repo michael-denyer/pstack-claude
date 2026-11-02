@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { flag, useWorld } from "./harness.mjs";
+import { fixtureModels, flag, useWorld } from "./harness.mjs";
 
 const setup = useWorld();
 const roots = [];
@@ -61,7 +61,7 @@ describe("agent file pins", () => {
   test("an effort pin that is not a level is an error naming the levels, and no child starts", async () => {
     const { w, pi, ctx } = withAgents({ bad: "effort: turbo" });
     const err = await run(pi, ctx, "bad").catch((e) => e);
-    expect(err.message).toContain('effort "turbo" is not one of low, medium, high, xhigh, max');
+    expect(err.message).toContain(`effort "turbo" is not one of ${fixtureModels.efforts.join(", ")}`);
     expect(w.invocations()).toEqual([]);
   });
 });

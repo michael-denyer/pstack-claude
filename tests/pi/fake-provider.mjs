@@ -12,7 +12,12 @@ export async function startFakeProvider(decide) {
     let body = "";
     req.on("data", (d) => (body += d));
     req.on("end", () => {
-      const request = JSON.parse(body || "{}");
+      let request = {};
+      try {
+        request = JSON.parse(body || "{}");
+      } catch {
+        // a probe or truncated request: answer it as one with no messages
+      }
       requests.push(request);
       const answer = decide(request.messages ?? []);
       res.writeHead(200, { "content-type": "text/event-stream" });
@@ -30,7 +35,11 @@ export async function startFakeProvider(decide) {
   return {
     url: `http://127.0.0.1:${server.address().port}/v1`,
     requests,
-    close: () => new Promise((resolve) => server.close(resolve)),
+    close: () =>
+      new Promise((resolve) => {
+        server.close(resolve);
+        server.closeAllConnections?.();
+      }),
   };
 }
 

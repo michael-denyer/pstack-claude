@@ -92,24 +92,32 @@ async function runRpcParent(world, answer) {
     }
   });
   proc.stdout.on("data", lines.write);
+  proc.stdin.on("error", () => {});
+  let closed = false;
   const exited = new Promise((resolve) => proc.on("close", resolve));
+  exited.then(() => (closed = true));
   cleanups.push(() => proc.kill("SIGKILL"));
+  const died = (what) => new Error(`pi exited before ${what}. stderr: ${stderr.slice(-800)}`);
   const command = (type) =>
-    new Promise((resolve) => {
+    new Promise((resolve, reject) => {
+      if (closed) return reject(died(`answering ${type}`));
       pending.set(type, resolve);
+      exited.then(() => reject(died(`answering ${type}`)));
       proc.stdin.write(`${JSON.stringify({ id: type, type })}\n`);
     });
   const done = () => messages.some((m) => m.role === "assistant" && JSON.stringify(m.content).includes("PARENT-DONE"));
   proc.stdin.write(`${JSON.stringify({ id: "prompt", type: "prompt", message: PROMPT })}\n`);
   const deadline = Date.now() + 45_000;
   while (!done()) {
+    if (closed) throw died("the parent finished");
     if (Date.now() > deadline) throw new Error(`the parent did not finish. stderr: ${stderr.slice(-800)}`);
     await sleep(100);
   }
   const { data } = await command("get_state");
   proc.stdin.end();
   await exited;
-  const childReport = messages.find((m) => m.role === "toolResult" && m.toolName === "agent").content[0].text;
+  const agentResult = messages.find((m) => m.role === "toolResult" && m.toolName === "agent");
+  const childReport = agentResult ? agentResult.content[0].text : "(no agent tool result arrived)";
   return { sessionId: data.sessionId, dialogs, childReport };
 }
 
@@ -144,7 +152,10 @@ suite("a child's permission ask on real pi", () => {
     let out = "";
     proc.stdout.on("data", (d) => (out += d));
     cleanups.push(() => proc.kill("SIGKILL"));
-    const code = await Promise.race([new Promise((resolve) => proc.on("close", resolve)), sleep(45_000).then(() => "timeout")]);
+    let timer;
+    const timeout = new Promise((resolve) => (timer = setTimeout(resolve, 45_000, "timeout")));
+    const code = await Promise.race([new Promise((resolve) => proc.on("close", resolve)), timeout]);
+    clearTimeout(timer);
     expect(code).toBe(0);
     expect(out).toContain("denied this 'bash' call");
     expect(existsSync(world.marker)).toBe(false);

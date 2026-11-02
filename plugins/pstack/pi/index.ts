@@ -13,7 +13,7 @@ export function install(pi: ExtensionAPI, settings: Settings): void {
   const runner = new AgentRunner(pi, settings);
   const scheduler = new Scheduler(pi);
   const oneShot = registerOneShot(pi, settings, runner);
-  registerAgentTools(pi, runner);
+  registerAgentTools(pi, runner, settings);
   if (!readSheet(settings.agentDir)?.askToolOff) registerAsk(pi, oneShot);
   registerSchedule(pi, scheduler, oneShot);
   registerPromptSections(pi, settings);

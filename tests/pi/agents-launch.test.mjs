@@ -75,6 +75,16 @@ describe("agent tool", () => {
     expect(w.invocations()).toEqual([]);
   });
 
+  test("the subagent_type description names every type the session starts with, the user's agent files included", async () => {
+    const { w } = setup();
+    mkdirSync(join(w.agentDir, "pstack-agents"));
+    writeFileSync(join(w.agentDir, "pstack-agents", "scout.md"), "Scout.\n");
+    const pi = await restore(w, []);
+    const { description } = pi.tools.get("agent").parameters.properties.subagent_type;
+    const types = ["general-purpose", "pstack:comment-sicko", "pstack:poteto-agent", "pstack:thermo-nuclear-code-quality-review-subagent", "pstack:thermo-nuclear-review-subagent", "scout"];
+    for (const type of types) expect(description).toContain(type);
+  });
+
   test("the effort parameter passes --thinking to any agent type, keeps a pstack agent's body as a 0600 system prompt file, and no effort runs at the parent's level", async () => {
     const { w, pi, ctx } = setup();
     await pi.call("agent", { description: "e", prompt: "x", subagent_type: "general-purpose", effort: "xhigh" }, ctx);

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 import { plainText, runtime } from "../backends/plain-text.ts";
 import { readMessages } from "../frontends/messages.ts";
+import { readVerdict } from "../frontends/verdict.ts";
 
 const tool = (code: number, level: number, ...lines: string[]) =>
   [`@!@!@STARTMSG ${code}:${level} @!@!@`, ...lines, `@!@!@ENDMSG ${code} @!@!@`].join("\n");
@@ -186,6 +189,18 @@ test("output that ends where TLC died prints as plain TLC's output cut at the sa
   );
   const afterStarts = [computing, "@!@!@STARTMSG 1000:1 @!@!@", "@!@!@STARTMSG 2132:0 @!@!@", ""];
   assert.equal(plain(afterStarts.join("\n")), "Computing initial states...\n");
+});
+
+test("TLC's output with Windows line endings reads as it does with Unix ones", () => {
+  const unix = fs.readFileSync(
+    path.join(import.meta.dirname, "corpus/MediaPlayer/verdict-1.out"),
+    "utf8",
+  );
+  const windows = unix.replaceAll("\n", "\r\n");
+  const verdict = readVerdict(readMessages(windows));
+  assert.deepEqual(verdict.broke, { kind: "invariant", name: "LoudWhenStopped" });
+  assert.deepEqual(verdict, readVerdict(readMessages(unix)));
+  assert.equal(plain(windows), plain(unix));
 });
 
 test("text outside TLC's messages, such as SANY's output, passes through unchanged", () => {

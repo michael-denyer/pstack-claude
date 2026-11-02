@@ -126,7 +126,7 @@ describe("agent tool", () => {
     expect(resumed.entries).toEqual([]);
   });
 
-  test("a system prompt file that cannot be written fails the launch before a worktree or its branch is made", async () => {
+  test("a system prompt file that cannot be written fails a fresh launch, recorded as failed, before a worktree or its branch is made", async () => {
     const { w, pi, ctx } = setup();
     const git = gitRepo(w.cwd);
     const state = join(w.agentDir, "pstack", "parent-session");
@@ -135,6 +135,8 @@ describe("agent tool", () => {
 
     const err = await pi.call("agent", { description: "wt", prompt: "x", subagent_type: "pstack:poteto-agent", isolation: "worktree" }, ctx).catch((e) => e);
     expect(err).toBeInstanceOf(Error);
+    expect((await listAgents(pi, ctx)).map((a) => a.status)).toEqual(["failed"]);
+    expect(pi.entries.map((e) => e.data.status)).toEqual(["failed"]);
     expect(git("worktree", "list").split("\n")).toHaveLength(1);
     expect(git("branch", "--list").split("\n")).toHaveLength(1);
     expect(w.invocations()).toEqual([]);

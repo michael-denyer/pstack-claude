@@ -307,6 +307,12 @@
       "why": "Adds a Report Format section requiring one summary report plus one detail file per subsystem or reviewer.",
       "since": "0.9.11",
       "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/thermos/SKILL.md": {
+      "kind": "port-feature",
+      "why": "Sets both reviewers' model from the thermos reviewers line in pstack-models.md, so the override sheet reaches them.",
+      "since": "0.9.115",
+      "upstream": "not-proposed"
     }
   }
 }

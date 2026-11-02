@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.118 - Name the SessionStart hook in Codex and Claude Code
+
+The Codex and Claude Code SessionStart hooks now carry the `statusMessage` the Muse hooks already had, `Loading pstack routing`. Codex titles a hook with that field in its "Hooks need review" list and shows it while the hook runs. Before, the list showed a generic label, so a user approving the hook could not tell it was pstack's. Codex's trust check hashes the whole plugin, so it asks for review after every pstack update; from this release that prompt names the hook. Claude Code shows the same text while the hook runs. @teddychan reported it ([#354](https://github.com/michael-denyer/pstack-claude/issues/354)).
+
 ## 0.9.117 - Give the no-comments reviewer a model role
 
 `no-comments` now reads its model from a `no-comments reviewer` line in the `pstack-models.md` sheet and passes it to `comment-sicko`. It was the one other skill that, like `thermos` before 0.9.115, spawned a plugin agent with no model, so the sheet could not reach it. The role defaults to the `default` tier (`opus`). On GitHub Copilot, a sheet written before this release lacks the new line, so, as with 0.9.115, the next skill that needs a role model runs `setup-pstack` first and offers each saved model as `(current)`.

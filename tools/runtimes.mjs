@@ -109,11 +109,16 @@ export function stampMuseManifest(text, { skills }) {
       event: "SessionStart",
       command,
       timeoutMs: 5000,
-      statusMessage: "Loading pstack routing",
+      statusMessage: SESSION_START_STATUS,
     })),
   };
   return JSON.stringify(manifest, null, 2) + "\n";
 }
+
+// The SessionStart hook's statusMessage. Codex titles the hook with it in
+// its review list, and every runtime that reads it shows it while the hook
+// runs, so users can tell the hook is pstack's.
+export const SESSION_START_STATUS = "Loading pstack routing";
 
 // Muse's native hook schema takes one command argv per hook, with no
 // per-OS variant, and rejects a `commandWindows`-style field. One argv

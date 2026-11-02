@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,10 @@ export const DEPTH_FLAG = "pstack-depth";
 // Under agentDir, holds each session's agent sessions and prompts. The worktree
 // audit scans it by this name, so a rename must reach that script too.
 export const PSTACK_STATE_DIR = "pstack";
+// Under agentDir, beside the pstack-models.md sheet, holds the user's agent
+// files. Not Pi's `agents`, which other subagent extensions read with their
+// own frontmatter.
+export const USER_AGENTS_DIR = "pstack-agents";
 
 export interface Settings {
   pluginRoot: string;
@@ -174,8 +178,9 @@ export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile
 }
 
 // Claude Code registers each plugin agent file as pstack:<file name>, beside
-// the built-in general-purpose type, which has no agent file.
-export function loadAgentTypes(settings: Pick<Settings, "pluginRoot">): Map<string, AgentDefinition> {
+// the built-in general-purpose type, which has no agent file, and a user agent
+// file under its bare name. A user file only adds a type, never replaces one.
+export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "agentDir">): Map<string, AgentDefinition> {
   const types = new Map<string, AgentDefinition>([[GENERAL_PURPOSE, { body: "" }]]);
   const dir = join(settings.pluginRoot, "agents");
   if (existsSync(dir)) {
@@ -184,5 +189,29 @@ export function loadAgentTypes(settings: Pick<Settings, "pluginRoot">): Map<stri
       types.set(type, parseAgentFile(readFileSync(join(dir, file), "utf8")));
     }
   }
+  for (const [type, text] of userAgentFiles(join(settings.agentDir, USER_AGENTS_DIR))) {
+    if (!types.has(type)) types.set(type, parseAgentFile(text));
+  }
   return types;
+}
+
+// Each readable .md file in the user's folder, by bare name. A name with a colon,
+// which Claude Code keeps for plugin agents, an entry that is not a readable file,
+// and a folder that cannot be listed are skipped, so the user's folder never
+// breaks the plugin's agent types.
+function userAgentFiles(dir: string): [string, string][] {
+  let files: string[];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith(".md") && !f.includes(":")).sort();
+  } catch {
+    return [];
+  }
+  return files.flatMap((file): [string, string][] => {
+    const path = join(dir, file);
+    try {
+      return statSync(path).isFile() ? [[basename(file, ".md"), readFileSync(path, "utf8")]] : [];
+    } catch {
+      return [];
+    }
+  });
 }

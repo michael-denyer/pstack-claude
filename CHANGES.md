@@ -4,7 +4,7 @@ This file is the release changelog, with one `## <version> - <title>` entry per 
 
 ## 0.9.115 - Give the thermos reviewers a model role
 
-`thermos` now reads its model from a `thermos reviewers` line in the `pstack-models.md` sheet, and passes it to both thermo-nuclear reviewers. Before, it set no model, so both reviewers ran on the runtime's default subagent model. On Claude Code that is `CLAUDE_CODE_SUBAGENT_MODEL` when set and the parent's model otherwise, and no sheet line could change it. The role defaults to the `default` tier (`opus`), so `/setup-pstack` lists it and the skill gains a stamped Models section. @TomDeLeu-TomTom reported it ([#346](https://github.com/michael-denyer/pstack-claude/issues/346)).
+`thermos` now reads its model from a `thermos reviewers` line in the `pstack-models.md` sheet, and passes it to both thermo-nuclear reviewers. Before, it set no model, so both reviewers ran on the runtime's default subagent model. On Claude Code that is `CLAUDE_CODE_SUBAGENT_MODEL` when set and the parent's model otherwise, and no sheet line could change it. The role defaults to the `default` tier (`opus`), so `/setup-pstack` lists it and the skill gains a stamped Models section. On GitHub Copilot, which has no default models, a sheet written before this release has no `thermos reviewers` line. The session hook then reports `sheet invalid` and drops the sheet's role lines, and the next skill that needs a role model runs `setup-pstack` first. The re-run offers each saved model as `(current)`. @TomDeLeu-TomTom reported it ([#346](https://github.com/michael-denyer/pstack-claude/issues/346)).
 
 ## 0.9.114 - Read malformed UTF-16 sheets the same way in every session hook
 

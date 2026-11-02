@@ -214,8 +214,9 @@ export class AgentRunner {
     if (!def) throw new Error(`Unknown subagent_type "${type}". Valid types: ${[...types.keys()].join(", ")}.`);
     const parentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
     const model = resolveModel(params.model ?? def.model, this.settings, readSheet(this.settings.agentDir), parentModel);
-    // Claude Code subagents without an effort run at the session's effort.
-    const thinking = params.effort === undefined ? this.pi.getThinkingLevel() : checkEffort(params.effort, this.settings);
+    // Claude Code subagents without an effort run at their definition's effort, else the session's.
+    const effort = params.effort ?? def.effort;
+    const thinking = effort === undefined ? this.pi.getThinkingLevel() : checkEffort(effort, this.settings);
 
     const id = `a${randomBytes(8).toString("hex")}`;
     const state = join(this.settings.agentDir, PSTACK_STATE_DIR, ctx.sessionManager.getSessionId());

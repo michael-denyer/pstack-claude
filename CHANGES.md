@@ -4,7 +4,7 @@ This file is the release changelog, with one `## <version> - <title>` entry per 
 
 ## 0.9.118 - Name the SessionStart hook in Codex and Claude Code
 
-The Codex and Claude Code SessionStart hooks now carry the `statusMessage` the Muse hooks already had, `Loading pstack routing`. Codex titles a hook with that field in its "Hooks need review" list and shows it while the hook runs. Before, the list showed a generic label, so a user approving the hook could not tell it was pstack's. Codex's trust check hashes the whole plugin, so it asks for review after every pstack update; from this release that prompt names the hook. Claude Code shows the same text while the hook runs. @teddychan reported it ([#354](https://github.com/michael-denyer/pstack-claude/issues/354)).
+The Codex and Claude Code SessionStart hooks now carry the `statusMessage` the Muse hooks already had, `Loading pstack routing`. Codex titles a hook with that field in its hook review list, which `/hooks` and the startup prompt's "Review hooks" option open, and shows it while the hook runs. Before, the list showed a generic label, so a user approving the hook could not tell it was pstack's. Codex's trust check hashes the whole plugin, so it asks for review after every pstack update; from this release the review list names the hook. Claude Code shows the same text while the hook runs. @teddychan reported it ([#354](https://github.com/michael-denyer/pstack-claude/issues/354)).
 
 ## 0.9.117 - Give the no-comments reviewer a model role
 

@@ -154,11 +154,13 @@ interface AgentDefinition {
 }
 
 export function frontmatter(text: string): { fields: Map<string, string>; body: string } {
-  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text);
+  // Windows editors often save a byte-order mark before the frontmatter.
+  const m = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text);
   const fields = new Map<string, string>();
   for (const line of (m?.[1] ?? "").split(/\r?\n/)) {
     const kv = /^([\w-]+):\s*(.*)$/.exec(line);
-    if (kv) fields.set(kv[1], kv[2].trim());
+    // YAML's quotes are not part of the value, so "high" and 'high' read as high.
+    if (kv) fields.set(kv[1], kv[2].trim().replace(/^"([^"\\]*)"$|^'([^']*)'$/, "$1$2"));
   }
   return { fields, body: (m?.[2] ?? text).trim() };
 }

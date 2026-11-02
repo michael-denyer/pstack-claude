@@ -43,6 +43,18 @@ describe("agent file defaults", () => {
     expect(w.invocations().map((inv) => flag(inv, "--model"))).toEqual(["anthropic/parent-model"]);
   });
 
+  test("YAML quotes around a value, and a byte-order mark before the frontmatter, are not part of the field", async () => {
+    const { w, pi, ctx } = withAgents({ quoted: `model: "gw/quoted-model"\neffort: 'high'` });
+    const bom = String.fromCharCode(0xfeff);
+    writeFileSync(join(w.agentDir, "pstack-agents", "bom.md"), `${bom}---\nmodel: gw/bom-model\neffort: max\n---\nbody of bom\n`);
+    await run(pi, ctx, "quoted");
+    await run(pi, ctx, "bom");
+    expect(w.invocations().map((inv) => [flag(inv, "--model"), flag(inv, "--thinking"), inv.systemPrompt])).toEqual([
+      ["gw/quoted-model", "high", "body of quoted"],
+      ["gw/bom-model", "max", "body of bom"],
+    ]);
+  });
+
   test("a resume keeps the file's effort", async () => {
     const { w, pi, ctx } = withAgents({ slow: "effort: high" });
     await run(pi, ctx, "slow");

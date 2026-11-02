@@ -27,6 +27,7 @@ describe("agent tool", () => {
       "--session-dir", join(w.agentDir, "pstack", "parent-session", "agents"),
       "--model", "anthropic/parent-model",
       "--thinking", "medium",
+      "--append-system-prompt", '<active_agent name="general-purpose" />',
       "--pstack-depth", "1",
     ]);
     expect(inv.prompt).toBe("-do it");

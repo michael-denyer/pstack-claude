@@ -95,12 +95,12 @@ describe("agent tool", () => {
     const [effort, poteto, general] = w.invocations();
 
     expect(flag(effort, "--thinking")).toBe("xhigh");
-    expect(flag(effort, "--append-system-prompt")).toBeNull();
+    expect(effort.systemPrompt).toBeNull();
     expect(flag(poteto, "--thinking")).toBe("high");
     expect(poteto.systemPrompt).toBe(agentBody("agents/poteto-agent.md"));
     expect(statSync(flag(poteto, "--append-system-prompt")).mode & 0o777).toBe(0o600);
     expect(flag(general, "--thinking")).toBe("medium");
-    expect(flag(general, "--append-system-prompt")).toBeNull();
+    expect(general.systemPrompt).toBeNull();
   });
 
   test("an unknown effort is an error naming the valid levels, and no child starts or state is written", async () => {

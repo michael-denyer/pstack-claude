@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,11 +12,15 @@ export const DEPTH_FLAG = "pstack-depth";
 // Under agentDir, holds each session's agent sessions and prompts. The worktree
 // audit scans it by this name, so a rename must reach that script too.
 export const PSTACK_STATE_DIR = "pstack";
+// Moves the user agents folder from its default, `agents` in the Pi agent directory.
+export const USER_AGENTS_ENV = "PSTACK_AGENTS_DIR";
 
 export interface Settings {
   pluginRoot: string;
   modelsFile: string;
   agentDir: string;
+  // User agent files, read after the plugin's own so a file of the same name wins.
+  userAgentsDir: string;
   pi: { command: string; args: string[] };
   // Layers below the main session: 0 there, 1 in its agents, and so on.
   readonly depth: number;
@@ -41,10 +45,12 @@ function piInvocation(): Settings["pi"] {
 // the extension.
 export function defaultSettings(readDepth: () => number, env: NodeJS.ProcessEnv = process.env): Settings {
   const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const agentDir = env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
   return {
     pluginRoot,
     modelsFile: join(pluginRoot, "models.json"),
-    agentDir: env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
+    agentDir,
+    userAgentsDir: env[USER_AGENTS_ENV] || join(agentDir, "agents"),
     pi: piInvocation(),
     get depth() {
       return readDepth();
@@ -171,14 +177,16 @@ export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile
 }
 
 // Claude Code registers each plugin agent file as pstack:<file name>, beside
-// the built-in general-purpose type, which has no agent file.
-export function loadAgentTypes(settings: Pick<Settings, "pluginRoot">): Map<string, AgentDefinition> {
+// the built-in general-purpose type, which has no agent file. The user folder
+// registers under the same names and is read last, so a user file named like a
+// plugin file replaces it and any other file adds a type.
+export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "userAgentsDir">): Map<string, AgentDefinition> {
   const types = new Map<string, AgentDefinition>([[GENERAL_PURPOSE, { body: "" }]]);
-  const dir = join(settings.pluginRoot, "agents");
-  if (existsSync(dir)) {
-    for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
-      const type = `pstack:${basename(file, ".md")}`;
-      types.set(type, parseAgentFile(readFileSync(join(dir, file), "utf8")));
+  for (const dir of [join(settings.pluginRoot, "agents"), settings.userAgentsDir]) {
+    if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) continue;
+    // statSync follows links and skips a directory or dangling link named like an agent file.
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".md") && statSync(join(dir, f), { throwIfNoEntry: false })?.isFile()).sort()) {
+      types.set(`pstack:${basename(file, ".md")}`, parseAgentFile(readFileSync(join(dir, file), "utf8")));
     }
   }
   return types;

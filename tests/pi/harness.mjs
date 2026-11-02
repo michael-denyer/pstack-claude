@@ -110,6 +110,7 @@ export function world({ script = {}, sheet = null } = {}) {
     pluginRoot,
     modelsFile,
     agentDir,
+    userAgentsDir: join(agentDir, "agents"),
     pi: { command: fakePiBin, args: [scriptFile, logFile] },
     depth: 0,
     killGraceMs: 300,

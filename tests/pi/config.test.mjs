@@ -17,6 +17,12 @@ test("depth comes from the reader on each use and PI_CODING_AGENT_DIR moves the 
   expect(defaultSettings(() => 0, {}).agentDir).toBe(join(homedir(), ".pi", "agent"));
 });
 
+test("the user agents folder is agents in the Pi agent directory unless PSTACK_AGENTS_DIR moves it", () => {
+  expect(defaultSettings(() => 0, { PI_CODING_AGENT_DIR: "/tmp/pi-agent-x" }).userAgentsDir).toBe("/tmp/pi-agent-x/agents");
+  expect(defaultSettings(() => 0, { PI_CODING_AGENT_DIR: "/tmp/pi-agent-x", PSTACK_AGENTS_DIR: "/tmp/mine" }).userAgentsDir).toBe("/tmp/mine");
+  expect(defaultSettings(() => 0, {}).userAgentsDir).toBe(join(homedir(), ".pi", "agent", "agents"));
+});
+
 test("only an exact pi ask tool: off line turns the ask tool off", () => {
   expect(parseSheet("bug-fix: opus\r\npi ask tool: off\r\n").askToolOff).toBe(true);
   for (const sheet of ["bug-fix: opus\n", "pi ask tool: on\n", "pi ask tool: off \n", "ask tool: off\n", "session hook: off\n"]) {
@@ -31,7 +37,7 @@ test("an agent file loads as pstack:<name> with its body and model, and an effor
     writeFileSync(join(root, "models.json"), JSON.stringify(models));
     mkdirSync(join(root, "agents"));
     writeFileSync(join(root, "agents", "slow.md"), "---\nmodel: opus\n---\nbody\n");
-    const settings = { pluginRoot: root, modelsFile: join(root, "models.json") };
+    const settings = { pluginRoot: root, modelsFile: join(root, "models.json"), userAgentsDir: join(root, "none") };
     expect(loadAgentTypes(settings).get("pstack:slow")).toEqual({ body: "body", model: "opus" });
     expect(checkEffort("low", settings)).toBe("low");
     expect(() => checkEffort("medium", settings)).toThrow('effort "medium" is not one of low');

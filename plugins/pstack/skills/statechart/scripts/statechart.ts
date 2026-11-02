@@ -111,7 +111,7 @@ try {
         detached: true,
         windowsHide: true,
         stdio: ["ignore", "inherit", "inherit"],
-        env: { ...process.env, TMPDIR: tmp },
+        env: { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp },
       },
     );
     if (process.platform === "win32")

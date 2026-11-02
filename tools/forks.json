@@ -284,7 +284,7 @@
     },
     "plugins/pstack/skills/statechart/scripts/statechart.ts": {
       "kind": "policy",
-      "why": "Spawns janitor.ts on Windows in place of the /bin/sh janitor, and hides the windows of the detached worker and janitor.",
+      "why": "Spawns janitor.ts on Windows in place of the /bin/sh janitor, points the worker's TEMP and TMP at its temp folder as TMPDIR already is, and hides the windows of the detached worker and janitor.",
       "since": "0.9.116",
       "upstream": "not-proposed"
     },

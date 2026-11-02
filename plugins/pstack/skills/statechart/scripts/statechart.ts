@@ -109,22 +109,30 @@ try {
       ],
       {
         detached: true,
+        windowsHide: true,
         stdio: ["ignore", "inherit", "inherit"],
         env: { ...process.env, TMPDIR: tmp },
       },
     );
-    janitor = spawn(
-      "/bin/sh",
-      [
-        "-c",
-        'while read -r line; do :; done; kill -s KILL -- "-$1"; rm -rf -- "$2" "$3"',
-        "sh",
-        String(worker.pid),
-        stage,
-        tmp,
-      ],
-      { detached: true, stdio: ["pipe", "ignore", "ignore"] },
-    );
+    janitor =
+      process.platform === "win32"
+        ? spawn(
+            process.execPath,
+            [...runtime, path.join(import.meta.dirname, "janitor.ts"), String(worker.pid), stage, tmp],
+            { detached: true, windowsHide: true, stdio: ["pipe", "ignore", "ignore"] },
+          )
+        : spawn(
+            "/bin/sh",
+            [
+              "-c",
+              'while read -r line; do :; done; kill -s KILL -- "-$1"; rm -rf -- "$2" "$3"',
+              "sh",
+              String(worker.pid),
+              stage,
+              tmp,
+            ],
+            { detached: true, stdio: ["pipe", "ignore", "ignore"] },
+          );
     const exited = new Promise<number>((resolve) =>
       worker.on("exit", (code) => resolve(code ?? 2)),
     );

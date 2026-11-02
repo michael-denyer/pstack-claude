@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.116 - Run statechart on Windows
+
+`statechart` now runs on Windows. It used to spawn `/bin/sh` to kill the TLC worker and clean up after it, which Windows Node cannot find, so the command crashed with `spawn /bin/sh ENOENT` once TLC finished. On Windows it now kills the worker's process tree with `taskkill`, and a small Node janitor, `janitor.ts`, takes over the `/bin/sh` janitor's cleanup. TLC on Windows also ends each output line with `\r\n`, and the message reader kept the `\r`, so no message closed and a broken rule read as "its output names no rule that broke". The reader now drops a trailing `\r`. A `windows-latest` CI job charts the `MediaPlayer` corpus spec and diffs its `report.md` and `chart.mmd` against the Linux ones. @Adamya05 reported both failures with a patch ([#345](https://github.com/michael-denyer/pstack-claude/issues/345)).
+
 ## 0.9.115 - Give the thermos reviewers a model role
 
 `thermos` now reads its model from a `thermos reviewers` line in the `pstack-models.md` sheet, and passes it to both thermo-nuclear reviewers. Before, it set no model, so both reviewers ran on the runtime's default subagent model. On Claude Code that is `CLAUDE_CODE_SUBAGENT_MODEL` when set and the parent's model otherwise, and no sheet line could change it. The role defaults to the `default` tier (`opus`), so `/setup-pstack` lists it and the skill gains a stamped Models section. On GitHub Copilot, which has no default models, a sheet written before this release has no `thermos reviewers` line. The session hook then reports `sheet invalid` and drops the sheet's role lines, and the next skill that needs a role model runs `setup-pstack` first. The re-run offers each saved model as `(current)`. @TomDeLeu-TomTom reported it ([#346](https://github.com/michael-denyer/pstack-claude/issues/346)).

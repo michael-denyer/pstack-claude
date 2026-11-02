@@ -1,11 +1,11 @@
 // What the agent tool registers and the child command a call produces.
 import { describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
 import { chmodDeniesReads } from "../session-hook-sheets.mjs";
-import { agentBody, agentEntry, fakeCtx, fakePi, flag, gitRepo, listAgents, recordWith, restore, useWorld, waitFor } from "./harness.mjs";
+import { agentBody, agentEntry, fakeCtx, fakePi, flag, gitRepo, listAgents, pluginRoot, recordWith, restore, useWorld, waitFor } from "./harness.mjs";
 
 const setup = useWorld();
 
@@ -73,6 +73,18 @@ describe("agent tool", () => {
     }
     expect(err.message).not.toContain("effort-");
     expect(w.invocations()).toEqual([]);
+  });
+
+  test("the subagent_type description names every type the session starts with, the user's agent files included", async () => {
+    const { w } = setup();
+    mkdirSync(join(w.agentDir, "pstack-agents"));
+    writeFileSync(join(w.agentDir, "pstack-agents", "scout.md"), "Scout.\n");
+    const pi = await restore(w, []);
+    const { description } = pi.tools.get("agent").parameters.properties.subagent_type;
+    const pluginTypes = readdirSync(join(pluginRoot, "agents")).filter((f) => f.endsWith(".md")).map((f) => `pstack:${f.slice(0, -3)}`);
+    expect(pluginTypes).toContain("pstack:poteto-agent");
+    // Run together in prose, so a name must not continue into a longer one.
+    for (const type of ["general-purpose", ...pluginTypes, "scout"]) expect(description).toMatch(new RegExp(`(?<![\\w:-])${type}(?![\\w-])`));
   });
 
   test("the effort parameter passes --thinking to any agent type, keeps a pstack agent's body as a 0600 system prompt file, and no effort runs at the parent's level", async () => {

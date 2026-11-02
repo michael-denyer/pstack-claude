@@ -109,11 +109,18 @@ try {
       ],
       {
         detached: true,
+        windowsHide: true,
         stdio: ["ignore", "inherit", "inherit"],
-        env: { ...process.env, TMPDIR: tmp },
+        env: { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp },
       },
     );
-    janitor = spawn(
+    if (process.platform === "win32")
+      janitor = spawn(
+        process.execPath,
+        [...runtime, path.join(import.meta.dirname, "janitor.ts"), String(worker.pid), stage, tmp],
+        { detached: true, windowsHide: true, stdio: ["pipe", "ignore", "ignore"] },
+      );
+    janitor ??= spawn(
       "/bin/sh",
       [
         "-c",

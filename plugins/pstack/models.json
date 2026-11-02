@@ -25,7 +25,9 @@
     { "role": "arena cross-judge pool", "models": "panel", "skill": "arena" },
     { "role": "swarm workers", "models": "default", "skill": "swarm" },
     { "role": "architect runners", "models": "panel", "skill": "architect" },
-    { "role": "interrogate reviewers", "models": "panel", "skill": "interrogate" }
+    { "role": "interrogate reviewers", "models": "panel", "skill": "interrogate" },
+    { "role": "thermos reviewers", "models": "default", "skill": "thermos" },
+    { "role": "no-comments reviewer", "models": "default", "skill": "no-comments" }
   ],
   "codex": {
     "default": "gpt-6.1-sol",

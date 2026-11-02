@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { agentSkills } from "../tools/generate.mjs";
-import { MUSE_HOOKS } from "../tools/runtimes.mjs";
+import { MUSE_HOOKS, SESSION_START_STATUS } from "../tools/runtimes.mjs";
 import { roleCases, sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
@@ -80,6 +80,13 @@ describe("SessionStart hook", () => {
     expect(sessionStart.claude.matcher).toBe("startup|resume|clear|compact");
     expect(sessionStart.codex.matcher).toBe("startup|resume|clear|compact");
     expect(sessionStart.copilot.matcher).toBe("startup|resume|clear|compact");
+  });
+
+  // Codex shows a hook without a statusMessage under a generic label when it
+  // asks the user to trust it.
+  test("names the hook for Claude Code and Codex", () => {
+    expect(sessionStart.claude.hooks[0].statusMessage).toBe(SESSION_START_STATUS);
+    expect(sessionStart.codex.hooks[0].statusMessage).toBe(SESSION_START_STATUS);
   });
 
   test("names only skills that exist", () => {

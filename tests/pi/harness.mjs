@@ -43,10 +43,12 @@ export function fakePi() {
   const messages = [];
   const userMessages = [];
   const entries = [];
+  // Skills and prompt templates pi lists beside the extension commands: { name, source, sourceInfo: { path, baseDir } }.
+  const slashCommands = [];
   const api = {
     registerTool: (tool) => tools.set(tool.name, tool),
     registerCommand: (name, options) => commands.set(name, options),
-    getCommands: () => [...commands.keys()].map((name) => ({ name, source: "extension" })),
+    getCommands: () => [...commands.keys()].map((name) => ({ name, source: "extension" })).concat(slashCommands),
     on(event, handler) {
       handlers.set(event, [...(handlers.get(event) ?? []), handler]);
       return () => {};
@@ -63,6 +65,7 @@ export function fakePi() {
     commands,
     messages,
     userMessages,
+    slashCommands,
     entries,
     async emit(event, payload, ctx) {
       const results = [];

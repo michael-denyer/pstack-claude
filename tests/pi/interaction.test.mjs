@@ -1,5 +1,7 @@
 // ask_user_question, schedule_wakeup, and /loop through the fake ExtensionAPI.
 import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { DONE, OTHER } from "../../plugins/pstack/pi/ask.ts";
 import { resultText, useWorld } from "./harness.mjs";
@@ -227,6 +229,45 @@ describe("schedule_wakeup", () => {
     expect(woken(pi)[2]).toContain("watch PR 42\n");
     expect(woken(pi).slice(3).length).toBeGreaterThan(0);
     expect(woken(pi).slice(3).every((c) => c === "tick")).toBe(true);
+  });
+
+  // Pi expands a skill or template only inside a user message, so the wakeup does it and sends the result as its own.
+  test("an agent-scheduled skill or prompt template arrives expanded, as one custom message and no user message", async () => {
+    const { pi, ctx, w } = setup({ ctx: { idle: true } });
+    const dir = mkdtempSync(join(w.cwd, "slash-"));
+    writeFileSync(join(dir, "SKILL.md"), "---\nname: babysit\ndescription: watch a PR\n---\nSKILL-BODY-MARKER watch the PR\n");
+    writeFileSync(join(dir, "tpl.md"), "---\ndescription: t\n---\nTEMPLATE-MARKER first=$1 rest=${@:2} all=$ARGUMENTS\n");
+    writeFileSync(join(dir, "other.md"), "OTHER-BODY-MARKER");
+    pi.slashCommands.push(
+      { name: "skill:babysit", source: "skill", sourceInfo: { path: join(dir, "SKILL.md"), baseDir: dir } },
+      { name: "review", source: "prompt", sourceInfo: { path: join(dir, "tpl.md") } },
+      { name: "loop", source: "prompt", sourceInfo: { path: join(dir, "other.md") } },
+      { name: "skill:gone", source: "skill", sourceInfo: { path: join(dir, "missing.md"), baseDir: dir } },
+    );
+    pi.commands.set("clash", {});
+    pi.slashCommands.push({ name: "clash", source: "prompt", sourceInfo: { path: join(dir, "other.md") } });
+    for (const prompt of ["/skill:babysit PR 42", "/review a 'b c' d", "/clash x", "/skill:gone", "/skill:unknown y", "/nothing"]) {
+      await wake(pi, ctx, { delaySeconds: 60, prompt });
+      jest.advanceTimersByTime(60_000);
+    }
+    expect(pi.userMessages).toEqual([]);
+    expect(pi.messages.every((m) => m.message.customType === "pstack-wakeup" && m.options.triggerTurn)).toBe(true);
+    const [skill, template, ...plain] = woken(pi);
+    expect(skill).toBe(`<skill name="babysit" location="${join(dir, "SKILL.md")}">\nReferences are relative to ${dir}.\n\nSKILL-BODY-MARKER watch the PR\n</skill>\n\nPR 42`);
+    expect(template).toBe("TEMPLATE-MARKER first=a rest=b c d all=a b c d");
+    // An extension command is never run for the agent, and an unknown or unreadable one is left as typed.
+    expect(plain).toEqual(["/clash x", "/skill:gone", "/skill:unknown y", "/nothing"]);
+  });
+
+  test("a loop the agent re-arms with a skill sends it expanded on every tick", async () => {
+    const { pi, ctx, w } = setup({ ctx: { idle: true } });
+    writeFileSync(join(w.cwd, "SKILL.md"), "SKILL-BODY-MARKER");
+    pi.slashCommands.push({ name: "skill:babysit", source: "skill", sourceInfo: { path: join(w.cwd, "SKILL.md"), baseDir: w.cwd } });
+    await wake(pi, { ...ctx, ui: scriptedUi([]) }, { delaySeconds: 60, prompt: "/loop 1m /skill:babysit" });
+    jest.advanceTimersByTime(3 * 60_000);
+    expect(pi.userMessages).toEqual([]);
+    expect(woken(pi)).toHaveLength(3);
+    expect(woken(pi).every((c) => c.includes("SKILL-BODY-MARKER") && !c.startsWith("/skill:"))).toBe(true);
   });
 
   for (const mode of ["print", "json"]) {

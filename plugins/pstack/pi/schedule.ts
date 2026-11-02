@@ -1,6 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { readFileSync } from "node:fs";
 import { Type } from "typebox";
 
+import { frontmatter } from "./config.ts";
 import type { OneShot } from "./one-shot.ts";
 
 const MIN_DELAY_S = 60;
@@ -13,6 +15,40 @@ const IDLE_RETRY_MS = 1000;
 // for, so a user message here would let the agent write its own permission.
 const AGENT_PROMPT_TYPE = "pstack-wakeup";
 const LOOP_COMMAND = /^\/loop(?:\s+([\s\S]*))?$/;
+
+// Pi expands "/skill:x args" and "/template args" only inside sendUserMessage and exposes no helper for
+// it, so the agent's slash text is expanded here from the files pi.getCommands() points at, the way
+// AgentSession._expandSkillCommand and expandPromptTemplate do (pi 1.4.0). An extension command stays
+// plain text: pi dispatches it only from a user message, and the agent must not run one as the user.
+function words(line: string): string[] {
+  return (line.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map((w) => w.replace(/^(["'])([\s\S]*)\1$/, "$2"));
+}
+
+// $1, $@, $ARGUMENTS, ${1:-default}, ${@:N} and ${@:N:L}, as pi's substituteArgs.
+function fillArgs(body: string, args: string[]): string {
+  return body.replace(/\$\{(\d+|ARGUMENTS|@):-([^}]*)\}|\$\{@:(\d+)(?::(\d+))?\}|\$(ARGUMENTS|@|\d+)/g, (_m, target, dflt, from, len, simple) => {
+    if (target) return (target === "@" || target === "ARGUMENTS" ? args.join(" ") : args[Number(target) - 1]) || dflt;
+    if (from) return args.slice(Math.max(0, Number(from) - 1), len ? Math.max(0, Number(from) - 1) + Number(len) : undefined).join(" ");
+    return simple === "@" || simple === "ARGUMENTS" ? args.join(" ") : (args[Number(simple) - 1] ?? "");
+  });
+}
+
+function expandSlash(pi: ExtensionAPI, text: string): string {
+  const m = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(text);
+  const named = m ? pi.getCommands().filter((c) => c.name === m[1]) : [];
+  const command = named.find((c) => c.source !== "extension");
+  if (!m || !command || named.some((c) => c.source === "extension")) return text;
+  try {
+    const { sourceInfo } = command;
+    const body = frontmatter(readFileSync(sourceInfo.path, "utf8")).body;
+    if (command.source === "prompt") return fillArgs(body, words(m[2] ?? ""));
+    const args = (m[2] ?? "").trim();
+    const block = `<skill name="${command.name.slice(6)}" location="${sourceInfo.path}">\nReferences are relative to ${sourceInfo.baseDir}.\n\n${body}\n</skill>`;
+    return args ? `${block}\n\n${args}` : block;
+  } catch {
+    return text;
+  }
+}
 
 const wakeupParams = Type.Object({
   delaySeconds: Type.Optional(Type.Number({ description: `Seconds until the wakeup (${MIN_DELAY_S}-${MAX_DELAY_S})` })),
@@ -49,7 +85,7 @@ export class Scheduler {
 
   fire(prompt: string, fromAgent: boolean): void {
     if (fromAgent) {
-      this.pi.sendMessage({ customType: AGENT_PROMPT_TYPE, content: prompt, display: true }, { triggerTurn: true, deliverAs: "followUp" });
+      this.pi.sendMessage({ customType: AGENT_PROMPT_TYPE, content: expandSlash(this.pi, prompt), display: true }, { triggerTurn: true, deliverAs: "followUp" });
       return;
     }
     this.pi.sendUserMessage(prompt, { deliverAs: "followUp", expandPromptTemplates: true });

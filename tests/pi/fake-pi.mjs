@@ -210,6 +210,8 @@ log({
   cwd: process.cwd(),
   pid: process.pid,
   depth: flag("--pstack-depth") ?? null,
+  parentSession: process.env.PI_SUBAGENT_PARENT_SESSION ?? null,
+  path: process.env.PATH ?? null,
   // As pi: a value that names no file is appended as the prompt text itself.
   systemPrompt: systemFile && existsSync(systemFile) ? readFileSync(systemFile, "utf8") : (systemFile ?? null),
 });

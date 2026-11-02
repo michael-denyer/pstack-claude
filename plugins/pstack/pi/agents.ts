@@ -17,6 +17,9 @@ const STATUS_KEY = "pstack-agents";
 // Claude Code lets agents nest three layers below the main session and withholds
 // the Agent tool at the third.
 const MAX_SPAWN_DEPTH = 3;
+// Names the session a child's permission asks go to. @gotgenes/pi-permission-system
+// relays them there while that session has a UI; without it a child answers them itself.
+const PARENT_SESSION_ENV = "PI_SUBAGENT_PARENT_SESSION";
 
 const endedStatus = Type.Union([Type.Literal("completed"), Type.Literal("failed"), Type.Literal("stopped")]);
 type EndedStatus = Static<typeof endedStatus>;
@@ -197,6 +200,7 @@ export class AgentRunner {
   // The footer of the top-level session only: a child's status would go to its
   // parent's stdout, which the reader ignores.
   private ui?: ExtensionContext["ui"];
+  private ownSessionId?: string;
 
   constructor(
     private readonly pi: ExtensionAPI,
@@ -233,7 +237,7 @@ export class AgentRunner {
       worktree,
       startedAt: now(),
     };
-    this.attachUi(ctx);
+    this.attachSession(ctx);
     return this.launch(identity, params.prompt, params.run_in_background === true);
   }
 
@@ -253,7 +257,7 @@ export class AgentRunner {
     const child = new PiChild(
       command,
       [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills"), ...childArgs(identity, this.settings.depth)],
-      { cwd: identity.cwd, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() },
+      { cwd: identity.cwd, env: { [PARENT_SESSION_ENV]: this.ownSessionId }, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() },
       prompt,
     );
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
@@ -267,7 +271,8 @@ export class AgentRunner {
 
   // From session_start too: a reloaded session can resume an agent with
   // send_message before any agent call.
-  attachUi(ctx: ExtensionContext): void {
+  attachSession(ctx: ExtensionContext): void {
+    this.ownSessionId = ctx.sessionManager.getSessionId();
     if (ctx.hasUI && this.settings.depth === 0) this.ui = ctx.ui;
   }
 

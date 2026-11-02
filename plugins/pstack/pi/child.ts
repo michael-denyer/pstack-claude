@@ -98,10 +98,10 @@ export class PiChild {
   // shown ends it.
   private toolCallId?: string;
 
-  constructor(command: string, args: string[], opts: { cwd: string; exitGraceMs: number; onActivity?: () => void }, prompt: string) {
+  constructor(command: string, args: string[], opts: { cwd: string; env?: NodeJS.ProcessEnv; exitGraceMs: number; onActivity?: () => void }, prompt: string) {
     this.exitGraceMs = opts.exitGraceMs;
     this.onActivity = opts.onActivity;
-    this.proc = spawn(command, args, { cwd: opts.cwd, detached: true, stdio: ["pipe", "pipe", "pipe"] });
+    this.proc = spawn(command, args, { cwd: opts.cwd, env: { ...process.env, ...opts.env }, detached: true, stdio: ["pipe", "pipe", "pipe"] });
     this.pid = this.proc.pid;
     this.proc.stdin.on("error", () => {});
     const stdout = lineSplitter((line) => this.onLine(line));

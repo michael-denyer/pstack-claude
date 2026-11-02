@@ -31,7 +31,7 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | T14 | `TaskCreate`/`TaskUpdate`/`TodoWrite` | poteto-mode's own `todo.md` fallback | mapping | poteto-mode Platform Adaptation; pi-tools.md Tool actions | n/a |
 | T15 | `Read`/`Edit`/`Write`/`Bash`/`Grep`/`Glob` | `read`, `edit`, `write`, `bash`; `grep`, `find`, `ls` when enabled | native | pi-tools.md Tool actions | n/a |
 | T16 | `WebFetch`/`WebSearch` | `curl` through `bash`; web search through an MCP server | difference | No skill names either tool. Fetching works through `bash`. | n/a |
-| T17 | `ScheduleWakeup` (other named tools are never referenced) | `schedule_wakeup` with the same shape | extension | `clamps to 60 s and fires the prompt as a follow-up user message` | VERIFIED |
+| T17 | `ScheduleWakeup` (other named tools are never referenced) | `schedule_wakeup` with the same shape | extension | `clamps to 60 s and fires the prompt as a follow-up custom message that starts a turn` | VERIFIED |
 | T18 | MCP tool discovery | Pi's built-in MCP; list servers from the session's tools or `pi mcp list` | mapping | pi-tools.md `why` note | n/a |
 | T19 | Facts named in the system prompt | Pi's system prompt lists tools and skills; the transcript directory is given in pi-tools.md | mapping | pi-tools.md `reflect` note | n/a |
 | T20 | Image-generation tool | None, as on Claude Code; draw with Mermaid or text | difference | Claude Code has no such tool either, so `teach` already falls back. | n/a |

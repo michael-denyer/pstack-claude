@@ -8,6 +8,11 @@ const MAX_DELAY_S = 3600;
 // setInterval treats a delay above 2^31-1 ms as 1 ms.
 const MAX_LOOP_S = 24 * 86400;
 const IDLE_RETRY_MS = 1000;
+// Text the agent chose (a schedule_wakeup prompt, and what a loop it re-arms sends) goes in as a custom
+// message, not a user message. The permission classifier reads user-role messages as what the user asked
+// for, so a user message here would let the agent write its own permission.
+const AGENT_PROMPT_TYPE = "pstack-wakeup";
+const LOOP_COMMAND = /^\/loop(?:\s+([\s\S]*))?$/;
 
 const wakeupParams = Type.Object({
   delaySeconds: Type.Optional(Type.Number({ description: `Seconds until the wakeup (${MIN_DELAY_S}-${MAX_DELAY_S})` })),
@@ -18,8 +23,9 @@ const wakeupParams = Type.Object({
 });
 
 // One pending wakeup, one fixed-interval loop, and one live self-paced loop per
-// session. A fire delivers the prompt as a follow-up user message, which runs at
-// once when the agent is idle.
+// session. A fire delivers the prompt as a follow-up message, which runs at
+// once when the agent is idle. It is a user message when the user wrote the
+// prompt, and a custom message when the agent did.
 export class Scheduler {
   private wakeup?: NodeJS.Timeout;
   private loop?: NodeJS.Timeout;
@@ -35,13 +41,21 @@ export class Scheduler {
   // ctx.isIdle(), which is also false during a manual compaction.
   running = false;
 
+  // Set by registerSchedule: runs a /loop command line on behalf of the agent. A wakeup that asks for
+  // "/loop ..." used to reach the command through a user message; a custom message does not run commands.
+  loopCommand?: (args: string, ctx: ExtensionContext) => Promise<void>;
+
   constructor(private readonly pi: ExtensionAPI) {}
 
-  fire(prompt: string): void {
+  fire(prompt: string, fromAgent: boolean): void {
+    if (fromAgent) {
+      this.pi.sendMessage({ customType: AGENT_PROMPT_TYPE, content: prompt, display: true }, { triggerTurn: true, deliverAs: "followUp" });
+      return;
+    }
     this.pi.sendUserMessage(prompt, { deliverAs: "followUp", expandPromptTemplates: true });
   }
 
-  scheduleWakeup(seconds: number, prompt: string, ctx: ExtensionContext): void {
+  scheduleWakeup(seconds: number, prompt: string, ctx: ExtensionContext, fromAgent: boolean): void {
     this.cancelWakeup();
     const deliver = () => {
       // Pi rejects prompts during manual compaction. Keep the wakeup pending
@@ -51,7 +65,12 @@ export class Scheduler {
         return;
       }
       this.wakeup = undefined;
-      this.fire(prompt);
+      const loop = fromAgent ? LOOP_COMMAND.exec(prompt) : null;
+      if (loop && this.loopCommand) {
+        this.loopCommand(loop[1] ?? "", ctx).catch((e) => ctx.ui.notify(`/loop from a wakeup failed: ${e instanceof Error ? e.message : String(e)}`, "error"));
+        return;
+      }
+      this.fire(prompt, fromAgent);
     };
     this.wakeup = setTimeout(deliver, seconds * 1000);
     this.wakeup.unref();
@@ -64,9 +83,9 @@ export class Scheduler {
     return had;
   }
 
-  startLoop(seconds: number, prompt: string, ctx: ExtensionContext): void {
+  startLoop(seconds: number, prompt: string, ctx: ExtensionContext, fromAgent: boolean): void {
     // A tick that lands mid-run is dropped, so a slow iteration cannot pile up a backlog.
-    this.loop = setInterval(() => ctx.isIdle() && this.fire(prompt), seconds * 1000);
+    this.loop = setInterval(() => ctx.isIdle() && this.fire(prompt, fromAgent), seconds * 1000);
     this.loop.unref();
   }
 
@@ -156,7 +175,7 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
         throw new Error(`schedule_wakeup cannot fire in a ${ctx.mode} run: pi exits when this run ends. Finish the work in this run instead.`);
       }
       const seconds = clampDelay(params.delaySeconds);
-      scheduler.scheduleWakeup(seconds, params.prompt, ctx);
+      scheduler.scheduleWakeup(seconds, params.prompt, ctx, true);
       const fireAt = new Date(Date.now() + seconds * 1000).toISOString();
       const clamped = seconds !== params.delaySeconds ? ` (clamped from ${params.delaySeconds})` : "";
       return {
@@ -174,53 +193,57 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
     scheduler.sealed = false;
   });
 
+  // fromAgent: the line came from a wakeup the agent scheduled, not from the user typing /loop.
+  async function runLoop(args: string, ctx: ExtensionContext, fromAgent: boolean): Promise<void> {
+    const cmd = parseLoop(args);
+    // Also true during a manual compaction, which no run is behind: the first
+    // prompt then waits for idle, but only a run in flight seals the slot.
+    const midRun = !ctx.isIdle();
+    // sendUserMessage only starts the run, and a one-shot run disposes the
+    // session as soon as the command returns, so there the command waits it out.
+    const fire = async (prompt: string) => {
+      // The slot is sealed against the run in flight, so the loop's first
+      // prompt takes the slot and runs once that run has settled. Its own
+      // re-arm then comes from a later run and is not refused.
+      if (midRun) {
+        scheduler.scheduleWakeup(0, prompt, ctx, fromAgent);
+        ctx.ui.notify("The loop starts once the session is idle.", "info");
+        return;
+      }
+      if (!oneShot.exits(ctx)) {
+        scheduler.fire(prompt, fromAgent);
+        return;
+      }
+      await oneShot.assertStartsRun(prompt, ctx);
+      const settled = oneShot.untilSettled();
+      scheduler.fire(prompt, fromAgent);
+      await settled;
+    };
+    switch (cmd.kind) {
+      case "usage":
+        ctx.ui.notify(`${cmd.reason ? `${cmd.reason} ` : ""}Usage: /loop [interval like 5m or 1h] <prompt>, or /loop stop`, "info");
+        return;
+      case "stop":
+        ctx.ui.notify(scheduler.stopAll(scheduler.running) ? "Loop stopped." : "No loop was running.", "info");
+        return;
+      case "fixed": {
+        const seconds = Math.max(MIN_DELAY_S, cmd.seconds);
+        scheduler.stopAll(scheduler.running);
+        scheduler.startLoop(seconds, cmd.prompt, ctx, fromAgent);
+        ctx.ui.notify(`Looping every ${seconds}s. /loop stop ends it.`, "info");
+        await fire(cmd.prompt);
+        return;
+      }
+      case "dynamic":
+        scheduler.stopAll(scheduler.running);
+        scheduler.startSelfPaced();
+        await fire(dynamicPrompt(cmd.prompt));
+    }
+  }
+  scheduler.loopCommand = (args, ctx) => runLoop(args, ctx, true);
+
   pi.registerCommand("loop", {
     description: "Run a prompt on an interval (/loop 5m <prompt>), self-paced (/loop <prompt>), or stop (/loop stop)",
-    async handler(args, ctx) {
-      const cmd = parseLoop(args);
-      // Also true during a manual compaction, which no run is behind: the first
-      // prompt then waits for idle, but only a run in flight seals the slot.
-      const midRun = !ctx.isIdle();
-      // sendUserMessage only starts the run, and a one-shot run disposes the
-      // session as soon as the command returns, so there the command waits it out.
-      const fire = async (prompt: string) => {
-        // The slot is sealed against the run in flight, so the loop's first
-        // prompt takes the slot and runs once that run has settled. Its own
-        // re-arm then comes from a later run and is not refused.
-        if (midRun) {
-          scheduler.scheduleWakeup(0, prompt, ctx);
-          ctx.ui.notify("The loop starts once the session is idle.", "info");
-          return;
-        }
-        if (!oneShot.exits(ctx)) {
-          scheduler.fire(prompt);
-          return;
-        }
-        await oneShot.assertStartsRun(prompt, ctx);
-        const settled = oneShot.untilSettled();
-        scheduler.fire(prompt);
-        await settled;
-      };
-      switch (cmd.kind) {
-        case "usage":
-          ctx.ui.notify(`${cmd.reason ? `${cmd.reason} ` : ""}Usage: /loop [interval like 5m or 1h] <prompt>, or /loop stop`, "info");
-          return;
-        case "stop":
-          ctx.ui.notify(scheduler.stopAll(scheduler.running) ? "Loop stopped." : "No loop was running.", "info");
-          return;
-        case "fixed": {
-          const seconds = Math.max(MIN_DELAY_S, cmd.seconds);
-          scheduler.stopAll(scheduler.running);
-          scheduler.startLoop(seconds, cmd.prompt, ctx);
-          ctx.ui.notify(`Looping every ${seconds}s. /loop stop ends it.`, "info");
-          await fire(cmd.prompt);
-          return;
-        }
-        case "dynamic":
-          scheduler.stopAll(scheduler.running);
-          scheduler.startSelfPaced();
-          await fire(dynamicPrompt(cmd.prompt));
-      }
-    },
+    handler: (args, ctx) => runLoop(args, ctx, false),
   });
 }

@@ -164,6 +164,9 @@ describe("ask_user_question", () => {
   });
 });
 
+// What the agent's own wakeups sent: custom messages, never user messages.
+const woken = (pi) => pi.messages.map((m) => m.message.content);
+
 describe("schedule_wakeup", () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
@@ -175,12 +178,12 @@ describe("schedule_wakeup", () => {
     const { pi, ctx } = setup({ ctx: { idle: () => idle } });
     await wake(pi, ctx, { delaySeconds: 60, prompt: "resume after compaction" });
     jest.advanceTimersByTime(65_000);
-    expect(pi.userMessages).toEqual([]);
+    expect(pi.messages).toEqual([]);
     idle = true;
     jest.advanceTimersByTime(1_000);
-    expect(pi.userMessages.map((m) => m.content)).toEqual(["resume after compaction"]);
+    expect(woken(pi)).toEqual(["resume after compaction"]);
     jest.advanceTimersByTime(60_000);
-    expect(pi.userMessages).toHaveLength(1);
+    expect(pi.messages).toHaveLength(1);
   });
 
   test.each(["cancel", "replace", "shutdown"])("a wakeup waiting for idle can %s", async (action) => {
@@ -193,17 +196,37 @@ describe("schedule_wakeup", () => {
     if (action === "shutdown") await pi.emit("session_shutdown", { reason: "quit" }, ctx);
     idle = true;
     jest.advanceTimersByTime(120_000);
-    expect(pi.userMessages.map((m) => m.content)).toEqual(action === "replace" ? ["new"] : []);
+    expect(woken(pi)).toEqual(action === "replace" ? ["new"] : []);
   });
 
-  test("clamps to 60 s and fires the prompt as a follow-up user message", async () => {
+  test("clamps to 60 s and fires the prompt as a follow-up custom message that starts a turn", async () => {
     const { pi, ctx } = setup({ ctx: { idle: true } });
     const result = await wake(pi, ctx, { delaySeconds: 5, prompt: "check CI" });
     expect(result.details.delaySeconds).toBe(60);
     jest.advanceTimersByTime(59_000);
-    expect(pi.userMessages).toEqual([]);
+    expect(pi.messages).toEqual([]);
     jest.advanceTimersByTime(1_000);
-    expect(pi.userMessages).toEqual([{ content: "check CI", options: { deliverAs: "followUp", expandPromptTemplates: true } }]);
+    expect(pi.messages).toEqual([
+      { message: { customType: "pstack-wakeup", content: "check CI", display: true }, options: { triggerTurn: true, deliverAs: "followUp" } },
+    ]);
+  });
+
+  // The permission classifier counts user-role messages as what the user asked for. Text the agent chose
+  // for itself must not land as one, in any form a wakeup takes.
+  test("nothing the agent schedules lands as a user message", async () => {
+    const { pi, ctx } = setup({ ctx: { idle: true } });
+    const ui = scriptedUi([]);
+    for (const prompt of ["check CI", "/skill:babysit 42", "/loop watch PR 42", "/loop 1m tick"]) {
+      await wake(pi, { ...ctx, ui }, { delaySeconds: 60, prompt });
+      jest.advanceTimersByTime(60_000);
+    }
+    jest.advanceTimersByTime(3 * 60_000);
+    expect(pi.userMessages).toEqual([]);
+    expect(woken(pi)[0]).toBe("check CI");
+    expect(woken(pi)[1]).toBe("/skill:babysit 42");
+    expect(woken(pi)[2]).toContain("watch PR 42\n");
+    expect(woken(pi).slice(3).length).toBeGreaterThan(0);
+    expect(woken(pi).slice(3).every((c) => c === "tick")).toBe(true);
   });
 
   for (const mode of ["print", "json"]) {
@@ -221,12 +244,12 @@ describe("schedule_wakeup", () => {
     const { pi, ctx } = setup({ ctx: { idle: () => idle } });
     expect((await wake(pi, ctx, { delaySeconds: 99999, prompt: "later" })).details.delaySeconds).toBe(3600);
     jest.advanceTimersByTime(3_599_000);
-    expect(pi.userMessages).toEqual([]);
+    expect(pi.messages).toEqual([]);
     jest.advanceTimersByTime(1_000);
-    expect(pi.userMessages).toEqual([]);
+    expect(pi.messages).toEqual([]);
     idle = true;
     jest.advanceTimersByTime(1_000);
-    expect(pi.userMessages).toEqual([{ content: "later", options: { deliverAs: "followUp", expandPromptTemplates: true } }]);
+    expect(woken(pi)).toEqual(["later"]);
   });
 
   test("a new call replaces the pending wakeup", async () => {
@@ -234,7 +257,7 @@ describe("schedule_wakeup", () => {
     await wake(pi, ctx, { delaySeconds: 600, prompt: "first" });
     await wake(pi, ctx, { delaySeconds: 120, prompt: "second" });
     jest.advanceTimersByTime(3_600_000);
-    expect(pi.userMessages.map((m) => m.content)).toEqual(["second"]);
+    expect(woken(pi)).toEqual(["second"]);
   });
 
   test("noop only labels the wakeup; it is scheduled and replaces the pending one, as on Claude Code", async () => {
@@ -243,9 +266,9 @@ describe("schedule_wakeup", () => {
     const result = await wake(pi, ctx, { delaySeconds: 60, prompt: "routine check", noop: true });
     expect(result.details).toMatchObject({ delaySeconds: 60, noop: true });
     jest.advanceTimersByTime(60_000);
-    expect(pi.userMessages.map((m) => m.content)).toEqual(["routine check"]);
+    expect(woken(pi)).toEqual(["routine check"]);
     jest.advanceTimersByTime(3_600_000);
-    expect(pi.userMessages.map((m) => m.content)).toEqual(["routine check"]);
+    expect(woken(pi)).toEqual(["routine check"]);
   });
 
   test("stop: true cancels the pending wakeup and needs no other field", async () => {
@@ -347,14 +370,13 @@ describe("/loop", () => {
     await run("watch new PR");
     jest.advanceTimersByTime(60_000);
     expect(pi.userMessages.map((m) => m.content)).toEqual([expect.stringContaining("watch old PR\n"), expect.stringContaining("watch new PR\n")]);
+    expect(pi.messages).toEqual([]);
 
+    // The agent's re-arm runs the /loop command for it, and what that sends is the agent's, not the user's.
     await pi.call("schedule_wakeup", { delaySeconds: 120, prompt: "/loop watch new PR" }, ctx);
     jest.advanceTimersByTime(120_000);
-    expect(pi.userMessages.map((m) => m.content)).toEqual([
-      expect.stringContaining("watch old PR\n"),
-      expect.stringContaining("watch new PR\n"),
-      "/loop watch new PR",
-    ]);
+    expect(pi.userMessages).toHaveLength(2);
+    expect(pi.messages.map((m) => m.message.content)).toEqual([expect.stringContaining("watch new PR\n")]);
   });
 
   for (const rearm of ["/loop watch PR 42", "watch PR 42", "/loop 5m watch PR 42"]) {
@@ -388,7 +410,8 @@ describe("/loop", () => {
     idle = true;
     expect(resultText(await wake())).toContain("Wakeup scheduled");
     jest.advanceTimersByTime(60_000);
-    expect(pi.userMessages.map((m) => m.content)).toEqual(["later"]);
+    expect(woken(pi)).toEqual(["later"]);
+    expect(pi.userMessages).toEqual([]);
   });
 
   test("a new self-paced loop asked for during an old iteration starts once that run settles: the old run can neither re-arm nor cancel it, and the new loop re-arms itself", async () => {
@@ -411,11 +434,8 @@ describe("/loop", () => {
     expect(pi.userMessages).toHaveLength(2);
     expect(resultText(await wake({ delaySeconds: 120, prompt: "/loop watch new" }))).toContain("Wakeup scheduled");
     jest.advanceTimersByTime(120_000);
-    expect(pi.userMessages.map((m) => m.content)).toEqual([
-      expect.stringContaining("watch old\n"),
-      expect.stringContaining("watch new\n"),
-      "/loop watch new",
-    ]);
+    expect(pi.userMessages.map((m) => m.content)).toEqual([expect.stringContaining("watch old\n"), expect.stringContaining("watch new\n")]);
+    expect(woken(pi)).toEqual([expect.stringContaining("watch new\n")]);
   });
 
   test("a fixed loop asked for during a run sends its first prompt once that run settles", async () => {
@@ -465,7 +485,9 @@ describe("/loop", () => {
       if (started) await run(started);
       expect(resultText(await pi.call("schedule_wakeup", { delaySeconds: 60, prompt }, ctx))).toContain("Wakeup scheduled");
       jest.advanceTimersByTime(60_000);
-      expect(pi.userMessages.at(-1).content).toBe(prompt);
+      // The wakeup's /loop line runs the command for the agent; its prompt goes out as the agent's.
+      expect(woken(pi).at(-1)).toContain(prompt.replace(/^\/loop\s+/, "").replace(/\.$/, ""));
+      expect(pi.userMessages.every((m) => m.content !== prompt)).toBe(true);
     });
   }
 

@@ -32,7 +32,7 @@ test("an agent file loads as pstack:<name> with its body and model, and an effor
     mkdirSync(join(root, "agents"));
     writeFileSync(join(root, "agents", "slow.md"), "---\nmodel: opus\n---\nbody\n");
     const settings = { pluginRoot: root, modelsFile: join(root, "models.json"), agentDir: root };
-    expect(loadAgentTypes(settings).get("pstack:slow")).toEqual({ body: "body", model: "opus" });
+    expect(loadAgentTypes(settings).get("pstack:slow")).toEqual({ file: join(root, "agents", "slow.md"), body: "body", model: "opus" });
     expect(checkEffort("low", settings)).toBe("low");
     expect(() => checkEffort("medium", settings)).toThrow('effort "medium" is not one of low');
   } finally {

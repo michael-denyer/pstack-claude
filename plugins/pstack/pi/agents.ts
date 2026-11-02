@@ -192,6 +192,17 @@ function reapOrphan(record: RunningRecord, killGraceMs: number): Promise<void> {
 
 const now = () => new Date().toISOString();
 
+// A value the call left out came from the agent file, which the caller never
+// saw, so an error over it names that file.
+function fromAgentFile<T>(file: string | undefined, passed: string | undefined, resolve: () => T): T {
+  try {
+    return resolve();
+  } catch (e) {
+    if (passed !== undefined || file === undefined) throw e;
+    throw new Error(`${file}: ${(e as Error).message}`);
+  }
+}
+
 export class AgentRunner {
   private readonly agents = new Map<string, AgentState>();
   // Set once the session tears its agents down; a launch after that would
@@ -213,10 +224,10 @@ export class AgentRunner {
     const def = types.get(type);
     if (!def) throw new Error(`Unknown subagent_type "${type}". Valid types: ${[...types.keys()].join(", ")}.`);
     const parentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
-    const model = resolveModel(params.model ?? def.model, this.settings, readSheet(this.settings.agentDir), parentModel);
+    const model = fromAgentFile(def.file, params.model, () => resolveModel(params.model ?? def.model, this.settings, readSheet(this.settings.agentDir), parentModel));
     // Claude Code subagents without an effort run at their definition's effort, else the session's.
     const effort = params.effort ?? def.effort;
-    const thinking = effort === undefined ? this.pi.getThinkingLevel() : checkEffort(effort, this.settings);
+    const thinking = effort === undefined ? this.pi.getThinkingLevel() : fromAgentFile(def.file, params.effort, () => checkEffort(effort, this.settings));
 
     const id = `a${randomBytes(8).toString("hex")}`;
     const state = join(this.settings.agentDir, PSTACK_STATE_DIR, ctx.sessionManager.getSessionId());

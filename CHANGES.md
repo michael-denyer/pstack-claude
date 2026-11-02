@@ -2,6 +2,18 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.120 - Pi agent file fixes
+
+Four fixes to the Pi extension's `agent` tool, for the gaps that [#357](https://github.com/michael-denyer/pstack-claude/pull/357) listed after 0.9.119 added user agent files.
+
+An agent file's frontmatter now skips a byte-order mark before the `---` and drops YAML quotes around a whole value, so `effort: 'high'` is `high`. A value with a quote of the same kind inside, an escape, or a trailing comment is still read as written. Before, a file saved with a byte-order mark had no fields, and its frontmatter went into the child's system prompt ([#362](https://github.com/michael-denyer/pstack-claude/pull/362)).
+
+A `send_message` resume that cannot set up its system prompt file or its worktree now fails and leaves the agent's record alone. Before, it wrote a failed record over the completed one, so `list_agents` and a reloaded session lost the earlier result ([#363](https://github.com/michael-denyer/pstack-claude/pull/363)).
+
+The `agent` tool's `subagent_type` description now names every type the session starts with, each file in `pstack-agents` included. Before, it named only `general-purpose` and the plugin's four types, so a model found a user type only when told its name ([#364](https://github.com/michael-denyer/pstack-claude/pull/364)).
+
+An invalid `model:` or `effort:` in an agent file now gives an error that starts with the file's path. A bad value passed on the call gives the same error as before ([#365](https://github.com/michael-denyer/pstack-claude/pull/365)).
+
 ## 0.9.119 - Pi user agents, agent file effort, and permission asks from Pi agents
 
 Three changes to the Pi extension's `agent` tool, all from @foreztgump.

@@ -200,7 +200,6 @@ export class AgentRunner {
   // The footer of the top-level session only: a child's status would go to its
   // parent's stdout, which the reader ignores.
   private ui?: ExtensionContext["ui"];
-  // This process's own session id, which a child's permission asks are relayed to.
   private ownSessionId?: string;
 
   constructor(
@@ -258,7 +257,7 @@ export class AgentRunner {
     const child = new PiChild(
       command,
       [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills"), ...childArgs(identity, this.settings.depth)],
-      { cwd: identity.cwd, env: this.ownSessionId ? { [PARENT_SESSION_ENV]: this.ownSessionId } : undefined, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() },
+      { cwd: identity.cwd, env: { [PARENT_SESSION_ENV]: this.ownSessionId }, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() },
       prompt,
     );
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;

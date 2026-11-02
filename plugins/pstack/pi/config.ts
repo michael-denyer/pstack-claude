@@ -145,10 +145,7 @@ export const GENERAL_PURPOSE = "general-purpose";
 
 interface AgentDefinition {
   body: string;
-  // A full provider/id pins the agent's model. A family name or inherit-parent
-  // is only the default for a call that names no model.
   model?: string;
-  // Pins the agent's reasoning effort, one of models.json's levels.
   effort?: string;
 }
 

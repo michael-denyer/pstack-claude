@@ -18,13 +18,13 @@ const agentParams = Type.Object(
     model: Type.Optional(
       Type.String({
         description:
-          "Optional model for this agent: a family name (opus, fable, sonnet, haiku) or a full provider/id. If omitted, the agent runs on the parent's model. An agent file that pins a provider/id model overrides this.",
+          "Optional model for this agent: a family name (opus, fable, sonnet, haiku) or a full provider/id. If omitted, the agent runs on the parent's model.",
       }),
     ),
     effort: Type.Optional(
       Type.String({
         description:
-          "Reasoning effort for this agent, one of the levels in models.json (low, medium, high, xhigh, max). If omitted, the agent runs at the parent's thinking level. An agent file that pins an effort overrides this.",
+          "Reasoning effort for this agent, one of the levels in models.json (low, medium, high, xhigh, max). If omitted, the agent runs at its agent file's effort, else at the parent's thinking level.",
       }),
     ),
     run_in_background: Type.Optional(Type.Boolean({ description: "Return at once; a completion notice arrives when the agent exits." })),

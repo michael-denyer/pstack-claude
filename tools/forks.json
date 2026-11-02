@@ -38,7 +38,7 @@
     },
     "plugins/pstack/skills/no-comments/SKILL.md": {
       "kind": "policy",
-      "why": "Treats a HOLD that names its dependency, platform, vendor, or protocol rule and where to check it as settled for the run, restores as a HOLD any kill of such a comment without a refuting page or file, and limits a second rejected report's failure to that report's findings so the accepted work still lands.",
+      "why": "Treats a HOLD that names its dependency, platform, vendor, or protocol rule and where to check it as settled for the run, restores as a HOLD any kill of such a comment without a refuting page or file, and limits a second rejected report's failure to that report's findings so the accepted work still lands. Sets comment-sicko's model from the no-comments reviewer line in pstack-models.md.",
       "since": "0.9.106",
       "upstream": "not-proposed"
     },

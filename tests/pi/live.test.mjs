@@ -90,6 +90,8 @@ suite("pstack on live pi", () => {
   test(
     "panel: three background agents on opus, fable, and sonnet each notify, on their own resolved model",
     async () => {
+      // An agent that ignored its model would run on the parent's, so one alias must resolve elsewhere.
+      expect(["opus", "fable", "sonnet"].some((alias) => MODELS.get(alias) !== PARENT_MODEL)).toBe(true);
       await withParent(async (parent) => {
         const from = await parent.run(
           [

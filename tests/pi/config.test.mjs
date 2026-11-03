@@ -25,6 +25,13 @@ test("only an exact pi ask tool: off line turns the ask tool off", () => {
   }
 });
 
+test("only an exact pi agent tools: off line turns the agent tools off", () => {
+  expect(parseSheet("bug-fix: opus\r\npi agent tools: off\r\n").agentToolsOff).toBe(true);
+  for (const sheet of ["bug-fix: opus\n", "pi agent tools: on\n", "pi agent tools: off \n", "agent tools: off\n", "pi ask tool: off\n"]) {
+    expect({ sheet, off: parseSheet(sheet).agentToolsOff }).toEqual({ sheet, off: false });
+  }
+});
+
 test("an agent file loads as pstack:<name> with its body and model, and an effort is checked against models.json", () => {
   const root = mkdtempSync(join(tmpdir(), "pstack-agents-"));
   try {

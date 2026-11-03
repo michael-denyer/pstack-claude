@@ -4,13 +4,15 @@ This file is the release changelog, with one `## <version> - <title>` entry per 
 
 ## 0.9.122 - Pi wakeups as the agent's own messages, and Pi agent names in permission asks
 
-Three fixes from outside contributors.
+Four fixes from outside contributors.
 
 A wakeup the agent schedules with `schedule_wakeup` now arrives as a `pstack-wakeup` custom message, not a user message. A permission check reads a user message as the user's request, so a prompt the agent wrote for itself could pass as the user's consent. A `/skill:` or prompt-template prompt arrives expanded, with its arguments split as Pi splits a command the user types. A `/loop` prompt runs the loop, and what the loop sends also arrives as custom messages. When a skill file cannot be read, the extension shows the error and sends the prompt as written. The user's own `/loop` still sends user messages. @foreztgump found and fixed this in [#367](https://github.com/michael-denyer/pstack-claude/pull/367). @agammann's review of it found that the first version split an argument with a quote inside it, such as `--title="Fix login flow"`, into three.
 
 Each child agent's system prompt now carries an `<active_agent>` tag with its agent type. `@gotgenes/pi-permission-system` 42.0.0 reads the tag to name the agent in a permission ask it forwards to the parent, which said "unknown" before, and to pick that agent's `permission:` policy. @foreztgump found and fixed this in [#366](https://github.com/michael-denyer/pstack-claude/pull/366).
 
 The skill link check now reads a bare link destination with parentheses in it, such as `references/guide(v1).md`, in full. It used to stop at the first `)`, so a link to a file that exists failed as missing `references/guide(v1`. @idealistichacker found and fixed this in [#368](https://github.com/michael-denyer/pstack-claude/pull/368).
+
+`bun tools/generate.mjs` now runs on a native Windows checkout. With Git for Windows' default `core.autocrlf=true`, files came out with CRLF line endings, and the generator failed with `no anchor for the Models section to stamp`. A `.gitattributes` now checks text files out with LF endings, and the generator writes the paths it reports with forward slashes. @dajiaohuang found and fixed this in [#372](https://github.com/michael-denyer/pstack-claude/pull/372).
 
 ## 0.9.121 - Pi agent type descriptions
 

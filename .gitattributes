@@ -1,0 +1,2 @@
+# Keep generator anchors and executable scripts identical on every platform.
+* text=auto eol=lf

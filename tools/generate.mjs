@@ -51,7 +51,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, join, posix, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { Type } from "typebox";
@@ -62,6 +62,7 @@ import { RUNTIMES, roleSkills } from "./runtimes.mjs";
 import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRelative = (root, file) => relative(root, file).split(sep).join("/");
 
 const PROMPT_RUNTIMES = RUNTIMES.filter((runtime) => runtime.prompts);
 
@@ -227,7 +228,7 @@ export function validatePluginLayout(pluginRoot) {
       // lookbehind scanned a long line about nine times slower.
       for (const [, name] of line.matchAll(/(?:^|\W|\\[a-z])subagent_type[\s\\"'`*]*[:=][\s\\"'`*]*([a-z0-9-]+)(?![\w-]|\.\w)/g)) {
         if (agents.includes(name)) {
-          bareDispatches.push(`${relative(pluginRoot, file)}:${i + 1}: subagent_type: "${name}" (use "pstack:${name}")`);
+          bareDispatches.push(`${repoRelative(pluginRoot, file)}:${i + 1}: subagent_type: "${name}" (use "pstack:${name}")`);
         }
       }
     });
@@ -243,7 +244,7 @@ export function validatePluginLayout(pluginRoot) {
     const raw = readFileSync(file);
     if (raw.includes(0)) continue;
     raw.toString("utf8").split("\n").forEach((line, i) => {
-      if (/^(<{7}|\|{7}|={7}|>{7})( |$)/.test(line)) markers.push(`${relative(pluginRoot, file)}:${i + 1}: ${line}`);
+      if (/^(<{7}|\|{7}|={7}|>{7})( |$)/.test(line)) markers.push(`${repoRelative(pluginRoot, file)}:${i + 1}: ${line}`);
     });
   }
   if (markers.length) {
@@ -821,7 +822,7 @@ function shapeFaults(schema, value, subject) {
 // directly must be executable, or the SessionStart hook fails silently for
 // every user.
 // The root is the variable the runtime exports with the plugin's directory.
-export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", root = "CLAUDE_PLUGIN_ROOT" }) {
+export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", root = "CLAUDE_PLUGIN_ROOT", checkExecutable = true }) {
   const raw = JSON.parse(hooksJson);
   const faults = shapeFaults(HOOKS_FILE, raw, "file");
   if (faults.length) throw new Error(`${file}:\n  ${faults.join("\n  ")}`);
@@ -848,7 +849,7 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", ro
         refs.forEach((rel, i) => {
           const st = statOf(rel);
           if (!st) faults.push(`${event}: ${rel} does not exist in the plugin`);
-          else if (i === 0 && executed && !(st.mode & 0o111)) faults.push(`${event}: ${rel} is not executable`);
+          else if (checkExecutable && i === 0 && executed && !(st.mode & 0o111)) faults.push(`${event}: ${rel} is not executable`);
         });
       }
     }
@@ -907,7 +908,7 @@ export function plan(root, models) {
   const realRoot = realpathSync(root);
   for (const { source, target } of PORTABLE_ASSETS) {
     const path = `${SKILLS}/${target}`;
-    if (!OWNED_DIRS.includes(dirname(path))) {
+    if (!OWNED_DIRS.includes(posix.dirname(path))) {
       throw new Error(`${path} is not directly inside a generator-owned directory (${OWNED_DIRS.join(", ")})`);
     }
     if (!pathIsInside(realRoot, realpathSync(join(root, source)))) {
@@ -925,7 +926,7 @@ function lstatNoSymlinks(root, path) {
     at = join(at, part);
     st = lstatSync(at, { throwIfNoEntry: false });
     if (!st) return null;
-    if (st.isSymbolicLink()) throw new Error(`${relative(root, at)} is a symlink; the generator never writes through one`);
+    if (st.isSymbolicLink()) throw new Error(`${repoRelative(root, at)} is a symlink; the generator never writes through one`);
   }
   return st;
 }
@@ -1001,7 +1002,7 @@ export function problems(root, models) {
   if (models) {
     attempt(() => {
       const strays = markdownFiles(skillsDir).flatMap((full) =>
-        strayModelSlugs(relative(root, full), readFileSync(full, "utf8"), models),
+        strayModelSlugs(repoRelative(root, full), readFileSync(full, "utf8"), models),
       );
       if (strays.length) {
         throw new Error(
@@ -1014,7 +1015,7 @@ export function problems(root, models) {
   attempt(() => {
     const leads = loadLeadLines(root);
     const strays = markdownFiles(skillsDir).flatMap((full) => {
-      const file = relative(root, full);
+      const file = repoRelative(root, full);
       return readFileSync(full, "utf8")
         .split("\n")
         .flatMap((line, i) =>
@@ -1041,7 +1042,9 @@ export function problems(root, models) {
     ),
   ];
   for (const { file, root } of hooksFiles) {
-    attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file, root }));
+    // Windows stat modes cannot represent the POSIX execute bits; Unix checks
+    // still verify them, and every host checks that the hook paths exist.
+    attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file, root, checkExecutable: process.platform !== "win32" }));
   }
   return failures;
 }

@@ -217,6 +217,14 @@ describe("validateHooks", () => {
     );
   });
 
+  test("a host without POSIX execute bits still checks every hook path", () => {
+    const cmd = hooks('"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh"');
+    expect(() => validateHooks(cmd, { statOf: () => plain, checkExecutable: false })).not.toThrow();
+    expect(() => validateHooks(cmd, { statOf: () => null, checkExecutable: false })).toThrow(
+      "SessionStart: hooks/session-start.sh does not exist",
+    );
+  });
+
   test("checks the Windows override path without requiring an executable bit for PowerShell", () => {
     const cmd = hooks(
       '"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh" codex',

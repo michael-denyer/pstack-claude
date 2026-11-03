@@ -114,10 +114,19 @@ const modelsConfig = Type.Object({
 });
 
 function readModels(modelsFile: string): Static<typeof modelsConfig> {
-  const raw: unknown = JSON.parse(readFileSync(modelsFile, "utf8"));
+  const text = readFileSync(modelsFile, "utf8");
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`${modelsFile} is not valid JSON: ${(e as Error).message}`);
+  }
   if (!Value.Check(modelsConfig, raw)) throw new Error(`${modelsFile} is not a pstack models file: it needs available[], efforts[] and pi.{fallback, models}.`);
   return raw;
 }
+
+// A model or effort value that is not valid, unlike a models.json that cannot be read.
+export class InvalidValueError extends Error {}
 
 // Returns the provider/id for --model, or undefined when the child should run
 // on Pi's default because the parent model is unknown.
@@ -132,7 +141,7 @@ export function resolveModel(
   const models = readModels(settings.modelsFile);
   if (!models.available.includes(requested)) {
     const valid = [...models.available, ...PARENT_MODEL_ALIASES, "<provider>/<model-id>"];
-    throw new Error(`Unknown model "${requested}". Valid values: ${valid.join(", ")}.`);
+    throw new InvalidValueError(`Unknown model "${requested}". Valid values: ${valid.join(", ")}.`);
   }
   // Family names follow the provider the session is signed in to, so a ChatGPT
   // subscription gets OpenAI models without any configuration.
@@ -140,16 +149,18 @@ export function resolveModel(
   const table = models.pi.models[Object.hasOwn(models.pi.models, provider) ? provider : models.pi.fallback];
   const id = sheet?.piModels.get(requested) ?? table[requested];
   if (!id) {
-    throw new Error(`No Pi model mapped for "${requested}": add a "pi models: ${requested}=<provider>/<id>" line to the override sheet.`);
+    throw new InvalidValueError(`No Pi model mapped for "${requested}": add a "pi models: ${requested}=<provider>/<id>" line to the override sheet.`);
   }
   return id;
 }
 
 export const GENERAL_PURPOSE = "general-purpose";
 
-interface AgentDefinition {
+export interface AgentDefinition {
   // The agent file it was read from; general-purpose has none.
   file?: string;
+  // When to use it, as the agent tool's type list shows it.
+  description?: string;
   body: string;
   model?: string;
   effort?: string;
@@ -159,10 +170,25 @@ export function frontmatter(text: string): { fields: Map<string, string>; body: 
   // Windows editors often save a byte-order mark before the frontmatter.
   const m = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text);
   const fields = new Map<string, string>();
-  for (const line of (m?.[1] ?? "").split(/\r?\n/)) {
-    const kv = /^([\w-]+):\s*(.*)$/.exec(line);
-    // YAML's quotes are not part of the value, so "high" and 'high' read as high.
-    if (kv) fields.set(kv[1], kv[2].trim().replace(/^"([^"\\]*)"$|^'([^']*)'$/, "$1$2"));
+  const lines = (m?.[1] ?? "").split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const kv = /^([\w-]+):\s*(.*)$/.exec(lines[i]);
+    if (!kv) continue;
+    const value = kv[2].trim();
+    // A YAML block scalar, as Claude Code agent files often write description:,
+    // is the indented lines after its | or >.
+    const block = /^([|>])[+-]?[1-9]?$/.exec(value);
+    if (!block) {
+      // YAML's quotes are not part of the value, so "high" and 'high' read as high.
+      fields.set(kv[1], value.replace(/^"([^"\\]*)"$|^'([^']*)'$/, "$1$2"));
+      continue;
+    }
+    const held: string[] = [];
+    while (i + 1 < lines.length && /^(\s|$)/.test(lines[i + 1])) held.push(lines[++i]);
+    const indent = Math.min(...held.filter((l) => l.trim()).map((l) => l.search(/\S/)));
+    const joined = held.map((l) => l.slice(indent)).join("\n").trim();
+    // > folds a line break into a space, and a run of n+1 breaks into n.
+    fields.set(kv[1], block[1] === ">" ? joined.replace(/\n(\n*)/g, (_, more: string) => more || " ") : joined);
   }
   return { fields, body: (m?.[2] ?? text).trim() };
 }
@@ -171,13 +197,13 @@ function parseAgentFile(file: string, text: string): AgentDefinition {
   const { fields, body } = frontmatter(text);
   // Claude Code's `model: inherit` runs the agent on the parent's model, as no model does.
   const model = fields.get("model");
-  return { file, body, model: model && model !== "inherit" ? model : undefined, effort: fields.get("effort") || undefined };
+  return { file, description: fields.get("description") || undefined, body, model: model && model !== "inherit" ? model : undefined, effort: fields.get("effort") || undefined };
 }
 
 // The agent tool's effort parameter: one of models.json's levels.
 export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile">): string {
   const { efforts } = readModels(settings.modelsFile);
-  if (!efforts.includes(effort)) throw new Error(`effort "${effort}" is not one of ${efforts.join(", ")}`);
+  if (!efforts.includes(effort)) throw new InvalidValueError(`effort "${effort}" is not one of ${efforts.join(", ")}`);
   return effort;
 }
 
@@ -185,7 +211,10 @@ export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile
 // the built-in general-purpose type, which has no agent file, and a user agent
 // file under its bare name. A user file only adds a type, never replaces one.
 export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "agentDir">): Map<string, AgentDefinition> {
-  const types = new Map<string, AgentDefinition>([[GENERAL_PURPOSE, { body: "" }]]);
+  // The built-in type's description is Claude Code's own.
+  const types = new Map<string, AgentDefinition>([
+    [GENERAL_PURPOSE, { body: "", description: "General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you." }],
+  ]);
   const dir = join(settings.pluginRoot, "agents");
   if (existsSync(dir)) {
     for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {

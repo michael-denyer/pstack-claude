@@ -55,11 +55,11 @@ const BACKGROUND_NOTE =
 const SLEEP_BLOCKED =
   "Blocked: a background agent is still running, and its completion notice arrives on its own. Do not sleep or poll for it. Continue other work, or end your turn. The notice starts your next one.";
 
-// model-only exposure keeps every tool declared to the model even under
-// codemode.mode "only", which would otherwise reach them only through scripts.
+const lookupsOf = (runner: AgentRunner) => ({ transcriptOf: sessionFile, activityOf: runner.activityOf.bind(runner) });
+
+// The user's own view: shown, never sent to the model.
 export function registerAgentsCommand(pi: ExtensionAPI, runner: AgentRunner): void {
-  const lookups = { transcriptOf: sessionFile, activityOf: runner.activityOf.bind(runner) };
-  // The user's own view: shown, never sent to the model.
+  const lookups = lookupsOf(runner);
   pi.registerCommand("pstack-agents", {
     description: "Show each pstack agent's status, what a running one is doing, and its transcript",
     async handler(_args, ctx) {
@@ -68,8 +68,10 @@ export function registerAgentsCommand(pi: ExtensionAPI, runner: AgentRunner): vo
   });
 }
 
+// model-only exposure keeps every tool declared to the model even under
+// codemode.mode "only", which would otherwise reach them only through scripts.
 export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner, settings: Settings): void {
-  const lookups = { transcriptOf: sessionFile, activityOf: runner.activityOf.bind(runner) };
+  const lookups = lookupsOf(runner);
   // Wording alone did not stop models from polling a background agent with
   // sleep, which spends turns and leads them to cut the agent short.
   pi.on("tool_call", (event) => {

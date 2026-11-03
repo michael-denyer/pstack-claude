@@ -454,7 +454,15 @@ for (const signal of ["SIGINT", "SIGTERM"] satisfies NodeJS.Signals[]) {
       signalWhile(signal, () => ({
         dir: gridCase(150),
         reached: (parent) => {
-          for (const f of fs.readdirSync(parent, { recursive: true, encoding: "utf8" }))
+          let entries: string[];
+          try {
+            entries = fs.readdirSync(parent, { recursive: true, encoding: "utf8" });
+          } catch (error) {
+            // The worker renames draft to done when it finishes, which can land mid-walk.
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+            throw error;
+          }
+          for (const f of entries)
             if (
               path.basename(f) === "chart.mmd" &&
               fs.statSync(path.join(parent, f), { throwIfNoEntry: false })?.size

@@ -104,63 +104,6 @@ async function noChecksCi(
     ? { ...none, kind: "ci-none", github: merge.github }
     : { ...none, kind: "ci-unreported" };
 }
-async function reportedCi(
-  reader: T.GitHubReader,
-  facts: T.PullRequestFacts,
-  checks: T.ReportedChecks,
-  pendingHistory: "include" | "omit"
-): Promise<T.CiState> {
-  const failed = nonEmpty(
-    checks.checks.filter(
-      (check): check is T.FailedCheck => check.kind === "failed"
-    )
-  );
-  const pending = nonEmpty(
-    checks.checks.filter(
-      (check): check is T.PendingCheck => check.kind === "pending"
-    )
-  );
-  if (failed === null && pending !== null && pendingHistory === "omit")
-    return {
-      kind: "ci-pending",
-      source: checks.source,
-      all: checks.checks,
-      failed: [],
-      pending,
-      hadPreviousPassingCi: false,
-    };
-  const merge = await mergeAssessment(reader, facts);
-  const base = {
-    source: checks.source,
-    all: checks.checks,
-    hadPreviousPassingCi: merge.hadPreviousPassingCi,
-  };
-  if (failed !== null)
-    return {
-      ...base,
-      kind: "ci-failing",
-      failed,
-      pending: pending ?? [],
-      github: merge.github,
-    };
-  if (merge.github.kind === "refused")
-    return {
-      ...base,
-      kind: "ci-github-rejected",
-      failed: [],
-      pending: pending ?? [],
-      github: merge.github,
-    };
-  if (pending !== null)
-    return { ...base, kind: "ci-pending", failed: [], pending };
-  return {
-    ...base,
-    kind: "ci-clean",
-    failed: [],
-    pending: [],
-    github: merge.github,
-  };
-}
 const AUTOMATION_TOKENS = [
   "bugbot",
   "security review",
@@ -216,10 +159,66 @@ export async function readSnapshot(args: {
     resolveReviewThreads(args.reader, args.context),
     resolveChecks(args.reader, args.context),
   ]);
-  const ci =
-    checks.kind === "no-checks"
-      ? await noChecksCi(args.reader, facts, args.confirmNoChecks)
-      : await reportedCi(args.reader, facts, checks, args.pendingHistory);
+  const failed = nonEmpty(
+    checks.checks.filter(
+      (check): check is T.FailedCheck => check.kind === "failed"
+    )
+  );
+  const pending = nonEmpty(
+    checks.checks.filter(
+      (check): check is T.PendingCheck => check.kind === "pending"
+    )
+  );
+  let ci: T.CiState;
+  if (checks.kind === "no-checks")
+    ci = await noChecksCi(args.reader, facts, args.confirmNoChecks);
+  else if (
+    failed === null &&
+    pending !== null &&
+    args.pendingHistory === "omit"
+  )
+    ci = {
+      kind: "ci-pending",
+      source: checks.source,
+      all: checks.checks,
+      failed: [],
+      pending,
+      hadPreviousPassingCi: false,
+    };
+  else {
+    const merge = await mergeAssessment(args.reader, facts);
+    const base = {
+      source: checks.source,
+      all: checks.checks,
+      hadPreviousPassingCi: merge.hadPreviousPassingCi,
+    };
+    if (failed !== null)
+      ci = {
+        ...base,
+        kind: "ci-failing",
+        failed,
+        pending: pending ?? [],
+        github: merge.github,
+      };
+    else if (merge.github.kind === "refused")
+      ci = {
+        ...base,
+        kind: "ci-github-rejected",
+        failed: [],
+        pending: pending ?? [],
+        github: merge.github,
+      };
+    else if (pending !== null)
+      ci = { ...base, kind: "ci-pending", failed: [], pending };
+    else
+      ci = {
+        ...base,
+        kind: "ci-clean",
+        failed: [],
+        pending: [],
+        github: merge.github,
+      };
+  }
   const factsAfterChecks = await args.reader.pullRequest(args.context);
   const changed = changedFacts(facts, factsAfterChecks);
   if (changed.length > 0)
@@ -234,15 +233,13 @@ export async function readSnapshot(args: {
     facts,
     threads,
     ci,
-    reviewAutomationRunning:
-      checks.kind === "reported" &&
-      checks.checks.some(
-        (check) =>
-          check.kind === "pending" &&
-          AUTOMATION_TOKENS.some((token) =>
-            check.name.toLowerCase().includes(token)
-          )
-      ),
+    reviewAutomationRunning: checks.checks.some(
+      (check) =>
+        check.kind === "pending" &&
+        AUTOMATION_TOKENS.some((token) =>
+          check.name.toLowerCase().includes(token)
+        )
+    ),
   };
 }
 const conflictBlocker = (row: T.PrSnapshot): T.MergeBlocker | null =>

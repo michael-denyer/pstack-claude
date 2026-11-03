@@ -56,7 +56,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/autopilot-full.md": {
       "kind": "policy",
-      "why": "Owners stop at merge-ready and the operator clicks every merge, with the patch-id rule governing re-verification if trunk moves first, instead of each owner merging after a clean verdict, and the root writes the program objective into standing orders on the go and re-reads it each tick, arms the tick as a dynamic-mode /loop, states the program's size before the first owner starts and waits for the operator's go above three owners, scopes review lanes to what the diff breaks, and stops a PR at two fix-forwards.",
+      "why": "Owners stop at merge-ready and the operator clicks every merge, with the patch-id rule governing re-verification if trunk moves first, instead of each owner merging after a clean verdict, and the root writes the program objective into the store's notes.md on the go and re-reads it each tick, arms the tick as a dynamic-mode /loop, states the program's size before the first owner starts and waits for the operator's go above three owners, scopes review lanes to what the diff breaks, and stops a PR at two fix-forwards.",
       "since": "0.9.39",
       "upstream": "not-proposed"
     },
@@ -86,7 +86,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/multi-phase-plan.md": {
       "kind": "port-feature",
-      "why": "Plans read skills from the installed plugin, keep the store under ~/.claude/orchestrate, write the program objective into standing orders, run the tick as a dynamic-mode /loop that re-reads that objective, run live lanes in worktrees through the driver skill the Non-negotiables resolve instead of on cloud VMs with control-ui or control-cli, name the configured swarm workers model instead of a placeholder, leave rebase and merge authority to the execution playbook, and pick Autopilot-stack only when a PR builds on another, because neither autopilot merges.",
+      "why": "Plans read skills from the installed plugin, keep the store under ~/.claude/orchestrate, write the program objective into the store's notes.md, run the tick as a dynamic-mode /loop that re-reads that objective, run live lanes in worktrees through the driver skill the Non-negotiables resolve instead of on cloud VMs with control-ui or control-cli, name the configured swarm workers model instead of a placeholder, leave rebase and merge authority to the execution playbook, and pick Autopilot-stack only when a PR builds on another, because neither autopilot merges.",
       "since": "0.9.19",
       "upstream": "not-proposed"
     },
@@ -128,13 +128,13 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/check-plan.mjs": {
       "kind": "port-feature",
-      "why": "Checks for the port's plan skeleton markers (standing orders, installed-plugin reads, an hourly cadence, the configured swarm workers model), requires a box under each program task and under Close the program, excludes fenced examples from required section and review-gate text, opens and closes a code fence at any indentation so a fence inside a list item counts, and strips a leading byte-order mark before parsing.",
+      "why": "Checks for the port's plan skeleton markers (the objective written into the program store's notes.md, installed-plugin reads, an hourly cadence, the configured swarm workers model), requires a box under each program task and under Close the program, excludes fenced examples from required section and review-gate text, opens and closes a code fence at any indentation so a fence inside a list item counts, and strips a leading byte-order mark before parsing.",
       "since": "0.9.19",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/check-plan.test.ts": {
       "kind": "port-feature",
-      "why": "Gives upstream's valid-plan fixture the boxes under each program task and under Close the program, the standing-orders, installed-plugin, and hourly lines, and the configured swarm workers lane line that the port's checker requires.",
+      "why": "Gives upstream's valid-plan fixture the boxes under each program task and under Close the program, the notes.md, installed-plugin, and hourly lines, and the configured swarm workers lane line that the port's checker requires.",
       "since": "0.9.83",
       "upstream": "not-proposed"
     },

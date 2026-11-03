@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.124 - program objective in the store's notes.md
+
+The Autopilot-full and multi-phase-plan playbooks wrote the program objective into "the standing orders", the port's stand-in for Cursor's `/goal`. The term's only definition was the `preferences.md` register in the Orchestrate playbook, which 0.9.123 dropped with upstream's rewrite. Both playbooks now write the objective into `notes.md` in the program's store under `~/.claude/orchestrate/<slug>/`, the tracker the Orchestrate playbook names, and each audit tick re-reads it from there instead of from "the standing objective". `check-plan.mjs` requires a program checklist line that writes into `notes.md` in the program's store, where it required "standing orders", so a plan written from an earlier skeleton fails the check until that line is updated.
+
 ## 0.9.123 - sync to upstream c742dd6 (v0.15.36): agentic Orchestrate, orch scripts removed
 
 The upstream pin moves from `ab1f702` to `c742dd6`, upstream v0.15.36, 1 pstack commit. The Orchestrate playbook now runs a program with the coordinator's own tools: the `Agent` tool for workers, a store under `~/.claude/orchestrate/<slug>/` with `notes.md` as its tracker, and PR and CI event subscriptions where the runtime has them. It calls no scripts and runs no polling loops. Two sections, Topology and Supervision, replace all nine earlier sections, Roles and placement through Escalation. The `preferences.md` register of standing orders went with them, and so did the port's rule to keep a human ruling in its original wording. The playbook no longer names `units.tsv`, `frontier.json`, or the inbox, so a store an earlier release wrote keeps those files but the playbook does not read them.

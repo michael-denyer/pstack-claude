@@ -116,7 +116,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/session-pickup.md": {
       "kind": "policy",
-      "why": "Reads the project checkpoint first and applies the human-rulings epistemics when reconstructing state.",
+      "why": "Reads the project checkpoint first and applies the human-rulings epistemics when reconstructing state, and verifies inherited claims before it routes and ends.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },

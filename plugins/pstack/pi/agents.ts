@@ -139,7 +139,8 @@ function childArgs(identity: AgentIdentity, depth: number): string[] {
   if (identity.thinking) args.push("--thinking", identity.thinking);
   if (identity.systemPromptFile) args.push("--append-system-prompt", identity.systemPromptFile);
   // @gotgenes/pi-permission-system 42.0.0 names a forwarded ask's agent from this tag in the child's
-  // system prompt; without it the parent's dialog says "unknown".
+  // system prompt, and picks its per-agent permission policy by that name; without it the parent's
+  // dialog says "unknown".
   args.push("--append-system-prompt", `<active_agent name="${identity.subagentType}" />`);
   args.push(`--${DEPTH_FLAG}`, String(depth + 1));
   const excluded = [...(identity.readonly ? ["edit", "write"] : []), ...(depth + 1 >= MAX_SPAWN_DEPTH ? ["agent"] : [])];

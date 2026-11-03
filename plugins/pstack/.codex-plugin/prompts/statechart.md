@@ -1,6 +1,6 @@
 ---
 name: statechart
-description: check a TLA+ model and draw it as a Mermaid statechart, with the shortest path to each state that breaks a rule
+description: "check a TLA+ model and draw it as a Mermaid statechart, with the shortest path to each state that breaks a rule"
 disable-model-invocation: true
 ---
 

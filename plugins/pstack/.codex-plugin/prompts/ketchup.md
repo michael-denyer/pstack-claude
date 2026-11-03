@@ -1,6 +1,6 @@
 ---
 name: ketchup
-description: catch up on everything in this chat since your last message, with an executive summary for each action item
+description: "catch up on everything in this chat since your last message, with an executive summary for each action item"
 disable-model-invocation: true
 ---
 

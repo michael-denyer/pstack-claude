@@ -317,10 +317,7 @@ describe("slashCommands", () => {
     expect(() => slashCommands("# R\n\nno table\n", ["a"])).toThrow("table header not found");
   });
 
-  test("rejects menu text that the prompt's YAML frontmatter would not read back, naming file and row", () => {
-    expect(() => slashCommands(reference(["| `/a` | fine |", "| `/b` | fix CI: then ship |"]), ["a", "b"])).toThrow(
-      "docs/reference.md: slash-command row 2 text is not a plain YAML value",
-    );
+  test("menu text of any wording reads back from the prompt's YAML frontmatter as the same string", () => {
     const samples = [
       "fix CI: then ship",
       "run it # carefully",
@@ -332,19 +329,17 @@ describe("slashCommands", () => {
       "a:b ratio, issue#12, [x] {y}",
       "-mode skill",
       "monitor an open PR, fix CI/comments, keep it merge-ready",
+      `say "hi" and 'bye'`,
+      "a back\\slash",
+      "true",
+      "null",
+      "001",
+      "~",
     ];
     for (const menu of samples) {
-      let parsed;
-      try {
-        parsed = Bun.YAML.parse(promptStub({ name: "b", menu }, RUNTIMES[0]).split("---\n")[1]).description;
-      } catch {}
-      let accepted = true;
-      try {
-        slashCommands(reference([`| \`/b\` | ${menu} |`]), ["b"]);
-      } catch {
-        accepted = false;
-      }
-      expect({ menu, accepted }).toEqual({ menu, accepted: parsed === menu });
+      const [row] = slashCommands(reference([`| \`/b\` | ${menu} |`]), ["b"]);
+      expect(row.menu).toBe(menu);
+      expect(Bun.YAML.parse(promptStub(row, RUNTIMES[0]).split("---\n")[1]).description).toBe(menu);
     }
   });
 

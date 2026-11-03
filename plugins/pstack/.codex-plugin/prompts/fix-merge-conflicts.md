@@ -1,6 +1,6 @@
 ---
 name: fix-merge-conflicts
-description: non-interactively resolve merge conflicts, validate, finalize
+description: "non-interactively resolve merge conflicts, validate, finalize"
 disable-model-invocation: true
 ---
 

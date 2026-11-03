@@ -1,6 +1,6 @@
 ---
 name: benchmark-checklist
-description: vet a measured speedup or regression (limiter, tuning, errors, repeat runs, end-to-end relevance) before you report or act on it
+description: "vet a measured speedup or regression (limiter, tuning, errors, repeat runs, end-to-end relevance) before you report or act on it"
 disable-model-invocation: true
 ---
 

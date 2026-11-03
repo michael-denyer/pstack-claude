@@ -1,6 +1,6 @@
 ---
 name: reflect
-description: capture a long task's lessons as a skill edit
+description: "capture a long task's lessons as a skill edit"
 disable-model-invocation: true
 ---
 

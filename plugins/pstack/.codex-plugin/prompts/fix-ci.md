@@ -1,6 +1,6 @@
 ---
 name: fix-ci
-description: find failing PR checks, inspect logs, apply focused fixes
+description: "find failing PR checks, inspect logs, apply focused fixes"
 disable-model-invocation: true
 ---
 

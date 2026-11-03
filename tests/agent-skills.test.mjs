@@ -233,6 +233,12 @@ describe("shared Agent Skills tree", () => {
     );
   });
 
+  test("a backslash at the end of a line does not carry a link onto the next line", () => {
+    withSkillTree({ "example/SKILL.md": "[guide](missing\\\nmore) text\n" }, (root) =>
+      expect(() => validateSkillsTree(root)).not.toThrow(),
+    );
+  });
+
   test.each([
     ["missing(v1).md", "missing"],
     ["missing (v1).md", "missing"],

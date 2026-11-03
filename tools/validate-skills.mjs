@@ -27,28 +27,31 @@ function markdownTargets(text) {
   const targets = [];
   // Only an unescaped, outer parenthesis closes the link. Angle destinations
   // and quoted titles can contain parentheses that do not affect its depth.
-  const openings = /\]\([ \t]*/g;
-  while (openings.exec(text)) {
-    const start = openings.lastIndex;
-    let depth = 1;
-    let angle = text[start] === "<";
-    let quote = null;
-    for (let i = start; i < text.length && !/[\r\n]/.test(text[i]); i += 1) {
-      const char = text[i];
-      if (char === "\\") {
-        i += 1;
-      } else if (angle) {
-        if (char === ">") angle = false;
-      } else if (quote) {
-        if (char === quote) quote = null;
-      } else if ((char === '"' || char === "'") && /[ \t]/.test(text[i - 1])) {
-        quote = char;
-      } else if (char === "(") {
-        depth += 1;
-      } else if (char === ")" && --depth === 0) {
-        targets.push(destination(text.slice(start, i)));
-        openings.lastIndex = i + 1;
-        break;
+  // A link never spans lines, so each line is scanned on its own.
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    const openings = /\]\([ \t]*/g;
+    while (openings.exec(line)) {
+      const start = openings.lastIndex;
+      let depth = 1;
+      let angle = line[start] === "<";
+      let quote = null;
+      for (let i = start; i < line.length; i += 1) {
+        const char = line[i];
+        if (char === "\\") {
+          i += 1;
+        } else if (angle) {
+          if (char === ">") angle = false;
+        } else if (quote) {
+          if (char === quote) quote = null;
+        } else if ((char === '"' || char === "'") && /[ \t]/.test(line[i - 1])) {
+          quote = char;
+        } else if (char === "(") {
+          depth += 1;
+        } else if (char === ")" && --depth === 0) {
+          targets.push(destination(line.slice(start, i)));
+          openings.lastIndex = i + 1;
+          break;
+        }
       }
     }
   }

@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.123 - sync to upstream c742dd6 (v0.15.36): agentic Orchestrate, orch scripts removed
+
+The upstream pin moves from `ab1f702` to `c742dd6`, upstream v0.15.36, 1 pstack commit. The Orchestrate playbook now runs a program with the coordinator's own tools: the `Agent` tool for workers, a store under `~/.claude/orchestrate/<slug>/` with `notes.md` as its tracker, and PR and CI event subscriptions where the runtime has them. It calls no scripts and runs no polling loops. Two sections, Topology and Supervision, replace all nine earlier sections, Roles and placement through Escalation. The `preferences.md` register of standing orders went with them, and so did the port's rule to keep a human ruling in its original wording. The playbook no longer names `units.tsv`, `frontier.json`, or the inbox, so a store an earlier release wrote keeps those files but the playbook does not read them.
+
+Upstream deleted the `orch` scripts, and the port follows. `orch/orch.ts`, `orch/store.ts`, and `orch/orch.test.ts` are gone, with the silent-failure fixes the port carried in the last two. The scripts' `test` script, the `orch` case in `watch-pr/fresh-install.test.ts`, and the `orch` lines in `.prettierignore` went with them, and so did `tla/OrchStoreLock`, the TLA+ model of the store's lock. The Codex, Copilot, Muse, and Pi mapping notes and the requirements table in `docs/reference.md` no longer list the `orch` CLI.
+
+New substitution rules rewrite the playbook's Project tracker and Project store sentence, its cloud VM sentence, and "a control-skill check". A fourth rewrites its line on forking a worker: a Claude Code fork copies the coordinator, so new work that needs a worker's checkout goes to a fresh worker in that worker's worktree. The denylist now rejects "Project tracker" and "Project store". Four rules whose upstream text is gone were removed.
+
 ## 0.9.122 - Pi wakeups as the agent's own messages, and Pi agent names in permission asks
 
 Three fixes from outside contributors.

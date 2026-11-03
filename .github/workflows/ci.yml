@@ -221,6 +221,15 @@ jobs:
             files: differential
           - group: rest
             files: "!(corpus|differential)"
+          # Diagnostic only: each file on its own runner, to time it without contention.
+          - { group: solo chart, files: chart }
+          - { group: solo cli, files: cli }
+          - { group: solo config-fuzz, files: config-fuzz }
+          - { group: solo messages, files: messages }
+          - { group: solo pipeline, files: pipeline }
+          - { group: solo plain-tlc, files: plain-tlc }
+          - { group: solo render, files: render }
+          - { group: solo tlc-out, files: tlc-out }
     defaults:
       run:
         working-directory: plugins/pstack/skills/statechart/scripts

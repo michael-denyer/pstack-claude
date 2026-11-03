@@ -104,6 +104,30 @@ describe("agent tool", () => {
     expect(w.invocations().map((inv) => [flag(inv, "--thinking"), flag(inv, "--model")])).toEqual([["low", "anthropic/parent-model"], ["medium", "gw/folded"]]);
   });
 
+  test("frontmatter reads as Claude Code 2.1.310 reads it: comments and YAML escapes drop out, a repeated key keeps its last value, the retry reads a value holding YAML syntax as text and turns tabs into spaces, and a file that still does not parse is skipped", async () => {
+    const { w, ctx } = setup();
+    const dir = join(w.agentDir, "pstack-agents");
+    mkdirSync(dir);
+    writeFileSync(join(dir, "commented.md"), "---\ndescription: Commented # a comment\nmodel: inherit # the session model\neffort: low # a comment\n---\nC.\n");
+    writeFileSync(join(dir, "escaped.md"), '---\ndescription: "Use for \\"x\\" words"\n---\nE.\n');
+    writeFileSync(join(dir, "colon.md"), "---\ndescription: Use for a: b # not a comment\nmodel: gw/colon\n---\nK.\n");
+    writeFileSync(join(dir, "quoted-word.md"), '---\ndescription: "Sharpen" a prompt: use when asked\r\n---\r\nQ.\r\n');
+    writeFileSync(join(dir, "tabbed.md"), "---\ndescription: Tabbed\ntools:\n\t- Read\n---\nT.\n");
+    writeFileSync(join(dir, "repeated.md"), "---\ndescription: First value\ndescription: Repeated value # a comment\n---\nR.\n");
+    writeFileSync(join(dir, "repeated-block.md"), "---\ndescription: |\n  First\n  block\nmodel: gw/repeated\ndescription: Repeated block\n---\nRB.\n");
+    writeFileSync(join(dir, "broken.md"), "---\ndescription: |\n Use for a\n  b: c\neffort: [low\n---\nB.\n");
+    const pi = await restore(w, []);
+    const lines = pi.tools.get("agent").parameters.properties.subagent_type.description.split("\n");
+    expect(lines).toEqual(
+      expect.arrayContaining(["- commented: Commented", '- escaped: Use for "x" words', "- colon: Use for a: b # not a comment", '- quoted-word: "Sharpen" a prompt: use when asked', "- tabbed: Tabbed", "- repeated: Repeated value", "- repeated-block: Repeated block"]),
+    );
+    expect(lines.filter((line) => line.startsWith("- broken"))).toEqual([]);
+    await pi.call("agent", { description: "c", prompt: "x", subagent_type: "commented" }, ctx);
+    await pi.call("agent", { description: "k", prompt: "x", subagent_type: "colon" }, ctx);
+    await pi.call("agent", { description: "r", prompt: "x", subagent_type: "repeated-block" }, ctx);
+    expect(w.invocations().map((inv) => [flag(inv, "--thinking"), flag(inv, "--model")])).toEqual([["low", "anthropic/parent-model"], ["medium", "gw/colon"], ["medium", "gw/repeated"]]);
+  });
+
   test("the effort parameter passes --thinking to any agent type, keeps a pstack agent's body as a 0600 system prompt file, and no effort runs at the parent's level", async () => {
     const { w, pi, ctx } = setup();
     await pi.call("agent", { description: "e", prompt: "x", subagent_type: "general-purpose", effort: "xhigh" }, ctx);

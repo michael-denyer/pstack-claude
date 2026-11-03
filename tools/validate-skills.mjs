@@ -25,10 +25,35 @@ export function markdownFiles(dir) {
 
 function markdownTargets(text) {
   const targets = [];
-  // Parentheses inside <...> belong to the destination, not the inline
-  // link's closing delimiter. Keep that form intact for destination().
-  for (const [, raw] of text.matchAll(/\]\(([ \t]*<[^<>\r\n]*>[^)\n]*|[^)\n]*)\)/g)) {
-    targets.push(destination(raw));
+  // Only an unescaped, outer parenthesis closes the link. Angle destinations
+  // and quoted titles can contain parentheses that do not affect its depth.
+  // A link never spans lines, so each line is scanned on its own.
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    const openings = /\]\([ \t]*/g;
+    while (openings.exec(line)) {
+      const start = openings.lastIndex;
+      let depth = 1;
+      let angle = line[start] === "<";
+      let quote = null;
+      for (let i = start; i < line.length; i += 1) {
+        const char = line[i];
+        if (char === "\\") {
+          i += 1;
+        } else if (angle) {
+          if (char === ">") angle = false;
+        } else if (quote) {
+          if (char === quote) quote = null;
+        } else if ((char === '"' || char === "'") && /[ \t]/.test(line[i - 1])) {
+          quote = char;
+        } else if (char === "(") {
+          depth += 1;
+        } else if (char === ")" && --depth === 0) {
+          targets.push(destination(line.slice(start, i)));
+          openings.lastIndex = i + 1;
+          break;
+        }
+      }
+    }
   }
   for (const [, raw] of text.matchAll(/^\s{0,3}\[(?!\^)[^\]\n]+\]:\s*(.+)$/gm)) {
     targets.push(destination(raw));

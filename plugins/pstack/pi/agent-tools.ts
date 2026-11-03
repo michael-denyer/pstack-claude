@@ -3,17 +3,19 @@ import { type Static, Type } from "typebox";
 
 import { agentsReport, listing, resultText } from "./agent-text.ts";
 import { type AgentRunner, sessionFile } from "./agents.ts";
-import { GENERAL_PURPOSE, loadAgentTypes, type Settings } from "./config.ts";
+import { type AgentDefinition, GENERAL_PURPOSE, loadAgentTypes, type Settings } from "./config.ts";
 import { isForegroundWait } from "./sleep-wait.ts";
 
-// Claude Code's Agent tool names every agent type, the user's included.
-const agentParams = (types: string[]) => Type.Object(
+// Claude Code's Agent tool lists every agent type, the user's included, with its description.
+const typeLine = ([type, { description }]: [string, AgentDefinition]) => `- ${type === GENERAL_PURPOSE ? `${type} (default)` : type}${description ? `: ${description}` : ""}`;
+
+const agentParams = (types: Map<string, AgentDefinition>) => Type.Object(
   {
     description: Type.String({ description: "A short (3-5 word) description of the task" }),
     prompt: Type.String({ description: "The task for the agent to perform" }),
     subagent_type: Type.Optional(
       Type.String({
-        description: `Agent definition to run: ${types.map((type) => (type === GENERAL_PURPOSE ? `${type} (default)` : type)).join(", ")}. A name without the pstack: prefix, other than general-purpose, is an agent file in pstack-agents in the Pi agent directory, whose tools:, disallowedTools:, and isolation: fields are not applied.`,
+        description: `Agent definition to run, one of:\n${[...types].map(typeLine).join("\n")}\nA name without the pstack: prefix, other than general-purpose, is an agent file in pstack-agents in the Pi agent directory, whose tools:, disallowedTools:, and isolation: fields are not applied.`,
       }),
     ),
     model: Type.Optional(
@@ -78,7 +80,7 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner, settin
     description:
       "Launch a subagent: a separate pi process with its own context. Foreground (default) waits and returns its final text; run_in_background returns an agentId at once and a completion notice arrives when it exits. Use send_message to steer a running agent or continue a finished one, stop_agent to stop one, list_agents to see them.",
     promptSnippet: "Launch a subagent (foreground or background, optional worktree isolation)",
-    parameters: agentParams([...loadAgentTypes(settings).keys()]),
+    parameters: agentParams(loadAgentTypes(settings)),
     async execute(_id, params, signal, _onUpdate, ctx) {
       const started = runner.start(params, ctx);
       if (params.run_in_background) {

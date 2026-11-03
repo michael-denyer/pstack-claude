@@ -119,6 +119,9 @@ function readModels(modelsFile: string): Static<typeof modelsConfig> {
   return raw;
 }
 
+// A model or effort value that is not valid, unlike a models.json that cannot be read.
+export class InvalidValueError extends Error {}
+
 // Returns the provider/id for --model, or undefined when the child should run
 // on Pi's default because the parent model is unknown.
 export function resolveModel(
@@ -132,7 +135,7 @@ export function resolveModel(
   const models = readModels(settings.modelsFile);
   if (!models.available.includes(requested)) {
     const valid = [...models.available, ...PARENT_MODEL_ALIASES, "<provider>/<model-id>"];
-    throw new Error(`Unknown model "${requested}". Valid values: ${valid.join(", ")}.`);
+    throw new InvalidValueError(`Unknown model "${requested}". Valid values: ${valid.join(", ")}.`);
   }
   // Family names follow the provider the session is signed in to, so a ChatGPT
   // subscription gets OpenAI models without any configuration.
@@ -140,7 +143,7 @@ export function resolveModel(
   const table = models.pi.models[Object.hasOwn(models.pi.models, provider) ? provider : models.pi.fallback];
   const id = sheet?.piModels.get(requested) ?? table[requested];
   if (!id) {
-    throw new Error(`No Pi model mapped for "${requested}": add a "pi models: ${requested}=<provider>/<id>" line to the override sheet.`);
+    throw new InvalidValueError(`No Pi model mapped for "${requested}": add a "pi models: ${requested}=<provider>/<id>" line to the override sheet.`);
   }
   return id;
 }
@@ -177,7 +180,7 @@ function parseAgentFile(file: string, text: string): AgentDefinition {
 // The agent tool's effort parameter: one of models.json's levels.
 export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile">): string {
   const { efforts } = readModels(settings.modelsFile);
-  if (!efforts.includes(effort)) throw new Error(`effort "${effort}" is not one of ${efforts.join(", ")}`);
+  if (!efforts.includes(effort)) throw new InvalidValueError(`effort "${effort}" is not one of ${efforts.join(", ")}`);
   return effort;
 }
 

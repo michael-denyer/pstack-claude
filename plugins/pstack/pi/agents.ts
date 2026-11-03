@@ -9,7 +9,7 @@ import { Value } from "typebox/value";
 import { noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
 import { type Activity, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
-import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, loadAgentTypes, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
+import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, loadAgentTypes, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
 
 const ENTRY_TYPE = "pstack-agents";
@@ -193,12 +193,12 @@ function reapOrphan(record: RunningRecord, killGraceMs: number): Promise<void> {
 const now = () => new Date().toISOString();
 
 // A value the call left out came from the agent file, which the caller never
-// saw, so an error over it names that file.
+// saw, so an error over the value names that file.
 function fromAgentFile<T>(file: string | undefined, passed: string | undefined, resolve: () => T): T {
   try {
     return resolve();
   } catch (e) {
-    if (passed !== undefined || file === undefined) throw e;
+    if (passed !== undefined || file === undefined || !(e instanceof InvalidValueError)) throw e;
     throw new Error(`${file}: ${(e as Error).message}`);
   }
 }

@@ -63,6 +63,14 @@ describe("agent file defaults", () => {
     expect(w.invocations().map((inv) => flag(inv, "--thinking"))).toEqual(["high", "high"]);
   });
 
+  test("a models.json that cannot be read is its own error, not the agent file's", async () => {
+    const { w, pi, ctx } = withAgents({ slow: "effort: high", big: "model: opus" });
+    writeFileSync(w.settings.modelsFile, "{}");
+    const broken = `${w.settings.modelsFile} is not a pstack models file`;
+    for (const type of ["slow", "big"]) expect((await run(pi, ctx, type).catch((e) => e)).message).toStartWith(broken);
+    expect(w.invocations()).toEqual([]);
+  });
+
   test("a bad effort or model from an agent file is an error that names the file, the same value on the call is not, and no child starts", async () => {
     const { w, pi, ctx } = withAgents({ slow: "effort: turbo", odd: "model: gpt9", plain: "description: none" });
     const file = (name) => join(w.agentDir, "pstack-agents", `${name}.md`);

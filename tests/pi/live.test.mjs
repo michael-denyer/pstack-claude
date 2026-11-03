@@ -107,7 +107,8 @@ suite("pstack on live pi", () => {
         const expected = { "panel-opus": ["opus", "alpha"], "panel-fable": ["fable", "beta"], "panel-sonnet": ["sonnet", "gamma"] };
         const notices = parent.notices(from);
         expect(notices).toHaveLength(3);
-        const seen = new Set();
+        // Each agent's own model is checked; a provider's table may map two
+        // aliases to one model, as openai does for opus and sonnet.
         for (const [description, [alias, word]] of Object.entries(expected)) {
           const snaps = agentByDescription(file, description);
           const last = snaps.at(-1);
@@ -121,9 +122,7 @@ suite("pstack on live pi", () => {
           const childSections = sections(child);
           expect(childSections[SHEET_KEY]).toBe(tagged(SHEET_KEY, SHEET));
           expect(childSections[MANDATE_KEY]).toBeUndefined();
-          seen.add(MODELS.get(alias));
         }
-        expect(seen.size).toBe(3);
       });
     },
     8 * MINUTE,

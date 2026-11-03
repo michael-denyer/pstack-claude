@@ -6,6 +6,10 @@ import { dirname, join } from "node:path";
 import { install } from "../../plugins/pstack/pi/index.ts";
 import { fakeCtx, fakePi } from "./harness.mjs";
 
+// Loading pi's package, from where the extension resolves it, adds the
+// signal-exit SIGINT listener every pi process has.
+await import(Bun.resolveSync("@earendil-works/pi-coding-agent", join(import.meta.dir, "../../plugins/pstack/pi")));
+
 const [settingsJson, how] = process.argv.slice(2);
 const settings = JSON.parse(settingsJson);
 const [, log] = settings.pi.args;

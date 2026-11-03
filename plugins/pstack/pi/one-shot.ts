@@ -49,8 +49,9 @@ function pendingMessage(ctx: ExtensionContext, signal: { done: boolean }): Promi
 // Everything that follows from "this process ends when the run settles":
 // a background agent's notice would be lost, so the settle is held until one
 // exits or a message arrives; /loop must wait for the run it started; a wakeup
-// could never fire; Ctrl-C must take the children along, since pi leaves SIGINT
-// at its default in print mode.
+// could never fire; Ctrl-C must take the children along, since pi's one SIGINT
+// listener outside interactive mode is signal-exit's, which re-raises the signal
+// and so skips the exit hook.
 export function registerOneShot(pi: ExtensionAPI, settings: Settings, runner: Pick<AgentRunner, "nextExit">): OneShot {
   // Print and json runs exit once the agent settles. A pstack child is an rpc
   // process whose parent closes its stdin at the same moment, so it is one-shot too.
@@ -62,7 +63,7 @@ export function registerOneShot(pi: ExtensionAPI, settings: Settings, runner: Pi
   // The exit hook in index.ts signals the children.
   const onSigint = () => process.exit(130);
   pi.on("session_start", (_event, ctx) => {
-    if (exits(ctx) && process.listenerCount("SIGINT") === 0) process.on("SIGINT", onSigint);
+    if (exits(ctx) && !process.listeners("SIGINT").includes(onSigint)) process.on("SIGINT", onSigint);
   });
   pi.on("agent_before_settle", async (_event, ctx) => {
     if (!exits(ctx) || ctx.hasPendingMessages()) return;

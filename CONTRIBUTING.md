@@ -33,15 +33,16 @@ When a clean merge matches the new upstream text and mode, the sync reports it a
 
 ## Before you open a PR
 
-Install the root dependencies, then run the generator and the tests:
+Install the root dependencies and the copy of Pi the tests load, then run the generator and the tests:
 
 ```shell
 bun install --frozen-lockfile
+bun install --frozen-lockfile --cwd plugins
 bun tools/generate.mjs
 bun test tests/
 ```
 
-The root `package.json` declares `typebox` and the optional `@earendil-works/pi-coding-agent` as peer dependencies, because Pi provides both to an extension at runtime. The root `bun.lock` pins `typebox` for the generator, which checks hook files against it, and for the tests under `tests/pi/`, which load the extension outside Pi.
+The root `package.json` declares `typebox` and the optional `@earendil-works/pi-coding-agent` as peer dependencies, because Pi provides both to an extension at runtime. The root `bun.lock` pins `typebox` for the generator, which checks hook files against it, and for the tests under `tests/pi/`, which load the extension outside Pi. Those tests load Pi's package as a Pi process does, signal handlers included, from the copy that `plugins/package.json` pins and `plugins/bun.lock` locks. It sits on the extension's module path but outside every plugin and outside the root package that `pi install` installs, so no user downloads it, and npm never resolves it on a user's install.
 
 The generator writes `VERSION` into all five plugin manifests and the Pi `package.json` and stamps model defaults from `plugins/pstack/models.json`. It also owns the lines under the first heading of some files: the Codex preamble on each skill with a row in the Per-skill notes table of `skills/poteto-mode/references/codex-tools.md`, and the driver-skill line on the playbooks in `DRIVER_PLAYBOOKS`. Either line anywhere else fails the generator, so a skill gets the preamble by gaining a notes row. The GitHub Copilot preamble comes the same way from the Per-skill notes table of `copilot-tools.md` and follows any Codex preamble; the Muse preamble comes from `muse-tools.md` and follows both. For Muse it also stamps the `.muse-plugin/plugin.json` skill list from the skills tree and its `SessionStart` hooks from `MUSE_HOOKS` in `tools/runtimes.mjs`, and `muse plugins validate plugins/pstack` plus `tests/muse.test.mjs` check the bundle the same way the Muse CLI does. No skill file carries a Pi line: `poteto-mode/SKILL.md` points at `pi-tools.md` once, and a skill's Pi note is a row in that file. For Copilot it also stamps the role list in `skills/setup-pstack/scripts/sheet.awk`, the roles-by-tier table in `setup-pstack/copilot.md`, and the role-model skill list in `hooks/session-start-copilot.md` from `models.json`. It validates each skill's `name` and `description`, then generates a Codex prompt for each public skill using the [slash-command table](docs/reference.md#slash-commands).
 
@@ -110,7 +111,7 @@ uvx zizmor@1.29.0 --persona pedantic --min-severity low --collect all -- .
 
 ## Dependency updates
 
-Dependabot keeps the pinned action SHAs current. The vendored scripts' one runtime dependency (`commander`) follows upstream's pin and moves with `tools/sync.mjs`; `osv-scanner` scans every `bun.lock` weekly, so a CVE still surfaces. The root `bun.lock` pins `typebox`, which the generator and the Pi extension tests import. If you bump it by hand, run `bun install` and commit the resulting `bun.lock` in the same change.
+Dependabot keeps the pinned action SHAs current. The vendored scripts' one runtime dependency (`commander`) follows upstream's pin and moves with `tools/sync.mjs`; `osv-scanner` scans every `bun.lock` weekly, so a CVE still surfaces. The root `bun.lock` pins `typebox`, which the generator and the Pi extension tests import, and `plugins/bun.lock` pins the copy of Pi the tests load. If you bump either by hand, run `bun install` in its directory and commit the resulting `bun.lock` in the same change.
 
 ## Releasing
 

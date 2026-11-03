@@ -1,6 +1,6 @@
 ---
 name: correct
-description: find the mistakes agents keep repeating in a repo and make each one impossible, enforced at the highest level that works
+description: "find the mistakes agents keep repeating in a repo and make each one impossible, enforced at the highest level that works"
 disable-model-invocation: true
 ---
 

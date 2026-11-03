@@ -147,9 +147,11 @@ export function resolveModel(
 
 export const GENERAL_PURPOSE = "general-purpose";
 
-interface AgentDefinition {
+export interface AgentDefinition {
   // The agent file it was read from; general-purpose has none.
   file?: string;
+  // When to use it, as the agent tool's type list shows it.
+  description?: string;
   body: string;
   model?: string;
   effort?: string;
@@ -171,7 +173,7 @@ function parseAgentFile(file: string, text: string): AgentDefinition {
   const { fields, body } = frontmatter(text);
   // Claude Code's `model: inherit` runs the agent on the parent's model, as no model does.
   const model = fields.get("model");
-  return { file, body, model: model && model !== "inherit" ? model : undefined, effort: fields.get("effort") || undefined };
+  return { file, description: fields.get("description") || undefined, body, model: model && model !== "inherit" ? model : undefined, effort: fields.get("effort") || undefined };
 }
 
 // The agent tool's effort parameter: one of models.json's levels.
@@ -185,7 +187,10 @@ export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile
 // the built-in general-purpose type, which has no agent file, and a user agent
 // file under its bare name. A user file only adds a type, never replaces one.
 export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "agentDir">): Map<string, AgentDefinition> {
-  const types = new Map<string, AgentDefinition>([[GENERAL_PURPOSE, { body: "" }]]);
+  // The built-in type's description is Claude Code's own.
+  const types = new Map<string, AgentDefinition>([
+    [GENERAL_PURPOSE, { body: "", description: "General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks." }],
+  ]);
   const dir = join(settings.pluginRoot, "agents");
   if (existsSync(dir)) {
     for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {

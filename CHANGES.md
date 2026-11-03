@@ -2,6 +2,16 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.121 - Pi agent type descriptions
+
+Two follow-ups to the Pi extension's `agent` tool from 0.9.120, and a fix to the live Pi suite.
+
+The `agent` tool's `subagent_type` description now lists each type on its own line with the `description:` from its agent file, as Claude Code's Agent tool does, so a model can tell when to use a type from `pstack-agents`. `general-purpose` shows Claude Code's description of its built-in type ([#371](https://github.com/michael-denyer/pstack-claude/pull/371)).
+
+When an agent file supplies the `model` or `effort`, only an error about that value now starts with the file's path. A `models.json` that cannot be read keeps its own message instead of reading as the agent file's fault ([#370](https://github.com/michael-denyer/pstack-claude/pull/370)).
+
+The live Pi suite's panel test no longer requires `opus`, `fable`, and `sonnet` to map to three different models. The `openai` and `openai-codex` tables map `opus` and `sonnet` to the same model, so the test failed on those providers ([#369](https://github.com/michael-denyer/pstack-claude/pull/369)).
+
 ## 0.9.120 - Pi agent file fixes
 
 Four fixes to the Pi extension's `agent` tool, for the gaps that [#357](https://github.com/michael-denyer/pstack-claude/pull/357) listed after 0.9.119 added user agent files.

@@ -61,7 +61,8 @@ fi
 echo "mcode $("$mcode" --version)"
 
 mkdir -p "$data/plugins"
-cp -R "$repo/plugins/pstack" "$data/plugins/pstack"
+# A checkout that ran the scripts' tests has node_modules no install carries.
+tar -C "$repo/plugins" --exclude node_modules -cf - pstack | tar -C "$data/plugins" -xf -
 
 list="$(MINIMAX_DATA_DIR="$data" "$mcode" plugin list --json)"
 entry="$(jq -c '.installed[] | select(.pluginId == "pstack@local")' <<<"$list")"

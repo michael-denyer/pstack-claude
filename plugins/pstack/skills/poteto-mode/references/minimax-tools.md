@@ -13,7 +13,7 @@ MiniMax Code loads the pstack Claude Code plugin through its Claude Code reader:
 | Search file contents / find files | `grep` (ripgrep syntax) and `glob` |
 | Fetch a URL | `web_fetch` |
 | Search the web | `web_search` |
-| Invoke a skill (the `Skill` tool, `/command`) | `skill` with `name` set to the plugin skill, as in `pstack:poteto-mode`. MiniMax Code lists each user-invocable skill as `/<name>` itself. |
+| Invoke a skill (the `Skill` tool, `/command`) | `skill` with `name` set to the plugin skill, as in `pstack:poteto-mode` |
 | Dispatch a subagent (the `Agent`/`Task` tool) | `task` with `description`, `prompt`, and `agent_name` |
 | Dispatch N parallel subagents in one turn | N `task` calls in one response |
 | Wait for a subagent result | End the turn. A `<background-task-finished>` notice wakes the session, and `task_output` with the `task_id` reads the result. |

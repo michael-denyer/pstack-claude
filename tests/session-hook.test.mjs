@@ -38,6 +38,13 @@ const runtimes = {
     env: (sheetRoot) => ({ CLAUDE_CONFIG_DIR: sheetRoot }),
   },
   "claude with PLUGIN_ROOT exported": { hooks: "claude", sheetDir: ".claude", env: () => ({ PLUGIN_ROOT: pluginRoot }) },
+  // Only MINIMAX_PLUGIN_ROOT marks a MiniMax Code session; a profile may export
+  // MINIMAX_DATA_DIR for every shell.
+  "claude with MINIMAX_DATA_DIR exported": {
+    hooks: "claude",
+    sheetDir: ".claude",
+    env: (sheetRoot) => ({ MINIMAX_DATA_DIR: join(sheetRoot, "..", "minimax-data") }),
+  },
   codex: { hooks: "codex", sheetDir: ".codex", env: () => ({}) },
   "codex with CODEX_HOME": {
     hooks: "codex",

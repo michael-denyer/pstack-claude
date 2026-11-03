@@ -80,7 +80,7 @@ export const RUNTIMES = [
     // agents, and hooks/hooks.json beside it, so the build has no manifest or
     // hooks file of its own.
     manifest: `${PLUGIN}/.claude-plugin/plugin.json`,
-    validate: ({ pathExists }) => validateMiniMaxPackage({ pathExists }),
+    validate: validateMiniMaxPackage,
   },
 ].map((runtime) => ({
   ...runtime,
@@ -195,10 +195,10 @@ export const MINIMAX_MANIFESTS = ["plugin.json", ".minimax-plugin/plugin.json", 
 // loads the plugin agents and hooks/hooks.json. A manifest earlier in the
 // order would switch MiniMax Code to another reader.
 export function validateMiniMaxPackage({ pathExists }) {
-  const read = MINIMAX_MANIFESTS.find((file) => pathExists(`${PLUGIN}/${file}`));
-  if (read !== ".claude-plugin/plugin.json") {
+  const first = MINIMAX_MANIFESTS.find((file) => pathExists(`${PLUGIN}/${file}`));
+  if (first !== ".claude-plugin/plugin.json") {
     throw new Error(
-      `${PLUGIN}/${read}: MiniMax Code reads this manifest instead of .claude-plugin/plugin.json, ` +
+      `${PLUGIN}/${first}: MiniMax Code reads this manifest instead of .claude-plugin/plugin.json, ` +
         "so it would stop loading pstack through its Claude Code reader",
     );
   }

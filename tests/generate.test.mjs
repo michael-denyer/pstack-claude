@@ -498,19 +498,20 @@ describe("lead lines", () => {
     for (const text of ["# X\n\nA.\n", "# X\n\nA."]) expect(stampLeadLine(text, "A.")).toBe(text);
   });
 
-  test("Codex, Copilot, and Muse stamp a preamble on their noted skills and Pi stamps none", () => {
-    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi", "GitHub Copilot", "Muse"]);
+  test("Codex, Copilot, and Muse stamp a preamble on their noted skills, and Pi and MiniMax Code stamp none", () => {
+    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi", "GitHub Copilot", "Muse", "MiniMax Code"]);
     expect(codex.preamble).toBe(
       "On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.",
     );
     expect(copilot.preamble).toBe(
       "On GitHub Copilot, read the [platform mapping](../poteto-mode/references/copilot-tools.md), including its per-skill notes, before following this skill.",
     );
-    expect(RUNTIMES.at(-1).preamble).toBe(
+    expect(RUNTIMES.find((r) => r.name === "Muse").preamble).toBe(
       "On Muse, read the [platform mapping](../poteto-mode/references/muse-tools.md), including its per-skill notes, before following this skill.",
     );
     expect(pi.preamble).toBeNull();
-    expect([...leads.values()].flat().filter((line) => line.includes("pi-tools.md"))).toEqual([]);
+    expect(RUNTIMES.find((r) => r.name === "MiniMax Code").preamble).toBeNull();
+    expect([...leads.values()].flat().filter((line) => /(?:pi|minimax)-tools\.md/.test(line))).toEqual([]);
   });
 
   test("a notes table lists its skills in row order and rejects a row without one", () => {
@@ -915,7 +916,10 @@ describe("plan, changes, apply", () => {
     const manifest = { $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", name: "pstack" };
     writeFileSync(join(root, "plugins/pstack/plugin.json"), JSON.stringify(manifest));
     const failure = "plugins/pstack/plugin.json exists; Codex then skips the hooks .codex-plugin/plugin.json names (#265)";
-    expect(problems(root)).toEqual([failure]);
+    expect(problems(root)).toEqual([
+      expect.stringContaining("plugins/pstack/plugin.json: MiniMax Code reads this manifest instead"),
+      failure,
+    ]);
     const check = generate(root, "--check");
     expect(check.status).toBe(1);
     expect(check.stderr).toContain(`FAIL: ${failure}\n`);

@@ -413,13 +413,14 @@ export function minimaxModelNamesSection(models) {
     "MiniMax Code names a model `<provider>/<model>`, and the models a session can reach depend on the providers the " +
     "user connected: MiniMax itself, OpenAI through its Codex sign-in, or a provider added with `mcode provider add`. " +
     "So the MiniMax Code build ships no default models, and the user picks them once.\n\n" +
-    "- The model sheet is `${MINIMAX_DATA_DIR:-~/.minimax}/pstack-models.md`. Before a skill that needs a role model " +
+    "- The model sheet is `~/.minimax/pstack-models.md`. Before a skill that needs a role model " +
     `(${roleSkills(models).map(code).join(", ")}), read it. With no sheet, load \`setup-pstack\` with the \`skill\` ` +
     "tool and finish it first.\n" +
     "- A role line in the sheet is the user's explicit model instruction, so pass it as the `task` tool's `model`. " +
-    "Pass the role's `@level`, or the sheet's `default effort`, as `effort`: the `task` tool fails a model other than " +
-    "the parent's that offers effort levels when `effort` is missing. A level the model does not offer takes its " +
-    "nearest level (MiniMax M3 offers only `on` and `off`). `inherit-parent` or `auto` omits `model` and `effort`.\n" +
+    "Pass the role's `@level`, or the sheet's `default effort`, as `effort`. The `task` tool fails a model other than " +
+    "the parent's that offers effort levels when `effort` is missing or names a level the model does not offer, " +
+    "such as `high` on MiniMax M3, which offers only `on` and `off`. When the level is not one the model offers, " +
+    "ask the user which to use. `inherit-parent` or `auto` omits `model` and `effort`.\n" +
     `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose.\n` +
     `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): ` +
     "the strongest model the user chose.\n" +

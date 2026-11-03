@@ -15,7 +15,8 @@ case "$runtime" in
     reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
   minimax)
-    sheet="${MINIMAX_DATA_DIR:-$HOME/.minimax}/pstack-models.md"
+    # MiniMax Code withholds MINIMAX_DATA_DIR from hooks and its bash tool.
+    sheet="$HOME/.minimax/pstack-models.md"
     reader="${MINIMAX_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
   codex)

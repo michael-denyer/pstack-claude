@@ -60,13 +60,13 @@ const runtimes = {
     env: (sheetRoot) => ({ COPILOT_PLUGIN_ROOT: pluginRoot, COPILOT_HOME: sheetRoot }),
   },
   // MiniMax Code runs Claude Code's hooks file and sets MINIMAX_PLUGIN_ROOT
-  // beside CLAUDE_PLUGIN_ROOT, and MINIMAX_DATA_DIR only when the user
-  // relocated ~/.minimax.
+  // beside CLAUDE_PLUGIN_ROOT. Its hooks get a fixed set of variables without
+  // MINIMAX_DATA_DIR, so the sheet stays in ~/.minimax even if one leaks in.
   minimax: { hooks: "claude", sheetDir: ".minimax", env: () => ({ MINIMAX_PLUGIN_ROOT: pluginRoot }) },
-  "minimax with MINIMAX_DATA_DIR": {
+  "minimax with MINIMAX_DATA_DIR exported": {
     hooks: "claude",
-    sheetDir: "minimax-data",
-    env: (sheetRoot) => ({ MINIMAX_PLUGIN_ROOT: pluginRoot, MINIMAX_DATA_DIR: sheetRoot }),
+    sheetDir: ".minimax",
+    env: (sheetRoot) => ({ MINIMAX_PLUGIN_ROOT: pluginRoot, MINIMAX_DATA_DIR: join(sheetRoot, "..", "minimax-data") }),
   },
 };
 

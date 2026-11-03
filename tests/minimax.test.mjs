@@ -30,6 +30,9 @@ mappingCoverage(minimax, [
   ["pstack:poteto-agent", "`pstack:poteto-agent`"],
   ["general-purpose", "`general-purpose`"],
   ["isolation: \"worktree\"", "`isolation: \"worktree\"`"],
+  [".claude/skills", "`.claude/skills/`"],
+  ["${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects", "`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`"],
+  ["`loop`", "`self_reminder`, set again after each check"],
 ]);
 
 describe("MiniMax Code packaging", () => {
@@ -55,7 +58,7 @@ describe("minimax-tools.md Model names", () => {
   });
 
   test("names the sheet, the task fields, and every skill that dispatches on a role model", () => {
-    expect(section).toContain("`${MINIMAX_DATA_DIR:-~/.minimax}/pstack-models.md`");
+    expect(section).toContain("`~/.minimax/pstack-models.md`");
     expect(section).toContain("the `task` tool's `model`");
     expect(section).toContain("as `effort`");
     for (const skill of roleSkills(models)) expect(section).toContain(`\`${skill}\``);

@@ -72,6 +72,16 @@ const rules = [
     phrase: "When several sessions share the checkout, name it `.audit/<task-slug>.todo.md`",
   },
   {
+    source: "#387 desktop app plan tool is named",
+    file: "poteto-mode/SKILL.md",
+    phrase: "In the Claude desktop app, `mcp__ccd_turn__update_plan` asks for items of about seven words.",
+  },
+  {
+    source: "#387 desktop app keeps the verbatim checklist",
+    file: "poteto-mode/SKILL.md",
+    phrase: "keep this checklist as well, with the playbook steps verbatim and each `skip: <reason>` line",
+  },
+  {
     source: "#58 stop before you re-delegate",
     file: "poteto-mode/SKILL.md",
     phrase: "Stop the abandoned agent first, and confirm it stopped.",

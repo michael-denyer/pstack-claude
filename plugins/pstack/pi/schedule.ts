@@ -1,9 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { readFileSync } from "node:fs";
 import { Type } from "typebox";
 
-import { frontmatter } from "./config.ts";
 import type { OneShot } from "./one-shot.ts";
+import { expandSlash } from "./slash.ts";
 
 const MIN_DELAY_S = 60;
 const MAX_DELAY_S = 3600;
@@ -15,41 +14,9 @@ const IDLE_RETRY_MS = 1000;
 // for, so a user message here would let the agent write its own permission.
 const AGENT_PROMPT_TYPE = "pstack-wakeup";
 const LOOP_COMMAND = /^\/loop(?:\s+([\s\S]*))?$/;
+type Send = (prompt: string) => void;
 
-// Pi expands "/skill:x args" and "/template args" only inside sendUserMessage and exposes no helper for
-// it, so the agent's slash text is expanded here from the files pi.getCommands() points at, the way
-// AgentSession._expandSkillCommand and expandPromptTemplate do (pi 1.4.0). An extension command stays
-// plain text: pi dispatches it only from a user message, and the agent must not run one as the user.
-function words(line: string): string[] {
-  return (line.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map((w) => w.replace(/^(["'])([\s\S]*)\1$/, "$2"));
-}
-
-// $1, $@, $ARGUMENTS, ${1:-default}, ${@:N} and ${@:N:L}, as pi's substituteArgs.
-function fillArgs(body: string, args: string[]): string {
-  return body.replace(/\$\{(\d+|ARGUMENTS|@):-([^}]*)\}|\$\{@:(\d+)(?::(\d+))?\}|\$(ARGUMENTS|@|\d+)/g, (_m, target, dflt, from, len, simple) => {
-    if (target) return (target === "@" || target === "ARGUMENTS" ? args.join(" ") : args[Number(target) - 1]) || dflt;
-    if (from) return args.slice(Math.max(0, Number(from) - 1), len ? Math.max(0, Number(from) - 1) + Number(len) : undefined).join(" ");
-    return simple === "@" || simple === "ARGUMENTS" ? args.join(" ") : (args[Number(simple) - 1] ?? "");
-  });
-}
-
-function expandSlash(pi: ExtensionAPI, text: string): string {
-  const m = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(text);
-  const named = m ? pi.getCommands().filter((c) => c.name === m[1]) : [];
-  const command = named.find((c) => c.source !== "extension");
-  if (!m || !command || named.some((c) => c.source === "extension")) return text;
-  try {
-    const { sourceInfo } = command;
-    if (!sourceInfo || (command.source === "skill" && !command.name.startsWith("skill:"))) return text;
-    const body = frontmatter(readFileSync(sourceInfo.path, "utf8")).body;
-    if (command.source === "prompt") return fillArgs(body, words(m[2] ?? ""));
-    const args = (m[2] ?? "").trim();
-    const block = `<skill name="${command.name.slice("skill:".length)}" location="${sourceInfo.path}">\nReferences are relative to ${sourceInfo.baseDir}.\n\n${body}\n</skill>`;
-    return args ? `${block}\n\n${args}` : block;
-  } catch {
-    return text;
-  }
-}
+const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const wakeupParams = Type.Object({
   delaySeconds: Type.Optional(Type.Number({ description: `Seconds until the wakeup (${MIN_DELAY_S}-${MAX_DELAY_S})` })),
@@ -60,9 +27,8 @@ const wakeupParams = Type.Object({
 });
 
 // One pending wakeup, one fixed-interval loop, and one live self-paced loop per
-// session. A fire delivers the prompt as a follow-up message, which runs at
-// once when the agent is idle. It is a user message when the user wrote the
-// prompt, and a custom message when the agent did.
+// session. A due wakeup or loop tick runs the delivery its caller chose, at
+// once when the agent is idle.
 export class Scheduler {
   private wakeup?: NodeJS.Timeout;
   private loop?: NodeJS.Timeout;
@@ -78,38 +44,19 @@ export class Scheduler {
   // ctx.isIdle(), which is also false during a manual compaction.
   running = false;
 
-  // Set by registerSchedule: runs a /loop command line on behalf of the agent. A wakeup that asks for
-  // "/loop ..." used to reach the command through a user message; a custom message does not run commands.
-  loopCommand?: (args: string, ctx: ExtensionContext) => Promise<void>;
-
-  constructor(private readonly pi: ExtensionAPI) {}
-
-  fire(prompt: string, fromAgent: boolean): void {
-    if (fromAgent) {
-      this.pi.sendMessage({ customType: AGENT_PROMPT_TYPE, content: expandSlash(this.pi, prompt), display: true }, { triggerTurn: true, deliverAs: "followUp" });
-      return;
-    }
-    this.pi.sendUserMessage(prompt, { deliverAs: "followUp", expandPromptTemplates: true });
-  }
-
-  scheduleWakeup(seconds: number, prompt: string, ctx: ExtensionContext, fromAgent: boolean): void {
+  scheduleWakeup(seconds: number, deliver: () => void, ctx: ExtensionContext): void {
     this.cancelWakeup();
-    const deliver = () => {
+    const due = () => {
       // Pi rejects prompts during manual compaction. Keep the wakeup pending
       // until idle, including while a run or compaction is still finishing.
       if (!ctx.isIdle()) {
-        this.wakeup = setTimeout(deliver, IDLE_RETRY_MS).unref();
+        this.wakeup = setTimeout(due, IDLE_RETRY_MS).unref();
         return;
       }
       this.wakeup = undefined;
-      const loop = fromAgent ? LOOP_COMMAND.exec(prompt) : null;
-      if (loop && this.loopCommand) {
-        this.loopCommand(loop[1] ?? "", ctx).catch((e) => ctx.ui.notify(`/loop from a wakeup failed: ${e instanceof Error ? e.message : String(e)}`, "error"));
-        return;
-      }
-      this.fire(prompt, fromAgent);
+      deliver();
     };
-    this.wakeup = setTimeout(deliver, seconds * 1000);
+    this.wakeup = setTimeout(due, seconds * 1000);
     this.wakeup.unref();
   }
 
@@ -120,9 +67,9 @@ export class Scheduler {
     return had;
   }
 
-  startLoop(seconds: number, prompt: string, ctx: ExtensionContext, fromAgent: boolean): void {
+  startLoop(seconds: number, tick: () => void, ctx: ExtensionContext): void {
     // A tick that lands mid-run is dropped, so a slow iteration cannot pile up a backlog.
-    this.loop = setInterval(() => ctx.isIdle() && this.fire(prompt, fromAgent), seconds * 1000);
+    this.loop = setInterval(() => ctx.isIdle() && tick(), seconds * 1000);
     this.loop.unref();
   }
 
@@ -185,6 +132,22 @@ function dynamicPrompt(prompt: string): string {
 
 // model-only exposure keeps the tool declared under codemode.mode "only".
 export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot: OneShot): void {
+  // The prompt's author picks the role: the user's /loop sends user messages, and text the agent chose
+  // goes in as a custom message, which the permission classifier does not read as the user's ask. Pi
+  // expands slash text only in a user message, so the agent's is expanded before it is sent.
+  const sendAsUser: Send = (prompt) => pi.sendUserMessage(prompt, { deliverAs: "followUp", expandPromptTemplates: true });
+  const sendAsAgent =
+    (ctx: ExtensionContext): Send =>
+    (prompt) => {
+      let content = prompt;
+      try {
+        content = expandSlash(pi.getCommands(), prompt);
+      } catch (e) {
+        ctx.ui.notify(`A wakeup's command could not be expanded and was sent as written: ${errorText(e)}`, "error");
+      }
+      pi.sendMessage({ customType: AGENT_PROMPT_TYPE, content, display: true }, { triggerTurn: true, deliverAs: "followUp" });
+    };
+
   pi.registerTool({
     name: "schedule_wakeup",
     label: "Schedule wakeup",
@@ -212,7 +175,14 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
         throw new Error(`schedule_wakeup cannot fire in a ${ctx.mode} run: pi exits when this run ends. Finish the work in this run instead.`);
       }
       const seconds = clampDelay(params.delaySeconds);
-      scheduler.scheduleWakeup(seconds, params.prompt, ctx, true);
+      // A custom message runs no command, so the agent's "/loop ..." re-arm runs the loop here.
+      const prompt = params.prompt;
+      const send = sendAsAgent(ctx);
+      const loop = LOOP_COMMAND.exec(prompt);
+      const deliver = loop
+        ? () => void runLoop(loop[1] ?? "", ctx, send).catch((e) => ctx.ui.notify(`/loop from a wakeup failed: ${errorText(e)}`, "error"))
+        : () => send(prompt);
+      scheduler.scheduleWakeup(seconds, deliver, ctx);
       const fireAt = new Date(Date.now() + seconds * 1000).toISOString();
       const clamped = seconds !== params.delaySeconds ? ` (clamped from ${params.delaySeconds})` : "";
       return {
@@ -230,8 +200,7 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
     scheduler.sealed = false;
   });
 
-  // fromAgent: the line came from a wakeup the agent scheduled, not from the user typing /loop.
-  async function runLoop(args: string, ctx: ExtensionContext, fromAgent: boolean): Promise<void> {
+  async function runLoop(args: string, ctx: ExtensionContext, send: Send): Promise<void> {
     const cmd = parseLoop(args);
     // Also true during a manual compaction, which no run is behind: the first
     // prompt then waits for idle, but only a run in flight seals the slot.
@@ -243,17 +212,17 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
       // prompt takes the slot and runs once that run has settled. Its own
       // re-arm then comes from a later run and is not refused.
       if (midRun) {
-        scheduler.scheduleWakeup(0, prompt, ctx, fromAgent);
+        scheduler.scheduleWakeup(0, () => send(prompt), ctx);
         ctx.ui.notify("The loop starts once the session is idle.", "info");
         return;
       }
       if (!oneShot.exits(ctx)) {
-        scheduler.fire(prompt, fromAgent);
+        send(prompt);
         return;
       }
       await oneShot.assertStartsRun(prompt, ctx);
       const settled = oneShot.untilSettled();
-      scheduler.fire(prompt, fromAgent);
+      send(prompt);
       await settled;
     };
     switch (cmd.kind) {
@@ -266,7 +235,7 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
       case "fixed": {
         const seconds = Math.max(MIN_DELAY_S, cmd.seconds);
         scheduler.stopAll(scheduler.running);
-        scheduler.startLoop(seconds, cmd.prompt, ctx, fromAgent);
+        scheduler.startLoop(seconds, () => send(cmd.prompt), ctx);
         ctx.ui.notify(`Looping every ${seconds}s. /loop stop ends it.`, "info");
         await fire(cmd.prompt);
         return;
@@ -277,10 +246,9 @@ export function registerSchedule(pi: ExtensionAPI, scheduler: Scheduler, oneShot
         await fire(dynamicPrompt(cmd.prompt));
     }
   }
-  scheduler.loopCommand = (args, ctx) => runLoop(args, ctx, true);
 
   pi.registerCommand("loop", {
     description: "Run a prompt on an interval (/loop 5m <prompt>), self-paced (/loop <prompt>), or stop (/loop stop)",
-    handler: (args, ctx) => runLoop(args, ctx, false),
+    handler: (args, ctx) => runLoop(args, ctx, sendAsUser),
   });
 }

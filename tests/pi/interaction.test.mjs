@@ -224,11 +224,16 @@ describe("schedule_wakeup", () => {
     }
     jest.advanceTimersByTime(3 * 60_000);
     expect(pi.userMessages).toEqual([]);
-    expect(woken(pi)[0]).toBe("check CI");
-    expect(woken(pi)[1]).toBe("/skill:babysit 42");
-    expect(woken(pi)[2]).toContain("watch PR 42\n");
-    expect(woken(pi).slice(3).length).toBeGreaterThan(0);
-    expect(woken(pi).slice(3).every((c) => c === "tick")).toBe(true);
+    // The fixed loop sends "tick" when its wakeup fires, then once a minute for three minutes.
+    expect(woken(pi)).toEqual([
+      "check CI",
+      "/skill:babysit 42",
+      expect.stringContaining("watch PR 42\n\n[/loop, self-paced] "),
+      "tick",
+      "tick",
+      "tick",
+      "tick",
+    ]);
   });
 
   // Pi expands a skill or template only inside a user message, so the wakeup does it and sends the result as its own.
@@ -246,17 +251,23 @@ describe("schedule_wakeup", () => {
     );
     pi.commands.set("clash", {});
     pi.slashCommands.push({ name: "clash", source: "prompt", sourceInfo: { path: join(dir, "other.md") } });
-    for (const prompt of ["/skill:babysit PR 42", "/review a 'b c' d", "/clash x", "/skill:gone", "/skill:unknown y", "/nothing"]) {
-      await wake(pi, ctx, { delaySeconds: 60, prompt });
+    const ui = scriptedUi([]);
+    for (const prompt of ["/skill:babysit PR 42", "/review a 'b c' d", '/review --title="fix bug" 42', "/clash x", "/skill:gone", "/skill:unknown y", "/nothing"]) {
+      await wake(pi, { ...ctx, ui }, { delaySeconds: 60, prompt });
       jest.advanceTimersByTime(60_000);
     }
     expect(pi.userMessages).toEqual([]);
     expect(pi.messages.every((m) => m.message.customType === "pstack-wakeup" && m.options.triggerTurn)).toBe(true);
-    const [skill, template, ...plain] = woken(pi);
+    const [skill, template, quoted, ...plain] = woken(pi);
     expect(skill).toBe(`<skill name="babysit" location="${join(dir, "SKILL.md")}">\nReferences are relative to ${dir}.\n\nSKILL-BODY-MARKER watch the PR\n</skill>\n\nPR 42`);
     expect(template).toBe("TEMPLATE-MARKER first=a rest=b c d all=a b c d");
+    // As pi's parser: a quote inside a word joins it with the quoted text.
+    expect(quoted).toBe("TEMPLATE-MARKER first=--title=fix bug rest=42 all=--title=fix bug 42");
     // An extension command is never run for the agent, and an unknown or unreadable one is left as typed.
     expect(plain).toEqual(["/clash x", "/skill:gone", "/skill:unknown y", "/nothing"]);
+    expect(ui.calls.filter((c) => c.kind === "notify").map((c) => c.message)).toEqual([
+      expect.stringMatching(/^A wakeup's command could not be expanded and was sent as written: ENOENT.*missing\.md/),
+    ]);
   });
 
   test("a loop the agent re-arms with a skill sends it expanded on every tick", async () => {
@@ -517,9 +528,9 @@ describe("/loop", () => {
     expect(resultText(wake)).toContain("Wakeup scheduled");
   });
 
-  for (const [what, started, prompt] of [
-    ["a live loop's re-arm in other words than its prompt", "watch  PR 42", "/loop Watch PR 42."],
-    ["a /loop prompt with no loop started", null, "/loop babysit PR 42"],
+  for (const [what, started, prompt, sent] of [
+    ["a live loop's re-arm in other words than its prompt", "watch  PR 42", "/loop Watch PR 42.", "Watch PR 42."],
+    ["a /loop prompt with no loop started", null, "/loop babysit PR 42", "babysit PR 42"],
   ]) {
     test(`with no /loop command during the run, a wakeup is scheduled whatever its prompt says: ${what}`, async () => {
       const { pi, ctx, run } = loop();
@@ -527,8 +538,8 @@ describe("/loop", () => {
       expect(resultText(await pi.call("schedule_wakeup", { delaySeconds: 60, prompt }, ctx))).toContain("Wakeup scheduled");
       jest.advanceTimersByTime(60_000);
       // The wakeup's /loop line runs the command for the agent; its prompt goes out as the agent's.
-      expect(woken(pi).at(-1)).toContain(prompt.replace(/^\/loop\s+/, "").replace(/\.$/, ""));
-      expect(pi.userMessages.every((m) => m.content !== prompt)).toBe(true);
+      expect(woken(pi)).toEqual([expect.stringContaining(`${sent}\n\n[/loop, self-paced] `)]);
+      expect(pi.userMessages.map((m) => m.content)).toEqual(started ? [expect.stringContaining(`${started}\n\n[/loop, self-paced] `)] : []);
     });
   }
 

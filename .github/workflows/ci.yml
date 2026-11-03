@@ -171,8 +171,8 @@ jobs:
       - name: Install test dependencies
         run: bun install --frozen-lockfile
       # These checks make no model calls. Missing Pi fails instead of skipping.
-      - name: Check the model catalog and child startup against Pi
-        run: bun test tests/pi/catalog.test.mjs tests/pi/runtime.test.mjs
+      - name: Check the model catalog, child startup, and slash expansion against Pi
+        run: bun test tests/pi/catalog.test.mjs tests/pi/runtime.test.mjs tests/pi/slash.test.mjs
         env:
           PSTACK_PI_REQUIRE_CATALOG: "1"
           PSTACK_PI_REQUIRE_RUNTIME: "1"

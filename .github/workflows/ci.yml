@@ -26,6 +26,9 @@ jobs:
           bun-version: "1.4.4"
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Install the copy of Pi the tests load
+        run: bun install --frozen-lockfile
+        working-directory: plugins
       - name: Check generated files and plugin invariants
         run: bun tools/generate.mjs --check
       - name: Tool and invariant fixture tests
@@ -71,6 +74,9 @@ jobs:
           bun-version: "1.4.4"
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Install the copy of Pi the tests load
+        run: bun install --frozen-lockfile
+        working-directory: plugins
       - name: Test the worktree audit
         run: bun test --timeout 30000 tests/worktree-audit.test.mjs
 
@@ -168,14 +174,18 @@ jobs:
       # --before holds Pi's dependencies to the versions published by that
       # date, since Pi releases after 1.0.0 ship no npm-shrinkwrap.json. Move
       # the date with the version. The job has read-only permissions and no
-      # secrets. A lockfile here would put Pi's whole dependency tree under
-      # this repository's dependency scans.
+      # secrets. The copy in plugins/bun.lock, which the tests load the
+      # extension against, is the latest release; this job checks the oldest
+      # one the port supports.
       - name: Install Pi
         run: npm install -g --ignore-scripts --before=2026-10-11 @earendil-works/pi-coding-agent@1.1.0 # zizmor: ignore[adhoc-packages]
       - name: Typecheck the extension against Pi
         run: bun tools/typecheck-pi.mjs
       - name: Install test dependencies
         run: bun install --frozen-lockfile
+      - name: Install the copy of Pi the tests load
+        run: bun install --frozen-lockfile
+        working-directory: plugins
       # These checks make no model calls. Missing Pi fails instead of skipping.
       - name: Check the model catalog, child startup, and slash expansion against Pi
         run: bun test tests/pi/catalog.test.mjs tests/pi/runtime.test.mjs tests/pi/slash.test.mjs
@@ -405,5 +415,8 @@ jobs:
           bun-version: "1.4.4"
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Install the copy of Pi the tests load
+        run: bun install --frozen-lockfile
+        working-directory: plugins
       - name: Test the worktree audit
         run: bun test --timeout 30000 tests/worktree-audit.test.mjs

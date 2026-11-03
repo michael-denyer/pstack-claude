@@ -302,7 +302,7 @@ suite("pstack on live pi", () => {
   );
 
   test(
-    "wake: schedule_wakeup re-invokes the parent with the stored prompt after 60 s",
+    "wake: schedule_wakeup re-invokes the parent with the stored prompt after 60 s, as a custom message, not a user message",
     async () => {
       await withParent(async (parent) => {
         const wakePrompt = "WAKE-PING: reply with exactly one word: pong";
@@ -312,7 +312,7 @@ suite("pstack on live pi", () => {
         const [scheduled] = parent.toolResults("schedule_wakeup", from);
         expect(scheduled.details.delaySeconds).toBe(60);
         const fired = await parent.until(
-          () => parent.messages(from).find((m) => m.role === "user" && textOf(m) === wakePrompt),
+          () => parent.messages(from).find((m) => m.role === "custom" && m.customType === "pstack-wakeup" && textOf(m) === wakePrompt),
           2 * MINUTE,
           "the wakeup prompt",
         );

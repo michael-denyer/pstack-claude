@@ -11,7 +11,7 @@ import { registerSchedule, Scheduler } from "./schedule.ts";
 
 export function install(pi: ExtensionAPI, settings: Settings): void {
   const runner = new AgentRunner(pi, settings);
-  const scheduler = new Scheduler(pi);
+  const scheduler = new Scheduler();
   const oneShot = registerOneShot(pi, settings, runner);
   registerAgentTools(pi, runner, settings);
   if (!readSheet(settings.agentDir)?.askToolOff) registerAsk(pi, oneShot);

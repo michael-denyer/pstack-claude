@@ -1,0 +1,10 @@
+{
+  "pstack-routing": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "./hooks/agy-session-start.sh"
+      }
+    ]
+  }
+}

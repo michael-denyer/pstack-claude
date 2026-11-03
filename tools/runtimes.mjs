@@ -82,6 +82,14 @@ export const RUNTIMES = [
     manifest: `${PLUGIN}/.claude-plugin/plugin.json`,
     validate: validateMiniMaxPackage,
   },
+  {
+    name: "Antigravity",
+    mapping: "agy-tools.md",
+    modelNames: agyModelNamesSection,
+    manifest: `${PLUGIN}/.antigravity-plugin/plugin.json`,
+    validate: ({ manifest, read, pathExists }) =>
+      validateAgyManifest(manifest, { claude: JSON.parse(read(`${PLUGIN}/.claude-plugin/plugin.json`)), pathExists }),
+  },
 ].map((runtime) => ({
   ...runtime,
   tools: `${SKILLS}/poteto-mode/references/${runtime.mapping}`,
@@ -429,5 +437,31 @@ export function minimaxModelNamesSection(models) {
     "reachable, vary reasoning effort and note in the verdict that diversity was reduced.\n\n" +
     "`/setup-pstack` writes the configured model list. On MiniMax Code, list the models with `mcode provider list` " +
     "or the `model` slash command and write only keys they show."
+  );
+}
+
+export function validateAgyManifest(manifest, { claude, pathExists }) {
+  const at = `${PLUGIN}/.antigravity-plugin/plugin.json`;
+  if (manifest.name !== claude.name) throw new Error(`${at}: name "${manifest.name}" != Claude Code manifest name "${claude.name}"`);
+  for (const path of ["hooks.json", "hooks/agy-session-start.sh", "hooks/session-start-agy.md"]) {
+    if (!pathExists(`${PLUGIN}/${path}`)) throw new Error(`${at}: ${path} does not exist in the plugin`);
+  }
+}
+
+export function agyModelNamesSection(models) {
+  return (
+    "Skills name Claude Code model aliases in their Models sections. On Antigravity (`agy`), `invoke_subagent`'s " +
+    "`Model` parameter accepts `inherit` (default, uses the parent's model), `flash_lite`, `flash`, and `pro`.\n\n" +
+    "- The model sheet is `~/.gemini/config/pstack-models.md`. Before a skill that needs a role model " +
+    `(${roleSkills(models).map(code).join(", ")}), read it. With no sheet, read \`setup-pstack\`'s \`SKILL.md\` ` +
+    "and finish it first.\n" +
+    "- A role line in the sheet is the user's explicit model instruction, so pass it as `invoke_subagent`'s `Model` " +
+    "(`inherit`, `flash_lite`, `flash`, or `pro`). `inherit-parent` or `auto` maps to `inherit` (or omits `Model`).\n" +
+    `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose (for example \`flash\`).\n` +
+    `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): ` +
+    "the strongest model the user chose (for example `pro`).\n" +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): vary across available " +
+    "`Model` tiers (`pro`, `flash`, `inherit`) and note in the verdict when diversity is reduced.\n\n" +
+    "`/setup-pstack` writes the configured model list to `~/.gemini/config/pstack-models.md`."
   );
 }

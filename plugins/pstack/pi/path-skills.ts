@@ -2,7 +2,8 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, matchesGlob, relative, resolve } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { frontmatter, type Settings } from "./config.ts";
+import { frontmatter } from "./agent-files.ts";
+import type { Settings } from "./config.ts";
 
 const FILE_TOOLS = new Set(["read", "edit", "write"]);
 
@@ -12,16 +13,9 @@ interface PathSkill {
   globs: string[];
 }
 
-function parsePaths(file: string, line: string): string[] {
-  const fault = new Error(`${file}: paths must be a JSON array of globs`);
-  let globs: unknown;
-  try {
-    globs = JSON.parse(line);
-  } catch {
-    throw fault;
-  }
+function parsePaths(file: string, globs: unknown): string[] {
   if (Array.isArray(globs) && globs.every((g): g is string => typeof g === "string")) return globs;
-  throw fault;
+  throw new Error(`${file}: paths must be a JSON array of globs`);
 }
 
 // Skills whose frontmatter names `paths:` globs, the files that should load them.
@@ -32,8 +26,8 @@ function pathSkills(pluginRoot: string): PathSkill[] {
   for (const name of readdirSync(dir).sort()) {
     const file = join(dir, name, "SKILL.md");
     if (!existsSync(file)) continue;
-    const line = frontmatter(readFileSync(file, "utf8")).fields.get("paths");
-    if (line) skills.push({ name, file, globs: parsePaths(file, line) });
+    const globs = frontmatter(readFileSync(file, "utf8")).fields.paths;
+    if (globs != null) skills.push({ name, file, globs: parsePaths(file, globs) });
   }
   return skills;
 }

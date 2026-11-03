@@ -13,7 +13,6 @@ const scriptsDirectory = join(import.meta.dir, "..");
 for (const [name, entry] of [
   ["watch-pr", "watch-pr/watch-pr"],
   ["ship-pr", "watch-pr/ship-pr"],
-  ["orch", "orch/orch.ts"],
 ]) {
   it(`${name} --help runs on the first run after an install`, () => {
     const copy = mkdtempSync(join(tmpdir(), "poteto-mode-scripts-"));

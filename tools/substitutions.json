@@ -475,28 +475,28 @@
       "rationale": "Claude Code runs subagents locally; a worktree per writer gives the isolation a cloud VM gave"
     },
     {
-      "pattern": "- **Sub-coordinator.** Always local, durable,",
+      "pattern": "Keep the program's state in the Project tracker (`notes.md`) and the Project store.",
       "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
-      "replacement": "- **Sub-coordinator.** Durable,",
-      "rationale": "every Claude Code subagent is local, so the placement word distinguishes nothing"
+      "replacement": "Keep the program's state in a store under `~/.claude/orchestrate/<slug>/`, outside the repo, with `notes.md` as its tracker.",
+      "rationale": "Claude Code has no Project tracker or Project store, so the port keeps the program's state in a directory that outlives the session"
     },
     {
-      "pattern": "spawns its own workers and verifiers (nesting works to depth 3, and a nested spawn has the full Task schema including `environment`).",
+      "pattern": "Run workers on a new cloud VM (`environment: \"cloud\"`) unless the work needs this machine: a `control-ui` or `control-cli` runtime check (from `cursor-team-kit`), local transcripts, a simulator, or auth that exists only here.",
       "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
-      "replacement": "spawns its own workers and verifiers where the runtime lets a subagent spawn one. Where it does not, it owns its track's units directly with the same review separation.",
-      "rationale": "Claude Code subagents cannot always spawn subagents, and the Agent tool has no environment parameter"
-    },
-    {
-      "pattern": "- **Worker / verifier.** Always `environment: \"cloud\"` unless the task needs this machine: `control-ui` or `control-cli` runtime verification (from `cursor-team-kit`). Reading local transcripts under `agent-transcripts/`. Simulators and local IDE state. Auth that exists only here. Cloud agents cannot read the local store, so their briefs inline what they need or point at repo paths.",
-      "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
-      "replacement": "- **Worker / verifier.** Background subagents (`run_in_background: true`). Claude Code has no remote worker environment, so isolation is a worktree or branch per writer, not a separate machine. Runtime verification goes through the driver skill. The brief names its resolved skill path or exact commands. A subagent never sees this chat, so its brief inlines what it needs or points at repo and store paths.",
+      "replacement": "Run workers as background subagents (`run_in_background: true`). Claude Code has no remote worker environment, so give each writer its own worktree or branch, and run runtime checks through the driver skill.",
       "rationale": "Claude Code runs every subagent on this machine, so the cloud placement rule becomes a worktree rule"
     },
     {
-      "regex": "(?:Restacks|Chain rebases) run in cloud\\. A local (?:restack|rebase) at this scale takes the laptop down\\.",
+      "pattern": "a control-skill check",
       "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
-      "replacement": "A chain rebase at this scale is slow and blocks whoever runs it, so give it its own unit and keep the coordinator out of it.",
-      "rationale": "Claude Code has no cloud placement for a long rebase, so the rule isolates it as a unit instead"
+      "replacement": "a driver-skill check",
+      "rationale": "driver selection lives in poteto-mode/SKILL.md Non-negotiables, and the port calls the skill the driver skill"
+    },
+    {
+      "pattern": "**Fork when new work needs a worker's built state,** such as its checkout, uncommitted changes, or a running process.",
+      "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
+      "replacement": "**When new work needs a worker's built state,** such as its checkout or uncommitted changes, start a fresh worker in that worker's worktree. A Claude Code fork copies the coordinator, not the worker.",
+      "rationale": "Claude Code's fork subagent inherits the caller's context, so it cannot take over a worker's checkout; a fresh worker in that worktree can"
     },
     {
       "pattern": "re-reads this playbook from trunk",
@@ -526,6 +526,14 @@
     }
   ],
   "denylist": [
+    {
+      "token": "Project tracker",
+      "hint": "Cursor's Project tracker; the port keeps program state under ~/.claude/orchestrate/<slug>/, so add a substitution rule for the phrase"
+    },
+    {
+      "token": "Project store",
+      "hint": "Cursor's Project store; the port keeps program state under ~/.claude/orchestrate/<slug>/, so add a substitution rule for the phrase"
+    },
     {
       "token": "grok-",
       "hint": "Cursor model slug; point at the Models section, or add a substitution rule for the phrase"

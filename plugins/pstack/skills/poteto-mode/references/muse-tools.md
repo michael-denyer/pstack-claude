@@ -98,7 +98,7 @@ Affected skill entry points point here. Most skills need only the tables above. 
 
 ## Vendored scripts
 
-`skills/poteto-mode/scripts/` ships the `watch-pr` PR watcher, the `orch` store CLI, and `worktree-audit.mjs`. These scripts use bun and Node.js and run the same on Muse; invoke them through `bash`. They need `bun` and `gh`, or `origin` when the forge is Origin. Run `worktree-audit.mjs` with `node`, as its shebang does. The audit finds each worktree's last chat only in the transcript directories that exist (Claude Code, Codex, Pi); it does not scan Muse sessions, so pass a Muse sessions directory explicitly when a worktree's last chat was a Muse one. It imports the transcript walker from the `reflect` skill, so keep the `reflect` skill installed beside `poteto-mode`.
+`skills/poteto-mode/scripts/` ships the `watch-pr` PR watcher and `worktree-audit.mjs`. These scripts use bun and Node.js and run the same on Muse; invoke them through `bash`. They need `bun` and `gh`, or `origin` when the forge is Origin. Run `worktree-audit.mjs` with `node`, as its shebang does. The audit finds each worktree's last chat only in the transcript directories that exist (Claude Code, Codex, Pi); it does not scan Muse sessions, so pass a Muse sessions directory explicitly when a worktree's last chat was a Muse one. It imports the transcript walker from the `reflect` skill, so keep the `reflect` skill installed beside `poteto-mode`.
 
 ## Instructions file
 

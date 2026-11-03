@@ -46,7 +46,9 @@ const flag = (name) => {
 };
 const sessionId = flag("--session-id");
 const sessionDir = flag("--session-dir");
-const systemFile = flag("--append-system-prompt");
+const appended = argv.flatMap((arg, i) => (arg === "--append-system-prompt" ? [argv[i + 1]] : []));
+const activeAgent = appended.find((text) => text.startsWith("<active_agent "))?.match(/name="([^"]*)"/)?.[1];
+const systemFile = appended.find((text) => !text.startsWith("<active_agent "));
 
 const log = (record) => appendFileSync(logPath, JSON.stringify(record) + "\n");
 let held;
@@ -211,6 +213,7 @@ log({
   pid: process.pid,
   depth: flag("--pstack-depth") ?? null,
   parentSession: process.env.PI_SUBAGENT_PARENT_SESSION ?? null,
+  activeAgent: activeAgent ?? null,
   path: process.env.PATH ?? null,
   // As pi: a value that names no file is appended as the prompt text itself.
   systemPrompt: systemFile && existsSync(systemFile) ? readFileSync(systemFile, "utf8") : (systemFile ?? null),

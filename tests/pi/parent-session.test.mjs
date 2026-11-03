@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
-import { fakeCtx, fakePi, restore, useWorld, waitFor } from "./harness.mjs";
+import { agentBody, fakeCtx, fakePi, restore, useWorld, waitFor } from "./harness.mjs";
 
 const setup = useWorld();
 const ENV = "PI_SUBAGENT_PARENT_SESSION";
@@ -16,6 +16,14 @@ describe("parent session for children", () => {
     await pi.call("agent", { description: "b", prompt: "x", subagent_type: "pstack:poteto-agent" }, ctx);
     expect(w.invocations().map((inv) => inv.parentSession)).toEqual(["parent-session", "parent-session"]);
     expect(w.invocations().every((inv) => inv.path === process.env.PATH)).toBe(true);
+  });
+
+  test("a child's system prompt carries an active_agent tag with its agent type, the name 42.0.0 shows the parent for a forwarded ask", async () => {
+    const { w, pi, ctx } = setup();
+    await pi.call("agent", { description: "a", prompt: "x" }, ctx);
+    await pi.call("agent", { description: "b", prompt: "x", subagent_type: "pstack:poteto-agent" }, ctx);
+    expect(w.invocations().map((inv) => inv.activeAgent)).toEqual(["general-purpose", "pstack:poteto-agent"]);
+    expect(w.invocations()[1].systemPrompt).toBe(agentBody("agents/poteto-agent.md"));
   });
 
   test("a child that is itself a parent names its own session, not the one that started it", async () => {

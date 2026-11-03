@@ -6,7 +6,7 @@ This file is the release changelog, with one `## <version> - <title>` entry per 
 
 Two follow-ups to the Pi extension's `agent` tool from 0.9.120, and a fix to the live Pi suite.
 
-The `agent` tool's `subagent_type` description now lists each type on its own line with the `description:` from its agent file, as Claude Code's Agent tool does, so a model can tell when to use a type from `pstack-agents`. `general-purpose` shows Claude Code's description of its built-in type ([#371](https://github.com/michael-denyer/pstack-claude/pull/371)).
+The `agent` tool's `subagent_type` description now lists each type with the `description:` from its agent file, as Claude Code's Agent tool does, so a model can tell when to use a type from `pstack-agents`. A `description:` on one line or as a YAML `|` or `>` block, as Claude Code agent files often write it, reads as its text. `general-purpose` shows Claude Code's description of its built-in type ([#371](https://github.com/michael-denyer/pstack-claude/pull/371)).
 
 When an agent file supplies the `model` or `effort`, only an error about that value now starts with the file's path. A `models.json` that cannot be read keeps its own message instead of reading as the agent file's fault ([#370](https://github.com/michael-denyer/pstack-claude/pull/370)).
 

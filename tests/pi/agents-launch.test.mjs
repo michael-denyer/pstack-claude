@@ -89,6 +89,21 @@ describe("agent tool", () => {
     expect(lines).toEqual(expect.arrayContaining([expect.stringMatching(/^- general-purpose \(default\): \S/), ...pluginLines, "- scout: Finds files fast.", "- plain"]));
   });
 
+  test("a description: written as a YAML block scalar reads as its text, and the keys after it still read", async () => {
+    const { w, ctx } = setup();
+    const dir = join(w.agentDir, "pstack-agents");
+    mkdirSync(dir);
+    writeFileSync(join(dir, "literal.md"), "---\nname: literal\ndescription: |\n  Use when X.\n\n  Then Y.\neffort: low\n---\nL.\n");
+    writeFileSync(join(dir, "folded.md"), "---\ndescription: >-\n  Reviews code\n  for bugs.\n\n  Says why.\nmodel: gw/folded\n---\nF.\n");
+    const pi = await restore(w, []);
+    const { description } = pi.tools.get("agent").parameters.properties.subagent_type;
+    expect(description).toContain("\n- folded: Reviews code for bugs.\nSays why.\n");
+    expect(description).toContain("\n- literal: Use when X.\n\nThen Y.\n");
+    await pi.call("agent", { description: "l", prompt: "x", subagent_type: "literal" }, ctx);
+    await pi.call("agent", { description: "f", prompt: "x", subagent_type: "folded" }, ctx);
+    expect(w.invocations().map((inv) => [flag(inv, "--thinking"), flag(inv, "--model")])).toEqual([["low", "anthropic/parent-model"], ["medium", "gw/folded"]]);
+  });
+
   test("the effort parameter passes --thinking to any agent type, keeps a pstack agent's body as a 0600 system prompt file, and no effort runs at the parent's level", async () => {
     const { w, pi, ctx } = setup();
     await pi.call("agent", { description: "e", prompt: "x", subagent_type: "general-purpose", effort: "xhigh" }, ctx);

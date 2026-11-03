@@ -181,6 +181,14 @@ describe("shared Agent Skills tree", () => {
   }
 
   test.each([
+    ["bare parentheses", "[guide](references/guide(v1).md)", "guide(v1).md"],
+    ["nested bare parentheses", "[guide](references/guide(v(1)).md)", "guide(v(1)).md"],
+    ["escaped parentheses", String.raw`[guide](references/guide\(v1\).md)`, "guide(v1).md"],
+    ["escaped closing parenthesis", String.raw`[guide](references/guide\).md)`, "guide).md"],
+    ["bare parentheses and a title", '[guide](references/guide(v1).md "Guide (v1)")', "guide(v1).md"],
+    ["a quoted title with an unmatched parenthesis", '[guide](references/guide(v1).md "Guide (v1")', "guide(v1).md"],
+    ["a single-quoted title", "[guide](references/guide(v1).md 'Guide )')", "guide(v1).md"],
+    ["a parenthesized title", "[guide](references/guide(v1).md (Guide))", "guide(v1).md"],
     ["parentheses", "[guide](<references/guide(v1).md>)", "guide(v1).md"],
     ["spaces and a title", '[guide]( \t<references/guide (v1).md> "Guide (v1)")', "guide (v1).md"],
     ["an unmatched parenthesis", "[guide](<references/guide).md>)", "guide).md"],
@@ -191,6 +199,37 @@ describe("shared Agent Skills tree", () => {
     withSkillTree(
       { "example/SKILL.md": `${markdown}\n`, [`example/references/${filename}`]: "# Guide\n" },
       (root) => expect(() => validateSkillsTree(root)).not.toThrow(),
+    );
+  });
+
+  test.each([
+    ["references/missing(v1).md", "missing"],
+    [String.raw`references/missing\).md`, "missing"],
+    ["references/missing%GG(v1).md", "invalid URI encoding"],
+    ["../../outside(v1).md", "escapes skills tree"],
+  ])("invalid bare destinations are checked in full: %s", (target, reason) => {
+    withSkillTree({ "example/SKILL.md": `[guide](${target})\n` }, (root) => {
+      const decoded = target.replaceAll("\\", "");
+      expect(() => validateSkillsTree(root)).toThrow(`example/SKILL.md -> ${decoded} (${reason})`);
+    });
+  });
+
+  test("a bare-parenthesis link does not hide a later missing link on the same line", () => {
+    withSkillTree(
+      {
+        "example/SKILL.md": '[guide](references/guide(v1).md "Guide (v1)") [missing](missing.md)\n',
+        "example/references/guide(v1).md": "# Guide\n",
+      },
+      (root) => {
+        let message = "did not throw";
+        try {
+          validateSkillsTree(root);
+        } catch (error) {
+          message = error.message;
+        }
+        expect(message).toContain("example/SKILL.md -> missing.md (missing)");
+        expect(message).not.toContain("references/guide");
+      },
     );
   });
 
@@ -224,9 +263,13 @@ describe("shared Agent Skills tree", () => {
     );
   });
 
-  test("the link validator CLI exits 0 on an angle-bracket link and 1 on a missing one", () => {
+  test.each([
+    '[guide](<references/guide(v1).md> "Guide")',
+    '[guide](references/guide(v1).md "Guide")',
+    String.raw`[guide](references/guide\(v1\).md)`,
+  ])("the link validator CLI checks the complete destination in %s", (link) => {
     const cli = join(repoRoot, "tools/validate-skills.mjs");
-    const markdown = '[guide](<references/guide(v1).md> "Guide") [external](<https://example.com/guide(v1)>)';
+    const markdown = `${link} [external](<https://example.com/guide(v1)>)`;
     withSkillTree(
       { "example/SKILL.md": `${markdown}\n`, "example/references/guide(v1).md": "# Guide\n" },
       (root) => {

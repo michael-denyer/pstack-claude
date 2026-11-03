@@ -25,8 +25,8 @@ function quoteAsText(yaml: string): string {
 }
 
 // Claude Code's YAML reader, Bun's, keeps the last value of a repeated
-// top-level key, where Pi's rejects the key. Drops each earlier entry, its
-// indented lines included.
+// top-level key, where Pi's rejects the key. Drops each earlier entry with
+// every line up to the next key, a list written at column 0 included.
 function lastOfEachKey(yaml: string): string {
   const lines = yaml.split("\n");
   const keyOf = (line: string) => /^([^\s#][^:]*):(?:\s|$)/.exec(line)?.[1];
@@ -36,7 +36,6 @@ function lastOfEachKey(yaml: string): string {
     .filter((line, i) => {
       const key = keyOf(line);
       if (key !== undefined) dropping = last.get(key) !== i;
-      else if (/^\S/.test(line)) dropping = false;
       return !dropping;
     })
     .join("\n");

@@ -115,11 +115,12 @@ describe("agent tool", () => {
     writeFileSync(join(dir, "tabbed.md"), "---\ndescription: Tabbed\ntools:\n\t- Read\n---\nT.\n");
     writeFileSync(join(dir, "repeated.md"), "---\ndescription: First value\ndescription: Repeated value # a comment\n---\nR.\n");
     writeFileSync(join(dir, "repeated-block.md"), "---\ndescription: |\n  First\n  block\nmodel: gw/repeated\ndescription: Repeated block\n---\nRB.\n");
+    writeFileSync(join(dir, "repeated-list.md"), "---\ntools:\n- Read\n- Grep\ndescription: Repeated list\ntools: Bash\n---\nRL.\n");
     writeFileSync(join(dir, "broken.md"), "---\ndescription: |\n Use for a\n  b: c\neffort: [low\n---\nB.\n");
     const pi = await restore(w, []);
     const lines = pi.tools.get("agent").parameters.properties.subagent_type.description.split("\n");
     expect(lines).toEqual(
-      expect.arrayContaining(["- commented: Commented", '- escaped: Use for "x" words', "- colon: Use for a: b # not a comment", '- quoted-word: "Sharpen" a prompt: use when asked', "- tabbed: Tabbed", "- repeated: Repeated value", "- repeated-block: Repeated block"]),
+      expect.arrayContaining(["- commented: Commented", '- escaped: Use for "x" words', "- colon: Use for a: b # not a comment", '- quoted-word: "Sharpen" a prompt: use when asked', "- tabbed: Tabbed", "- repeated: Repeated value", "- repeated-block: Repeated block", "- repeated-list: Repeated list"]),
     );
     expect(lines.filter((line) => line.startsWith("- broken"))).toEqual([]);
     await pi.call("agent", { description: "c", prompt: "x", subagent_type: "commented" }, ctx);

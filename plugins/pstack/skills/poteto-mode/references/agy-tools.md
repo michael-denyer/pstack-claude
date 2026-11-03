@@ -70,15 +70,25 @@ Most skills need only the tables above. These need one more mapping:
 
 | Skill | On Antigravity |
 |-------|----------------|
+| `interrogate` | Each adversary is an `invoke_subagent` call with `Model` from the sheet (`pro`, `flash`, `inherit`). |
 | `setup-pstack` | The skill's Other runtimes table names `~/.gemini/config/pstack-models.md`. `invoke_subagent` accepts `inherit`, `flash_lite`, `flash`, and `pro` for `Model`. |
+| `architect` | The runner panel goes through the **arena** skill: one `invoke_subagent` call per runner, each with a `Model` from the sheet's `architect runners` line. |
+| `how` | The parallel explorers and the explainer map to `invoke_subagent` fan-out with the sheet's `how` role models. |
+| `arena` | The parallel candidates and the cross-judge map to `invoke_subagent` calls with the sheet's panel lines. |
 | `no-comments` | Dispatch `comment-sicko` via `invoke_subagent` with `TypeName: "comment-sicko"`. |
 | `thermos` | Dispatch both review subagents via `invoke_subagent` with `TypeName: "thermo-nuclear-review-subagent"` and `"thermo-nuclear-code-quality-review-subagent"`. |
 | `swarm` | Each worker is an `invoke_subagent` call; use `Workspace: "share"` or `git worktree add` for writing workers. |
+| `teach` | Running `how` and `why` in parallel maps to two `invoke_subagent` calls in one response; image generation uses `image-generator` via `invoke_subagent`. |
 | `why` | The parallel investigators and synthesizer map to `invoke_subagent` fan-out. |
 | `recall` | Read Antigravity transcripts under `~/.gemini/antigravity-cli/brain/<conversation-id>/.system_generated/logs/transcript.jsonl` instead of `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`. |
 | `reflect` | Pass the current session's transcript path (`<appDataDir>/brain/<conversation-id>/.system_generated/logs/transcript.jsonl`) to the three review subagents. |
 | `show-me-your-work` | Check the log against this session's transcript or context, not a Claude Code transcript. |
 | `automate-me` | Follow the `agy-customizations` skill alongside `unslop`, and write the mode skill under `.agents/skills/` or `~/.gemini/config/skills/`. |
+| `create-verification-skill` | Write the generated skill where Antigravity discovers project skills, `.agents/skills/verify/`, instead of `.claude/skills/verify/`. |
+| `maintain-verification-skill` | The parallel per-feature source readers map to `invoke_subagent` fan-out; the project-local skill lives under `.agents/skills/`. |
+| `create-formal-verification-skill` | Write the generated skill to `.agents/skills/<area>/`, named for the area it verifies. |
+| `maintain-formal-verification-skill` | Project skills, the formal verification skill among them, live under `.agents/skills/`. |
+| `babysit` | `loop` and `AskUserQuestion` resolve through the tables above (`schedule` and `ask_question`). |
 
 ## Instructions file
 

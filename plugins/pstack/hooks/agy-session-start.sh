@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-HOOKS_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+HOOKS_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 PLUGIN_ROOT="$(dirname "$HOOKS_DIR")"
 READER="$PLUGIN_ROOT/skills/setup-pstack/scripts/read-sheet.sh"
 SHEET="$HOME/.gemini/config/pstack-models.md"

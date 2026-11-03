@@ -86,9 +86,10 @@ export const RUNTIMES = [
     name: "Antigravity",
     mapping: "agy-tools.md",
     modelNames: agyModelNamesSection,
+    skillPreambles: true,
     manifest: `${PLUGIN}/.antigravity-plugin/plugin.json`,
     validate: ({ manifest, read, pathExists }) =>
-      validateAgyManifest(manifest, { claude: JSON.parse(read(`${PLUGIN}/.claude-plugin/plugin.json`)), pathExists }),
+      validateAgyManifest(manifest, { claude: JSON.parse(read(`${PLUGIN}/.claude-plugin/plugin.json`)), read, pathExists }),
   },
 ].map((runtime) => ({
   ...runtime,
@@ -440,11 +441,24 @@ export function minimaxModelNamesSection(models) {
   );
 }
 
-export function validateAgyManifest(manifest, { claude, pathExists }) {
+export function validateAgyManifest(manifest, { claude, read, pathExists }) {
   const at = `${PLUGIN}/.antigravity-plugin/plugin.json`;
   if (manifest.name !== claude.name) throw new Error(`${at}: name "${manifest.name}" != Claude Code manifest name "${claude.name}"`);
-  for (const path of ["hooks.json", "hooks/agy-session-start.sh", "hooks/session-start-agy.md"]) {
+  const paths = [
+    ...(manifest.logo ? [manifest.logo] : []),
+    "hooks.json",
+    "hooks/agy-session-start.sh",
+    "hooks/agy-context.awk",
+    "hooks/json.awk",
+    "hooks/session-start-agy.md",
+  ];
+  for (const path of paths) {
     if (!pathExists(`${PLUGIN}/${path}`)) throw new Error(`${at}: ${path} does not exist in the plugin`);
+  }
+  const hooks = JSON.parse(read(`${PLUGIN}/hooks.json`));
+  const start = hooks?.["pstack-routing"]?.SessionStart;
+  if (!Array.isArray(start) || !start.some((h) => h?.type === "command" && h?.command === "./hooks/agy-session-start.sh")) {
+    throw new Error(`${PLUGIN}/hooks.json must declare ./hooks/agy-session-start.sh under pstack-routing.SessionStart`);
   }
 }
 

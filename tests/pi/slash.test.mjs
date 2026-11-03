@@ -17,7 +17,7 @@ if (process.env.PSTACK_PI_REQUIRE_RUNTIME === "1" && !piDir) throw new Error("Th
 const argLines = ["", "a b  c", ' --title="fix bug" 42', 'a"b c"d', "it's fine", `'single' "double"`, "tab\tsep\nnewline", 'open "quote here', `x 'a"b' y`];
 const templates = ["$1 $2 $3", "$@|$ARGUMENTS", "${1:-def} ${3:-none}", "${@:-empty}", "${ARGUMENTS:-empty}", "${@:2}", "${@:2:1}", "${@:0}", "$10", "$ARGUMENTS$1"];
 const argSets = [[], ["a"], ["a", "b c", "d"]];
-const files = ["no frontmatter\n", "---\nname: x\n---\nbody\n", "﻿---\r\nname: x\r\n---\r\n  body  \r\n", "---\nunterminated", "---\na: 1\n----\nbody", "  ---\nx: 1\n---\ny\r"];
+const files = ["no frontmatter\n", "---\nname: x\n---\nbody\n", "\uFEFF---\r\nname: x\r\n---\r\n  body  \r\n", "---\nunterminated", "---\na: 1\n----\nbody", "  ---\nx: 1\n---\ny\r"];
 
 describe.skipIf(!piDir)("slash expansion matches the installed pi", () => {
   test("parseCommandArgs", async () => {

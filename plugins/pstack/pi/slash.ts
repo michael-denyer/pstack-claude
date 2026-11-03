@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 // for text the extension sends as a custom message. tests/pi/slash.test.mjs checks it against the installed pi.
 
 export function stripFrontmatter(content: string): string {
-  const normalized = content.replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const normalized = content.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   if (!normalized.startsWith("---")) return normalized;
   const endIndex = normalized.indexOf("\n---", 3);
   return endIndex === -1 ? normalized : normalized.slice(endIndex + 4).trim();

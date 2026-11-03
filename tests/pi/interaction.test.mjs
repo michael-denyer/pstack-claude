@@ -428,7 +428,7 @@ describe("/loop", () => {
     await pi.call("schedule_wakeup", { delaySeconds: 120, prompt: "/loop watch new PR" }, ctx);
     jest.advanceTimersByTime(120_000);
     expect(pi.userMessages).toHaveLength(2);
-    expect(pi.messages.map((m) => m.message.content)).toEqual([expect.stringContaining("watch new PR\n")]);
+    expect(woken(pi)).toEqual([expect.stringContaining("watch new PR\n")]);
   });
 
   for (const rearm of ["/loop watch PR 42", "watch PR 42", "/loop 5m watch PR 42"]) {

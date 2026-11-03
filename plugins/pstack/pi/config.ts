@@ -64,6 +64,9 @@ interface Sheet {
   // Leaves ask_user_question to another extension: Pi refuses to start when two
   // extensions register the same tool name.
   askToolOff: boolean;
+  // Leaves agent, send_message, list_agents and stop_agent to another extension, such as a
+  // dedicated subagent package. The rest of the extension is unchanged.
+  agentToolsOff: boolean;
   piModels: Map<string, string>;
 }
 
@@ -82,6 +85,7 @@ export function parseSheet(text: string): Sheet {
     text,
     hookOff: lines.some((l) => l === "session hook: off"),
     askToolOff: lines.some((l) => l === "pi ask tool: off"),
+    agentToolsOff: lines.some((l) => l === "pi agent tools: off"),
     piModels,
   };
 }

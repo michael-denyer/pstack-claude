@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { registerAgentTools } from "./agent-tools.ts";
+import { registerAgentsCommand, registerAgentTools } from "./agent-tools.ts";
 import { AgentRunner } from "./agents.ts";
 import { registerAsk } from "./ask.ts";
 import { DEPTH_FLAG, defaultSettings, readSheet, type Settings } from "./config.ts";
@@ -13,8 +13,10 @@ export function install(pi: ExtensionAPI, settings: Settings): void {
   const runner = new AgentRunner(pi, settings);
   const scheduler = new Scheduler();
   const oneShot = registerOneShot(pi, settings, runner);
-  registerAgentTools(pi, runner, settings);
-  if (!readSheet(settings.agentDir)?.askToolOff) registerAsk(pi, oneShot);
+  const sheet = readSheet(settings.agentDir);
+  registerAgentsCommand(pi, runner);
+  if (!sheet?.agentToolsOff) registerAgentTools(pi, runner, settings);
+  if (!sheet?.askToolOff) registerAsk(pi, oneShot);
   registerSchedule(pi, scheduler, oneShot);
   registerPromptSections(pi, settings);
   registerPathSkills(pi, settings);

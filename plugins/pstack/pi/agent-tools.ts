@@ -57,7 +57,7 @@ const SLEEP_BLOCKED =
 
 // model-only exposure keeps every tool declared to the model even under
 // codemode.mode "only", which would otherwise reach them only through scripts.
-export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner, settings: Settings): void {
+export function registerAgentsCommand(pi: ExtensionAPI, runner: AgentRunner): void {
   const lookups = { transcriptOf: sessionFile, activityOf: runner.activityOf.bind(runner) };
   // The user's own view: shown, never sent to the model.
   pi.registerCommand("pstack-agents", {
@@ -66,6 +66,10 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner, settin
       ctx.ui.notify(agentsReport(runner.list(), lookups), "info");
     },
   });
+}
+
+export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner, settings: Settings): void {
+  const lookups = { transcriptOf: sessionFile, activityOf: runner.activityOf.bind(runner) };
   // Wording alone did not stop models from polling a background agent with
   // sleep, which spends turns and leads them to cut the agent short.
   pi.on("tool_call", (event) => {

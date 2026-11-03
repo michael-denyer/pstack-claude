@@ -15,7 +15,7 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 
 | ID | Claude Code mechanism | On Pi | Status | Evidence | Live |
 | --- | --- | --- | --- | --- | --- |
-| T01 | `Agent` tool dispatch | `agent` tool runs a child `pi --mode rpc` process and sends the prompt as an RPC command on its stdin | extension | `foreground waits, returns the final text and agentId, and runs the exact child command` | VERIFIED |
+| T01 | `Agent` tool dispatch | `agent` tool runs a child `pi --mode rpc` process and sends the prompt as an RPC command on its stdin. `pi agent tools: off` in the override sheet skips the registration of `agent`, `send_message`, `list_agents` and `stop_agent` and the sleep guard, so another extension can provide them | extension | `foreground waits, returns the final text and agentId, and runs the exact child command` | VERIFIED |
 | T02 | `subagent_type` | Resolves to the plugin's agent files; unknown types list the valid ones | extension | `unknown subagent_type is an error listing every valid type` | VERIFIED |
 | T03 | Per-call `model` | Family names resolve through `models.json` and the sheet's `pi models:` line | extension | `alias, sheet override, inherit-parent, auto, pass-through, and no parent model` | VERIFIED |
 | T04 | `run_in_background` | Returns the agent id at once; completion joins the running turn at the next tool boundary, or starts a turn when idle, after the process exits | extension | `background returns at once and the completion notice comes only after the process exits` | VERIFIED |

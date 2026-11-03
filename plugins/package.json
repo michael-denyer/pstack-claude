@@ -1,0 +1,8 @@
+{
+  "name": "pstack-pi-test-copy",
+  "private": true,
+  "description": "The copy of Pi that the tests under tests/ load the extension against. Outside every plugin and outside the root package Pi installs, so no user downloads it.",
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "1.5.0"
+  }
+}

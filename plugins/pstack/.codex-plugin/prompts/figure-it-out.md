@@ -1,6 +1,6 @@
 ---
 name: figure-it-out
-description: design a rigorous, auditable playbook for a task no bundled playbook fits
+description: "design a rigorous, auditable playbook for a task no bundled playbook fits"
 disable-model-invocation: true
 ---
 

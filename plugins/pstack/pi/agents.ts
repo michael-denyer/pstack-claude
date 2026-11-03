@@ -9,7 +9,8 @@ import { Value } from "typebox/value";
 import { noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
 import { type Activity, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
-import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, loadAgentTypes, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
+import { loadAgentTypes } from "./agent-files.ts";
+import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
 
 const ENTRY_TYPE = "pstack-agents";

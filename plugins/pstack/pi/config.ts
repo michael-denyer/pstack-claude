@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -170,86 +170,9 @@ export interface AgentDefinition {
   effort?: string;
 }
 
-export function frontmatter(text: string): { fields: Map<string, string>; body: string } {
-  // Windows editors often save a byte-order mark before the frontmatter.
-  const m = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text);
-  const fields = new Map<string, string>();
-  const lines = (m?.[1] ?? "").split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    const kv = /^([\w-]+):\s*(.*)$/.exec(lines[i]);
-    if (!kv) continue;
-    const value = kv[2].trim();
-    // A YAML block scalar, as Claude Code agent files often write description:,
-    // is the indented lines after its | or >.
-    const block = /^([|>])[+-]?[1-9]?$/.exec(value);
-    if (!block) {
-      // YAML's quotes are not part of the value, so "high" and 'high' read as high.
-      fields.set(kv[1], value.replace(/^"([^"\\]*)"$|^'([^']*)'$/, "$1$2"));
-      continue;
-    }
-    const held: string[] = [];
-    while (i + 1 < lines.length && /^(\s|$)/.test(lines[i + 1])) held.push(lines[++i]);
-    const indent = Math.min(...held.filter((l) => l.trim()).map((l) => l.search(/\S/)));
-    const joined = held.map((l) => l.slice(indent)).join("\n").trim();
-    // > folds a line break into a space, and a run of n+1 breaks into n.
-    fields.set(kv[1], block[1] === ">" ? joined.replace(/\n(\n*)/g, (_, more: string) => more || " ") : joined);
-  }
-  return { fields, body: (m?.[2] ?? text).trim() };
-}
-
-function parseAgentFile(file: string, text: string): AgentDefinition {
-  const { fields, body } = frontmatter(text);
-  // Claude Code's `model: inherit` runs the agent on the parent's model, as no model does.
-  const model = fields.get("model");
-  return { file, description: fields.get("description") || undefined, body, model: model && model !== "inherit" ? model : undefined, effort: fields.get("effort") || undefined };
-}
-
 // The agent tool's effort parameter: one of models.json's levels.
 export function checkEffort(effort: string, settings: Pick<Settings, "modelsFile">): string {
   const { efforts } = readModels(settings.modelsFile);
   if (!efforts.includes(effort)) throw new InvalidValueError(`effort "${effort}" is not one of ${efforts.join(", ")}`);
   return effort;
-}
-
-// Claude Code registers each plugin agent file as pstack:<file name>, beside
-// the built-in general-purpose type, which has no agent file, and a user agent
-// file under its bare name. A user file only adds a type, never replaces one.
-export function loadAgentTypes(settings: Pick<Settings, "pluginRoot" | "agentDir">): Map<string, AgentDefinition> {
-  // The built-in type's description is Claude Code's own.
-  const types = new Map<string, AgentDefinition>([
-    [GENERAL_PURPOSE, { body: "", description: "General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you." }],
-  ]);
-  const dir = join(settings.pluginRoot, "agents");
-  if (existsSync(dir)) {
-    for (const file of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
-      const type = `pstack:${basename(file, ".md")}`;
-      const path = join(dir, file);
-      types.set(type, parseAgentFile(path, readFileSync(path, "utf8")));
-    }
-  }
-  for (const [type, def] of userAgentFiles(join(settings.agentDir, USER_AGENTS_DIR))) {
-    if (!types.has(type)) types.set(type, def);
-  }
-  return types;
-}
-
-// Each readable .md file in the user's folder, by bare name. A hidden file, such
-// as a macOS ._ sidecar, a name with a colon, which Claude Code keeps for plugin
-// agents, an entry that is not a readable file, and a folder that cannot be
-// listed are skipped, so the user's folder never breaks the plugin's agent types.
-function userAgentFiles(dir: string): [string, AgentDefinition][] {
-  let files: string[];
-  try {
-    files = readdirSync(dir).filter((f) => f.endsWith(".md") && !f.startsWith(".") && !f.includes(":")).sort();
-  } catch {
-    return [];
-  }
-  return files.flatMap((file): [string, AgentDefinition][] => {
-    const path = join(dir, file);
-    try {
-      return statSync(path).isFile() ? [[basename(file, ".md"), parseAgentFile(path, readFileSync(path, "utf8"))]] : [];
-    } catch {
-      return [];
-    }
-  });
 }

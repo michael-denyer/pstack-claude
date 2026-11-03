@@ -4,7 +4,8 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { checkEffort, defaultSettings, loadAgentTypes, parseSheet, readSheet } from "../../plugins/pstack/pi/config.ts";
+import { loadAgentTypes } from "../../plugins/pstack/pi/agent-files.ts";
+import { checkEffort, defaultSettings, parseSheet, readSheet } from "../../plugins/pstack/pi/config.ts";
 import { chmodDeniesReads } from "../session-hook-sheets.mjs";
 
 test("depth comes from the reader on each use and PI_CODING_AGENT_DIR moves the sheet", () => {

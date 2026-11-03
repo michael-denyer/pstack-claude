@@ -3,7 +3,8 @@ import { type Static, Type } from "typebox";
 
 import { agentsReport, listing, resultText } from "./agent-text.ts";
 import { type AgentRunner, sessionFile } from "./agents.ts";
-import { type AgentDefinition, GENERAL_PURPOSE, loadAgentTypes, type Settings } from "./config.ts";
+import { loadAgentTypes } from "./agent-files.ts";
+import { type AgentDefinition, GENERAL_PURPOSE, type Settings } from "./config.ts";
 import { isForegroundWait } from "./sleep-wait.ts";
 
 // Claude Code's Agent tool lists every agent type, the user's included, with its description.

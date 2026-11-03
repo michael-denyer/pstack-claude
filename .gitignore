@@ -20,5 +20,8 @@ plugins/pstack/skills/statechart/scripts/node_modules/
 # bun installs the typebox peer for the Pi extension tests
 /node_modules/
 
+# bun installs the copy of Pi the tests load the extension against
+/plugins/node_modules/
+
 # Lake build output for the Lean models
 /lean/.lake/

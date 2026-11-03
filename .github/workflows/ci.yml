@@ -16,6 +16,7 @@ jobs:
   generated:
     name: Generated files current
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -33,6 +34,7 @@ jobs:
   windows-hooks:
     name: Windows session hooks
     runs-on: windows-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -59,6 +61,7 @@ jobs:
   windows-worktree-audit:
     name: Windows worktree audit
     runs-on: windows-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -74,6 +77,7 @@ jobs:
   forks:
     name: Fork registry
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -131,6 +135,7 @@ jobs:
   skills-only:
     name: Skills-only install
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -149,6 +154,7 @@ jobs:
   pi-types:
     name: Pi extension types
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -180,6 +186,7 @@ jobs:
   scripts:
     name: Vendored bun tooling
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: plugins/pstack/skills/poteto-mode/scripts
@@ -207,20 +214,29 @@ jobs:
     name: Statechart scripts (${{ matrix.group }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Node runs the tests in one file one at a time, and corpus.test.ts took
-    # 180 s on its own runner and 390 s beside the other files. The two
-    # slowest files each get a runner, and the rest share one, so a new test
-    # file lands in the rest.
+    # Node runs the tests in one file one at a time and the files in one job
+    # side by side, which slows each file: tlc-out.test.ts took 120 s on its
+    # own runner and 187 s beside the other files. The two slowest files each
+    # get a runner. corpus.test.ts, at 190 s alone, splits across two runners
+    # by test name: names that start with A to L in one, and every other name
+    # in the other, so the two patterns must stay the same. The rest share one
+    # runner, so a new test file lands in the rest.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - group: corpus
+          - group: corpus, A to L
             files: corpus
+            select: --test-name-pattern=^[A-L]
+          - group: corpus, other names
+            files: corpus
+            select: --test-skip-pattern=^[A-L]
           - group: differential
             files: differential
+          - group: tlc-out
+            files: tlc-out
           - group: rest
-            files: "!(corpus|differential)"
+            files: "!(corpus|differential|tlc-out)"
     defaults:
       run:
         working-directory: plugins/pstack/skills/statechart/scripts
@@ -260,11 +276,12 @@ jobs:
           XDG_CACHE_HOME: ${{ runner.temp }}/xdg
           WATCHDOG_REPORTS: ${{ runner.temp }}/reports
           FILES: ${{ matrix.files }}
+          SELECT: ${{ matrix.select }}
         run: |
           shopt -s extglob failglob
           # shellcheck disable=SC2206 # FILES is a glob to expand here
           files=(test/$FILES.test.ts)
-          JAVA="$(command -v java)" bash "$GITHUB_WORKSPACE/.github/scripts/statechart-watchdog.sh" node --disable-warning=ExperimentalWarning --test "${files[@]}"
+          JAVA="$(command -v java)" bash "$GITHUB_WORKSPACE/.github/scripts/statechart-watchdog.sh" node --disable-warning=ExperimentalWarning --test ${SELECT:+"$SELECT"} "${files[@]}"
 
   statechart-windows:
     name: Statechart on Windows
@@ -308,6 +325,7 @@ jobs:
   shellcheck:
     name: Shell scripts
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -321,6 +339,7 @@ jobs:
   actionlint:
     name: Workflow lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -340,6 +359,7 @@ jobs:
   markdownlint:
     name: Markdown lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -352,6 +372,7 @@ jobs:
   links:
     name: Markdown links
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -374,6 +395,7 @@ jobs:
   macos-worktree-audit:
     name: macOS worktree audit
     runs-on: macos-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

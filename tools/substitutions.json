@@ -588,7 +588,7 @@
     },
     {
       "token": "/goal",
-      "hint": "Cursor's /goal has no Claude Code equivalent; the autopilot playbooks keep the objective in standing orders"
+      "hint": "Cursor's /goal has no Claude Code equivalent; the autopilot playbooks keep the objective in the program store's notes.md"
     },
     {
       "token": "create-skill",

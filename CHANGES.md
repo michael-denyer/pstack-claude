@@ -4,7 +4,7 @@ This file is the release changelog, with one `## <version> - <title>` entry per 
 
 ## 0.9.124 - program objective in the store's notes.md
 
-The Autopilot-full and multi-phase-plan playbooks wrote the program objective into "the standing orders", the port's stand-in for Cursor's `/goal`. The term's only definition was the `preferences.md` register in the Orchestrate playbook, which 0.9.123 dropped with upstream's rewrite. Both playbooks now write the objective into `notes.md` in the program's store under `~/.claude/orchestrate/<slug>/`, the tracker the Orchestrate playbook names. `check-plan.mjs` requires `notes.md` in a plan's program checklist where it required "standing orders".
+The Autopilot-full and multi-phase-plan playbooks wrote the program objective into "the standing orders", the port's stand-in for Cursor's `/goal`. The term's only definition was the `preferences.md` register in the Orchestrate playbook, which 0.9.123 dropped with upstream's rewrite. Both playbooks now write the objective into `notes.md` in the program's store under `~/.claude/orchestrate/<slug>/`, the tracker the Orchestrate playbook names, and each audit tick re-reads it from there instead of from "the standing objective". `check-plan.mjs` requires a program checklist line that writes into `notes.md` in the program's store, where it required "standing orders", so a plan written from an earlier skeleton fails the check until that line is updated.
 
 ## 0.9.123 - sync to upstream c742dd6 (v0.15.36): agentic Orchestrate, orch scripts removed
 

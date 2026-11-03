@@ -114,7 +114,13 @@ const modelsConfig = Type.Object({
 });
 
 function readModels(modelsFile: string): Static<typeof modelsConfig> {
-  const raw: unknown = JSON.parse(readFileSync(modelsFile, "utf8"));
+  const text = readFileSync(modelsFile, "utf8");
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`${modelsFile} is not valid JSON: ${(e as Error).message}`);
+  }
   if (!Value.Check(modelsConfig, raw)) throw new Error(`${modelsFile} is not a pstack models file: it needs available[], efforts[] and pi.{fallback, models}.`);
   return raw;
 }

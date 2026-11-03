@@ -13,6 +13,7 @@ import { roleCases, sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
 const mandate = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
+const minimaxMandate = readFileSync(join(pluginRoot, "hooks/session-start-minimax.md"), "utf8");
 const codexManifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8"));
 const copilotManifest = JSON.parse(readFileSync(join(pluginRoot, ".github/plugin/plugin.json"), "utf8"));
 const models = JSON.parse(readFileSync(join(pluginRoot, "models.json"), "utf8"));
@@ -37,6 +38,13 @@ const runtimes = {
     env: (sheetRoot) => ({ CLAUDE_CONFIG_DIR: sheetRoot }),
   },
   "claude with PLUGIN_ROOT exported": { hooks: "claude", sheetDir: ".claude", env: () => ({ PLUGIN_ROOT: pluginRoot }) },
+  // Only MINIMAX_PLUGIN_ROOT marks a MiniMax Code session; a profile may export
+  // MINIMAX_DATA_DIR for every shell.
+  "claude with MINIMAX_DATA_DIR exported": {
+    hooks: "claude",
+    sheetDir: ".claude",
+    env: (sheetRoot) => ({ MINIMAX_DATA_DIR: join(sheetRoot, "..", "minimax-data") }),
+  },
   codex: { hooks: "codex", sheetDir: ".codex", env: () => ({}) },
   "codex with CODEX_HOME": {
     hooks: "codex",
@@ -50,6 +58,15 @@ const runtimes = {
     hooks: "copilot",
     sheetDir: "copilot-home",
     env: (sheetRoot) => ({ COPILOT_PLUGIN_ROOT: pluginRoot, COPILOT_HOME: sheetRoot }),
+  },
+  // MiniMax Code runs Claude Code's hooks file and sets MINIMAX_PLUGIN_ROOT
+  // beside CLAUDE_PLUGIN_ROOT. Its hooks get a fixed set of variables without
+  // MINIMAX_DATA_DIR, so the sheet stays in ~/.minimax even if one leaks in.
+  minimax: { hooks: "claude", sheetDir: ".minimax", env: () => ({ MINIMAX_PLUGIN_ROOT: pluginRoot }) },
+  "minimax with MINIMAX_DATA_DIR exported": {
+    hooks: "claude",
+    sheetDir: ".minimax",
+    env: (sheetRoot) => ({ MINIMAX_PLUGIN_ROOT: pluginRoot, MINIMAX_DATA_DIR: join(sheetRoot, "..", "minimax-data") }),
   },
 };
 
@@ -89,11 +106,18 @@ describe("SessionStart hook", () => {
     expect(sessionStart.codex.hooks[0].statusMessage).toBe(SESSION_START_STATUS);
   });
 
-  test("names only skills that exist", () => {
-    const named = [...mandate.matchAll(/(?:pstack:|`\/)([a-z0-9-]+)/g)].map((m) => m[1]);
+  test.each([
+    ["Claude Code", mandate],
+    ["MiniMax Code", minimaxMandate],
+  ])("the %s mandate names only skills that exist", (_, text) => {
+    const named = [...text.matchAll(/(?:pstack:|`\/)([a-z0-9-]+)/g)].map((m) => m[1]);
     const skills = new Set(agentSkills(join(pluginRoot, "skills")).map(({ name }) => name));
     expect(named).toContain("poteto-mode");
     expect(named.filter((name) => !skills.has(name))).toEqual([]);
+  });
+
+  test("the MiniMax Code mandate points at the MiniMax mapping", () => {
+    expect(minimaxMandate).toContain("references/minimax-tools.md");
   });
 
   for (const arg of ["cursor", ""]) {
@@ -109,7 +133,8 @@ describe("SessionStart hook", () => {
     // Copilot wraps the mandate in JSON; the sheet cases name too few roles to
     // be a valid Copilot sheet, so every case that injects gets setup's note.
     const wrap = runtime.startsWith("copilot") ? (out) => context(out, ["sheet invalid", setupNote]) : (out) => out;
-    const expected = (off) => (off ? "" : mandate);
+    const injected = runtime.startsWith("minimax") ? minimaxMandate : mandate;
+    const expected = (off) => (off ? "" : injected);
     describe(runtime, () => {
       test("injects the mandate when no sheet exists", () => {
         const r = runHook(runtime, null);
@@ -258,6 +283,12 @@ describe("Copilot SessionStart context", () => {
         writeFileSync(join(home, dir, "pstack-models.md"), "session hook: off\n");
       }
       expect(run("copilot")).not.toBe("");
+      // MiniMax Code runs Claude Code's hooks file but keeps its own sheet.
+      const minimax = spawnSync("sh", ["-c", sessionStart.claude.hooks[0].command], {
+        env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot, MINIMAX_PLUGIN_ROOT: pluginRoot },
+        encoding: "utf8",
+      }).stdout;
+      expect(minimax).toBe(minimaxMandate);
       rmSync(join(home, ".claude"), { recursive: true });
       rmSync(join(home, ".codex"), { recursive: true });
       mkdirSync(join(home, ".copilot"));

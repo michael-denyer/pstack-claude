@@ -6,7 +6,7 @@ Thanks for helping out. This repo is a **port**, not an original work: the `skil
 
 ## The sync boundary
 
-Upstream owns skill content. This port owns the Cursor-to-Claude-Code translation. It also carries named forks, each declared in [`tools/forks.json`](tools/forks.json) as a `port-feature` (Claude Code, Codex, Pi, GitHub Copilot, or Muse mechanics upstream cannot carry) or a `policy` (a workflow change the port chose to keep).
+Upstream owns skill content. This port owns the Cursor-to-Claude-Code translation. It also carries named forks, each declared in [`tools/forks.json`](tools/forks.json) as a `port-feature` (Claude Code, Codex, Pi, GitHub Copilot, Muse, or MiniMax Code mechanics upstream cannot carry) or a `policy` (a workflow change the port chose to keep).
 
 Both kinds of `SKILL.md` change land here. Upstream rarely merges pull requests from outside its own team, so this port does not ask you to land a change there first. Before changing a `SKILL.md`, work out which kind yours is:
 
@@ -66,6 +66,8 @@ If you touched `plugins/pstack/pi/` or `pi-tools.md`, run the Pi checks against 
 
 If you touched `plugins/pstack/hooks/`, `copilot-tools.md`, or `setup-pstack`, run `tests/copilot-smoke.sh` against a signed-in `copilot` CLI. It installs the checkout into a throwaway `HOME` and `COPILOT_HOME`, spends about twenty premium requests, and skips when `copilot` is missing. Set `SMOKE_GITHUB=<owner>/<repo>@<ref>` to repeat the plugin-file checks on a GitHub marketplace install of a pushed ref.
 
+If you touched `plugins/pstack/hooks/`, `minimax-tools.md`, or the plugin's manifests, run `tests/minimax-smoke.sh`. It installs `@minimax-ai/code` into a throwaway npm prefix, or uses the `mcode` that `MCODE` names, copies the checkout into a throwaway `MINIMAX_DATA_DIR` as a local plugin, and checks that MiniMax Code reads it through the Claude Code manifest with every skill and agent. It makes no model calls and needs no sign-in.
+
 If you touched `skills/poteto-mode/scripts/`:
 
 ```shell
@@ -124,6 +126,6 @@ So: any PR that changes skill behavior either bumps the version itself or is fol
 
 ## Reporting bugs
 
-Include the pstack version, the Claude Code (or Codex, Pi, or GitHub Copilot) version, and the reproduction steps. [#22](https://github.com/michael-denyer/pstack-claude/issues/22) is the model to copy: it named versions, gave numbered steps, and included the experiment that isolated the cause.
+Include the pstack version, the Claude Code (or Codex, Pi, GitHub Copilot, Muse, or MiniMax Code) version, and the reproduction steps. [#22](https://github.com/michael-denyer/pstack-claude/issues/22) is the model to copy: it named versions, gave numbered steps, and included the experiment that isolated the cause.
 
 Reproduce the bug on the latest release before you file it, because only that release receives fixes. The [bug report form](.github/ISSUE_TEMPLATE/bug_report.yml) asks for each of these fields. An issue filed through `gh` or the API skips the form, so give the same fields in the same order.

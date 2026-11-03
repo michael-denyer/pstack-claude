@@ -21,6 +21,9 @@ import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 // file either, and no prompts directory, since Muse lists each user-invocable
 // skill as a slash command itself and rejects a command whose id duplicates a
 // skill id. Its `stampManifest` rewrites the manifest's skill list from the tree.
+// MiniMax Code reads the Claude Code build as it ships, so its row names the
+// Claude Code manifest and stamps no preambles; its one pointer is in
+// poteto-mode's Platform Adaptation section, as Pi's is.
 export const RUNTIMES = [
   {
     name: "Codex",
@@ -68,6 +71,16 @@ export const RUNTIMES = [
     validate: ({ manifest, read, pathExists }) =>
       validateMuseManifest(manifest, { claude: JSON.parse(read(`${PLUGIN}/.claude-plugin/plugin.json`)), pathExists }),
     stampManifest: stampMuseManifest,
+  },
+  {
+    name: "MiniMax Code",
+    mapping: "minimax-tools.md",
+    modelNames: minimaxModelNamesSection,
+    // MiniMax Code's Claude Code reader loads this manifest with the skills,
+    // agents, and hooks/hooks.json beside it, so the build has no manifest or
+    // hooks file of its own.
+    manifest: `${PLUGIN}/.claude-plugin/plugin.json`,
+    validate: validateMiniMaxPackage,
   },
 ].map((runtime) => ({
   ...runtime,
@@ -171,6 +184,24 @@ export function validateMuseManifest(manifest, { claude, pathExists }) {
   // The PowerShell hook reads the roles from models.json at runtime, where
   // sheet.awk has them stamped in.
   if (!pathExists(`${PLUGIN}/models.json`)) throw new Error(`${at}: hooks/session-start.ps1 reads models.json, which is not in the plugin`);
+}
+
+// The manifests MiniMax Code 0.7.4 looks for in a plugin directory, in the
+// order its loader tries them. It reads the plugin through the reader for the
+// first one present.
+export const MINIMAX_MANIFESTS = ["plugin.json", ".minimax-plugin/plugin.json", ".claude-plugin/plugin.json", ".codex-plugin/plugin.json"];
+
+// pstack runs on MiniMax Code through its Claude Code reader, the one that
+// loads the plugin agents and hooks/hooks.json. A manifest earlier in the
+// order would switch MiniMax Code to another reader.
+export function validateMiniMaxPackage({ pathExists }) {
+  const first = MINIMAX_MANIFESTS.find((file) => pathExists(`${PLUGIN}/${file}`));
+  if (first !== ".claude-plugin/plugin.json") {
+    throw new Error(
+      `${PLUGIN}/${first}: MiniMax Code reads this manifest instead of .claude-plugin/plugin.json, ` +
+        "so it would stop loading pstack through its Claude Code reader",
+    );
+  }
 }
 
 // The pstack Pi extension resolves each Claude alias a skill names through the
@@ -371,5 +402,32 @@ export function copilotModelNamesSection(models) {
     "Run `setup-pstack`, and the parent session that orchestrates a panel, on a model at least as strong as " +
     "gpt-5.4-mini or a Sonnet-class Claude model. On a Haiku-class model, setup picked models the user never " +
     "chose in about half of the smoke runs."
+  );
+}
+
+// MiniMax Code ships no default slugs either: its models come from whichever
+// providers the user connected, and every one is named <provider>/<model>.
+export function minimaxModelNamesSection(models) {
+  return (
+    "Skills name Claude Code model aliases in their Models sections. Those aliases are not MiniMax Code model keys. " +
+    "MiniMax Code names a model `<provider>/<model>`, and the models a session can reach depend on the providers the " +
+    "user connected: MiniMax itself, OpenAI through its Codex sign-in, or a provider added with `mcode provider add`. " +
+    "So the MiniMax Code build ships no default models, and the user picks them once.\n\n" +
+    "- The model sheet is `~/.minimax/pstack-models.md`. Before a skill that needs a role model " +
+    `(${roleSkills(models).map(code).join(", ")}), read it. With no sheet, load \`setup-pstack\` with the \`skill\` ` +
+    "tool and finish it first.\n" +
+    "- A role line in the sheet is the user's explicit model instruction, so pass it as the `task` tool's `model`. " +
+    "Pass the role's `@level`, or the sheet's `default effort`, as `effort`. The `task` tool fails a model other than " +
+    "the parent's that offers effort levels when `effort` is missing or names a level the model does not offer, " +
+    "such as `high` on MiniMax M3, which offers only `on` and `off`. When the level is not one the model offers, " +
+    "ask the user which to use. `inherit-parent` or `auto` omits `model` and `effort`.\n" +
+    `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose.\n` +
+    `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): ` +
+    "the strongest model the user chose.\n" +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
+    "signal comes from model diversity, so fill a panel from distinct providers. If only one model family is " +
+    "reachable, vary reasoning effort and note in the verdict that diversity was reduced.\n\n" +
+    "`/setup-pstack` writes the configured model list. On MiniMax Code, list the models with `mcode provider list` " +
+    "or the `model` slash command and write only keys they show."
   );
 }

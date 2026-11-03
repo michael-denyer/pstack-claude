@@ -768,7 +768,7 @@ export async function resolveChecks(
   // credential that cannot see checks, and a rollup that exists but maps to no
   // check can hold a context type this reader does not know.
   if (fast.kind === "none-reported" && !headHasRollup)
-    return { kind: "no-checks" };
+    return { kind: "no-checks", checks: [] };
   const suffix =
     fast.kind === "unusable"
       ? `fast path exit=${fast.exitCode}; GraphQL rollup was empty${firstLine(fast.stderr) ? `; ${firstLine(fast.stderr)}` : ""}`

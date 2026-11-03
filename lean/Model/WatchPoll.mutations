@@ -2,7 +2,7 @@
 # plausible bug. The text after `- ` must occur exactly once in the model;
 # `+ ` lines replace it. mutate.py reports the declarations that fail on each.
 
-# queryBackoffSeconds, policy.ts:399-402
+# queryBackoffSeconds, policy.ts:397-400
 
 mutation backoff floor lowered to 30 seconds
 -   min (max interval 60 * 2 ^ (failures - 1)) 300
@@ -34,7 +34,7 @@ mutation remaining budget does not shrink as the clock advances
 -   | .finite r => .finite (r - seconds)
 +   | .finite r => .finite r
 
-# pollUntilTerminal, policy.ts:509-562
+# pollUntilTerminal, policy.ts:507-560
 
 mutation loop runs with no budget left
 -   | .finite remaining => decide (0 < remaining)
@@ -72,7 +72,7 @@ mutation backoff arguments swapped
 -         let retryInSeconds := remaining.cap (queryBackoffSeconds o.interval failures)
 +         let retryInSeconds := remaining.cap (queryBackoffSeconds failures o.interval)
 
-# noChecksConfirmer, policy.ts:63-85
+# noChecksConfirmer, policy.ts:64-86
 
 mutation confirmation window shortened to 30 seconds
 - def NO_CHECKS_CONFIRM_SECONDS : Nat := 60

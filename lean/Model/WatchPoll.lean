@@ -3,9 +3,9 @@ This model checks the sequential arithmetic of the watch-pr polling loop.
 
 Sources, in `plugins/pstack/skills/poteto-mode/scripts/watch-pr/`:
 
-* `policy.ts:399-402`  `queryBackoffSeconds`
-* `policy.ts:509-562`  `pollUntilTerminal`
-* `policy.ts:63-85`    `NO_CHECKS_CONFIRM_SECONDS`, `noChecksConfirmer`
+* `policy.ts:397-400`  `queryBackoffSeconds`
+* `policy.ts:507-560`  `pollUntilTerminal`
+* `policy.ts:64-86`    `NO_CHECKS_CONFIRM_SECONDS`, `noChecksConfirmer`
 * `deadline.ts:9-20`   `WatchDeadline`, `WatchDeadline.remaining`
 * `cli.ts:37-63,122-145,181-192`  the option ranges and the real clock
 
@@ -27,7 +27,7 @@ Assumptions the model makes. The code does not guarantee the ones marked (!).
 5. (!) One clock that never runs backwards serves `WatchDeadline.remaining` and
    `clock.sleep`. `RunDependencies` takes them as two separate objects.
 6. (!) `deadline.remaining()` and the `clock.sleep` call that uses it happen at
-   one instant. `policy.ts:541-549` emits a verdict between them.
+   one instant. `policy.ts:539-547` emits a verdict between them.
 7. The step result is the environment's choice: any outcome, taking any time,
    zero included. `StepOutcome` lists the six ways `await args.step()` can end.
 8. A clock that advances by at least the slept amount is the theorem hypothesis
@@ -45,14 +45,14 @@ Assumptions the model makes. The code does not guarantee the ones marked (!).
 
 namespace WatchPoll
 
-/-! ## 1. `queryBackoffSeconds`, policy.ts:399-402 -/
+/-! ## 1. `queryBackoffSeconds`, policy.ts:397-400 -/
 
-/-- policy.ts:402 `Math.min(Math.max(interval, 60) * 2 ** (failures - 1), 300)`.
+/-- policy.ts:400 `Math.min(Math.max(interval, 60) * 2 ** (failures - 1), 300)`.
 Faithful for `failures ≥ 1` (assumption 3). -/
 def queryBackoffSeconds (interval failures : Nat) : Nat :=
   min (max interval 60 * 2 ^ (failures - 1)) 300
 
-/-- Twice the JavaScript result of policy.ts:402, for every `failures ≥ 0`:
+/-- Twice the JavaScript result of policy.ts:400, for every `failures ≥ 0`:
 `2 * min (m * 2 ^ (f - 1)) 300 = min (m * 2 ^ f) 600` over the reals. Half-seconds
 keep `failures = 0`, where JavaScript multiplies by `0.5`, inside `Nat`. -/
 def queryBackoffHalfSeconds (interval failures : Nat) : Nat :=
@@ -104,7 +104,7 @@ def badBackoff : List (Nat × Nat) :=
 #guard (backoffIntervals.filter fun interval => queryBackoffHalfSeconds interval 0 < 2 * 60)
   == [0, 1, 30, 59, 60, 61, 74, 75, 76, 119]
 
-/-! ## 2. `WatchDeadline`, deadline.ts:9-20, and `pollUntilTerminal`, policy.ts:509-562 -/
+/-! ## 2. `WatchDeadline`, deadline.ts:9-20, and `pollUntilTerminal`, policy.ts:507-560 -/
 
 /-- A JavaScript number of seconds that may be `Infinity`. -/
 inductive Seconds
@@ -128,12 +128,12 @@ def WatchDeadline.remaining (d : WatchDeadline) (now : Nat) : Seconds :=
   | .finite expiresAt => .finite (expiresAt - now)
   | .infinity => .infinity
 
-/-- policy.ts:519 `deadline.remaining() > 0`. -/
+/-- policy.ts:517 `deadline.remaining() > 0`. -/
 def Seconds.positive : Seconds → Bool
   | .finite remaining => decide (0 < remaining)
   | .infinity => true
 
-/-- policy.ts:537-540 and 557 `Math.min(seconds, deadline.remaining())`. -/
+/-- policy.ts:535-538 and 555 `Math.min(seconds, deadline.remaining())`. -/
 def Seconds.cap (remaining : Seconds) (seconds : Nat) : Nat :=
   match remaining with
   | .finite r => min seconds r
@@ -169,7 +169,7 @@ structure PollingOptions where
   maxQueryErrors : Nat
 deriving Repr, DecidableEq
 
-/-- How one `await args.step()` at policy.ts:522 ends. -/
+/-- How one `await args.step()` at policy.ts:520 ends. -/
 inductive StepOutcome
   | terminal                       -- returned `{ kind: "terminal" }`
   | sleep (seconds : Nat)          -- returned `{ kind: "sleep", seconds }`
@@ -179,7 +179,7 @@ inductive StepOutcome
   | otherError                     -- threw anything else
 deriving Repr, DecidableEq
 
-/-- The step returned, so policy.ts:523 `failures = 0` ran. -/
+/-- The step returned, so policy.ts:521 `failures = 0` ran. -/
 def StepOutcome.succeeded : StepOutcome → Bool
   | .terminal | .sleep _ | .continue_ => true
   | _ => false
@@ -187,16 +187,16 @@ def StepOutcome.succeeded : StepOutcome → Bool
 /-- What the last pass of the loop did. -/
 inductive Last
   | start                                 -- no pass yet
-  | sleptPoll (seconds : Nat)             -- policy.ts:556 `clock.sleep(seconds)`
-  | sleptRetry (seconds : Nat)            -- policy.ts:550 `clock.sleep(seconds)`
+  | sleptPoll (seconds : Nat)             -- policy.ts:554 `clock.sleep(seconds)`
+  | sleptRetry (seconds : Nat)            -- policy.ts:548 `clock.sleep(seconds)`
   | continued                             -- `continue` result: no sleep
-  | returnedVerdict                       -- policy.ts:553
-  | returnedStatusQuery (failures : Nat)  -- policy.ts:536
-  | returnedOnDeadline                    -- policy.ts:561, from 519 or the `break` at 525
-  | threw                                 -- policy.ts:526
+  | returnedVerdict                       -- policy.ts:551
+  | returnedStatusQuery (failures : Nat)  -- policy.ts:534
+  | returnedOnDeadline                    -- policy.ts:559, from 517 or the `break` at 523
+  | threw                                 -- policy.ts:524
 deriving Repr, DecidableEq
 
-/-- The loop is back at policy.ts:519. -/
+/-- The loop is back at policy.ts:517. -/
 def Last.running : Last → Bool
   | .start | .sleptPoll _ | .sleptRetry _ | .continued => true
   | _ => false
@@ -207,10 +207,10 @@ def Last.sleepSeconds : Last → Option Nat
   | _ => none
 
 structure State where
-  failures : Nat        -- policy.ts:515
+  failures : Nat        -- policy.ts:513
   remaining : Seconds   -- `deadline.remaining()` now
   last : Last
-  retries : Nat         -- ghost: `clock.sleep` calls at policy.ts:550 since the last successful step
+  retries : Nat         -- ghost: `clock.sleep` calls at policy.ts:548 since the last successful step
   slept : Nat           -- ghost: sum of every `clock.sleep` argument
 deriving Repr, DecidableEq
 
@@ -222,36 +222,36 @@ structure Event where
   sleepElapsed : Nat
 deriving Repr, DecidableEq
 
-/-- policy.ts:515-518. -/
+/-- policy.ts:513-516. -/
 def init (remaining : Seconds) : State := ⟨0, remaining, .start, 0, 0⟩
 
-/-- One pass from the loop head, policy.ts:519-561. `none` once the function has
+/-- One pass from the loop head, policy.ts:517-559. `none` once the function has
 returned or thrown. -/
 def pollStep (o : PollingOptions) (s : State) (e : Event) : Option State :=
   if s.last.running = false then none
   else if s.remaining.positive = false then
-    some { s with last := .returnedOnDeadline }                                    -- 519, 561
+    some { s with last := .returnedOnDeadline }                                    -- 517, 559
   else
-    let remaining := s.remaining.elapse e.stepElapsed                              -- 522
+    let remaining := s.remaining.elapse e.stepElapsed                              -- 520
     match e.outcome with
-    | .terminal =>                                                                 -- 523, 553
+    | .terminal =>                                                                 -- 521, 551
       some { s with failures := 0, retries := 0, remaining := remaining, last := .returnedVerdict }
-    | .sleep seconds =>                                                            -- 523, 554-558
+    | .sleep seconds =>                                                            -- 521, 552-556
       let requested := remaining.cap seconds
       some { failures := 0, retries := 0, remaining := remaining.elapse e.sleepElapsed,
              last := .sleptPoll requested, slept := s.slept + requested }
-    | .continue_ =>                                                                -- 523, then 519
+    | .continue_ =>                                                                -- 521, then 517
       some { s with failures := 0, retries := 0, remaining := remaining, last := .continued }
-    | .deadlineExceeded => some { s with remaining := remaining, last := .returnedOnDeadline }  -- 525
-    | .otherError => some { s with remaining := remaining, last := .threw }        -- 526
+    | .deadlineExceeded => some { s with remaining := remaining, last := .returnedOnDeadline }  -- 523
+    | .otherError => some { s with remaining := remaining, last := .threw }        -- 524
     | .queryError retryable =>
-      let failures := s.failures + 1                                               -- 534
-      if retryable = false ∨ failures ≥ o.maxQueryErrors then                      -- 535-536
+      let failures := s.failures + 1                                               -- 532
+      if retryable = false ∨ failures ≥ o.maxQueryErrors then                      -- 533-534
         some { s with failures := failures, remaining := remaining, last := .returnedStatusQuery failures }
       else
-        let retryInSeconds := remaining.cap (queryBackoffSeconds o.interval failures)  -- 537-540
+        let retryInSeconds := remaining.cap (queryBackoffSeconds o.interval failures)  -- 535-538
         some { failures := failures, retries := s.retries + 1, remaining := remaining.elapse e.sleepElapsed,
-               last := .sleptRetry retryInSeconds, slept := s.slept + retryInSeconds }  -- 550-551
+               last := .sleptRetry retryInSeconds, slept := s.slept + retryInSeconds }  -- 548-549
 
 /-- The state after a sequence of passes. -/
 def run (o : PollingOptions) (s : State) : List Event → State
@@ -451,25 +451,25 @@ def stallOutcomes : List StepOutcome :=
 #eval stallOutcomes
 #guard stallOutcomes.length == 2 && stallOutcomes.all fun outcome => outcome == .continue_ || outcome == .sleep 0
 
-/-! ## 3. `noChecksConfirmer`, policy.ts:63-85 -/
+/-! ## 3. `noChecksConfirmer`, policy.ts:64-86 -/
 
-/-- policy.ts:66. -/
+/-- policy.ts:67. -/
 def NO_CHECKS_CONFIRM_SECONDS : Nat := 60
 
-/-- A value of the `firstSeen` map, policy.ts:70-73. `seenAt` is the field `at`. -/
+/-- A value of the `firstSeen` map, policy.ts:71-74. `seenAt` is the field `at`. -/
 structure Sighting where
   headRefOid : Nat
   seenAt : Nat
 deriving Repr, DecidableEq
 
-/-- The `firstSeen` map of policy.ts:70, keyed by PR number. -/
+/-- The `firstSeen` map of policy.ts:71, keyed by PR number. -/
 abbrev FirstSeen := Nat → Option Sighting
 
-/-- policy.ts:79-82 `firstSeen.set(pr, sighting)`. -/
+/-- policy.ts:80-83 `firstSeen.set(pr, sighting)`. -/
 def firstSeenSet (firstSeen : FirstSeen) (pr : Nat) (sighting : Sighting) : FirstSeen :=
   fun n => if n = pr then some sighting else firstSeen n
 
-/-- One call of the closure, policy.ts:74-84: the map after the call and the
+/-- One call of the closure, policy.ts:75-85: the map after the call and the
 result. Truncated `now - prior.seenAt` agrees with JavaScript, where a negative
 difference is also below 60. -/
 def confirm (firstSeen : FirstSeen) (now pr headRefOid : Nat) : FirstSeen × Bool :=
@@ -488,7 +488,7 @@ structure Call where
 deriving Repr, DecidableEq
 
 /-- The map after the calls in `past`, newest first, from the empty map of
-policy.ts:70. -/
+policy.ts:71. -/
 def firstSeenAfter : List Call → FirstSeen
   | [] => fun _ => none
   | c :: older => (confirm (firstSeenAfter older) c.now c.pr c.headRefOid).1

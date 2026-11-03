@@ -36,6 +36,18 @@
       "since": "0.9.29",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/how/SKILL.md": {
+      "kind": "policy",
+      "why": "Makes the parent check that the files and functions the explainer names exist, and fix or flag any that do not, before it presents the explanation.",
+      "since": "0.9.129",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/how/references/explainer-prompt.md": {
+      "kind": "policy",
+      "why": "Tells a lone explainer on the simple path that no explorers ran and that it traces the code itself with Read, Grep, and Glob before explaining.",
+      "since": "0.9.129",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/no-comments/SKILL.md": {
       "kind": "policy",
       "why": "Treats a HOLD that names its dependency, platform, vendor, or protocol rule and where to check it as settled for the run, restores as a HOLD any kill of such a comment without a refuting page or file, and limits a second rejected report's failure to that report's findings so the accepted work still lands. Sets comment-sicko's model from the no-comments reviewer line in pstack-models.md.",

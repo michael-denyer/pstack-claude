@@ -44,13 +44,13 @@ assert run('enable', ['plugin', 'enable', 'pstack']) == 0
 assert run('enabled', ['-p', '/poteto-mode', '-m', 'probe', '--output-format', 'json']) == 0
 first = json.dumps(requests)
 assert 'On every task, read pstack' in first
-assert 'references/grok-tools.md' in first
+assert 'references/grok.md' in first
 requests.clear()
 assert run('disable', ['plugin', 'disable', 'pstack']) == 0
 assert run('disabled', ['-p', '/poteto-mode', '-m', 'probe', '--output-format', 'json']) == 0
 second = json.dumps(requests)
 assert 'On every task, read pstack' not in second
-assert 'references/grok-tools.md' not in second
+assert 'references/grok.md' not in second
 assert run('uninstall', ['plugin', 'uninstall', 'pstack', '--confirm']) == 0
 server.shutdown()
 print('PASS: native skill routing description and explicit skill expansion disappear when disabled')

@@ -71,6 +71,8 @@ If you touched `plugins/pstack/pi/` or `pi-tools.md`, run the Pi checks against 
 
 If you touched `plugins/pstack/hooks/`, `copilot-tools.md`, or `setup-pstack`, run `tests/copilot-smoke.sh` against a signed-in `copilot` CLI. It installs the checkout into a throwaway `HOME` and `COPILOT_HOME`, spends about twenty premium requests, and skips when `copilot` is missing. Set `SMOKE_GITHUB=<owner>/<repo>@<ref>` to repeat the plugin-file checks on a GitHub marketplace install of a pushed ref.
 
+If you touched the Grok plugin manifest, routing skill, or mapping, run `python3 tests/grok-smoke.py` with Grok Build installed. It uses an isolated home and synthetic local provider to check the routing description and explicit skill content; it does not make real model calls.
+
 If you touched `plugins/pstack/hooks/`, `minimax-tools.md`, or the plugin's manifests, run `tests/minimax-smoke.sh`. It installs `@minimax-ai/code` into a throwaway npm prefix, or uses the `mcode` that `MCODE` names, copies the checkout into a throwaway `MINIMAX_DATA_DIR` as a local plugin, and checks that MiniMax Code reads it through the Claude Code manifest with every skill and agent. It makes no model calls and needs no sign-in.
 
 If you touched `skills/poteto-mode/scripts/`:

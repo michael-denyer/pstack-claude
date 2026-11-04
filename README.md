@@ -92,9 +92,14 @@ The first command installs the native Muse plugin bundle. The second approves it
 <details>
 <summary><strong>Grok Build</strong></summary>
 
-Install from a local checkout with `grok plugin install /path/to/pstack-claude/plugins/pstack --trust`, then run `grok plugin enable pstack` and start a new session. Use `/poteto-mode` to load the skill explicitly. A plugin-owned routing skill also asks the model to read poteto-mode on each task. This is a model-followed hint, not a guaranteed instruction: Grok Build 1.0.70 discards SessionStart hook output. The `session hook: off` setting does not suppress the hint. `grok plugin disable pstack` removes it along with all pstack skills; `grok plugin enable pstack` restores them.
+```shell
+git clone https://github.com/michael-denyer/pstack-claude
+cd pstack-claude
+grok plugin install "$PWD/plugins/pstack" --trust
+grok plugin enable pstack
+```
 
-Local installs are copies. In Grok Build 1.0.70, `grok plugin update pstack` reports a live local symlink even though source edits did not reach the installed copy in our test. Before updating, inspect `grok plugin details pstack` and its source, check for local changes in the installed copy, and record whether pstack is enabled or disabled. Stop Grok sessions before replacing it. Pull the checkout, uninstall with `grok plugin uninstall pstack --keep-data`, and repeat the install command. Then restore the prior state: run `grok plugin enable pstack` if it was enabled, or `grok plugin disable pstack` if it was disabled. Grok 1.0.70 can add pstack to the enabled list during reinstall even when it remains in the disabled list, so explicitly disable it again before restarting a disabled installation. Removal deletes the installed cached copy; `--keep-data` preserves persistent plugin data, not local edits in that copy. The plugin is unavailable between those commands, and the new install requires trust again. If a skill is missing, check `grok plugin list` and `grok inspect`, confirm the plugin is enabled and trusted, and start a new session. The Grok-specific mapping describes tool and model limitations in more detail.
+Start a new session and use `/poteto-mode` to load the skill explicitly. To update a local install, quit Grok sessions, inspect `grok plugin details pstack` and back up any edits in the installed copy, pull the checkout, run `grok plugin uninstall pstack --keep-data`, and repeat the last two commands. If pstack was disabled, disable it again before restarting. `grok plugin update` does not refresh a local install.
 
 </details>
 

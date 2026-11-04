@@ -993,7 +993,10 @@ export function problems(root, models) {
   });
   attempt(() => validateSkillsTree(skillsDir));
   attempt(() => validateProsePaths(skillsDir));
-  for (const packaged of packages) attempt(() => packaged.runtime.validate({ ...packaged, read, pathExists }));
+  // Windows stat modes cannot represent the POSIX execute bits; Unix checks
+  // still verify them, and every host checks that the hook paths exist.
+  const checkExecutable = process.platform !== "win32";
+  for (const packaged of packages) attempt(() => packaged.runtime.validate({ ...packaged, read, pathExists, statOf, checkExecutable }));
   attempt(() => validatePluginLayout(pluginRoot));
   attempt(() => validateAgentFrontmatter(pluginRoot));
   const hooksFiles = [
@@ -1003,9 +1006,7 @@ export function problems(root, models) {
     ),
   ];
   for (const { file, root } of hooksFiles) {
-    // Windows stat modes cannot represent the POSIX execute bits; Unix checks
-    // still verify them, and every host checks that the hook paths exist.
-    attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file, root, checkExecutable: process.platform !== "win32" }));
+    attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file, root, checkExecutable }));
   }
   return failures;
 }

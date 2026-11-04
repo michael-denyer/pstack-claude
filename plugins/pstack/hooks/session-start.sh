@@ -56,6 +56,7 @@ else
   normalized=
 fi
 if printf '%s\n' "$normalized" | grep -qx 'session hook: off'; then
+  [ "$runtime" != agy ] || printf '{}\n'
   exit 0
 fi
 

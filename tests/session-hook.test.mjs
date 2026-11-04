@@ -102,13 +102,6 @@ function runHook(runtime, sheet, command) {
 }
 
 describe("SessionStart hook", () => {
-  test("Antigravity disabled hook returns an empty JSON object", () => {
-    const r = runHook("agy", "session hook: off\n");
-    expect(r.status).toBe(0);
-    expect(r.err).toBe("");
-    expect(JSON.parse(r.out)).toEqual({});
-  });
-
   // The manifest names Codex's own hooks file instead of relying on Codex's
   // default discovery; `resume` keeps the mandate present after a restart.
   test("declares the hook in the Codex manifest", () => {

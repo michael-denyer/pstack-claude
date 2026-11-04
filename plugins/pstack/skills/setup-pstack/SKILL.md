@@ -13,6 +13,8 @@ On Muse, read the [platform mapping](../poteto-mode/references/muse-tools.md), i
 
 On Antigravity, read the [platform mapping](../poteto-mode/references/agy-tools.md), including its per-skill notes, before following this skill.
 
+On Grok Build, read the [platform mapping](../poteto-mode/references/grok.md) and skip step 4, the effort questions in step 3 and effort validation in step 5; omit effort and `session hook` lines and suffixes from the sheet. Grok exposes no effort control, and the `session hook` line does not control the Grok routing hint.
+
 On GitHub Copilot, follow [the Copilot setup](copilot.md) in place of steps 1, 3, 4, and 7 and step 6's header.
 
 On OMP, follow [OMP setup](../poteto-mode/references/omp-tools.md#model-names) instead of steps 1 through 8. OMP uses native model roles and agent overrides; its global pstack sheet controls only the session hook. Ask whether main-session routing should be on or off for all OMP profiles. In `~/.omp/pstack-models.md`, replace all `session hook:` lines with one exact `session hook: on` or `session hook: off` line, preserving other lines and the existing encoding. Confirm the global scope and restart the session to clear earlier context.
@@ -127,6 +129,7 @@ The role lines are the same everywhere. What differs is the sheet path, how the 
 | Kimi Code CLI | `<KIMI_CODE_HOME>/pstack-models.md`, or `~/.kimi-code/pstack-models.md` when unset | read by the agent before a role-model skill; no hook setting | the `Agent` tool's model parameter when a subagent model pool is configured, see [kimi-tools.md](../poteto-mode/references/kimi-tools.md#model-names) | installation and synthetic-provider context delivery checked on Kimi 2.4.1 for macOS; model compliance untested |
 | Antigravity (`agy`) | `~/.gemini/config/pstack-models.md` | model rows: read by the agent before a role-model skill, or paste into `~/.gemini/config/AGENTS.md`; hook setting: read by the plugin's `SessionStart` hook | `invoke_subagent`'s `Model` enum (`inherit`, `flash_lite`, `flash`, `pro`), see [agy-tools.md](../poteto-mode/references/agy-tools.md#model-names) | tested with `agy` 1.5.0 on macOS: plugin install, hook on/off, full skill read and a live subagent reply; Windows untested |
 | OMP | `~/.omp/pstack-models.md` (global across profiles; hook only) | read by the OMP plugin for routing | `omp models --kind chat`; model roles use OMP configuration, see [omp-tools.md](../poteto-mode/references/omp-tools.md#model-names) | extension and routing tested with a synthetic provider |
+| Grok Build | `${GROK_HOME:-~/.grok}/pstack-models.md` | read by the agent before a role-model skill; the `session hook` line does not control the Grok routing hint | the session model selector; see [grok.md](../poteto-mode/references/grok.md#model-names) | synthetic-provider plugin and skill loading tested |
 | opencode | `~/.config/opencode/pstack-models.md` | add the path to the `instructions` array in `opencode.json` | the `models` slash command in the session | from published docs, no live session |
 | Gemini CLI | `~/.gemini/pstack-models.md` | `@~/.gemini/pstack-models.md` in `~/.gemini/GEMINI.md` | the `model` slash command in the session | from published docs, no live session |
 | Prime Agent | no documented sheet path; Prime's configuration chooses models | | | no live session |

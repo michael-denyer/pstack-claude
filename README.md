@@ -118,6 +118,20 @@ To test an unreleased checkout, use `/plugins install /absolute/path/to/pstack-c
 </details>
 
 <details>
+<summary><strong>Grok Build</strong></summary>
+
+```shell
+git clone https://github.com/michael-denyer/pstack-claude
+cd pstack-claude
+grok plugin install "$PWD/plugins/pstack" --trust
+grok plugin enable pstack
+```
+
+Start a new session and use `/poteto-mode` to load the skill explicitly. To update a local install, quit Grok sessions, inspect `grok plugin details pstack` and back up any edits in the installed copy, pull the checkout, run `grok plugin uninstall pstack --keep-data`, and repeat the last two commands. If pstack was disabled, disable it again before restarting. `grok plugin update` does not refresh a local install.
+
+</details>
+
+<details>
 <summary><strong>MiniMax Code</strong></summary>
 
 Run in your terminal:
@@ -170,9 +184,9 @@ To update, run `git pull` in the clone, then run the `for` loop again to link sk
 
 ### Configure
 
-pstack routes tasks to `poteto-mode` automatically. At session start, a hook injects an instruction that points the agent at it: the plugin's hook on Claude Code, Codex, GitHub Copilot, Muse, and MiniMax Code, and the pstack extension on Pi. Codex runs the hook only after you trust it through `/hooks`, and Muse only after `muse plugins approve pstack`. Other harnesses have no hook.
+pstack provides automatic routing on Claude Code, Codex, GitHub Copilot, Muse, MiniMax Code, Antigravity, Pi, Kimi Code CLI, and OMP. The runtimes deliver the instruction at different points: Kimi adds it while the plugin is enabled, and OMP adds it before each main-agent turn. Grok Build exposes a routing hint through a skill description; the model may not follow it. Codex requires hook trust through `/hooks`, and Muse requires `muse plugins approve pstack`.
 
-Run `setup-pstack` to turn automatic routing on or off, change model defaults, or set a reasoning effort per role (`arena runners: opus @xhigh, fable @max`).
+Run `setup-pstack` to configure the options supported by your runtime. On OMP, the session hook setting applies globally across profiles; on Kimi, enable or disable the plugin to control routing. See the [routing reference](docs/reference.md#automatic-routing).
 
 ## Getting started
 

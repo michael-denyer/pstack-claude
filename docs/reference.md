@@ -56,7 +56,7 @@ Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
 ## Runtime support
 
-All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code, Codex, GitHub Copilot, and Muse plugins also install automatic routing hooks, the Kimi plugin contributes routing to the system prompt, and the Pi package adds an extension that injects the same routing and supplies the subagent tools.
+All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. Claude Code, Codex, GitHub Copilot, Muse, MiniMax Code, and Antigravity use plugin hooks for routing. Kimi adds routing while its plugin is enabled, OMP adds it before main-agent turns, and Pi adds it through an extension that also supplies subagent tools. Grok exposes a routing hint through a skill description, which the model may not follow.
 
 | Runtime | Setup and recorded verification |
 | --- | --- |
@@ -67,6 +67,7 @@ All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only i
 | Muse | Install the native plugin bundle with `muse plugins install`, then approve its hooks and agent definitions with `muse plugins approve pstack`. The [Muse mapping](../plugins/pstack/skills/poteto-mode/references/muse-tools.md) translates Claude tools, subagents, transcripts, and model roles. See [Muse](#muse). |
 | OMP | Install through the marketplace as described in the [README](../README.md#install). The [OMP mapping](../plugins/pstack/skills/poteto-mode/references/omp-tools.md) covers tools and model roles. |
 | Kimi Code CLI | Install the native plugin from a release containing its manifest, or test a clean local copy as described in the [README](../README.md#install). The [Kimi mapping](../plugins/pstack/skills/poteto-mode/references/kimi-tools.md) covers tool and model differences. On Kimi Code CLI 2.4.1 for macOS, installation and delivery of routing and skill content to a synthetic provider were verified; model compliance has not been tested. |
+| Grok Build | Install the native plugin from a local checkout as described in the [README](../README.md#install). The [Grok mapping](../plugins/pstack/skills/poteto-mode/references/grok.md) covers tool and model differences. On Grok Build 1.0.70 for macOS, `tests/grok-smoke.py` checked that a synthetic provider received the routing skill description and explicit skill content. |
 | MiniMax Code | Copy `plugins/pstack` into `${MINIMAX_DATA_DIR:-~/.minimax}/plugins/`, where MiniMax Code loads it as the local plugin `pstack@local` through its Claude Code reader, skills, agents, and routing hook included. The [MiniMax Code mapping](../plugins/pstack/skills/poteto-mode/references/minimax-tools.md) translates Claude tools, subagents, and model roles. Plugin loading is smoke-tested on 0.7.4 with `tests/minimax-smoke.sh`; no live MiniMax Code session has been run, so the routing hook, skill loading, and agent dispatch in a session are untested. |
 | Antigravity (`agy`) | Install `plugins/pstack` with `agy plugin install ./plugins/pstack`. Antigravity reads [`.antigravity-plugin/plugin.json`](../plugins/pstack/.antigravity-plugin/plugin.json) and the root [`hooks.json`](../plugins/pstack/hooks.json). The [Antigravity mapping](../plugins/pstack/skills/poteto-mode/references/agy-tools.md) translates Claude tools, subagents, transcripts, and model roles. On macOS, a signed-in `agy` 1.5.0 session received the routing instruction and read the full `poteto-mode` skill. A separate session dispatched `poteto-agent` and received its reply. The hook uses `sh`; Windows is untested. |
 | Prime Agent | Its documentation describes shared-directory discovery; it has not been tested in a live session. Choose tools and models through Prime's configuration. |
@@ -85,9 +86,9 @@ The Claude Code, Codex, and GitHub Copilot plugins load the same short [routing 
 
 Smaller tasks proceed directly. The full skill loads when invoked, and explicit user instructions take precedence.
 
-To disable routing, run `setup-pstack` and turn off the session hook. In Claude Code, use `/pstack:setup-pstack`. You can also write `session hook: off` in the runtime's sheet, at the path in [setup-pstack's runtime table](../plugins/pstack/skills/setup-pstack/SKILL.md#other-runtimes). The hook reads that setting before injecting its instruction. Without the setting, routing stays on.
+On runtimes that support the session hook setting, run `setup-pstack` and turn it off, or write `session hook: off` in the runtime's sheet at the path in [setup-pstack's runtime table](../plugins/pstack/skills/setup-pstack/SKILL.md#other-runtimes). In Claude Code, use `/pstack:setup-pstack`. On OMP this setting applies across profiles. On Kimi, disable the plugin to stop its routing instruction. Grok's routing hint is not controlled by the session hook setting.
 
-Skills-only installs and other runtimes do not include the hook or the Pi extension. Request `poteto-mode` explicitly, or add a standing instruction to the runtime's instruction file.
+Skills-only installs do not include these runtime integrations. Request `poteto-mode` explicitly, or add a standing instruction to the runtime's instruction file.
 
 ### Shared skills installation
 

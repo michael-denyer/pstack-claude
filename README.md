@@ -193,7 +193,7 @@ To update, run `git pull` in the clone, then run the `for` loop again to link sk
 
 pstack routes tasks to `poteto-mode` automatically. At session start, a hook injects an instruction that points the agent at it: the plugin's hook on Claude Code, Codex, GitHub Copilot, Muse, MiniMax Code, and Antigravity; the Kimi plugin; the pstack extension on Pi; and the OpenCode plugin in root sessions at each model step. Codex runs the hook only after you trust it through `/hooks`, and Muse only after `muse plugins approve pstack`. Other skills-only installs have no hook.
 
-Run `setup-pstack` to turn automatic routing on or off, change model defaults, or set a reasoning effort per role (`arena runners: opus @xhigh, fable @max`).
+Run `setup-pstack` to configure model choices and routing where supported. Kimi controls routing through the plugin enabled state; Grok provides a model-followed routing hint that is removed by disabling the plugin.
 
 ## Getting started
 

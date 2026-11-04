@@ -2,6 +2,7 @@
 // generator iterates, with each runtime's Model names renderer, models.json
 // check, versioned manifest, packaging validator, and hooks files.
 
+import { isDeepStrictEqual } from "node:util";
 import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 
 // Every runtime other than Claude Code that reads the skills through a mapping
@@ -20,6 +21,7 @@ import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 // MiniMax Code reads the Claude Code build as it ships, so its row names the
 // Claude Code manifest and stamps no preambles; its one pointer is in
 // poteto-mode's Platform Adaptation section, as Pi's is.
+// Antigravity keys its hooks by group name instead of the shared hooks schema.
 export const RUNTIMES = [
   {
     name: "Codex",
@@ -83,8 +85,8 @@ export const RUNTIMES = [
     modelNames: agyModelNamesSection,
     skillPreambles: true,
     manifest: `${PLUGIN}/.antigravity-plugin/plugin.json`,
-    validate: ({ manifest, read, pathExists }) =>
-      validateAgyManifest(manifest, { claude: JSON.parse(read(`${PLUGIN}/.claude-plugin/plugin.json`)), read, pathExists }),
+    validate: ({ manifest, read, statOf, checkExecutable }) =>
+      validateAgyManifest(manifest, { claude: JSON.parse(read(`${PLUGIN}/.claude-plugin/plugin.json`)), read, statOf, checkExecutable }),
   },
 ].map((runtime) => ({
   ...runtime,
@@ -436,25 +438,23 @@ export function minimaxModelNamesSection(models) {
   );
 }
 
-export function validateAgyManifest(manifest, { claude, read, pathExists }) {
+const agyScript = "hooks/session-start.sh";
+const agyCommand = `./${agyScript} agy`;
+export const AGY_HOOKS = {
+  "pstack-routing": { SessionStart: [{ type: "command", command: agyCommand }] },
+};
+
+export function validateAgyManifest(manifest, { claude, read, statOf, checkExecutable = true }) {
   const at = `${PLUGIN}/.antigravity-plugin/plugin.json`;
   if (manifest.name !== claude.name) throw new Error(`${at}: name "${manifest.name}" != Claude Code manifest name "${claude.name}"`);
-  const paths = [
-    ...(manifest.logo ? [manifest.logo] : []),
-    "hooks.json",
-    "hooks/agy-session-start.sh",
-    "hooks/agy-context.awk",
-    "hooks/json.awk",
-    "hooks/session-start-agy.md",
-  ];
-  for (const path of paths) {
-    if (!pathExists(`${PLUGIN}/${path}`)) throw new Error(`${at}: ${path} does not exist in the plugin`);
+  if (manifest.logo && !statOf(manifest.logo)?.isFile()) throw new Error(`${at}: ${manifest.logo} is not a file in the plugin`);
+  const hooksFile = `${PLUGIN}/hooks.json`;
+  if (!isDeepStrictEqual(JSON.parse(read(hooksFile)), AGY_HOOKS)) {
+    throw new Error(`${hooksFile}: expected pstack-routing.SessionStart to run ${agyCommand}`);
   }
-  const hooks = JSON.parse(read(`${PLUGIN}/hooks.json`));
-  const start = hooks?.["pstack-routing"]?.SessionStart;
-  if (!Array.isArray(start) || !start.some((h) => h?.type === "command" && h?.command === "./hooks/agy-session-start.sh")) {
-    throw new Error(`${PLUGIN}/hooks.json must declare ./hooks/agy-session-start.sh under pstack-routing.SessionStart`);
-  }
+  const script = statOf(agyScript);
+  if (!script?.isFile()) throw new Error(`${hooksFile}: ${agyScript} is not a file in the plugin`);
+  if (checkExecutable && !(script.mode & 0o111)) throw new Error(`${hooksFile}: ${agyScript} is not executable`);
 }
 
 export function agyModelNamesSection(models) {
@@ -464,13 +464,12 @@ export function agyModelNamesSection(models) {
     "- The model sheet is `~/.gemini/config/pstack-models.md`. Before a skill that needs a role model " +
     `(${roleSkills(models).map(code).join(", ")}), read it. With no sheet, read \`setup-pstack\`'s \`SKILL.md\` ` +
     "and finish it first.\n" +
-    "- A role line in the sheet is the user's explicit model instruction, so pass it as `invoke_subagent`'s `Model` " +
-    "(`inherit`, `flash_lite`, `flash`, or `pro`). `inherit-parent` or `auto` maps to `inherit` (or omits `Model`).\n" +
-    `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose (for example \`flash\`).\n` +
-    `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): ` +
-    "the strongest model the user chose (for example `pro`).\n" +
-    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): vary across available " +
-    "`Model` tiers (`pro`, `flash`, `inherit`) and note in the verdict when diversity is reduced.\n\n" +
-    "`/setup-pstack` writes the configured model list to `~/.gemini/config/pstack-models.md`."
+    "- Pass the role's model as `Model` on `invoke_subagent`. For `inherit-parent` or `auto`, omit `Model`.\n" +
+    `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose.\n` +
+    `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): the strongest model the user chose.\n` +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
+    "signal comes from model diversity. Use distinct available models and report when the panel shares a model family.\n\n" +
+    "`/setup-pstack` writes the sheet. Antigravity accepts `flash_lite`; the Copilot sheet checker rejects underscores " +
+    "in model IDs and does not apply to Antigravity."
   );
 }

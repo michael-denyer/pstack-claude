@@ -3,7 +3,7 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": "./hooks/agy-session-start.sh"
+        "command": "./hooks/session-start.sh agy"
       }
     ]
   }

@@ -1,7 +1,7 @@
 <EXTREMELY_IMPORTANT>
 You have pstack.
 
-Read the `poteto-mode` skill's `SKILL.md` with `read_file` and follow its instructions when a task meets any of these:
+Read the `poteto-mode` skill's `SKILL.md` in full with `read_file` and follow its instructions when a task meets any of these:
 
 - it touches more than one file, or changes a signature other files call
 - it involves a design or architecture choice

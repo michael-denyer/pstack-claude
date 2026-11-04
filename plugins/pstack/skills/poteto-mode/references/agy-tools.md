@@ -1,6 +1,6 @@
 # Antigravity tool mapping for pstack
 
-Antigravity (`agy` CLI, Antigravity IDE, and Antigravity 2.0) loads the native pstack plugin manifest, the skills, the four plugin subagents, and the `SessionStart` hook. Resolve each Claude Code tool, model, and path a pstack skill names here.
+The Antigravity CLI (`agy`) loads the native pstack plugin manifest, the skills, the four plugin subagents, and the `SessionStart` hook. Resolve each Claude Code tool, model, and path a pstack skill names here.
 
 ## Tool actions
 
@@ -10,9 +10,9 @@ Antigravity (`agy` CLI, Antigravity IDE, and Antigravity 2.0) loads the native p
 | Create a file | `write_file` |
 | Edit a file | `edit_file` |
 | Run a shell command | `run_command` (and `manage_task` to inspect, send input to, or kill background tasks) |
-| Search file contents / find files | `grep_search` / `find_by_name`, or `rg` / `fd` via `run_command` |
+| Search file contents / find files | Run `rg` to search file contents and `rg --files` or `fd` to find files via `run_command` |
 | Fetch a URL / search the web | `search_web` or `curl` via `run_command` |
-| Invoke a skill (the `Skill` tool, `/command`) | Read the skill's `SKILL.md` with `read_file` from its path in the system prompt's `<skills>` catalog |
+| Invoke a skill (the `Skill` tool, `/command`) | Use `read_file` on the path in the `<skills>` catalog. Read `poteto-mode/SKILL.md` in full: the native loader includes only the first 24,000 bytes of a skill body. |
 | Dispatch a subagent (the `Agent`/`Task` tool) | `invoke_subagent` with `TypeName`, `Role`, `Prompt`, `Model`, and `Workspace` |
 | Dispatch N parallel subagents in one turn | N `invoke_subagent` calls in one response |
 | Wait for a subagent result | End the turn (call no more tools). Antigravity resumes the session automatically when a subagent sends a message or finishes. |
@@ -29,7 +29,7 @@ Antigravity (`agy` CLI, Antigravity IDE, and Antigravity 2.0) loads the native p
 poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "pstack:poteto-agent"`, `run_in_background: true`). On Antigravity:
 
 - The plugin's four agents register in the `<subagents>` list (`pstack:poteto-agent` / `poteto-agent`, `pstack:comment-sicko` / `comment-sicko`, `pstack:thermo-nuclear-review-subagent` / `thermo-nuclear-review-subagent`, and `pstack:thermo-nuclear-code-quality-review-subagent` / `thermo-nuclear-code-quality-review-subagent`). Pass the agent name as `TypeName` in `invoke_subagent`. `general-purpose` maps to `self` (full tool access) or `research` (read-only sandbox).
-- Put the absolute path of `poteto-mode`'s `SKILL.md` (`~/.gemini/config/plugins/pstack/skills/poteto-mode/SKILL.md`) in every `poteto-agent` prompt, as poteto-mode asks.
+- Give each `poteto-agent` the installed path to `poteto-mode/SKILL.md` from the skills catalog. Expand `~` to the user's home directory and tell the agent to read the entire file with `read_file`, including the model and reasoning effort sections at the end.
 - `invoke_subagent` always runs asynchronously in the background, so `run_in_background: true` needs no extra flag.
 - `readonly: true` (reviewers, explorers, critics) maps to `TypeName: "research"` when no MCP or write tools are needed, or an explicit no-write instruction in `Prompt` when full MCP access is required.
 - `isolation: "worktree"` maps to `Workspace: "share"` (creates a shared git worktree-style workspace) or `Workspace: "branch"` on `invoke_subagent`, or a manual `git worktree add` path named in `Prompt`.
@@ -40,12 +40,12 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 Skills name Claude Code model aliases in their Models sections. On Antigravity (`agy`), `invoke_subagent`'s `Model` parameter accepts `inherit` (default, uses the parent's model), `flash_lite`, `flash`, and `pro`.
 
 - The model sheet is `~/.gemini/config/pstack-models.md`. Before a skill that needs a role model (`architect`, `arena`, `how`, `interrogate`, `no-comments`, `poteto-mode`, `reflect`, `swarm`, `thermos`, `why`), read it. With no sheet, read `setup-pstack`'s `SKILL.md` and finish it first.
-- A role line in the sheet is the user's explicit model instruction, so pass it as `invoke_subagent`'s `Model` (`inherit`, `flash_lite`, `flash`, or `pro`). `inherit-parent` or `auto` maps to `inherit` (or omits `Model`).
-- Roles that default to the worker model (`feature, refactoring`): the worker model the user chose (for example `flash`).
-- Roles that default to the strongest model (`strongest judgment`): the strongest model the user chose (for example `pro`).
-- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): vary across available `Model` tiers (`pro`, `flash`, `inherit`) and note in the verdict when diversity is reduced.
+- Pass the role's model as `Model` on `invoke_subagent`. For `inherit-parent` or `auto`, omit `Model`.
+- Roles that default to the worker model (`feature, refactoring`): the worker model the user chose.
+- Roles that default to the strongest model (`strongest judgment`): the strongest model the user chose.
+- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial signal comes from model diversity. Use distinct available models and report when the panel shares a model family.
 
-`/setup-pstack` writes the configured model list to `~/.gemini/config/pstack-models.md`.
+`/setup-pstack` writes the sheet. Antigravity accepts `flash_lite`; the Copilot sheet checker rejects underscores in model IDs and does not apply to Antigravity.
 
 ## Session routing hook
 
@@ -70,8 +70,8 @@ Most skills need only the tables above. These need one more mapping:
 
 | Skill | On Antigravity |
 |-------|----------------|
-| `interrogate` | Each adversary is an `invoke_subagent` call with `Model` from the sheet (`pro`, `flash`, `inherit`). |
-| `setup-pstack` | The skill's Other runtimes table names `~/.gemini/config/pstack-models.md`. `invoke_subagent` accepts `inherit`, `flash_lite`, `flash`, and `pro` for `Model`. |
+| `interrogate` | Each adversary is an `invoke_subagent` call with `Model` from the sheet. |
+| `setup-pstack` | The Other runtimes table gives the sheet path. Use the `Model` values listed in [Model names](#model-names). |
 | `architect` | The runner panel goes through the **arena** skill: one `invoke_subagent` call per runner, each with a `Model` from the sheet's `architect runners` line. |
 | `how` | The parallel explorers and the explainer map to `invoke_subagent` fan-out with the sheet's `how` role models. |
 | `arena` | The parallel candidates and the cross-judge map to `invoke_subagent` calls with the sheet's panel lines. |
@@ -89,6 +89,10 @@ Most skills need only the tables above. These need one more mapping:
 | `create-formal-verification-skill` | Write the generated skill to `.agents/skills/<area>/`, named for the area it verifies. |
 | `maintain-formal-verification-skill` | Project skills, the formal verification skill among them, live under `.agents/skills/`. |
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above (`schedule` and `ask_question`). |
+
+## Vendored scripts
+
+Use `run_command` to run the scripts under `skills/poteto-mode/scripts/`. The `watch-pr/watch-pr` watcher needs Bun and the GitHub CLI (`gh`). Run `worktree-audit.mjs` with Node.js. It uses `gh` to look up each branch's PR and imports the transcript walker from the sibling `reflect` skill. It does not read Antigravity transcripts.
 
 ## Instructions file
 

@@ -1,5 +1,5 @@
 // The off-switch grammar every SessionStart implementation must agree on:
-// session-start.sh, session-start.ps1, and Pi's parseSheet. The sheet is
+// session-start.sh, session-start.ps1, Pi's parseSheet, and OpenCode. The sheet is
 // UTF-8, or UTF-16 LE when it starts with that byte-order mark, which is what
 // Windows PowerShell 5.1's `>` writes. A leading byte-order mark is dropped,
 // lines end at LF, and one CR before the LF is dropped; any other CR is part of

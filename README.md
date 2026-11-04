@@ -108,9 +108,9 @@ MiniMax Code loads each directory under `plugins/` in its data directory as a lo
 <details>
 <summary><strong>OpenCode 2</strong></summary>
 
-Clone the repository, then add the absolute path to its `plugins/pstack` directory to the `plugins` array in your OpenCode configuration. Keep the other entries in the array. This loads pstack as a native server plugin and registers its bundled skills under `pstack-` IDs. The routing instruction is enabled for root sessions by default when every pstack ID resolves to this checkout's bundled skill.
+Clone the repository, then add the absolute path to `plugins/pstack` to the existing `plugins` array in `~/.config/opencode/opencode.jsonc`. On Windows, use a path such as `C:/Users/name/pstack-claude/plugins/pstack`. Restart OpenCode after checkout updates.
 
-Alternatively, once a release containing this integration is available, OpenCode 2 can install the repository as a Git package:
+Alternatively, install, check, or update the native Git package:
 
 ```bash
 opencode plugin add 'github:michael-denyer/pstack-claude#main'
@@ -118,19 +118,9 @@ opencode plugin check 'github:michael-denyer/pstack-claude#main'
 opencode plugin update 'github:michael-denyer/pstack-claude#main'
 ```
 
-The Git reference determines what the updater follows; a commit-pinned reference does not advance. If a check immediately after installation reports no package plugins, wait for the server to load the plugin and check again. Avoid changing OpenCode configuration concurrently with plugin installation or removal. Git package installation and updates were tested with a local Git remote and a temporary GitHub fork. Use the upstream specifier after a release includes this integration.
+A commit-pinned reference does not advance. If a check immediately after installation reports no package plugins, wait for the server to load it and check again. Avoid concurrent OpenCode configuration changes during installation or removal; its manager can lose a concurrent update.
 
-For example, add this entry to the existing array in `~/.config/opencode/opencode.jsonc`, replacing the path with your checkout's absolute path. On Windows use a path such as `C:/Users/name/pstack-claude/plugins/pstack`.
-
-```jsonc
-{
-  "plugins": ["/absolute/path/to/pstack-claude/plugins/pstack"]
-}
-```
-
-Before invoking a pstack skill, check its registered path. For example, run `opencode api get /api/skill` and find the `pstack-poteto-mode` entry in `data`; its `path` must be `skills/poteto-mode/SKILL.md` inside the `plugins/pstack` directory of your configured checkout or OpenCode's installed package. Only then mention `@pstack-poteto-mode` or invoke `pstack-poteto-mode` with the `skill` tool. Apply the same check to other `pstack-` IDs before invoking them. Another plugin or user skill can own the same ID; pstack preserves that skill and suppresses automatic routing if any bundled ID resolves elsewhere. Disable or rename the conflicting installation through its owner's documented mechanism, restart the service, and check the paths again. If routing is absent without a collision, verify the pstack plugin is active and that the OpenCode sheet does not contain `session hook: off`.
-
-After updating a local checkout, restart the OpenCode service with `opencode service restart` so it reloads the plugin and skills. To remove a local installation, remove only its path from `plugins` and restart the service. For a Git package, use `opencode plugin remove` with the exact installed specifier. OpenCode 1 uses a different plugin API and is not supported by this integration. See the [OpenCode mapping](plugins/pstack/skills/poteto-mode/references/opencode-tools.md) for routing and invocation details. Explicit skill activation and routing were tested with OpenCode 2.2.5 and a synthetic loopback provider; real model behavior remains untested.
+The plugin registers `pstack-` skill IDs and adds routing in root sessions. If routing is missing, run `opencode api get /api/skill` and check that each `pstack-` path belongs to this plugin. Resolve any conflicting skill before manually invoking that ID. Use `session hook: off` in the OpenCode model sheet to disable routing. To remove the plugin, remove its configured path and restart the service, or use `opencode plugin remove` with the exact Git specifier. OpenCode 1 is unsupported. See the [OpenCode mapping](plugins/pstack/skills/poteto-mode/references/opencode-tools.md).
 
 </details>
 

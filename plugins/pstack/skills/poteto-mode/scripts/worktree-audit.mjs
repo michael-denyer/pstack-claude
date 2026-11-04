@@ -34,6 +34,25 @@ const probe = (read) => {
 };
 const bind = (fact, next) => (fact.known ? next(fact.value) : UNKNOWN);
 
+// Bun on macOS opens a realpath target and can block on the auto_home mount.
+// The audit is a Node script, so use Node's realpath semantics under that test runtime.
+function auditRealpath(path) {
+  if (process.platform !== "darwin" || !process.versions.bun) return realpathSync(path);
+  const script = `try { process.stdout.write(JSON.stringify({ path: require("node:fs").realpathSync(process.argv[1]) })); } catch (error) { process.stdout.write(JSON.stringify({ error: { code: error.code, message: error.message } })); }`;
+  let result;
+  try {
+    const output = execFileSync("node", ["-e", script, path], {
+      encoding: "utf8", timeout: 3000, env: { PATH: process.env.PATH, HOME: process.env.HOME },
+    });
+    result = JSON.parse(output);
+    if (typeof result.path !== "string" && typeof result.error?.code !== "string") throw new Error("invalid response");
+  } catch (error) {
+    throw Object.assign(new Error(`Node realpath helper failed: ${error.message}`, { cause: error }), { code: "ERR_PSTACK_REALPATH_HELPER" });
+  }
+  if (result.error) throw Object.assign(new Error(result.error.message), { code: result.error.code });
+  return result.path;
+}
+
 const DAY = 86400;
 const RECENT_DAYS = 4;
 const HEADER = ["SIZE", "AGE", "MERGED", "DIRTY", "REMOTE", "PR", "LAST_CHAT", "BUCKET", "LOCKED", "WORKTREE"];
@@ -125,7 +144,14 @@ export function symlinkTargets(dir, stat = statSync) {
   return readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isSymbolicLink()).flatMap((entry) => {
     const link = join(dir, entry.name);
     try {
-      return [[link, { id: fileId(link, stat), name: probe(() => realpathSync(link)).value }]];
+      const id = fileId(link, stat);
+      let name;
+      try {
+        name = auditRealpath(link);
+      } catch (error) {
+        if (error.code === "ERR_PSTACK_REALPATH_HELPER") throw error;
+      }
+      return [[link, { id, name }]];
     } catch (error) {
       if (["ENOENT", "ELOOP"].includes(error.code)) return [];
       throw error;
@@ -140,7 +166,7 @@ export function symlinkTargets(dir, stat = statSync) {
 export function pathSpellings(path, linksIn = symlinkTargets, stat = statSync) {
   let resolved;
   try {
-    resolved = realpathSync(path);
+    resolved = auditRealpath(path);
   } catch (error) {
     if (error.code === "ENOENT") return [path];
     throw error;
@@ -417,10 +443,14 @@ function main(argv) {
 
 // node leaves argv[1] unresolved and may set it to a non-file (`node -e ... arg`).
 function invokedDirectly() {
-  if (!process.argv[1]) return false;
+  if (!process.argv[1] || (process.versions.bun && !import.meta.main)) return false;
   try {
-    return fileURLToPath(import.meta.url) === realpathSync(process.argv[1]);
-  } catch {
+    return fileURLToPath(import.meta.url) === auditRealpath(process.argv[1]);
+  } catch (error) {
+    if (error.code === "ERR_PSTACK_REALPATH_HELPER") {
+      console.error(error.message);
+      process.exitCode = 1;
+    }
     return false;
   }
 }

@@ -484,6 +484,57 @@ describe("lastChats matches a path as JSONL spells it, never a sibling's prefix"
 });
 
 describe("pathSpellings", () => {
+  test.skipIf(process.platform !== "darwin" || !process.versions.bun)("does not block on macOS auto_home while resolving a worktree", () => {
+    const path = realpathSync(tmpdir());
+    expect(pathSpellings(path)).toContain(path);
+  });
+
+  test.skipIf(process.platform !== "darwin" || !process.versions.bun)("fails closed when Node realpath is unavailable", () => {
+    const path = realpathSync(tmpdir());
+    const oldPath = process.env.PATH;
+    try {
+      process.env.PATH = join(path, "no-such-executable");
+      expect(() => pathSpellings(path)).toThrow("Node realpath helper failed");
+    } finally {
+      if (oldPath === undefined) delete process.env.PATH;
+      else process.env.PATH = oldPath;
+    }
+  });
+
+  test.skipIf(process.platform !== "darwin" || !process.versions.bun)("fails closed if Node disappears while resolving a symlink", () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-node-")));
+    fixtures.push(root);
+    mkdirSync(join(root, "target"));
+    symlinkSync(join(root, "target"), join(root, "link"));
+    const oldPath = process.env.PATH;
+    try {
+      expect(() => symlinkTargets(root, (...args) => {
+        process.env.PATH = join(root, "no-such-executable");
+        return statSync(...args);
+      })).toThrow("Node realpath helper failed");
+    } finally {
+      if (oldPath === undefined) delete process.env.PATH;
+      else process.env.PATH = oldPath;
+    }
+  });
+
+  test.skipIf(process.platform !== "darwin" || !process.versions.bun)("reports a missing Node helper on direct execution but ignores non-file arguments", () => {
+    const env = { ...process.env, PATH: join(tmpdir(), "no-such-executable") };
+    const direct = spawnSync(process.execPath, [script], { env, encoding: "utf8", timeout: 5000 });
+    expect(direct.status).not.toBe(0);
+    expect(direct.stderr).toContain("Node realpath helper failed");
+    const imported = spawnSync(process.execPath, ["-e", `await import(${JSON.stringify(scriptUrl)})`, "no-such-script"], { env, encoding: "utf8", timeout: 5000 });
+    expect(imported.status).toBe(0);
+    expect(imported.stderr).toBe("");
+    const root = mkdtempSync(join(tmpdir(), "worktree-audit-import-"));
+    fixtures.push(root);
+    const entry = join(root, "entry.mjs");
+    writeFileSync(entry, `await import(${JSON.stringify(scriptUrl)});`);
+    const fromFile = spawnSync(process.execPath, [entry], { env, encoding: "utf8", timeout: 5000 });
+    expect(fromFile.status).toBe(0);
+    expect(fromFile.stderr).toBe("");
+  });
+
   test("a worktree whose directory is gone keeps git's spelling", () => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-gone-")));
     fixtures.push(root);

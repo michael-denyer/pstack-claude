@@ -17,7 +17,7 @@ export function checkPlaybooks(root, bundled = BUNDLED) {
     const path = `.agents/playbooks/${name}`;
     const text = readFileSync(join(dir, name), "utf8").replace(/^\uFEFF/, "").replaceAll("\r\n", "\n");
     const front = text.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? "";
-    const field = (key) => front.match(new RegExp(`^${key}:[ \\t]*(.*)$`, "m"))?.[1].trim() ?? "";
+    const field = (fieldName) => front.match(new RegExp(`^${fieldName}:[ \\t]*(.*)$`, "m"))?.[1].trim() ?? "";
     if (!field("when")) problems.push(`${path}: its frontmatter needs a "when:" line`);
     const bases = field("extends")
       .split(",")

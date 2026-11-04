@@ -75,7 +75,7 @@ export function drawRegions(
   const regions: Region[] = [];
   const objects: ChartState[][] = [];
   for (const [r, name] of names.entries()) {
-    const key = keys[r];
+    const keyAt = keys[r];
     const kind = kinds[r];
     const states = new Map<string, ChartState>();
     const objectOf = new Array<ChartState>(sizes[r]);
@@ -96,9 +96,9 @@ export function drawRegions(
           group: undefined,
         };
         objectOf[kind[i]] = o;
-        keyOf[kind[i]] = key[i];
+        keyOf[kind[i]] = keyAt[i];
         position[kind[i]] = states.size;
-        states.set(key[i], o);
+        states.set(keyAt[i], o);
       }
       o.start ||= s.start;
       o.works ||= clean[i] === 1;

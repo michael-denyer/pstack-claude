@@ -10,12 +10,12 @@ import { chmodDeniesReads } from "../session-hook-sheets.mjs";
 
 test("depth comes from the reader on each use and PI_CODING_AGENT_DIR moves the sheet", () => {
   let flag = 0;
-  const settings = defaultSettings(() => flag, { PI_CODING_AGENT_DIR: "/tmp/pi-agent-x", HOME: "/nowhere" });
+  const settings = defaultSettings(() => flag, "/tmp/pi-agent-x");
   expect(settings.depth).toBe(0);
   flag = 2;
   expect(settings.depth).toBe(2);
   expect(settings.agentDir).toBe("/tmp/pi-agent-x");
-  expect(defaultSettings(() => 0, {}).agentDir).toBe(join(homedir(), ".pi", "agent"));
+  expect(defaultSettings(() => 0, "").agentDir).toBe(join(homedir(), ".pi", "agent"));
 });
 
 test("only an exact pi ask tool: off line turns the ask tool off", () => {

@@ -88,7 +88,7 @@ function sheet_vendor(id) {
   return id
 }
 
-# The key of `key: value` at the start of a line, or "" for any other line.
+# The label before the colon of a `label: value` line, or "" for any other line.
 function sheet_key(line) {
   return line ~ /^[^ \t]/ && index(line, ":") ? sheet_trim(substr(line, 1, index(line, ":") - 1)) : ""
 }
@@ -110,7 +110,7 @@ function sheet_value(line) {
 # Whatever the result, SHEET_OK[role] is 1 when that role's line has only
 # usable entries, and SHEET_EFFORT_OK is 1 when a usable default effort line
 # exists, for readers that keep a sheet's good lines and drop the rest.
-function sheet_problems(    roles, panel, n, want, any, i, key, out, E, m, j, e, V, nv, vl, real, bad) {
+function sheet_problems(    roles, panel, n, want, any, i, label, out, E, m, j, e, V, nv, vl, real, bad) {
   n = sheet_roles(roles, panel)
   split("", want)
   for (i = 1; i <= n; i++) want[roles[i]] = 1
@@ -121,19 +121,19 @@ function sheet_problems(    roles, panel, n, want, any, i, key, out, E, m, j, e,
   MODEL_ALIASES = 0
   any = 0
   for (i = 1; i <= SHEET_N; i++) {
-    key = sheet_key(SHEET[i])
-    if (key in want || key == "default effort") VALUE[key] = sheet_value(SHEET[i])
-    else if (key == "panel vendors" && sheet_value(SHEET[i]) == "any") any = 1
+    label = sheet_key(SHEET[i])
+    if (label in want || label == "default effort") VALUE[label] = sheet_value(SHEET[i])
+    else if (label == "panel vendors" && sheet_value(SHEET[i]) == "any") any = 1
   }
   out = ""
   for (i = 1; i <= n; i++) if (!(roles[i] in VALUE)) out = out "; missing role `" roles[i] "`"
   SHEET_EFFORT_OK = ("default effort" in VALUE) && (VALUE["default effort"] == "session" || (VALUE["default effort"] in SHEET_EFFORT))
   if (("default effort" in VALUE) && !SHEET_EFFORT_OK) out = out "; default effort is not session or a level"
   for (i = 1; i <= n; i++) {
-    key = roles[i]
-    if (!(key in VALUE)) continue
-    m = split(VALUE[key], E, ",")
-    if (m == 0) out = out "; no model in `" key "`"
+    label = roles[i]
+    if (!(label in VALUE)) continue
+    m = split(VALUE[label], E, ",")
+    if (m == 0) out = out "; no model in `" label "`"
     split("", V)
     nv = 0
     vl = ""
@@ -141,9 +141,9 @@ function sheet_problems(    roles, panel, n, want, any, i, key, out, E, m, j, e,
     bad = m == 0
     for (j = 1; j <= m; j++) {
       e = sheet_model(sheet_trim(E[j]))
-      if (e == "") { out = out "; an empty entry in `" key "`"; bad = 1; continue }
+      if (e == "") { out = out "; an empty entry in `" label "`"; bad = 1; continue }
       if (sheet_alias(e)) { MODEL_ALIASES = 1; SHEET_MODELS[e] = 1; continue }
-      if (e !~ /^[a-z0-9][a-z0-9.-]*$/) { out = out "; `" key "` has an entry that is not a model ID"; bad = 1; continue }
+      if (e !~ /^[a-z0-9][a-z0-9.-]*$/) { out = out "; `" label "` has an entry that is not a model ID"; bad = 1; continue }
       if (!(e in SHEET_MODELS)) MODEL_LIST = MODEL_LIST (MODEL_LIST == "" ? "" : ", ") "`" e "`"
       SHEET_MODELS[e] = 1
       real = 1
@@ -153,8 +153,8 @@ function sheet_problems(    roles, panel, n, want, any, i, key, out, E, m, j, e,
         vl = vl (vl == "" ? "" : ", ") sheet_vendor(e)
       }
     }
-    SHEET_OK[key] = !bad
-    if ((key in panel) && real && nv < 2 && !any) out = out "; `" key "` has models from one vendor (" vl ")"
+    SHEET_OK[label] = !bad
+    if ((label in panel) && real && nv < 2 && !any) out = out "; `" label "` has models from one vendor (" vl ")"
   }
   return substr(out, 3)
 }

@@ -138,11 +138,11 @@ const changedFacts = (
   after: T.PullRequestFacts
 ): string[] =>
   (Object.keys(VERDICT_FACTS) as (keyof typeof VERDICT_FACTS)[])
-    .filter((key) => before[key] !== after[key])
+    .filter((fact) => before[fact] !== after[fact])
     .filter(
-      (key) => !(mergeabilityUnknown(before) && COMPUTED_ON_DEMAND.has(key))
+      (fact) => !(mergeabilityUnknown(before) && COMPUTED_ON_DEMAND.has(fact))
     )
-    .map((key) => `${key} ${before[key]} -> ${after[key]}`);
+    .map((fact) => `${fact} ${before[fact]} -> ${after[fact]}`);
 export async function readSnapshot(args: {
   readonly reader: T.GitHubReader;
   readonly context: T.PrContext;
@@ -816,7 +816,7 @@ export function evaluateQueue(
     kind: "merge-queue" as const,
     unmergedCount: active.length,
   };
-  const key =
+  const waitKey =
     reason.kind === "pending-checks"
       ? `pending:${frontier.number}:${reason.pending.length}`
       : reason.kind === "merge-queue"
@@ -824,10 +824,10 @@ export function evaluateQueue(
         : `${reason.kind}:${frontier.number}`;
   return {
     kind: "waiting",
-    state: { ...state, frontier, lastWaitKey: key },
+    state: { ...state, frontier, lastWaitKey: waitKey },
     frontier,
     reason,
-    emit: state.lastWaitKey !== key,
+    emit: state.lastWaitKey !== waitKey,
   };
 }
 export async function runQueued(args: {

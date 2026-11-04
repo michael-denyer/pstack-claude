@@ -2,7 +2,7 @@ import { CHECK_DEADLOCK, type Config } from "../ir.ts";
 
 type ListField = "invariants" | "properties" | "constraints" | "actionConstraints";
 type Section = {
-  key: string;
+  keyword: string;
   plural?: string;
   field?:
     | ListField
@@ -24,26 +24,26 @@ const isListField = (field: Section["field"]): field is ListField =>
 
 const SECTIONS = new Map<string, Section>();
 for (const section of [
-  { key: "CONSTANT", plural: "CONSTANTS" },
-  { key: CHECK_DEADLOCK, field: "checkDeadlock" },
-  { key: "INIT", field: "init", undefinedNoun: "initial predicate" },
-  { key: "NEXT", field: "next", undefinedNoun: "next state action" },
-  { key: "SPECIFICATION", field: "spec", undefinedNoun: "name" },
-  { key: "VIEW", field: "view", undefinedNoun: "view function" },
-  { key: "SYMMETRY", field: "symmetry", undefinedNoun: "symmetry function" },
-  { key: "TYPE", field: "type" },
-  { key: "TYPE_CONSTRAINT", field: "typeConstraint" },
-  { key: "INVARIANT", plural: "INVARIANTS", field: "invariants", undefinedNoun: "invariant" },
-  { key: "PROPERTY", plural: "PROPERTIES", field: "properties", undefinedNoun: "property" },
-  { key: "CONSTRAINT", plural: "CONSTRAINTS", field: "constraints", undefinedNoun: "constraint" },
+  { keyword: "CONSTANT", plural: "CONSTANTS" },
+  { keyword: CHECK_DEADLOCK, field: "checkDeadlock" },
+  { keyword: "INIT", field: "init", undefinedNoun: "initial predicate" },
+  { keyword: "NEXT", field: "next", undefinedNoun: "next state action" },
+  { keyword: "SPECIFICATION", field: "spec", undefinedNoun: "name" },
+  { keyword: "VIEW", field: "view", undefinedNoun: "view function" },
+  { keyword: "SYMMETRY", field: "symmetry", undefinedNoun: "symmetry function" },
+  { keyword: "TYPE", field: "type" },
+  { keyword: "TYPE_CONSTRAINT", field: "typeConstraint" },
+  { keyword: "INVARIANT", plural: "INVARIANTS", field: "invariants", undefinedNoun: "invariant" },
+  { keyword: "PROPERTY", plural: "PROPERTIES", field: "properties", undefinedNoun: "property" },
+  { keyword: "CONSTRAINT", plural: "CONSTRAINTS", field: "constraints", undefinedNoun: "constraint" },
   {
-    key: "ACTION_CONSTRAINT",
+    keyword: "ACTION_CONSTRAINT",
     plural: "ACTION_CONSTRAINTS",
     field: "actionConstraints",
     undefinedNoun: "action constraint",
   },
 ] satisfies Section[]) {
-  SECTIONS.set(section.key, section);
+  SECTIONS.set(section.keyword, section);
   if (section.plural) SECTIONS.set(section.plural, section);
 }
 export const NAME = /^\w*[A-Za-z]\w*$/;
@@ -238,7 +238,7 @@ export function readConfig({ file, text }: { file: string; text: string }): Conf
     const keyword = t;
     const section = SECTIONS.get(keyword.image);
     if (!section) throw refuse(t.line, "It was expecting a keyword, but did not find it.");
-    const { key, field, undefinedNoun } = section;
+    const { field, undefinedNoun } = section;
     const begin = at;
     if (field === undefined) {
       for (t = next(); t !== eof && !SECTIONS.has(t.image); t = next()) constant(t, keyword.line);
@@ -262,14 +262,14 @@ export function readConfig({ file, text }: { file: string; text: string }): Conf
       else {
         config[field] = t.image;
         if (SECTIONS.has(t.image))
-          defer(cannot(t.line, `TLC would read the keyword ${t.image} as the name after ${key}.`));
+          defer(cannot(t.line, `TLC would read the keyword ${t.image} as the name after ${section.keyword}.`));
         else if (undefinedNoun) defined(t, undefinedNoun);
       }
       t = next();
     }
     const images: string[] = [];
     for (let k = begin; k < (t === eof ? tokens.length : at - 1); k++) images.push(tokens[k].image);
-    config.sections.push({ key, line: keyword.line, tokens: images });
+    config.sections.push({ keyword: section.keyword, line: keyword.line, tokens: images });
   }
   if (deferred) throw deferred;
   return config;

@@ -88,7 +88,7 @@ const MODEL = [
   "TYPE_CONSTRAINT",
 ];
 
-type Reading = { [key: string]: unknown };
+type Reading = { [field: string]: unknown };
 
 const isRecord = (v: unknown): v is Reading =>
   typeof v === "object" && v !== null && !Array.isArray(v);
@@ -110,12 +110,12 @@ function mulberry32(seed: number) {
 function generate(random: () => number) {
   const int = (n: number) => Math.floor(random() * n);
   const pick = <T>(list: T[]) => list[int(list.length)];
-  const section = (key: string) => {
-    const out = [{ gap: pick(BREAKS), text: key }];
+  const section = (keyword: string) => {
+    const out = [{ gap: pick(BREAKS), text: keyword }];
     const add = (text: string) => out.push({ gap: pick(SPACES), text });
-    if (key === "CHECK_DEADLOCK") add(pick(["TRUE", "FALSE"]));
-    else if (ONE_NAME.includes(key)) add(pick(NAMES));
-    else if (!key.startsWith("CONSTANT")) for (let n = 1 + int(3); n--;) add(pick(NAMES));
+    if (keyword === "CHECK_DEADLOCK") add(pick(["TRUE", "FALSE"]));
+    else if (ONE_NAME.includes(keyword)) add(pick(NAMES));
+    else if (!keyword.startsWith("CONSTANT")) for (let n = 1 + int(3); n--;) add(pick(NAMES));
     else
       for (let n = 1 + int(2); n--;) {
         const form = pick(["=", "<-", "<-[M]"]);
@@ -127,7 +127,7 @@ function generate(random: () => number) {
     return out;
   };
   const tokens = [];
-  for (const key of pick([["SPECIFICATION"], ["INIT", "NEXT"]])) tokens.push(...section(key));
+  for (const keyword of pick([["SPECIFICATION"], ["INIT", "NEXT"]])) tokens.push(...section(keyword));
   for (let n = int(4); n--;) tokens.splice(pick([0, tokens.length]), 0, ...section(pick(KEYWORDS)));
   for (let n = int(3); n--;)
     tokens.splice(int(tokens.length + 1), 0, { gap: pick(GAPS), text: pick(COMMENTS) });
@@ -175,13 +175,13 @@ function readInTlc(files: string[], jar: string) {
 function passesTlcStartChecks(reading: Reading) {
   if (reading.error) return false;
   const table = tableOf(reading);
-  for (const key of ["INVARIANT", "PROPERTY", "CONSTRAINT", "ACTION_CONSTRAINT"]) {
-    const names: unknown = table[key];
-    if (!Array.isArray(names)) throw new Error(`TLC printed no list for ${key}.`);
+  for (const keyword of ["INVARIANT", "PROPERTY", "CONSTRAINT", "ACTION_CONSTRAINT"]) {
+    const names: unknown = table[keyword];
+    if (!Array.isArray(names)) throw new Error(`TLC printed no list for ${keyword}.`);
     for (const name of names) if (!NAME.test(String(name))) return false;
   }
-  for (const key of ["INIT", "NEXT", "SPECIFICATION", "VIEW", "SYMMETRY"])
-    if (table[key] && !NAME.test(String(table[key]))) return false;
+  for (const keyword of ["INIT", "NEXT", "SPECIFICATION", "VIEW", "SYMMETRY"])
+    if (table[keyword] && !NAME.test(String(table[keyword]))) return false;
   return table.SPECIFICATION ? !table.INIT && !table.NEXT : Boolean(table.INIT);
 }
 
@@ -190,7 +190,7 @@ function model(reading: Reading | undefined) {
   const { overrides, modConstants, modOverrides } = reading;
   const table = tableOf(reading);
   const out: Reading = { overrides, modConstants, modOverrides };
-  for (const key of MODEL) out[key] = table[key];
+  for (const keyword of MODEL) out[keyword] = table[keyword];
   return out;
 }
 

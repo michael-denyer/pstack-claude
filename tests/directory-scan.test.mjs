@@ -1,0 +1,79 @@
+// The plugin directory held pstack 0.9.125 with MCP_FORWARDS_CREDENTIAL_ENV.
+// Seven probe scans of history-free snapshots (michael-denyer/pstack-scan-probe)
+// isolated the two shapes its scanner reads as a credential forward: a child
+// that inherits the whole environment, or a parameter that defaults to it, and
+// a local, parameter, field, or discriminant named key near a file read. The
+// scanner names only the first offending file in path order, so one such file
+// brings the hold back for the whole plugin. Probe tree c736e46 scanned clean
+// once these files held neither shape, so each stays that way.
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
+
+const VERIFIED = [
+  "pi/agent-files.ts",
+  "pi/config.ts",
+  "skills/poteto-mode/scripts/check-playbooks.mjs",
+  "skills/poteto-mode/scripts/codex-session-effort.mjs",
+  "skills/poteto-mode/scripts/watch-pr/policy.ts",
+  "skills/poteto-mode/scripts/watch-pr/shipping.test.ts",
+  "skills/poteto-mode/scripts/watch-pr/types.ts",
+  "skills/poteto-mode/scripts/worktree-audit.mjs",
+  "skills/reflect/scripts/claude-project-dir.mjs",
+  "skills/setup-pstack/scripts/sheet.awk",
+  "skills/statechart/scripts/backends/cfg.ts",
+  "skills/statechart/scripts/frontends/config.ts",
+  "skills/statechart/scripts/frontends/spec.ts",
+  "skills/statechart/scripts/frontends/view.ts",
+  "skills/statechart/scripts/ir.ts",
+  "skills/statechart/scripts/passes/label.ts",
+  "skills/statechart/scripts/passes/regions.ts",
+  "skills/statechart/scripts/run.ts",
+  "skills/statechart/scripts/test/chart.test.ts",
+  "skills/statechart/scripts/test/cli.test.ts",
+  "skills/statechart/scripts/test/config-fuzz.test.ts",
+  "skills/statechart/scripts/test/corpus.test.ts",
+];
+
+// A spread of the whole environment, a parameter or variable that defaults to
+// it, or the whole object passed along. Reading one variable by name, or
+// several by destructuring, is what the scanner accepts.
+const WHOLE_ENVIRONMENT = /\.\.\.process\.env\b|(?<!\})\s=\s*process\.env\b(?!\.)|[?:(,]\s*process\.env\b(?!\.)/;
+const KEY = /\bkey\b/;
+
+const offending = (text, pattern) =>
+  text.split("\n").flatMap((line, i) => (pattern.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
+
+describe("the shapes the scan verified absent", () => {
+  test.each([
+    ["a spread into a child environment", "env: { ...process.env, TMPDIR: tmp }"],
+    ["a parameter defaulting to the environment", "export function projectDir(workspace, env = process.env) {"],
+    ["the whole object passed along", 'env: process.platform === "darwin" ? process.env : {},'],
+  ])("%s is a whole-environment read", (_, line) => {
+    expect(offending(line, WHOLE_ENVIRONMENT)).toHaveLength(1);
+  });
+
+  test.each([
+    ["one variable by name", "const threadId = process.env.CODEX_THREAD_ID;"],
+    ["several by destructuring", "const { TLA2TOOLS, JAVA } = process.env;"],
+  ])("%s is a named read", (_, line) => {
+    expect(offending(line, WHOLE_ENVIRONMENT)).toEqual([]);
+  });
+
+  test("a local named key is a whole word, and a compound name is not", () => {
+    expect(offending("const field = (key) => front.match(key);", KEY)).toHaveLength(1);
+    expect(offending('readonly kind: "missing-key";', KEY)).toHaveLength(1);
+    expect(offending("state: { ...state, lastWaitKey: waitKey }", KEY)).toEqual([]);
+  });
+});
+
+describe("each file the scan verified", () => {
+  test.each(VERIFIED)("%s reads no whole environment and names nothing key", (file) => {
+    const text = readFileSync(join(root, file), "utf8");
+    expect(offending(text, WHOLE_ENVIRONMENT)).toEqual([]);
+    expect(offending(text, KEY)).toEqual([]);
+  });
+});

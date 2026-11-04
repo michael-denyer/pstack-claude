@@ -63,6 +63,7 @@ const repoRelative = (root, file) => relative(root, file).split(sep).join("/");
 const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
   `${PLUGIN}/.claude-plugin/plugin.json`,
+  `${PLUGIN}/.grok-plugin/plugin.json`,
   ...RUNTIMES.map((runtime) => runtime.manifest),
 ];
 
@@ -187,6 +188,16 @@ export function agentSkills(skillsDir) {
 }
 
 // Layout invariants that live outside any one skill.
+export function validateGrokPlugin(pluginRoot) {
+  const manifest = JSON.parse(readFileSync(join(pluginRoot, ".grok-plugin/plugin.json"), "utf8"));
+  if (manifest.name !== "pstack" || JSON.stringify(manifest.skills) !== JSON.stringify(["./skills", "./grok/skills"])) {
+    throw new Error("Grok manifest must name pstack and list both skill directories");
+  }
+  for (const path of ["skills/poteto-mode/SKILL.md", "grok/skills/pstack-routing/SKILL.md"]) {
+    if (!existsSync(join(pluginRoot, path))) throw new Error(`Grok plugin missing ${path}`);
+  }
+}
+
 export function validatePluginLayout(pluginRoot) {
   // CHANGES 0.9.13 (#22): Claude Code lists a plugin's commands and its
   // user-invocable skills in the slash menu, so a command trampoline beside a
@@ -995,6 +1006,7 @@ export function problems(root, models) {
   attempt(() => validateProsePaths(skillsDir));
   for (const packaged of packages) attempt(() => packaged.runtime.validate({ ...packaged, read, pathExists }));
   attempt(() => validatePluginLayout(pluginRoot));
+  attempt(() => validateGrokPlugin(pluginRoot));
   attempt(() => validateAgentFrontmatter(pluginRoot));
   const hooksFiles = [
     { file: "hooks/hooks.json" },

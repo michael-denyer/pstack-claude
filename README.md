@@ -90,6 +90,20 @@ The first command installs the native Muse plugin bundle. The second approves it
 </details>
 
 <details>
+<summary><strong>Kimi Code CLI</strong></summary>
+
+After a release containing `kimi.plugin.json` is published, close other Kimi sessions and install it in a fresh Kimi Code CLI session:
+
+```text
+/plugins install https://github.com/michael-denyer/pstack-claude
+/reload
+```
+
+To test an unreleased checkout, use `/plugins install /absolute/path/to/pstack-claude` instead, followed by `/reload`; Kimi copies the whole checkout, including Git metadata and local files, so use a clean, reviewed copy. To update, close other Kimi sessions, reinstall from the same source in a fresh session, and run `/reload`. Invoke a skill as `/skill:pstack:poteto-mode`; see the [Kimi mapping](plugins/pstack/skills/poteto-mode/references/kimi-tools.md) for tool guidance.
+
+</details>
+
+<details>
 <summary><strong>MiniMax Code</strong></summary>
 
 For a first install, check that `${MINIMAX_DATA_DIR:-$HOME/.minimax}/plugins/pstack` does not already exist. Then run in your terminal:

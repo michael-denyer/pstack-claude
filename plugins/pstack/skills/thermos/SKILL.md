@@ -11,6 +11,8 @@ On GitHub Copilot, read the [platform mapping](../poteto-mode/references/copilot
 
 On Muse, read the [platform mapping](../poteto-mode/references/muse-tools.md), including its per-skill notes, before following this skill.
 
+On Antigravity, read the [platform mapping](../poteto-mode/references/agy-tools.md), including its per-skill notes, before following this skill.
+
 Run the two thermo review passes as async background subagents in parallel, then synthesize their results.
 
 ## Workflow

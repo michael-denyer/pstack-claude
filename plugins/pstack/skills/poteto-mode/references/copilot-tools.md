@@ -91,7 +91,7 @@ Claude Code keeps one directory per project under `${CLAUDE_CONFIG_DIR:-$HOME/.c
 - `workspace.yaml` names the session's `cwd`. Scope every transcript search to the current workspace: keep only session directories whose `cwd` is the workspace path (or a worktree of it), then read their `events.jsonl`. Never read other projects' sessions.
 - When a skill says "this session's transcript", it is the newest matching session directory whose `events.jsonl` contains the opening prompt.
 
-In poteto-mode's playbooks, `eval` reads candidate transcripts from Copilot session state, and `session-pickup` and `worktree-cleanup` search it scoped to the workspace. `orchestrate` and `multi-phase-plan` keep their store under `${COPILOT_HOME:-~/.copilot}/orchestrate/` instead of `~/.claude/orchestrate/`.
+In poteto-mode's playbooks, the Eval playbook reads candidate transcripts from Copilot session state, and `session-pickup` and `worktree-cleanup` search it scoped to the workspace. `orchestrate` and `multi-phase-plan` keep their store under `${COPILOT_HOME:-~/.copilot}/orchestrate/` instead of `~/.claude/orchestrate/`.
 
 ## Driver and bundled skills pstack references
 

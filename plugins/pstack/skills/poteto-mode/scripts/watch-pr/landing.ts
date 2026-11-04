@@ -9,7 +9,11 @@ export interface LandingRevision {
 }
 
 function invalid(detail: string): never {
-  throw new WatcherQueryError({ kind: "missing-key", retryable: true, detail });
+  throw new WatcherQueryError({
+    kind: "missing-field",
+    retryable: true,
+    detail,
+  });
 }
 
 export function object(value: unknown, label: string): Record<string, unknown> {

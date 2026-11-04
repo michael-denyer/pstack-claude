@@ -16,17 +16,17 @@ function quoteAsText(yaml: string): string {
   const lines = yaml.split("\n").map((line) => {
     const kv = /^([a-zA-Z_-]+):\s+(\S.*)$/.exec(line);
     if (!kv) return line;
-    const [, key, value] = kv;
+    const [, name, value] = kv;
     const quoted = (value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"));
     if (quoted || !/[{}[\]*&#!|>%@`]|: /.test(value)) return line;
-    return `${key}: "${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+    return `${name}: "${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
   });
   return lines.join("\n").replace(/^\t+/gm, (tabs) => "  ".repeat(tabs.length));
 }
 
 // Claude Code's YAML reader, Bun's, keeps the last value of a repeated
-// top-level key, where Pi's rejects the key. Drops each earlier entry with
-// every line up to the next key, a list written at column 0 included.
+// top-level field, where Pi's rejects the field. Drops each earlier entry with
+// every line up to the next field, a list written at column 0 included.
 function lastOfEachKey(yaml: string): string {
   const lines = yaml.split("\n");
   const keyOf = (line: string) => /^([^\s#][^:]*):(?:\s|$)/.exec(line)?.[1];
@@ -34,14 +34,14 @@ function lastOfEachKey(yaml: string): string {
   let dropping = false;
   return lines
     .filter((line, i) => {
-      const key = keyOf(line);
-      if (key !== undefined) dropping = last.get(key) !== i;
+      const name = keyOf(line);
+      if (name !== undefined) dropping = last.get(name) !== i;
       return !dropping;
     })
     .join("\n");
 }
 
-// Pi's YAML reader, then Claude Code's: first with a repeated key's last
+// Pi's YAML reader, then Claude Code's: first with a repeated field's last
 // value, then with its retry. Frontmatter that fails all three throws.
 export function frontmatter(text: string): { fields: Record<string, unknown>; body: string } {
   let parsed: ReturnType<typeof parseFrontmatter>;

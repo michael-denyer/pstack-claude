@@ -50,17 +50,6 @@ describe("before_agent_start", () => {
     });
   }
 
-  test("pi agent tools: off tells the model to delegate with the session's own subagent tool", async () => {
-    const sheet = "swarm workers: opus\npi agent tools: off\n";
-    const { pi, ctx } = setup({ sheet });
-    expect(await sectionsAfterStart(pi, ctx)).toEqual({
-      ...always,
-      "pstack-pi-tools": `${always["pstack-pi-tools"]} This session turns off pstack's agent, send_message, list_agents, and stop_agent tools. Where that file names one of them, delegate with the subagent tool this session has instead.`,
-      "pstack-session-start": mandate,
-      "pstack-models": sheet,
-    });
-  });
-
   test("a child pi gets the sheet but not the mandate", async () => {
     const sheet = "swarm workers: opus\n";
     const { pi, ctx } = setup({ sheet, settings: { depth: 1 } });

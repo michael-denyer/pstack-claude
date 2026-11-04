@@ -1,6 +1,6 @@
 import { type CheckedView, checked, list, type Value, type Vars } from "../ir.ts";
 
-type Json = boolean | number | string | Json[] | { [key: string]: Json };
+type Json = boolean | number | string | Json[] | { [field: string]: Json };
 
 const projected = new WeakMap<object, Json>();
 
@@ -47,7 +47,7 @@ const THEME_COLORS = ["blue", "orange", "purple", "yellow", "teal", "tan", "pink
 
 const isFunction = (v: unknown): v is (...args: unknown[]) => unknown => typeof v === "function";
 
-const isPlainObject = (v: unknown): v is { [key: string]: unknown } => {
+const isPlainObject = (v: unknown): v is { [field: string]: unknown } => {
   if (typeof v !== "object" || v === null) return false;
   const proto = Object.getPrototypeOf(v);
   return proto === Object.prototype || proto === null;

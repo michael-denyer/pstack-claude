@@ -84,11 +84,18 @@ export function parseWorktrees(output) {
   return worktrees;
 }
 
-export function defaultTranscriptRoots({ env = process.env, home = homedir(), stat = statSync } = {}) {
-  const claude = join(env.CLAUDE_CONFIG_DIR || join(home, ".claude"), "projects");
-  const codex = env.CODEX_HOME || join(home, ".codex");
-  const piAgent = env.PI_CODING_AGENT_DIR || join(home, ".pi", "agent");
-  const copilot = join(env.COPILOT_HOME || join(home, ".copilot"), "session-state");
+export function defaultTranscriptRoots({
+  claudeConfigDir = process.env.CLAUDE_CONFIG_DIR,
+  codexHome = process.env.CODEX_HOME,
+  piAgentDir = process.env.PI_CODING_AGENT_DIR,
+  copilotHome = process.env.COPILOT_HOME,
+  home = homedir(),
+  stat = statSync,
+} = {}) {
+  const claude = join(claudeConfigDir || join(home, ".claude"), "projects");
+  const codex = codexHome || join(home, ".codex");
+  const piAgent = piAgentDir || join(home, ".pi", "agent");
+  const copilot = join(copilotHome || join(home, ".copilot"), "session-state");
   const found = [claude, join(codex, "sessions"), join(codex, "archived_sessions"),
     join(piAgent, "sessions"), join(piAgent, "pstack"), copilot].filter((root) => {
       try {

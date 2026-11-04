@@ -262,7 +262,7 @@ export type QueryFailure =
       readonly detail: string;
     }
   | {
-      readonly kind: "missing-key";
+      readonly kind: "missing-field";
       readonly retryable: true;
       readonly detail: string;
       readonly rawValue?: string;

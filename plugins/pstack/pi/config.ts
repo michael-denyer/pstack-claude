@@ -43,12 +43,12 @@ function piInvocation(): Settings["pi"] {
 
 // readDepth is called on each use: pi parses extension flags after it loads
 // the extension.
-export function defaultSettings(readDepth: () => number, env: NodeJS.ProcessEnv = process.env): Settings {
+export function defaultSettings(readDepth: () => number, agentDir = process.env.PI_CODING_AGENT_DIR): Settings {
   const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
   return {
     pluginRoot,
     modelsFile: join(pluginRoot, "models.json"),
-    agentDir: env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent"),
+    agentDir: agentDir || join(homedir(), ".pi", "agent"),
     pi: piInvocation(),
     get depth() {
       return readDepth();

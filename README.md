@@ -99,7 +99,7 @@ After a release containing `kimi.plugin.json` is published, close other Kimi ses
 /reload
 ```
 
-To test an unreleased checkout, use `/plugins install /absolute/path/to/pstack-claude` instead, followed by `/reload`; Kimi copies the whole checkout, including Git metadata and local files, so use a clean, reviewed copy. Invoke a skill as `/skill:pstack:poteto-mode`; see the [Kimi mapping](plugins/pstack/skills/poteto-mode/references/kimi-tools.md) for update and tool guidance.
+To test an unreleased checkout, use `/plugins install /absolute/path/to/pstack-claude` instead, followed by `/reload`; Kimi copies the whole checkout, including Git metadata and local files, so use a clean, reviewed copy. To update, close other Kimi sessions, reinstall from the same source in a fresh session, and run `/reload`. Invoke a skill as `/skill:pstack:poteto-mode`; see the [Kimi mapping](plugins/pstack/skills/poteto-mode/references/kimi-tools.md) for tool guidance.
 
 </details>
 

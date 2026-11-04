@@ -140,9 +140,7 @@ describe("manifests", () => {
     ]);
   });
 
-  test("Kimi package paths resolve within the downloaded repository", () => {
-    expect(kimi.skills).toBe("./plugins/pstack/skills");
-    expect(existsSync(join(repoRoot, kimi.skills, "poteto-mode/SKILL.md"))).toBe(true);
+  test("the Kimi system prompt carries the routing instruction and the mapping pointer", () => {
     const prompt = readFileSync(join(repoRoot, kimi.systemPromptPath), "utf8");
     expect(prompt).toContain("pstack:poteto-mode");
     expect(prompt).toContain(readFileSync(join(repoRoot, "plugins/pstack/hooks/session-start-context.md"), "utf8").trim());

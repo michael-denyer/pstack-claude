@@ -15,7 +15,7 @@ On Antigravity, read the [platform mapping](../poteto-mode/references/agy-tools.
 
 On GitHub Copilot, follow [the Copilot setup](copilot.md) in place of steps 1, 3, 4, and 7 and step 6's header.
 
-On Kimi Code CLI, skip step 4, the effort questions in step 3 and effort validation in step 5; omit effort and `session hook` lines and suffixes from the sheet. Both `inherit-parent` and `auto` omit `model` and use Kimi's configured default, which may differ from the parent model; `primary` selects the parent model only when the tool permits it. In step 8, explain that routing is controlled by the plugin's enabled state instead of reporting a hook setting. See [Kimi model names](../poteto-mode/references/kimi-tools.md#model-names).
+On Kimi Code CLI, skip step 4, the effort questions in step 3 and effort validation in step 5; omit effort and `session hook` lines and suffixes from the sheet. In step 8, explain that routing is controlled by the plugin's enabled state instead of reporting a hook setting. See [Kimi model names](../poteto-mode/references/kimi-tools.md#model-names).
 
 On another runtime, read [Other runtimes](#other-runtimes) below for where the sheet lives and how it loads; the steps are the same.
 

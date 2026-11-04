@@ -10,6 +10,18 @@ mappingCoverage(kimi, [
   ["ScheduleWakeup", "`ScheduleWakeup`"],
   ["CLAUDE.md", "`CLAUDE.md`"],
   ["AskUserQuestion", "`AskUserQuestion`"],
+  ["TodoWrite", "`TodoWrite`"],
+  ["TaskCreate", "`TaskCreate`"],
+  ["readonly", "`readonly: true`"],
+  ["the `Skill` tool", "the `Skill` tool"],
+  ["the `Agent` tool", "the `Agent`/`Task` tool"],
+  ["plugin-dev", "`plugin-dev:skill-development`"],
+  ["pstack:poteto-agent", "`pstack:poteto-agent`"],
+  ["general-purpose", "`general-purpose`"],
+  ["isolation: \"worktree\"", "`isolation: \"worktree\"`"],
+  [".claude/skills", "`.claude/skills/`"],
+  ["${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects", "`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`"],
+  ["`loop`", "`CronCreate`"],
 ]);
 
 test("Kimi manifest requires its packaged skills and prompt", () => {

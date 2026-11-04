@@ -92,21 +92,14 @@ The first command installs the native Muse plugin bundle. The second approves it
 <details>
 <summary><strong>OMP</strong></summary>
 
-OMP 18.16.0 provides the marketplace and extension interfaces used here. Add the marketplace, then install pstack at user scope:
+Run in your terminal:
 
 ```shell
 omp plugin marketplace add michael-denyer/pstack-claude
 omp plugin install --scope user pstack@pstack-claude
 ```
 
-Restart OMP to load the plugin's extension. The marketplace package contains the skills and an OMP-specific routing extension. Before upgrading, inspect user and project installations with `omp plugin list --json`. OMP 18.16.0 shares its version-keyed plugin cache across scopes: a user-scope upgrade can replace files used by a project-scope installation, including one created concurrently. Removal may also affect shared files. See [OMP issue 16827](https://github.com/can1357/oh-my-pi/issues/16827). Avoid automatic upgrades while those shared files matter. If you choose to upgrade after assessing the risk, refresh the marketplace and upgrade with:
-
-```shell
-omp plugin marketplace update pstack-claude
-omp plugin upgrade --scope user pstack@pstack-claude
-```
-
-To disable or remove it, use `omp plugin disable --scope user pstack@pstack-claude` or `omp plugin uninstall --scope user pstack@pstack-claude`. Restart OMP after disabling or removing the plugin to stop the routing extension. The interactive plugin manager can refresh skills in the current session, but that does not unload the extension. If installation reports a package-name conflict, inspect `omp plugin list --json` and resolve the existing installation before retrying. Do not remove an installation without checking its source and scope. If a skill name collides, use the name OMP shows in its skill list. Restart OMP if a newly installed extension is absent; `--no-extensions` also prevents the routing extension from loading. The extension uses OMP's native tools and model configuration, not Pi's model sheet. On OMP 18.16.0 for macOS, a synthetic provider received the routing instruction and plugin-owned skill paths; model compliance, same-session disable, custom profiles, and update/removal behavior remain unverified.
+Restart OMP after installing, disabling, or uninstalling pstack. OMP 18.16.0 shares one plugin cache across scopes, so an upgrade or removal can affect other installations; inspect their source and scope before changing them. See [OMP issue 16827](https://github.com/can1357/oh-my-pi/issues/16827).
 
 </details>
 

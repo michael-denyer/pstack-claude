@@ -1,8 +1,32 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pstack from "../plugins/pstack/omp/index.mjs";
+import { RUNTIMES } from "../tools/runtimes.mjs";
+import { mappingCoverage } from "./mapping-coverage.mjs";
+import { sheetCases, writeSheet } from "./session-hook-sheets.mjs";
+
+mappingCoverage(RUNTIMES.find((r) => r.name === "OMP"), [
+  ["AskUserQuestion", "`AskUserQuestion`"],
+  ["subagent_type", "`subagent_type`"],
+  ["run_in_background", "`run_in_background`"],
+  ["TodoWrite", "`TodoWrite`"],
+  ["TaskCreate", "`TaskCreate`"],
+  ["readonly", "`readonly`"],
+  ["the `Skill` tool", "the `Skill` tool"],
+  ["the `Agent` tool", "the `Agent` tool"],
+  ["plugin-dev", "`plugin-dev:skill-development`"],
+  ["CLAUDE.md", "`CLAUDE.md`"],
+  ["pstack:poteto-agent", "`pstack:poteto-agent`"],
+  ["general-purpose", "`general-purpose`"],
+  ["isolation: \"worktree\"", "`isolation: \"worktree\"`"],
+  [".claude/skills", "`.claude/skills`"],
+  ["${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects", "`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects`"],
+  ["`loop`", "`loop`"],
+]);
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const plugin = join(root, "plugins/pstack");
@@ -45,4 +69,37 @@ describe("OMP marketplace plugin", () => {
     expect(child.systemPrompt[1]).not.toContain("<EXTREMELY_IMPORTANT>");
     expect(event.systemPrompt).toEqual(["existing instructions"]);
   });
+
+  test("the global session-hook toggle stops main routing but keeps the subagent mapping", () => {
+    const home = mkdtempSync(join(tmpdir(), "pstack-omp-toggle-"));
+    try {
+      mkdirSync(join(home, ".omp"));
+      const sheet = join(home, ".omp", "pstack-models.md");
+      const script = `import pstack from ${JSON.stringify(new URL("../plugins/pstack/omp/index.mjs", import.meta.url).href)};
+        const handlers = new Map(); pstack({on: (name, fn) => handlers.set(name, fn)});
+        const event = {systemPrompt: ["existing instructions"]}; const before = handlers.get("before_agent_start");
+        console.log(JSON.stringify({main: before(event, {agent: {kind: "main"}}), sub: before(event, {agent: {kind: "sub"}})}));`;
+      const run = () => {
+        const result = spawnSync(process.execPath, ["-e", script], { env: { ...process.env, HOME: home }, encoding: "utf8" });
+        expect(result.status).toBe(0);
+        return JSON.parse(result.stdout);
+      };
+      expect(run().main.systemPrompt[1]).toContain("<EXTREMELY_IMPORTANT>");
+      for (const { sheet: contents, off } of sheetCases) {
+        rmSync(sheet, { recursive: true, force: true });
+        writeSheet(sheet, contents);
+        const result = run();
+        expect(result.main === undefined).toBe(off);
+        expect(result.sub.systemPrompt[1]).toContain("OMP tool and model mappings");
+      }
+      rmSync(sheet, { recursive: true, force: true });
+      writeFileSync(sheet, "session hook: on\nsession hook: off\n");
+      expect(run().main).toBeUndefined();
+      writeFileSync(sheet, "session hook: on\n");
+      expect(run().main.systemPrompt[1]).toContain("<EXTREMELY_IMPORTANT>");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
 });

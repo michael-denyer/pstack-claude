@@ -88,6 +88,14 @@ export const RUNTIMES = [
     validate: ({ manifest, read, statOf, checkExecutable }) =>
       validateAgyManifest(manifest, { claude: JSON.parse(read(`${PLUGIN}/.claude-plugin/plugin.json`)), read, statOf, checkExecutable }),
   },
+  {
+    name: "OMP",
+    mapping: "omp-tools.md",
+    modelNames: ompModelNamesSection,
+    manifest: `${PLUGIN}/package.json`,
+    validate: ({ manifest, read, pathExists }) =>
+      validateOmpPackage(manifest, { marketplace: JSON.parse(read(".claude-plugin/marketplace.json")), pathExists }),
+  },
 ].map((runtime) => ({
   ...runtime,
   tools: `${SKILLS}/poteto-mode/references/${runtime.mapping}`,
@@ -471,5 +479,31 @@ export function agyModelNamesSection(models) {
     "signal comes from model diversity. Use distinct available models and report when the panel shares a model family.\n\n" +
     "`/setup-pstack` writes the sheet. Antigravity accepts `flash_lite`; the Copilot sheet checker rejects underscores " +
     "in model IDs and does not apply to Antigravity."
+  );
+}
+
+export function validateOmpPackage(manifest, { marketplace, pathExists }) {
+  const entry = marketplace.plugins?.find((plugin) => plugin.name === "pstack");
+  if (manifest.name !== "pstack" || entry?.source !== "./plugins/pstack" || entry.version !== manifest.version) {
+    throw new Error("OMP package must match the pstack marketplace entry and version");
+  }
+  if (!isDeepStrictEqual(manifest.omp?.extensions, ["./omp/index.mjs"])) {
+    throw new Error("OMP package must load ./omp/index.mjs");
+  }
+  for (const path of ["omp/index.mjs", "skills/poteto-mode/SKILL.md", "hooks/session-start-context.md"]) {
+    if (!pathExists(`${PLUGIN}/${path}`)) throw new Error(`OMP package missing ${path}`);
+  }
+}
+
+export function ompModelNamesSection() {
+  return (
+    "OMP uses its own model selection; without a pstack sheet, use the runtime's defaults. " +
+    "The global `~/.omp/pstack-models.md` is shared across OMP profiles; `session hook: off` there disables " +
+    "main-session routing while retaining the subagent mapping. Configure models only when the user asks. " +
+    "List available chat models with `omp models --kind chat` and inspect the active OMP configuration with " +
+    "`omp config`. Ask which available models the user wants for routine, worker and demanding roles. Configure " +
+    "OMP's own `modelRoles` and `task.agentModelOverrides` through its configuration interface, preserving unrelated " +
+    "settings. Use only models listed by the active installation; do not copy Claude model aliases into OMP. " +
+    "If the available agent roster cannot select distinct models for a requested panel, report that limitation."
   );
 }

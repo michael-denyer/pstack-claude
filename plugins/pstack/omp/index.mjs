@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -14,9 +15,22 @@ export function instructions(kind) {
   return `${adapter}\n${mandate}`;
 }
 
+function routingOff() {
+  try {
+    const bytes = readFileSync(join(homedir(), ".omp", "pstack-models.md"));
+    const text = bytes[0] === 0xff && bytes[1] === 0xfe
+      ? new TextDecoder("utf-16le", { fatal: true }).decode(bytes)
+      : bytes.toString("utf8").replace(/^\uFEFF/, "");
+    return text.split(/\r?\n/).includes("session hook: off");
+  } catch {
+    return false;
+  }
+}
+
 export default function pstack(omp) {
   omp.on("before_agent_start", (event, ctx) => {
     if (event.systemPrompt.some((section) => section.includes(marker))) return;
+    if (ctx.agent.kind === "main" && routingOff()) return;
     return { systemPrompt: [...event.systemPrompt, instructions(ctx.agent.kind)] };
   });
 }

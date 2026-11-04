@@ -13,7 +13,7 @@ On Muse, read the [platform mapping](../poteto-mode/references/muse-tools.md), i
 
 On Antigravity, read the [platform mapping](../poteto-mode/references/agy-tools.md), including its per-skill notes, before following this skill.
 
-On Grok Build, read the [platform mapping](../poteto-mode/references/grok.md) and skip step 4, since the `session hook` line does not control the Grok routing hint.
+On Grok Build, read the [platform mapping](../poteto-mode/references/grok.md) and skip step 4, the effort questions in step 3 and effort validation in step 5; omit effort and `session hook` lines and suffixes from the sheet. Grok exposes no effort control, and the `session hook` line does not control the Grok routing hint.
 
 On GitHub Copilot, follow [the Copilot setup](copilot.md) in place of steps 1, 3, 4, and 7 and step 6's header.
 

@@ -17,7 +17,7 @@ On Grok Build, read the [platform mapping](../poteto-mode/references/grok.md) an
 
 On GitHub Copilot, follow [the Copilot setup](copilot.md) in place of steps 1, 3, 4, and 7 and step 6's header.
 
-On Kimi Code CLI, skip step 4, the effort questions in step 3 and effort validation in step 5; omit effort and `session hook` lines and suffixes from the sheet. In step 8, explain that routing is controlled by the plugin's enabled state instead of reporting a hook setting. See [Kimi model names](../poteto-mode/references/kimi-tools.md#model-names).
+On Kimi Code CLI, skip step 4, the effort questions in step 3 and effort validation in step 5; omit effort and `session hook` lines and suffixes from the sheet. In steps 1 and 6, describe `inherit-parent` and `auto` as omitting `model` and using Kimi's configured default, which can differ from the parent; write that meaning in the sheet header. In step 8, explain that routing is controlled by the plugin's enabled state instead of reporting a hook setting. See [Kimi model names](../poteto-mode/references/kimi-tools.md#model-names).
 
 On another runtime, read [Other runtimes](#other-runtimes) below for where the sheet lives and how it loads; the steps are the same.
 

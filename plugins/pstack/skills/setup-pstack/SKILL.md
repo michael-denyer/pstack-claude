@@ -13,7 +13,7 @@ On Muse, read the [platform mapping](../poteto-mode/references/muse-tools.md), i
 
 On Antigravity, read the [platform mapping](../poteto-mode/references/agy-tools.md), including its per-skill notes, before following this skill.
 
-On Grok Build, read the [platform mapping](../poteto-mode/references/grok.md), including its per-skill notes. For steps 1–8, offer role-model choices only from models the user confirms are available. Record choices the user explicitly requests; otherwise use the runtime default and omit the subagent `model` argument. Do not offer Claude model aliases, effort levels, or a session-hook toggle: Grok does not expose those controls for this routing hint. Read any existing `${GROK_HOME:-~/.grok}/pstack-models.md`, update the requested role lines there while preserving other choices, and confirm the path and changes to the user. The sheet does not load automatically: read it before role-model work. Report when a requested model or model diversity cannot be applied. Then continue with steps 9 and 10.
+On Grok Build, read the [platform mapping](../poteto-mode/references/grok.md) and skip step 4, since the `session hook` line does not control the Grok routing hint.
 
 On GitHub Copilot, follow [the Copilot setup](copilot.md) in place of steps 1, 3, 4, and 7 and step 6's header.
 

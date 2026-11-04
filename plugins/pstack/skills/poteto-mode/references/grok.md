@@ -14,7 +14,7 @@ Grok Build loads the pstack plugin's skills. It does not translate Claude Code t
 | Skill (`Skill`) | Read the path from the session's skills list with `read_file`; `/poteto-mode` also expands the skill |
 | Subagent (`Agent` / `Task`) | `spawn_subagent` with `prompt`, `description`, and a listed `subagent_type`; use `background` and `isolation: "worktree"` where needed |
 | Wait for a subagent (`TaskOutput`) | `get_command_or_subagent_output` with its task ID |
-| Send to a subagent (`SendMessage`) | No steering action was exposed in the tested session; do not claim to have sent an update |
+| Send to a subagent (`SendMessage`) | Grok exposes no steering action; do not claim to have sent an update |
 | Stop a subagent (`TaskStop`) | `kill_command_or_subagent` |
 | Tasks (`TaskCreate` / `TaskUpdate` / `TodoWrite`) | `todo_write` |
 | Questions (`AskUserQuestion`) | `ask_user_question` |
@@ -22,9 +22,14 @@ Grok Build loads the pstack plugin's skills. It does not translate Claude Code t
 | Wake-up (`ScheduleWakeup`) | For user-authorized recurring work, `scheduler_create` schedules a background subagent while the session is open; `scheduler_list` and `scheduler_delete` inspect or remove it. It is not a one-shot wake-up. |
 | Claude transcript search | Grok stores sessions under `${GROK_HOME:-~/.grok}/sessions`; inspect the relevant session there rather than Claude's projects directory |
 
-Grok's subagent tool says to omit `model` unless the user explicitly requests one. Do not pass a Claude model alias as a Grok model. It has no `effort` parameter. Follow the session tool's current schema when it differs from this mapping. The captured schema does not expose a steering action for a running child; do not claim that a child received an update without a working tool for it.
-
 Grok does not inject the Claude SessionStart hook output. The Grok-only routing skill asks the model to read poteto-mode through its description; this is a model-followed hint, not guaranteed injection. The pstack `session hook: off` setting does not suppress it. Disable the plugin to remove the hint and its other skills.
+
+## Subagent policy
+
+poteto-mode's Subagents section dispatches `subagent_type: "pstack:poteto-agent"`, and other skills name `general-purpose`. The Grok build ships skills and no agent definitions.
+
+- For `pstack:poteto-agent` or `general-purpose`, pass a `subagent_type` that the `spawn_subagent` schema lists.
+- Put the absolute path of `poteto-mode`'s `SKILL.md` in every brief that stands in for `pstack:poteto-agent`, as poteto-mode asks.
 
 ## Model names
 
@@ -42,4 +47,3 @@ Skills name Claude Code model aliases in their Models sections. Grok Build's ava
 
 | Skill | On Grok Build |
 | --- | --- |
-| `why` | Use Grok tools and available sources. |

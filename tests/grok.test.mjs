@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,6 +19,8 @@ mappingCoverage(RUNTIMES.find((runtime) => runtime.name === "Grok Build"), [
   ["WebFetch", "`WebFetch`"],
   ["the `Skill` tool", "`Skill`"],
   ["the `Agent` tool", "`Agent`"],
+  ["pstack:poteto-agent", "`pstack:poteto-agent`"],
+  ["general-purpose", "`general-purpose`"],
 ]);
 
 const root = mkdtempSync(join(tmpdir(), "pstack-grok-"));
@@ -33,7 +35,7 @@ const options = {
   pathExists: (path) => existsSync(join(root, path)),
   agentSkills: (path) => agentSkills(join(root, path)),
 };
-afterEach(() => rmSync(root, { recursive: true, force: true }));
+afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 test("Grok packaging requires both skill trees and valid routing frontmatter", () => {
   file("skills/poteto-mode/SKILL.md");

@@ -105,11 +105,30 @@ MiniMax Code loads each directory under `plugins/` in its data directory as a lo
 
 </details>
 
+<details>
+<summary><strong>OpenCode 2</strong></summary>
+
+Clone the repository, then add the absolute path to its `plugins/pstack` directory to the `plugins` array in your OpenCode configuration. Keep the other entries in the array. This loads pstack as a native server plugin and registers its bundled skills under `pstack-` IDs. The routing instruction is enabled for root sessions by default when every pstack ID resolves to this checkout's bundled skill.
+
+For example, add this entry to the existing array in `~/.config/opencode/opencode.jsonc`, replacing the path with your checkout's absolute path. On Windows use a path such as `C:/Users/name/pstack-claude/plugins/pstack`.
+
+```jsonc
+{
+  "plugins": ["/absolute/path/to/pstack-claude/plugins/pstack"]
+}
+```
+
+Before invoking a pstack skill, check its registered path. For example, run `opencode api get /api/skill` and find the `pstack-poteto-mode` entry in `data`; its `path` must be the `skills/poteto-mode/SKILL.md` inside your configured `plugins/pstack` directory. Only then mention `@pstack-poteto-mode` or invoke `pstack-poteto-mode` with the `skill` tool. Apply the same check to other `pstack-` IDs before invoking them. Another plugin or user skill can own the same ID; pstack preserves that skill and suppresses automatic routing if any bundled ID resolves elsewhere. Disable or rename the conflicting installation through its owner's documented mechanism, restart the service, and check the paths again. If routing is absent without a collision, verify the pstack plugin is active and that the OpenCode sheet does not contain `session hook: off`.
+
+After updating the checkout, restart the OpenCode service with `opencode service restart` so it reloads the plugin and skills. To remove it, remove only its path from `plugins` and restart the service. OpenCode 1 uses a different plugin API and is not supported by this integration. See the [OpenCode mapping](plugins/pstack/skills/poteto-mode/references/opencode-tools.md) for routing and invocation details. Explicit skill activation and routing were tested with OpenCode 2.2.5 and a synthetic loopback provider; real model behavior remains untested.
+
+</details>
+
 <a id="other-harnesses"></a>
 <details>
 <summary><strong>Other harnesses</strong></summary>
 
-OpenCode (the CLI and the desktop app), Gemini CLI, Prime Agent, and skills-only Codex installs read skills from `~/.agents/skills/`. Run in your terminal:
+Gemini CLI, Prime Agent, and skills-only Codex installs read skills from `~/.agents/skills/`. Run in your terminal:
 
 ```shell
 git clone https://github.com/michael-denyer/pstack-claude

@@ -55,7 +55,7 @@ export type Bug = {
   stutters?: boolean;
 };
 
-export type ConfigSection = { key: string; line: number; tokens: string[] };
+export type ConfigSection = { keyword: string; line: number; tokens: string[] };
 
 export type Config = {
   sections: ConfigSection[];
@@ -239,7 +239,7 @@ export type Chart = {
   lie?: string;
 };
 
-export const isRecord = (v: unknown): v is { [key: string]: unknown } =>
+export const isRecord = (v: unknown): v is { [field: string]: unknown } =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
 export const isStrings = (v: unknown): v is string[] =>
@@ -297,16 +297,16 @@ export const show = (v: Value): string => {
   }
 };
 
-export const must = <K, V>(map: ReadonlyMap<K, V>, key: K): V => {
-  const value = map.get(key);
-  if (value === undefined) throw new Error(`The chart lost track of ${JSON.stringify(key)}.`);
+export const must = <K, V>(map: ReadonlyMap<K, V>, k: K): V => {
+  const value = map.get(k);
+  if (value === undefined) throw new Error(`The chart lost track of ${JSON.stringify(k)}.`);
   return value;
 };
 
-export const append = <K, V>(groups: Map<K, V[]>, key: K, item: V) => {
-  const group = groups.get(key);
+export const append = <K, V>(groups: Map<K, V[]>, k: K, item: V) => {
+  const group = groups.get(k);
   if (group) group.push(item);
-  else groups.set(key, [item]);
+  else groups.set(k, [item]);
 };
 
 export const seqOf = (bug: Bug, index: ReadonlyMap<string, number>) => {
@@ -340,14 +340,14 @@ export const count = (n: number) => {
 
 export const sortBy = (items: Int32Array, keys: Int32Array[]) => {
   for (let k = keys.length - 1; k >= 0; k--) {
-    const key = keys[k];
+    const rank = keys[k];
     let size = 0;
-    for (let p = 0; p < items.length; p++) if (key[items[p]] >= size) size = key[items[p]] + 1;
+    for (let p = 0; p < items.length; p++) if (rank[items[p]] >= size) size = rank[items[p]] + 1;
     const start = new Int32Array(size + 1);
-    for (let p = 0; p < items.length; p++) start[key[items[p]] + 1]++;
+    for (let p = 0; p < items.length; p++) start[rank[items[p]] + 1]++;
     for (let v = 0; v < size; v++) start[v + 1] += start[v];
     const sorted = new Int32Array(items.length);
-    for (let p = 0; p < items.length; p++) sorted[start[key[items[p]]]++] = items[p];
+    for (let p = 0; p < items.length; p++) sorted[start[rank[items[p]]]++] = items[p];
     items = sorted;
   }
   return items;
@@ -356,7 +356,7 @@ export const sortBy = (items: Int32Array, keys: Int32Array[]) => {
 export const tupleKey = (parts: unknown[]) => JSON.stringify(parts);
 export const unkey = (k: string) => {
   const parts: unknown = JSON.parse(k);
-  if (!isStrings(parts)) throw new Error(`The chart cannot read the key ${k}.`);
+  if (!isStrings(parts)) throw new Error(`The chart cannot read the tuple ${k}.`);
   return parts;
 };
 
@@ -394,7 +394,7 @@ const setKey = (members: Value[]) => {
   let others: string[] = [];
   for (const m of members)
     if (typeof m === "number") ints.push(m);
-    else others.push(key(m));
+    else others.push(valueKey(m));
   for (let i = 1; i < ints.length; i++)
     if (ints[i - 1] >= ints[i]) {
       ints.sort((a, b) => a - b);
@@ -419,7 +419,7 @@ const functionKey = ({ keys, values }: { keys: Value[]; values: Value[] }) => {
   let ints = 0;
   for (let i = 0; i < keys.length; i++) {
     order.push(i);
-    keyTexts.push(key(keys[i]));
+    keyTexts.push(valueKey(keys[i]));
     if (typeof keys[i] === "number") ints++;
   }
   const rank = (i: number) => (typeof keys[i] === "number" ? (keys[i] as number) : Infinity);
@@ -430,7 +430,7 @@ const functionKey = ({ keys, values }: { keys: Value[]; values: Value[] }) => {
   for (let i = 0, kept = 0; i < order.length; i++) {
     const k = order[i];
     if (i && keyTexts[k] === keyTexts[order[i - 1]]) continue;
-    const v = key(values[k]);
+    const v = valueKey(values[k]);
     s += tuple ? `${kept++ ? "," : ""}${v}` : `${kept++ ? "@@" : ""}${keyTexts[k]}:>${v}`;
   }
   return s + (tuple ? ">>" : ")");
@@ -438,7 +438,7 @@ const functionKey = ({ keys, values }: { keys: Value[]; values: Value[] }) => {
 
 const keys = new WeakMap<object, string>();
 
-export const key = (v: Value): string => {
+export const valueKey = (v: Value): string => {
   switch (typeof v) {
     case "boolean":
       return v ? "TRUE" : "FALSE";
@@ -463,7 +463,7 @@ export const key = (v: Value): string => {
 
 export const stateKey = (values: Value[]) => {
   let k = "";
-  for (let i = 0; i < values.length; i++) k += (i ? "," : "") + key(values[i]);
+  for (let i = 0; i < values.length; i++) k += (i ? "," : "") + valueKey(values[i]);
   return k;
 };
 
@@ -535,7 +535,7 @@ const deadlockRule = ({ invariants, properties }: Spec): Rule => ({
 });
 
 export const hasSection = ({ written }: Spec, ...keys: string[]) => {
-  for (const s of written) if (keys.includes(s.key)) return true;
+  for (const s of written) if (keys.includes(s.keyword)) return true;
   return false;
 };
 

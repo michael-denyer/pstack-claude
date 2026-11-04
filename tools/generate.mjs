@@ -9,12 +9,6 @@
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
 //   each skill's frontmatter (name + description) defines the shared Agent
 //   Skills boundary consumed natively by Codex, Prime, opencode, and Gemini CLI
-//   docs/reference.md's "Slash commands" table (one row per public skill, in editorial
-//   order; the row text is the slash-menu one-liner)
-//     -> its prompt stub in the prompts directory of each RUNTIMES row that has one
-//   The row set must equal the public skills (every Agent Skill not marked
-//   user-invocable: false); a skill without a row or a row without a skill
-//   fails by name.
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
 //   available slugs, and one block per RUNTIMES row: Codex equivalents, Pi IDs)
 //     -> each model-consuming skill's "## Models" and "## Reasoning effort" sections
@@ -22,8 +16,7 @@
 //     -> the "## Model names" section of each runtime's mapping file
 //        (poteto-mode/references/codex-tools.md, pi-tools.md, copilot-tools.md)
 //   the Per-skill notes table in poteto-mode/references/codex-tools.md
-//     -> the Codex preamble under the first heading of each listed skill's SKILL.md,
-//        and the codex-tools.md pointer in the prompt stub of every other public skill
+//     -> the Codex preamble under the first heading of each listed skill's SKILL.md
 //   the Per-skill notes table in poteto-mode/references/copilot-tools.md
 //     -> the GitHub Copilot preamble under the same heading, after any Codex one
 //   DRIVER_PLAYBOOKS -> the driver-skill line under each playbook's first heading
@@ -38,7 +31,10 @@
 //
 // Also validated: each RUNTIMES row's packaging, through the row's `validate`
 // (tools/runtimes.mjs), and every hooks file, the Claude Code plugin's and the
-// ones each row's manifest names.
+// ones each row's manifest names. docs/reference.md's "Slash commands" table
+// must hold one row per public skill (every Agent Skill not marked
+// user-invocable: false); a skill without a row or a row without a skill
+// fails by name.
 
 import {
   existsSync,
@@ -64,8 +60,6 @@ import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, wa
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRelative = (root, file) => relative(root, file).split(sep).join("/");
 
-const PROMPT_RUNTIMES = RUNTIMES.filter((runtime) => runtime.prompts);
-
 const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
   `${PLUGIN}/.claude-plugin/plugin.json`,
@@ -89,7 +83,6 @@ export const PORTABLE_ASSETS = [
 // The generator removes every entry of these directories that no planned path
 // runs through, so no hand-written file may live in one.
 export const OWNED_DIRS = [
-  ...PROMPT_RUNTIMES.map((runtime) => runtime.prompts),
   `${SKILLS}/poteto-mode/references/agents`,
   `${SKILLS}/poteto-mode/references/licenses`,
 ];
@@ -197,11 +190,9 @@ export function agentSkills(skillsDir) {
 export function validatePluginLayout(pluginRoot) {
   // CHANGES 0.9.13 (#22): Claude Code lists a plugin's commands and its
   // user-invocable skills in the slash menu, so a command trampoline beside a
-  // same-named skill shows twice. Trampolines live in a runtime's prompts
-  // directory, which only that runtime reads.
+  // same-named skill shows twice.
   if (existsSync(join(pluginRoot, "commands"))) {
-    const prompts = PROMPT_RUNTIMES.map((runtime) => runtime.prompts).join(", ");
-    throw new Error(`${PLUGIN}/commands/ exists; trampolines belong in ${prompts} (CHANGES 0.9.13)`);
+    throw new Error(`${PLUGIN}/commands/ exists; remove it, since each skill already serves its own slash command and Claude Code would list a command beside it (CHANGES 0.9.13)`);
   }
   // #265: Codex reads a root plugin.json with an Agent Plugins $schema ahead
   // of .codex-plugin/plugin.json, and loads no plugin hooks in that format, so
@@ -263,17 +254,17 @@ export function publicSkills(skillsDir) {
 const COMMANDS_DOC = "docs/reference.md";
 const COMMAND_TABLE_HEADER = "| command | use it when |";
 
-// The reference table is the source of the Codex slash-menu one-liners and their
-// order. Returns [{ name, menu }] in row order; throws when the row set and the
+// The reference table lists each public skill once, in editorial order.
+// Returns [{ name }] in row order; throws when the row set and the
 // public skills disagree, naming each side's leftovers.
 export function slashCommands(markdown, skillNames) {
   const lines = markdown.split("\n");
   const range = tableRows(COMMAND_TABLE_HEADER, "|")(lines);
   if (!range) throw new Error(`${COMMANDS_DOC}: "${COMMAND_TABLE_HEADER}" table header not found`);
   const rows = lines.slice(range[0], range[1]).map((line, i) => {
-    const m = line.match(/^\| `\/([^`]+)` \| (.+) \|$/);
+    const m = line.match(/^\| `\/([^`]+)` \| .+ \|$/);
     if (!m) throw new Error(`${COMMANDS_DOC}: slash-command row ${i + 1} is not "| \`/name\` | text |": ${line}`);
-    return { name: m[1], menu: m[2] };
+    return { name: m[1] };
   });
   const rowNames = new Set(rows.map((r) => r.name));
   const skills = new Set(skillNames);
@@ -288,22 +279,6 @@ export function slashCommands(markdown, skillNames) {
   }
   if (rows.length !== rowNames.size) throw new Error(`${COMMANDS_DOC} slash-command table repeats a command`);
   return rows;
-}
-
-// Optional slash shortcut for a runtime with a prompts directory. Skills also
-// link to the platform mapping so native invocation and skills-only installs
-// do not depend on these stubs. A skill with the runtime's stamped preamble
-// already sends the reader to the mapping, so its stub does not say it again.
-export function promptStub({ name, menu }, runtime, { preamble } = {}) {
-  const pointer = preamble
-    ? ""
-    : " Resolve Claude tool names, Claude model names, and Claude built-in skills through " +
-      `\`poteto-mode/references/${runtime.mapping}\`, including its Per-skill notes.`;
-  // Bun quotes the menu text where YAML could read it as something else, such
-  // as a mapping after ": ", a comment after " #", or true, null, and 001, and
-  // wherever it holds a comma.
-  const frontmatter = Bun.YAML.stringify({ name, description: menu, "disable-model-invocation": true }, null, 2);
-  return `---\n${frontmatter}\n---\n\nInvoke the \`${name}\` skill and follow it.${pointer}\n`;
 }
 
 // Locators find a generator-owned span of a file and return its [start, end)
@@ -873,20 +848,15 @@ export function plan(root, models) {
   };
   for (const file of VERSIONED_MANIFESTS) stamp(file, (text) => stampVersion(text, version, file));
   for (const file of new Set(regions(models).map((r) => r.file))) stamp(file, (text) => applyRegions(file, text, models));
-  const leads = loadLeadLines(root);
-  for (const [file, line] of leads) {
+  for (const [file, line] of loadLeadLines(root)) {
     stamp(file, (text) => {
       const stamped = stampLeadLine(text, line);
       if (stamped === null) throw new Error(`${file}: no heading to stamp its lead line under`);
       return stamped;
     });
   }
-  for (const runtime of PROMPT_RUNTIMES) {
-    for (const skill of slashCommands(read(COMMANDS_DOC), publicSkills(join(root, SKILLS)))) {
-      const preamble = (leads.get(`${SKILLS}/${skill.name}/SKILL.md`) ?? []).includes(runtime.preamble);
-      put(`${runtime.prompts}/${skill.name}.md`, promptStub(skill, runtime, { preamble }));
-    }
-  }
+  // Checked here so a table that disagrees with the public skills fails before anything is written.
+  slashCommands(read(COMMANDS_DOC), publicSkills(join(root, SKILLS)));
   for (const runtime of RUNTIMES.filter((r) => r.stampManifest)) {
     stamp(runtime.manifest, (text) =>
       runtime.stampManifest(text, { skills: agentSkills(join(root, SKILLS)).map(({ name }) => name) }),

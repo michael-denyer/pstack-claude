@@ -75,7 +75,7 @@ The [driver policy](../SKILL.md#non-negotiables) selects the app driver. For ski
 
 ## Per-skill notes
 
-Affected skill entry points and the optional Codex slash stubs point here. Most skills need only the tables above. These need one more mapping:
+Affected skill entry points point here. Most skills need only the tables above. These need one more mapping:
 
 | Skill | On Codex |
 |-------|----------|

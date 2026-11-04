@@ -296,7 +296,7 @@ jobs:
   statechart-windows:
     name: Statechart on Windows
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     defaults:
       run:
         shell: bash
@@ -331,6 +331,37 @@ jobs:
           test "$status" -eq 1
           diff --strip-trailing-cr "$corpus/report.md" "$OUT/report.md"
           diff --strip-trailing-cr "$corpus/chart.mmd" "$OUT/chart.mmd"
+      # The skill's first run finds TLC and Java with mise. Every other job
+      # sets TLA2TOOLS, so only these two steps reach mise, through the named
+      # child environment run.ts gives it. The mise release is pinned with its
+      # checksum, as TLC is above. Expand-Archive unpacks it because the runner
+      # has no unzip.
+      - name: Install mise
+        env:
+          MISE_VERSION: "2026.10.21"
+          MISE_SHA256: 0387d927adb6bee5c69dac077e8c5ae9827463287c17c311bf72dc70b21e566e
+          MISE_ZIP: ${{ runner.temp }}/mise.zip
+          MISE_DEST: ${{ runner.temp }}/mise-dist
+        run: |
+          curl --fail --location --output "$MISE_ZIP" "https://github.com/jdx/mise/releases/download/v$MISE_VERSION/mise-v$MISE_VERSION-windows-x64.zip"
+          echo "$MISE_SHA256  $MISE_ZIP" | sha256sum --check
+          # shellcheck disable=SC2016 # PowerShell expands these, not bash
+          powershell -NoProfile -NonInteractive -Command 'Expand-Archive -LiteralPath $env:MISE_ZIP -DestinationPath $env:MISE_DEST -Force'
+          cygpath --windows "$MISE_DEST/mise/bin" >> "$GITHUB_PATH"
+      - name: Chart a spec with TLC and Java from mise
+        env:
+          OUT: ${{ runner.temp }}/MediaPlayer-mise
+        run: |
+          unset TLA2TOOLS JAVA
+          mise --version
+          corpus=test/corpus/MediaPlayer
+          status=0
+          node --disable-warning=ExperimentalWarning statechart.ts "$corpus/MediaPlayer.tla" --view "$corpus/view.mjs" --out "$OUT" || status=$?
+          echo "statechart exited $status"
+          test "$status" -eq 1
+          diff --strip-trailing-cr "$corpus/report.md" "$OUT/report.md"
+          diff --strip-trailing-cr "$corpus/chart.mmd" "$OUT/chart.mmd"
+          mise ls --installed
 
   shellcheck:
     name: Shell scripts

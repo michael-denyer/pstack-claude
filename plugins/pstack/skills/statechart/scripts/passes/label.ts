@@ -4,7 +4,6 @@ import {
   type Graph,
   type Hidden,
   isRecord,
-  key,
   type Labels,
   list,
   loopOf,
@@ -16,6 +15,7 @@ import {
   type Step,
   type Story,
   tupleKey,
+  valueKey,
   type Vars,
   type View,
   type Walk,
@@ -60,7 +60,7 @@ function unlabeled(
   bug: { rule: Rule; loop?: number },
 ): never {
   const changed: string[] = [];
-  for (const k of Object.keys(after)) if (key(before[k]) !== key(after[k])) changed.push(k);
+  for (const k of Object.keys(after)) if (valueKey(before[k]) !== valueKey(after[k])) changed.push(k);
   throw new Error(
     `The view's step() returned null for the step ${action} that changes ${changed.join(", ") || "nothing"}. It is on the path to the ${bug.rule.name} bug${bug.loop === undefined ? "" : " or leaves its loop"}, so label it.`,
   );
@@ -130,7 +130,7 @@ export function labelGraph(
   const kinds: Int32Array[] = [];
   const sizes: number[] = [];
   for (const name of names) {
-    const key = new Array<string>(n);
+    const keyAt = new Array<string>(n);
     const kind = new Int32Array(n);
     const tops = new Map<string, number>();
     const nested = new Map<string, number>();
@@ -145,10 +145,10 @@ export function labelGraph(
         seen.set(k, (c = keyOf.length));
         keyOf.push(top ? tupleKey(path) : k);
       }
-      key[i] = keyOf[c];
+      keyAt[i] = keyOf[c];
       kind[i] = c;
     }
-    keys.push(key);
+    keys.push(keyAt);
     kinds.push(kind);
     sizes.push(keyOf.length);
   }

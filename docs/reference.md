@@ -4,7 +4,7 @@ Start with the [README](../README.md) for installation and your first task.
 
 ## Slash commands
 
-The package includes 67 skill directories: 43 public skills and 24 `principle-*` references. Claude Code uses `/pstack:<name>`, Pi uses `/skill:<name>`, and Muse lists each user-invocable skill as `/<name>`. In Codex, request a skill by name or install the [optional shortcuts](#codex) for the `/name` form below.
+The package includes 67 skill directories: 43 public skills and 24 `principle-*` references. Claude Code uses `/pstack:<name>`, Pi uses `/skill:<name>`, and Muse lists each user-invocable skill as `/<name>`. In Codex, mention a skill with `$<name>`, such as `$poteto-mode`, or pick one from `/skills`.
 
 Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
@@ -56,7 +56,7 @@ Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
 ## Runtime support
 
-All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code, Codex, GitHub Copilot, and Muse plugins also install automatic routing hooks, and the Pi package adds an extension that injects the same routing and supplies the subagent tools. Codex command shortcuts are separate.
+All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code, Codex, GitHub Copilot, and Muse plugins also install automatic routing hooks, and the Pi package adds an extension that injects the same routing and supplies the subagent tools.
 
 | Runtime | Setup and recorded verification |
 | --- | --- |
@@ -117,7 +117,7 @@ The [README installation](../README.md#codex) registers that catalog with `codex
 
 OpenAI documents [marketplace registration and the plugin format](https://developers.openai.com/plugins/build/plugins#add-a-marketplace-from-the-cli). If your CLI lacks `plugin add`, use the plugin browser after registering the marketplace, or use the [skills-only installation](#shared-skills-installation).
 
-Request `poteto-mode` by name or select its entry, such as `pstack:poteto-mode`. To enable parallel subagents:
+Invoke a skill the two ways [Codex's skills documentation](https://developers.openai.com/codex/skills) gives. Type `$` and the skill's name, such as `$poteto-mode` or `$babysit`, and choose its entry, or pick it from `/skills`. In a plugin install the entry reads `poteto-mode (pstack)` and inserts `$pstack:poteto-mode`. A skills-only install has no `pstack:` prefix. To enable parallel subagents:
 
 ```toml
 [features]
@@ -125,18 +125,6 @@ multi_agent = true
 ```
 
 Add this setting to `~/.codex/config.toml` if subagents are disabled. Skills such as `arena`, `interrogate`, and `architect` use parallel agents. The [mapping](../plugins/pstack/skills/poteto-mode/references/codex-tools.md) describes a sequential fallback and translates Claude tool names, model defaults, and verification instructions.
-
-For optional slash-command shortcuts, run this from the clone's root:
-
-```shell
-mkdir -p ~/.codex/prompts
-for c in plugins/pstack/.codex-plugin/prompts/*.md; do
-  target=~/.codex/prompts/"$(basename "$c")"
-  test -e "$target" || test -L "$target" || ln -s "$(pwd)/$c" "$target"
-done
-```
-
-Each shortcut invokes its skill. The commands skip existing files and links. Remove a shortcut by deleting its link at `~/.codex/prompts/<name>.md`. Both native-plugin and skills-only installations work without these shortcuts.
 
 ### Pi
 
@@ -147,7 +135,7 @@ The extension supplies what Pi lacks natively, under the Claude Code names the s
 - `agent` dispatches a child `pi --mode rpc` process with the skill's `subagent_type`, model, and effort, in the foreground or background, optionally in its own git worktree. A background agent's completion joins the running turn after its current tool calls, or starts a turn when the session is idle.
 - `send_message`, `list_agents`, and `stop_agent` message, list, and stop those agents. A message to a running agent is an RPC `steer` on the child's stdin, which the agent reads after its current tool calls before it carries on in the same run. A finished agent resumes with the message. An agent's status follows its process. `list_agents`, a foreground agent's result, and each completion notice name the child's transcript, `<timestamp>_<session id>.jsonl` under `<agent dir>/pstack/<parent session id>/agents/`, so a user can follow a running agent with `tail -f` or render a finished one with `pi --export`. A running agent's `list_agents` entry also carries `activity`, its current or last tool call and its latest message, read from the child's RPC events and kept in memory, so the model sees it only in a `list_agents` result. The top-level session shows the count and the most recently active agent in a `pstack-agents` footer line, and the user can run `/pstack-agents` for a per-agent view that is not sent to the model.
 - `ask_user_question` and `schedule_wakeup` match `AskUserQuestion` and `ScheduleWakeup`, and `/loop` matches the `loop` skill. In a child agent, asking a question and scheduling a wakeup both return an error. Pi refuses to start when two extensions register the same tool name, so if you use another extension that provides `ask_user_question`, add a `pi ask tool: off` line to the override sheet and the pstack extension leaves that tool to it.
-- If you delegate through another subagent extension, such as `pi-subagents`, add a `pi agent tools: off` line to the override sheet. The pstack extension then registers none of `agent`, `send_message`, `list_agents`, `stop_agent`, and `/pstack-agents`, so the model sees one set of delegation tools, and the system prompt tells the model to delegate with the session's own subagent tool wherever the Pi mapping names pstack's. Everything else stays, including `ask_user_question`, `schedule_wakeup`, `/loop`, and the exit hook.
+- If you delegate through another subagent extension, such as `pi-subagents`, add a `pi agent tools: off` line to the override sheet. The pstack extension then registers none of `agent`, `send_message`, `list_agents`, `stop_agent`, and `/pstack-agents`, so the model sees one set of delegation tools. Everything else stays, including `ask_user_question`, `schedule_wakeup`, `/loop`, and the exit hook.
 - At every agent start it adds the routing instruction, the override sheet `~/.pi/agent/pstack-models.md`, and a pointer to the Pi mapping to the system prompt.
 
 Family names such as `opus` resolve through the `pi` block of [`models.json`](../plugins/pstack/models.json) to model IDs for the provider the Pi session runs on. A ChatGPT sign-in (`openai`, or the legacy `openai-codex`) gets OpenAI models, and Anthropic or any other provider gets Claude models. Pi warns that Anthropic bills Claude used through Pi per token, as extra usage, even on a Claude subscription, and every subagent pstack starts adds to that bill. Run pstack in Claude Code to stay within a Claude plan's limits. A `pi models:` line in the sheet remaps any family name. The [Pi mapping](../plugins/pstack/skills/poteto-mode/references/pi-tools.md) lists every translation, and the [equivalence table](pi-equivalence.md) records what was verified and how.
@@ -211,7 +199,7 @@ Use [create-verification-skill](../plugins/pstack/skills/create-verification-ski
 package.json                      Pi package manifest
 plugins/pstack/
   .claude-plugin/plugin.json      Claude Code plugin manifest
-  .codex-plugin/                  Codex manifest and generated prompt stubs
+  .codex-plugin/plugin.json       Codex plugin manifest
   .github/plugin/plugin.json      GitHub Copilot plugin manifest
   .muse-plugin/plugin.json        Muse native plugin manifest (skill list generated)
   pi/                            Pi extension (subagent, question, and wake-up tools)
@@ -226,7 +214,7 @@ Skills-only installs use `plugins/pstack/skills/`. Agent references and license 
 
 ### Generated files and checks
 
-The [generator](../tools/generate.mjs) updates versions, model defaults, Codex prompts, Copilot and Muse preambles and role lists, the Muse manifest's skill list, and portable reference files, and validates the Pi package manifest. The [slash-command table](#slash-commands) supplies the Codex prompt descriptions and order. Edit that table when changing a menu description, then regenerate. Keep a row for every public skill, with `poteto-mode` first.
+The [generator](../tools/generate.mjs) updates versions, model defaults, Copilot and Muse preambles and role lists, the Muse manifest's skill list, and portable reference files, and validates the Pi package manifest. It also fails when the [slash-command table](#slash-commands) and the public skills disagree. Keep a row for every public skill, with `poteto-mode` first.
 
 [Documentation fact tests](../tests/readme-facts.test.mjs) check the skill counts and upstream pin. The table parser requires the header `| command | use it when |`.
 
@@ -246,7 +234,7 @@ CI also checks shell scripts, workflows, Markdown, relative links, and the bundl
 
 The skill tree is synced against upstream `c742dd6` (v0.15.36). The thermos skills and agents are synced against `118e73b` (thermos 1.0.0).
 
-This repository ports Lauren Tan's pstack from Cursor to Claude Code and shares the skills with other runtimes. It includes six cursor-team-kit skills, the three thermos skills with their two review subagents, and an independently authored `babysit` skill. The port supplies Claude Code plugin registration and routing, Codex manifests and shortcuts, the Codex tool mapping, the Pi package, extension, and tool mapping, the GitHub Copilot hooks and tool mapping, and the Muse native plugin, routing hook, and tool mapping.
+This repository ports Lauren Tan's pstack from Cursor to Claude Code and shares the skills with other runtimes. It includes six cursor-team-kit skills, the three thermos skills with their two review subagents, and an independently authored `babysit` skill. The port supplies Claude Code plugin registration and routing, Codex manifests, the Codex tool mapping, the Pi package, extension, and tool mapping, the GitHub Copilot hooks and tool mapping, and the Muse native plugin, routing hook, and tool mapping.
 
 Cursor-specific automations, sticky-mode metadata, the Grok Bot UI workflow, and the Cursor UI tutorial are excluded. [tools/upstream.json](../tools/upstream.json) records the revisions and exclusions, [tools/substitutions.json](../tools/substitutions.json) holds the Cursor-to-Claude rewrite rules, and [CHANGES.md](../CHANGES.md) records each release. The bundled `thermo-nuclear-code-quality-review` provides a maintainability review when a workflow calls for one, `thermo-nuclear-review` a correctness and security audit, and `thermos` runs both as parallel subagents.
 

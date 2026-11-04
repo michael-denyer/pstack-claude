@@ -153,7 +153,7 @@ describe("checks fallback chain", () => {
     });
     await expect(resolveChecks(reader, context)).rejects.toMatchObject({
       failure: {
-        kind: "missing-key",
+        kind: "missing-field",
         retryable: true,
         detail: expect.stringContaining("must advance"),
       },
@@ -174,7 +174,7 @@ describe("checks fallback chain", () => {
     });
     await expect(resolveChecks(reader, context)).rejects.toMatchObject({
       failure: {
-        kind: "missing-key",
+        kind: "missing-field",
         detail: expect.stringContaining("must advance"),
       },
     });
@@ -406,7 +406,7 @@ describe("closed enum parsing", () => {
       expect(error).toBeInstanceOf(WatcherQueryError);
       if (!(error instanceof WatcherQueryError)) throw error;
       expect(error.failure).toMatchObject({
-        kind: "missing-key",
+        kind: "missing-field",
         retryable: true,
         rawValue: '"FUTURE_STATE"',
       });
@@ -598,7 +598,7 @@ describe("review thread pagination", () => {
     });
     await expect(resolveReviewThreads(reader, context)).rejects.toMatchObject({
       failure: {
-        kind: "missing-key",
+        kind: "missing-field",
         retryable: true,
         detail: expect.stringContaining(
           "reviewThreads.pageInfo.endCursor must advance"

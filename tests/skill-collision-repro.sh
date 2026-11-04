@@ -3,8 +3,8 @@
 #
 # Claude Code renders a plugin's commands AND its user-invocable skills in the
 # slash menu, so a command trampoline paired with a same-named skill shows the
-# entry twice. 0.9.13 moved the trampolines to .codex-plugin/prompts/ and left
-# the Claude Code plugin with no commands/. That works only if a user-typed
+# entry twice. 0.9.13 moved the trampolines out of the Claude Code plugin and
+# left it with no commands/. That works only if a user-typed
 # /plugin:name still reaches the skill on its own; this script proves it with
 # one haiku call. If it fails, upstream changed slash resolution: re-read #22
 # and CHANGES 0.9.13 before reintroducing commands/. Last verified on 2.1.245.

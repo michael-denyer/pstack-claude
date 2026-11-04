@@ -50,7 +50,7 @@
     },
     "plugins/pstack/skills/poteto-mode/SKILL.md": {
       "kind": "policy",
-      "why": "Adds the Claude Code, Codex, Pi, GitHub Copilot, Muse, MiniMax Code, and Antigravity Platform Adaptation section with its task-tool and todo.md fallback (per task slug when sessions share a checkout), the run-or-verify driver line, the deploy-platform and defect-severity triggers, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it points the Agent-call defaults at the Models section with full tool access and the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and describes Autopilot-full as stopping at merge-ready for the operator's click and Autopilot-stack as Autopilot-full for PRs that build on each other.",
+      "why": "Adds the Claude Code, Codex, Pi, GitHub Copilot, Muse, MiniMax Code, and Antigravity Platform Adaptation section with its task-tool and todo.md fallback (per task slug when sessions share a checkout, and beside the desktop app's short update_plan list), the run-or-verify driver line, the deploy-platform and defect-severity triggers, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it points the Agent-call defaults at the Models section with full tool access and the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and describes Autopilot-full as stopping at merge-ready for the operator's click and Autopilot-stack as Autopilot-full for PRs that build on each other.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },
@@ -164,13 +164,13 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/github.test.ts": {
       "kind": "policy",
-      "why": "Covers the port's GitHub reader: completed conclusions that gh buckets as pending, a checkout PR paired with a different explicit repository, a full open-PR page refused as a possibly cut stack, a stack that never takes a PR headed at the default branch as parent, child, or seed under the default branch the repository reports, while a fork branch of the same name still stacks, a check-rollup cursor that repeats or returns to an earlier page, a review-thread cursor that repeats, a review-thread page that promises more pages without a cursor, a binary that cannot be spawned, the base revision field, and a no-checks reading that needs both check reads to agree and fails closed otherwise.",
+      "why": "Covers the port's GitHub reader: completed conclusions that gh buckets as pending, a checkout PR paired with a different explicit repository, a full open-PR page refused as a possibly cut stack, a stack that never takes a PR headed at the default branch as parent, child, or seed under the default branch the repository reports, while a fork branch of the same name still stacks, a check-rollup cursor that repeats or returns to an earlier page, a review-thread cursor that repeats, a review-thread page that promises more pages without a cursor, a binary that cannot be spawned, the base revision field, and a no-checks reading that needs both check reads to agree and fails closed otherwise. Expects the `missing-field` query failure.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/github.ts": {
       "kind": "policy",
-      "why": "Runs every gh and git call under the shared deadline, reports a binary that cannot be spawned as a non-retryable query failure, reads the base revision, pages through every review thread, refuses a review-thread or check-rollup cursor that does not advance and a review-thread page that promises more pages without a cursor, fails completed conclusions that gh buckets as pending, refuses a checkout PR paired with a different explicit repository, reads the repository's default branch, leaves every PR whose head is that branch in the PR's own repository out of stack ordering as parent, child, and seed, orders a stack only through branches in the PR's own repository, while rejecting duplicate head branches, cycles, and a full open-PR page, and reads a repository with no checks configured as its own result when gh reports none and the head commit has no rollup.",
+      "why": "Runs every gh and git call under the shared deadline, reports a binary that cannot be spawned as a non-retryable query failure, reads the base revision, pages through every review thread, refuses a review-thread or check-rollup cursor that does not advance and a review-thread page that promises more pages without a cursor, fails completed conclusions that gh buckets as pending, refuses a checkout PR paired with a different explicit repository, reads the repository's default branch, leaves every PR whose head is that branch in the PR's own repository out of stack ordering as parent, child, and seed, orders a stack only through branches in the PR's own repository, while rejecting duplicate head branches, cycles, and a full open-PR page, and reads a repository with no checks configured as its own result when gh reports none and the head commit has no rollup. Throws the `missing-field` query failure.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
@@ -182,7 +182,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.ts": {
       "kind": "policy",
-      "why": "Stops at the review-required and branch-protection merge gates once checks finish, and at the behind-base gate at once and ahead of a required review, since updating the branch restarts its checks, waits at the poll interval while GitHub has not computed mergeability, never as a query error, and builds a ready proof only from a MERGEABLE reading, re-reads the PR facts after the checks and retries a snapshot whose head, base, mergeability, review, or draft state changed in between, leaving mergeability out of that comparison when the first read had not computed it, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks and the same head has shown none for 60 seconds of wall time whatever the poll interval, waiting until then as it waits on pending checks, and honours the shared deadline in the poll loop.",
+      "why": "Stops at the review-required and branch-protection merge gates once checks finish, and at the behind-base gate at once and ahead of a required review, since updating the branch restarts its checks, waits at the poll interval while GitHub has not computed mergeability, never as a query error, and builds a ready proof only from a MERGEABLE reading, re-reads the PR facts after the checks and retries a snapshot whose head, base, mergeability, review, or draft state changed in between, leaving mergeability out of that comparison when the first read had not computed it, reads review threads and checks concurrently, reports a PR with no checks configured as ready only when no commit on it has reported checks and the same head has shown none for 60 seconds of wall time whatever the poll interval, waiting until then as it waits on pending checks, and honours the shared deadline in the poll loop. Names the changed-fact and wait-key locals `fact` and `waitKey`, not `key`, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
@@ -200,7 +200,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/types.ts": {
       "kind": "policy",
-      "why": "Adds the review-required, behind-base, and merge-blocked gate reasons, the landing revision on open PR facts and in the ready proof, the head repository of an open PR, the default-branch reader method, deadline, spawn-failed, snapshot-changed, and invalid-stack query failures, the mergeability-unknown wait reason, and the no-checks reading (a none-reported fast path, a no-rollup page, the ci-none state, the ci-unreported first sighting, and the checks-unreported wait reason).",
+      "why": "Adds the review-required, behind-base, and merge-blocked gate reasons, the landing revision on open PR facts and in the ready proof, the head repository of an open PR, the default-branch reader method, deadline, spawn-failed, snapshot-changed, and invalid-stack query failures, the mergeability-unknown wait reason, and the no-checks reading (a none-reported fast path, a no-rollup page, the ci-none state, the ci-unreported first sighting, and the checks-unreported wait reason). Names the query failure for a missing response field `missing-field`, not `missing-key`, for the same scanner.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
@@ -252,15 +252,57 @@
       "since": "0.9.41",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/statechart/scripts/backends/cfg.ts": {
+      "kind": "policy",
+      "why": "Reads the section keyword from `keyword`, not `key`, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
+      "since": "0.9.128",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/frontends/config.ts": {
+      "kind": "policy",
+      "why": "Names the section keyword `keyword`, not `key`, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
+      "since": "0.9.128",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/statechart/scripts/frontends/messages.ts": {
       "kind": "policy",
       "why": "Drops the \\r that TLC on Windows leaves at the end of each line, so an end-of-message line closes its message there too.",
       "since": "0.9.116",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/statechart/scripts/frontends/spec.ts": {
+      "kind": "policy",
+      "why": "Reads the section keyword from `keyword`, not `key`, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
+      "since": "0.9.128",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/frontends/view.ts": {
+      "kind": "policy",
+      "why": "Names the index signatures `field`, not `key`, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
+      "since": "0.9.128",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/ir.ts": {
+      "kind": "policy",
+      "why": "Names the section keyword `keyword`, the value-key function `valueKey`, and the map-helper and radix-sort locals `k` and `rank`, not `key`, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
+      "since": "0.9.128",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/passes/label.ts": {
+      "kind": "policy",
+      "why": "Imports `valueKey` and names the per-state key array `keyAt`, not `key`, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
+      "since": "0.9.128",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/passes/regions.ts": {
+      "kind": "policy",
+      "why": "Names the per-state key array `keyAt`, not `key`, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
+      "since": "0.9.128",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/statechart/scripts/run.ts": {
       "kind": "policy",
-      "why": "Kills the worker's process tree with taskkill on Windows, which has no /bin/sh and no process groups.",
+      "why": "Kills the worker's process tree with taskkill on Windows, which has no /bin/sh and no process groups. Gives mise and java a named environment through childEnv, not the whole environment, because the plugin directory's scanner reads a whole environment given to a child beside a download URL as a credential forward (MCP_FORWARDS_CREDENTIAL_ENV).",
       "since": "0.9.116",
       "upstream": "not-proposed"
     },
@@ -270,10 +312,28 @@
       "since": "0.9.116",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/statechart/scripts/test/chart.test.ts": {
+      "kind": "policy",
+      "why": "Imports `valueKey`, names the fixture's record variable `lock`, and keeps the word out of its test titles, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
+      "since": "0.9.128",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/statechart/scripts/test/cli.test.ts": {
       "kind": "policy",
-      "why": "Resolves the temp folder before the symlinked-launcher test computes its relative link, because macOS keeps that folder under the /var symlink and the link would otherwise miss the launcher, so the suite passes on macOS. The signal-while-writing test's poll returns false when its walk meets the worker's rename of draft to done, instead of failing with ENOENT.",
+      "why": "Resolves the temp folder before the symlinked-launcher test computes its relative link, because macOS keeps that folder under the /var symlink and the link would otherwise miss the launcher, so the suite passes on macOS. The signal-while-writing test's poll returns false when its walk meets the worker's rename of draft to done, instead of failing with ENOENT. Spawns the command with the named child environment from run.ts, not the whole environment, for the same scanner.",
       "since": "0.9.105",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/test/config-fuzz.test.ts": {
+      "kind": "policy",
+      "why": "Names the section keyword `keyword` and the index signature `field`, not `key`, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
+      "since": "0.9.128",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/statechart/scripts/test/corpus.test.ts": {
+      "kind": "policy",
+      "why": "Spawns the command with the named child environment from run.ts plus TLA2TOOLS and JAVA, not the whole environment, because the plugin directory's scanner reads a whole environment given to a child as a credential forward (MCP_FORWARDS_CREDENTIAL_ENV).",
+      "since": "0.9.128",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/statechart/scripts/test/messages.test.ts": {

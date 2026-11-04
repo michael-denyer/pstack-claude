@@ -220,7 +220,7 @@ describe("shipping GitHub boundary", () => {
   ]) {
     it(`treats missing ${field} as unavailable, never absent`, async () => {
       const missing = Object.fromEntries(
-        Object.entries(raw).filter(([key]) => key !== field)
+        Object.entries(raw).filter(([name]) => name !== field)
       );
       const service = new GhShippingService(async () => response(missing));
       expect(await inspectLanding(service, context)).toMatchObject({

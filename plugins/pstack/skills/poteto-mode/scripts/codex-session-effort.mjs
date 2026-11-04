@@ -40,10 +40,9 @@ export async function activeEffort(stream, threadId) {
   return effort;
 }
 
-export async function sessionEffort(env = process.env) {
-  const threadId = env.CODEX_THREAD_ID;
+export async function sessionEffort(threadId = process.env.CODEX_THREAD_ID, codexHome = process.env.CODEX_HOME) {
   if (!threadId || !/^[a-zA-Z0-9_-]+$/.test(threadId)) throw new Error("CODEX_THREAD_ID is unavailable or invalid");
-  const root = join(env.CODEX_HOME || join(homedir(), ".codex"), "sessions");
+  const root = join(codexHome || join(homedir(), ".codex"), "sessions");
   const matches = [];
   const walk = (directory, depth = 0) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {

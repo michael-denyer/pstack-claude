@@ -8,19 +8,15 @@ import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 // file under poteto-mode/references/. A row gives the runtime the generated
 // Model names section in its mapping file, and a row with a `key` its
 // models.json block, checked by `checkModels`. A `skillPreambles` runtime also gets a preamble under
-// the first heading of each skill its Per-skill notes table lists, and a
-// runtime with a `prompts` directory a slash stub per public skill there. Pi
-// has neither: its one pointer is hand-written in poteto-mode's Platform
+// the first heading of each skill its Per-skill notes table lists. Pi has
+// none: its one pointer is hand-written in poteto-mode's Platform
 // Adaptation section. `manifest` is the file the generator stamps VERSION
 // into, `validate` checks the runtime's packaging against the tree once that
 // manifest parses, and `hooks` lists the hooks files the manifest names,
 // relative to the plugin root. GitHub Copilot stamps preambles but has no
-// prompts directory, since its CLI and app list plugin skills as slash commands
-// themselves, and no models.json block, since it ships no default models.
+// models.json block, since it ships no default models.
 // Muse declares its hooks inline in its native manifest, so it has no hooks
-// file either, and no prompts directory, since Muse lists each user-invocable
-// skill as a slash command itself and rejects a command whose id duplicates a
-// skill id. Its `stampManifest` rewrites the manifest's skill list from the tree.
+// file either. Its `stampManifest` rewrites the manifest's skill list from the tree.
 // MiniMax Code reads the Claude Code build as it ships, so its row names the
 // Claude Code manifest and stamps no preambles; its one pointer is in
 // poteto-mode's Platform Adaptation section, as Pi's is.
@@ -32,7 +28,6 @@ export const RUNTIMES = [
     modelNames: codexModelNamesSection,
     checkModels: tierExamples("codex"),
     skillPreambles: true,
-    prompts: `${PLUGIN}/.codex-plugin/prompts`,
     manifest: `${PLUGIN}/.codex-plugin/plugin.json`,
     validate: ({ manifest, read, pathExists }) =>
       validateCodexMarketplace(read(".agents/plugins/marketplace.json"), { expectedName: manifest.name, pathExists }),

@@ -11,7 +11,7 @@ export function readChecks({ configFile, config }: { configFile: string; config:
     throw refuse("The configuration file did not specify the initial state predicate.");
   const written: ConfigSection[] = [];
   for (const s of config.sections)
-    if (!["INVARIANT", "PROPERTY", "CHECK_DEADLOCK"].includes(s.key)) written.push(s);
+    if (!["INVARIANT", "PROPERTY", "CHECK_DEADLOCK"].includes(s.keyword)) written.push(s);
   return {
     invariants: config.invariants,
     properties: config.properties,
@@ -101,7 +101,7 @@ const STATE_LEVEL = 1;
 export function initialOnlyProperties({ definitions }: Sany, { written, properties }: Spec) {
   const replaced = new Map<string, string>();
   for (const s of written)
-    if (s.key === "CONSTANT")
+    if (s.keyword === "CONSTANT")
       for (let i = 1; i + 1 < s.tokens.length; i++)
         if (s.tokens[i] === "<-" && NAME.test(s.tokens[i + 1]))
           replaced.set(s.tokens[i - 1], s.tokens[i + 1]);

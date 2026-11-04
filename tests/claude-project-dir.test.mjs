@@ -41,20 +41,20 @@ describe("projectDirName", () => {
 describe("projectDir", () => {
   test("finds the derived directory under CLAUDE_CONFIG_DIR", () => {
     const config = configDir("-private-tmp-coat-opus48-440");
-    expect(projectDir("/private/tmp/coat_opus48_440", { CLAUDE_CONFIG_DIR: config })).toBe(
+    expect(projectDir("/private/tmp/coat_opus48_440", { config })).toBe(
       join(config, "projects", "-private-tmp-coat-opus48-440"),
     );
   });
 
   test("uses CLAUDE_CODE_PROJECT_DIR_NAME only when CLAUDE_CONFIG_DIR is set", () => {
     const config = configDir("work", "-srv-app");
-    expect(projectDir("/srv/app", { CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_PROJECT_DIR_NAME: "work" })).toBe(
+    expect(projectDir("/srv/app", { config, chosenName: "work" })).toBe(
       join(config, "projects", "work"),
     );
     const home = mkdtempSync(join(tmpdir(), "claude-home-"));
     fixtures.push(home);
     mkdirSync(join(home, ".claude", "projects", "-srv-app"), { recursive: true });
-    expect(projectDir("/srv/app", { HOME: home, CLAUDE_CODE_PROJECT_DIR_NAME: "work" })).toBe(
+    expect(projectDir("/srv/app", { home, chosenName: "work" })).toBe(
       join(home, ".claude", "projects", "-srv-app"),
     );
   });
@@ -62,7 +62,7 @@ describe("projectDir", () => {
   test("ignores a CLAUDE_CODE_PROJECT_DIR_NAME Claude Code would reject", () => {
     const config = configDir("-srv-app", "my.proj", "nul", "x".repeat(65));
     for (const chosen of ["my.proj", "NUL", "x".repeat(65), ""]) {
-      expect(projectDir("/srv/app", { CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_PROJECT_DIR_NAME: chosen })).toBe(
+      expect(projectDir("/srv/app", { config, chosenName: chosen })).toBe(
         join(config, "projects", "-srv-app"),
       );
     }
@@ -72,12 +72,12 @@ describe("projectDir", () => {
     const id = "9a212143-d801-496d-b0ce-50ad2a68b9a2";
     const config = configDir("-srv-app", "-Users-you-start", "-Users-you-nested");
     writeFileSync(join(config, "projects", "-Users-you-start", `${id}.jsonl`), "");
-    const env = { CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_SESSION_ID: id };
-    expect(projectDir("/srv/app", env)).toBe(join(config, "projects", "-Users-you-start"));
+    const options = { config, sessionId: id };
+    expect(projectDir("/srv/app", options)).toBe(join(config, "projects", "-Users-you-start"));
     rmSync(join(config, "projects", "-Users-you-start", `${id}.jsonl`));
     mkdirSync(join(config, "projects", "-Users-you-nested", id));
     writeFileSync(join(config, "projects", "-Users-you-nested", id, `${id}.jsonl`), "");
-    expect(projectDir("/srv/app", env)).toBe(join(config, "projects", "-Users-you-nested"));
+    expect(projectDir("/srv/app", options)).toBe(join(config, "projects", "-Users-you-nested"));
   });
 
   // Claude Code's Workflow tool keeps <id>/workflows/ under the shell's current project.
@@ -87,7 +87,7 @@ describe("projectDir", () => {
     for (const [decoy, home] of [["-Users-you-aaa", "-Users-you-zzz"], ["-Users-you-zzz", "-Users-you-aaa"]]) {
       const config = configDir(`${decoy}/${id}/workflows/scripts`, home);
       writeFileSync(join(config, "projects", home, `${id}.jsonl`), "");
-      expect(projectDir("/srv/app", { CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_SESSION_ID: id })).toBe(
+      expect(projectDir("/srv/app", { config, sessionId: id })).toBe(
         join(config, "projects", home),
       );
     }
@@ -96,7 +96,7 @@ describe("projectDir", () => {
   test("derives the name when the session id is unknown or not a file name", () => {
     const config = configDir("-srv-app", "..");
     for (const id of ["0f0f0f0f-0000-0000-0000-000000000000", "../projects", ""]) {
-      expect(projectDir("/srv/app", { CLAUDE_CONFIG_DIR: config, CLAUDE_CODE_SESSION_ID: id })).toBe(
+      expect(projectDir("/srv/app", { config, sessionId: id })).toBe(
         join(config, "projects", "-srv-app"),
       );
     }
@@ -105,14 +105,14 @@ describe("projectDir", () => {
   test("falls back to the one long directory that shares the first 200 characters", () => {
     const changedHash = `${LONG_NAME.slice(0, 201)}zzzzz`;
     const config = configDir(changedHash);
-    expect(projectDir(LONG, { CLAUDE_CONFIG_DIR: config })).toBe(join(config, "projects", changedHash));
+    expect(projectDir(LONG, { config })).toBe(join(config, "projects", changedHash));
     mkdirSync(join(config, "projects", `${LONG_NAME.slice(0, 201)}yyyyy`));
-    expect(projectDir(LONG, { CLAUDE_CONFIG_DIR: config })).toBeNull();
+    expect(projectDir(LONG, { config })).toBeNull();
   });
 
   test("returns null when no directory exists", () => {
-    expect(projectDir("/private/tmp/coat_opus48_440", { CLAUDE_CONFIG_DIR: configDir() })).toBeNull();
-    expect(projectDir(LONG, { CLAUDE_CONFIG_DIR: join(configDir(), "missing") })).toBeNull();
+    expect(projectDir("/private/tmp/coat_opus48_440", { config: configDir() })).toBeNull();
+    expect(projectDir(LONG, { config: join(configDir(), "missing") })).toBeNull();
   });
 });
 

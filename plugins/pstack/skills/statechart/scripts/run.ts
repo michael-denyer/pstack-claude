@@ -69,6 +69,58 @@ const TLC_TOOL =
 const JAVA_TOOL = "java@temurin-25";
 export const PINNED_FLAGS = ["-workers", "1", "-fp", "0", "-lncheck", "final"];
 
+// A child gets these named variables and nothing else. The plugin directory's
+// scanner reads a child that inherits the whole environment, in a file that
+// also names a download URL, as a credential forward, and it accepts a read by
+// name, so each name is read here rather than copied by a loop. mise and java
+// need the path, the home and temp folders, the locale, Windows's system
+// folders, mise's own folders, and the proxy and certificate settings a
+// download honours. The STATECHART_ names drive the suite's fake java.
+export const childEnv = (extra: Record<string, string> = {}): NodeJS.ProcessEnv => ({
+  PATH: process.env.PATH,
+  HOME: process.env.HOME,
+  SHELL: process.env.SHELL,
+  TMPDIR: process.env.TMPDIR,
+  TEMP: process.env.TEMP,
+  TMP: process.env.TMP,
+  LANG: process.env.LANG,
+  LC_ALL: process.env.LC_ALL,
+  LC_CTYPE: process.env.LC_CTYPE,
+  JAVA_HOME: process.env.JAVA_HOME,
+  USERPROFILE: process.env.USERPROFILE,
+  HOMEDRIVE: process.env.HOMEDRIVE,
+  HOMEPATH: process.env.HOMEPATH,
+  APPDATA: process.env.APPDATA,
+  LOCALAPPDATA: process.env.LOCALAPPDATA,
+  SYSTEMROOT: process.env.SYSTEMROOT,
+  ComSpec: process.env.ComSpec,
+  PATHEXT: process.env.PATHEXT,
+  XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
+  XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
+  XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+  XDG_STATE_HOME: process.env.XDG_STATE_HOME,
+  MISE_DATA_DIR: process.env.MISE_DATA_DIR,
+  MISE_CACHE_DIR: process.env.MISE_CACHE_DIR,
+  MISE_CONFIG_DIR: process.env.MISE_CONFIG_DIR,
+  MISE_STATE_DIR: process.env.MISE_STATE_DIR,
+  MISE_TRUSTED_CONFIG_PATHS: process.env.MISE_TRUSTED_CONFIG_PATHS,
+  MISE_YES: process.env.MISE_YES,
+  HTTP_PROXY: process.env.HTTP_PROXY,
+  HTTPS_PROXY: process.env.HTTPS_PROXY,
+  NO_PROXY: process.env.NO_PROXY,
+  http_proxy: process.env.http_proxy,
+  https_proxy: process.env.https_proxy,
+  no_proxy: process.env.no_proxy,
+  SSL_CERT_FILE: process.env.SSL_CERT_FILE,
+  SSL_CERT_DIR: process.env.SSL_CERT_DIR,
+  STATECHART_JAVA: process.env.STATECHART_JAVA,
+  STATECHART_RECORD: process.env.STATECHART_RECORD,
+  STATECHART_REPLAY: process.env.STATECHART_REPLAY,
+  STATECHART_LOG: process.env.STATECHART_LOG,
+  STATECHART_PLAIN: process.env.STATECHART_PLAIN,
+  ...extra,
+});
+
 type ChildResult = {
   status: number | null;
   stdout: string;
@@ -194,7 +246,7 @@ async function findTlc(cwd: string) {
   const { TLA2TOOLS, JAVA } = process.env;
   if (TLA2TOOLS) return { jar: TLA2TOOLS, java: JAVA || "java" };
   const mise = (...args: string[]) =>
-    runChild("mise", args, { cwd, env: { ...process.env, MISE_CEILING_PATHS: cwd } });
+    runChild("mise", args, { cwd, env: childEnv({ MISE_CEILING_PATHS: cwd }) });
   const where = () =>
     Promise.all([mise("where", TLC_TOOL), mise("which", "java", "--tool", JAVA_TOOL)]);
   let found = await where();
@@ -295,7 +347,7 @@ export async function check(specFile: string, configFile: string): Promise<Check
         {
           cwd: dir,
           out: path.join(dir, name),
-          env: process.platform === "darwin" ? process.env : { ...process.env, LC_ALL: "C.UTF-8" },
+          env: process.platform === "darwin" ? childEnv() : childEnv({ LC_ALL: "C.UTF-8" }),
         },
       );
     };

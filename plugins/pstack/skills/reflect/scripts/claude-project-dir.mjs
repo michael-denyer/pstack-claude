@@ -56,12 +56,19 @@ function sessionDir(projects, sessionId) {
   return dirs.find(transcript) ?? null;
 }
 
-export function projectDir(workspace, env = process.env) {
-  const config = env.CLAUDE_CONFIG_DIR;
-  const projects = join(config || join(env.HOME || homedir(), ".claude"), "projects");
-  const session = sessionDir(projects, env.CLAUDE_CODE_SESSION_ID);
+export function projectDir(
+  workspace,
+  {
+    config = process.env.CLAUDE_CONFIG_DIR,
+    home = process.env.HOME,
+    sessionId = process.env.CLAUDE_CODE_SESSION_ID,
+    chosenName = process.env.CLAUDE_CODE_PROJECT_DIR_NAME,
+  } = {},
+) {
+  const projects = join(config || join(home || homedir(), ".claude"), "projects");
+  const session = sessionDir(projects, sessionId);
   if (session) return session;
-  const chosen = config ? env.CLAUDE_CODE_PROJECT_DIR_NAME : undefined;
+  const chosen = config ? chosenName : undefined;
   const valid = chosen && CHOSEN_NAME.test(chosen) && !RESERVED_NAME.test(chosen);
   const name = valid ? chosen : projectDirName(workspace);
   const derived = join(projects, name);
@@ -90,8 +97,7 @@ function main(argv) {
   }
   const workspace = argv[0] ? resolvedPath(argv[0]) : process.cwd();
   // A directory argument asks for that workspace's sessions, not this session's.
-  const env = argv[0] ? { ...process.env, CLAUDE_CODE_SESSION_ID: undefined, CLAUDE_CODE_PROJECT_DIR_NAME: undefined } : process.env;
-  const dir = projectDir(workspace, env);
+  const dir = projectDir(workspace, argv[0] ? { sessionId: null, chosenName: null } : {});
   if (!dir) {
     console.error(`no Claude Code transcripts directory for ${workspace}`);
     return 1;

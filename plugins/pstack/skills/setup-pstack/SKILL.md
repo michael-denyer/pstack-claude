@@ -13,6 +13,8 @@ On Muse, read the [platform mapping](../poteto-mode/references/muse-tools.md), i
 
 On GitHub Copilot, follow [the Copilot setup](copilot.md) in place of steps 1, 3, 4, and 7 and step 6's header.
 
+On Kimi Code CLI, follow [Kimi setup](../poteto-mode/references/kimi-tools.md#setup-pstack) in place of steps 1 through 8. Kimi does not read the `session hook` setting and its Agent tool does not accept a per-call effort setting.
+
 On another runtime, read [Other runtimes](#other-runtimes) below for where the sheet lives and how it loads; the steps are the same.
 
 Write the current runtime's per-role model override sheet, using the path in [Other runtimes](#other-runtimes). Each pstack skill names a default model inline; the override sheet adapts those defaults to the models you actually have access to.
@@ -118,6 +120,7 @@ The role lines are the same everywhere. What differs is the sheet path, how the 
 | GitHub Copilot (CLI and app) | `${COPILOT_HOME:-~/.copilot}/pstack-models.md` | the plugin hook checks it and injects its role lines at session start; skills-only installs read it with `view` | the `task` tool's `model` enum, see [copilot-tools.md](../poteto-mode/references/copilot-tools.md#model-names) | hook contract tested; CLI install smoke-tested |
 | Muse | `${XDG_CONFIG_HOME:-~/.config}/muse/pstack-models.md` | the plugin hook reads it and injects its role lines at session start, once hooks are approved; no include line | the model catalog (`muse model-profile show <model>` names each one), see [muse-tools.md](../poteto-mode/references/muse-tools.md#model-names) | hook contract tested; plugin install verified |
 | MiniMax Code | `~/.minimax/pstack-models.md`, even when `MINIMAX_DATA_DIR` moves MiniMax's data directory, since MiniMax Code withholds that variable from hooks and its `bash` tool | model rows: read by the agent before a role-model skill, or paste into `AGENTS.md` in MiniMax Code's data directory; hook setting: read by the plugin | `mcode provider list` or the `model` slash command, see [minimax-tools.md](../poteto-mode/references/minimax-tools.md#model-names) | hook contract tested; plugin load smoke-tested on 0.7.4; no live session |
+| Kimi Code CLI | `<KIMI_CODE_HOME>/pstack-models.md`, or `~/.kimi-code/pstack-models.md` when unset | read by the agent before a role-model skill; no hook setting | the `Agent` tool's model parameter when a subagent model pool is configured, see [kimi-tools.md](../poteto-mode/references/kimi-tools.md#setup-pstack) | manifest and paths checked; no live session |
 | opencode | `~/.config/opencode/pstack-models.md` | add the path to the `instructions` array in `opencode.json` | the `models` slash command in the session | from published docs, no live session |
 | Gemini CLI | `~/.gemini/pstack-models.md` | `@~/.gemini/pstack-models.md` in `~/.gemini/GEMINI.md` | the `model` slash command in the session | from published docs, no live session |
 | Prime Agent | no documented sheet path; Prime's configuration chooses models | | | no live session |

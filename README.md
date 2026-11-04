@@ -92,16 +92,14 @@ The first command installs the native Muse plugin bundle. The second approves it
 <details>
 <summary><strong>Kimi Code CLI</strong></summary>
 
-After a release containing `kimi.plugin.json` is published, install it in a Kimi Code CLI session:
+After a release containing `kimi.plugin.json` is published, close other Kimi sessions and install it in a fresh Kimi Code CLI session:
 
 ```text
 /plugins install https://github.com/michael-denyer/pstack-claude
 /reload
 ```
 
-To test an unreleased checkout, use `/plugins install /absolute/path/to/pstack-claude` instead, followed by `/reload`. Use a clean, reviewed copy: Kimi copies the whole directory, including Git metadata and any local files, into its managed plugin storage. Installing the bare GitHub URL selects the latest release, which may not yet contain this manifest.
-
-Kimi installs the latest release into its managed per-user plugin directory. Before changing plugins, close other Kimi sessions and use a fresh session for each subsequent change: in a Kimi 2.5.0 test, an already-open session overwrote another session’s plugin registration. Invoke a skill as `/skill:pstack:poteto-mode`. Reinstall from the same URL to update, then reload or start a new session. Use `/plugins disable pstack` or `/plugins remove pstack` and reload to disable or remove it; Kimi leaves the managed copy on disk after removal. Check `/plugins info pstack` for diagnostics. Local source installs are copied, so reinstall after editing the source. The plugin's system prompt supplies routing while enabled; it does not read pstack's `session hook` setting. Custom agent prompts need `${plugin_sections}` or the effective default prompt to receive it. The local path example uses macOS or Linux syntax. On Kimi Code CLI 2.4.1 for macOS, a synthetic provider received the routing instruction and skill content; model compliance and Windows behavior have not been verified.
+To test an unreleased checkout, use `/plugins install /absolute/path/to/pstack-claude` instead, followed by `/reload`; Kimi copies the whole checkout, including Git metadata and local files, so use a clean, reviewed copy. Invoke a skill as `/skill:pstack:poteto-mode`; see the [Kimi mapping](plugins/pstack/skills/poteto-mode/references/kimi-tools.md) for update and tool guidance.
 
 </details>
 

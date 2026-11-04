@@ -80,6 +80,13 @@ export const RUNTIMES = [
     validate: validateMiniMaxPackage,
   },
   {
+    name: "Kimi Code CLI",
+    mapping: "kimi-tools.md",
+    modelNames: kimiModelNamesSection,
+    manifest: "kimi.plugin.json",
+    validate: ({ manifest, pathExists }) => validateKimiManifest(manifest, { pathExists }),
+  },
+  {
     name: "Antigravity",
     mapping: "agy-tools.md",
     modelNames: agyModelNamesSection,
@@ -472,4 +479,25 @@ export function agyModelNamesSection(models) {
     "`/setup-pstack` writes the sheet. Antigravity accepts `flash_lite`; the Copilot sheet checker rejects underscores " +
     "in model IDs and does not apply to Antigravity."
   );
+}
+
+export function validateKimiManifest(manifest, { pathExists }) {
+  if (manifest.name !== "pstack") throw new Error("kimi.plugin.json: expected pstack name");
+  if (manifest.skills !== "./plugins/pstack/skills" || !pathExists("plugins/pstack/skills/poteto-mode/SKILL.md")) {
+    throw new Error("kimi.plugin.json: skills must point to the packaged skill tree");
+  }
+  if (manifest.systemPromptPath !== "./plugins/pstack/hooks/kimi-instructions.md" || !pathExists("plugins/pstack/hooks/kimi-instructions.md")) {
+    throw new Error("kimi.plugin.json: systemPromptPath must point to the packaged instructions");
+  }
+}
+
+export function kimiModelNamesSection(models) {
+  return "Skills name Claude model aliases, which Kimi does not accept. Use only models advertised by the current `Agent` tool. " +
+    "When permitted, `primary` selects the current model and thinking level; omitting `model` uses the configured default, which may differ. " +
+    "Forced secondary mode can prohibit overrides, including `primary`; omit `model` in that mode. " +
+    "Kimi does not expose a per-call effort parameter.\n\n" +
+    "Read `<KIMI_CODE_HOME>/pstack-models.md` before a skill that needs a role model (" + roleSkills(models).map(code).join(", ") + "). " +
+    "KIMI_CODE_HOME defaults to `~/.kimi-code`. If the sheet is absent, use Kimi's configured default. " +
+    "For diverse-model panels, use available distinct models and report if diversity is unavailable. " +
+    "`setup-pstack` writes the model choices; `inherit-parent` and `auto` both omit `model` and use the configured default, which may differ from the parent model.";
 }

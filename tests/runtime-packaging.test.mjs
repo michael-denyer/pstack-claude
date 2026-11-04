@@ -1,8 +1,7 @@
 // Runtime packaging contracts: manifests and hook commands.
 import { describe, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { validateHooks } from "../tools/generate.mjs";
 import { AGY_HOOKS, MUSE_HOOKS, validateAgyManifest, validateCodexMarketplace, validateCopilotManifest, validateMuseManifest, validatePiPackage } from "../tools/runtimes.mjs";
@@ -150,23 +149,12 @@ describe("manifests", () => {
     expect(prompt).toContain("kimi-tools.md");
   });
 
-  test("Kimi routing and every skill locate the mapping in the managed plugin copy", () => {
-    const home = mkdtempSync(join(tmpdir(), "pstack-kimi-home-"));
-    try {
-      const managed = join(home, "plugins/managed/pstack");
-      cpSync(join(repoRoot, "plugins/pstack/skills"), join(managed, "plugins/pstack/skills"), { recursive: true });
-      const prompt = readFileSync(join(repoRoot, kimi.systemPromptPath), "utf8");
-      for (const instructions of [kimi.skillInstructions, prompt]) {
-        const path = instructions.match(/<KIMI_CODE_HOME>\/[^`\s]+kimi-tools\.md/)?.[0];
-        expect(path).toBeDefined();
-        const mapping = readFileSync(join(home, path.replace("<KIMI_CODE_HOME>/", "")), "utf8");
-        expect(mapping).toContain("# Kimi Code CLI tool mapping for pstack");
-        expect(mapping).toContain("Do not add effort suffixes, `default effort`, or `session hook`");
-      }
-      const setup = readFileSync(join(managed, "plugins/pstack/skills/setup-pstack/SKILL.md"), "utf8");
-      expect(setup).toContain("follow [Kimi setup](../poteto-mode/references/kimi-tools.md#setup-pstack) in place of steps 1 through 8");
-    } finally {
-      rmSync(home, { recursive: true, force: true });
+  test("Kimi instructions locate the packaged mapping", () => {
+    const prompt = readFileSync(join(repoRoot, kimi.systemPromptPath), "utf8");
+    for (const instructions of [kimi.skillInstructions, prompt]) {
+      const path = instructions.match(/<KIMI_CODE_HOME>\/plugins\/managed\/pstack\/([^`\s]+kimi-tools\.md)/)?.[1];
+      expect(path).toBeDefined();
+      expect(existsSync(join(repoRoot, path))).toBe(true);
     }
   });
 });

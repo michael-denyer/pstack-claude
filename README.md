@@ -101,9 +101,7 @@ mkdir -p "${MINIMAX_DATA_DIR:-$HOME/.minimax}/plugins"
 cp -R plugins/pstack "${MINIMAX_DATA_DIR:-$HOME/.minimax}/plugins/pstack"
 ```
 
-MiniMax Code discovers pstack as a local plugin through its Claude Code reader. `mcode plugin list` shows it as `pstack@local`. On MiniMax Code 0.7.4, synthetic-provider guest sessions delivered the routing hook and explicit `pstack:poteto-mode` skill when enabled; disabled controls omitted them. Agent dispatch and real-model compliance remain unverified.
-
-Before updating, record whether `pstack@local` is enabled and close all MiniMax Code sessions and other `mcode` processes. Inspect the existing plugin directory and save any local edits outside the `plugins` directory. After a `git pull`, move the old `plugins/pstack` directory outside `plugins`, then run the `cp` line again. Copying onto an existing directory nests it inside. Keep MiniMax Code stopped until the replacement is complete. In a 0.7.4 guest stress test with repeated directory exchanges and concurrent scans, a disabled plugin reappeared enabled. After the update, check `mcode plugin list` and restore the previous enabled state if necessary.
+MiniMax Code loads each directory under `plugins/` in its data directory as a local plugin, and reads pstack through its Claude Code reader with the skills, agents, and routing hook. `mcode plugin list` shows it as `pstack@local`. To update, record its enabled state, quit every `mcode` process, and move `plugins/pstack` to an unused path outside `plugins/`. Run `git pull` and the `cp` line again. Check `mcode plugin list` and restore the previous enabled state if needed.
 
 </details>
 
@@ -144,7 +142,7 @@ To update, run `git pull` in the clone, then run the `for` loop again to link sk
 
 ### Configure
 
-pstack routes tasks to `poteto-mode` automatically. At session start, a hook injects an instruction that points the agent at it: the plugin's hook on Claude Code, Codex, GitHub Copilot, Muse, MiniMax Code, and Antigravity, and the pstack extension on Pi. In a MiniMax Code 0.7.4 guest session, its hook delivered routing to a synthetic provider; a disabled-plugin control omitted it. Codex runs the hook only after you trust it through `/hooks`, and Muse only after `muse plugins approve pstack`. Other harnesses have no hook.
+pstack routes tasks to `poteto-mode` automatically. At session start, a hook injects an instruction that points the agent at it: the plugin's hook on Claude Code, Codex, GitHub Copilot, Muse, and MiniMax Code, and the pstack extension on Pi. Codex runs the hook only after you trust it through `/hooks`, and Muse only after `muse plugins approve pstack`. Other harnesses have no hook.
 
 Run `setup-pstack` to turn automatic routing on or off, change model defaults, or set a reasoning effort per role (`arena runners: opus @xhigh, fable @max`).
 

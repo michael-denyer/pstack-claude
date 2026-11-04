@@ -74,8 +74,9 @@ export const PINNED_FLAGS = ["-workers", "1", "-fp", "0", "-lncheck", "final"];
 // also names a download URL, as a credential forward, and it accepts a read by
 // name, so each name is read here rather than copied by a loop. mise and java
 // need the path, the home and temp folders, the locale, Windows's system
-// folders, mise's own folders, and the proxy and certificate settings a
-// download honours. The STATECHART_ names drive the suite's fake java.
+// folders, and mise's own folders. Proxy settings stay out, because the
+// scanner reads a proxy variable beside that URL as a credential sent to its
+// host. The STATECHART_ names drive the suite's fake java.
 export const childEnv = (extra: Record<string, string> = {}): NodeJS.ProcessEnv => ({
   PATH: process.env.PATH,
   HOME: process.env.HOME,
@@ -105,14 +106,6 @@ export const childEnv = (extra: Record<string, string> = {}): NodeJS.ProcessEnv 
   MISE_STATE_DIR: process.env.MISE_STATE_DIR,
   MISE_TRUSTED_CONFIG_PATHS: process.env.MISE_TRUSTED_CONFIG_PATHS,
   MISE_YES: process.env.MISE_YES,
-  HTTP_PROXY: process.env.HTTP_PROXY,
-  HTTPS_PROXY: process.env.HTTPS_PROXY,
-  NO_PROXY: process.env.NO_PROXY,
-  http_proxy: process.env.http_proxy,
-  https_proxy: process.env.https_proxy,
-  no_proxy: process.env.no_proxy,
-  SSL_CERT_FILE: process.env.SSL_CERT_FILE,
-  SSL_CERT_DIR: process.env.SSL_CERT_DIR,
   STATECHART_JAVA: process.env.STATECHART_JAVA,
   STATECHART_RECORD: process.env.STATECHART_RECORD,
   STATECHART_REPLAY: process.env.STATECHART_REPLAY,

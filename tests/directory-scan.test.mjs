@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
 
 const VERIFIED = [
+  "pi/agent-files.ts",
   "pi/config.ts",
   "skills/poteto-mode/scripts/check-playbooks.mjs",
   "skills/poteto-mode/scripts/codex-session-effort.mjs",

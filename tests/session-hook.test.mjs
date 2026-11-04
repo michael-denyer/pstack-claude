@@ -102,6 +102,13 @@ function runHook(runtime, sheet, command) {
 }
 
 describe("SessionStart hook", () => {
+  test("Antigravity disabled hook returns an empty JSON object", () => {
+    const r = runHook("agy", "session hook: off\n");
+    expect(r.status).toBe(0);
+    expect(r.err).toBe("");
+    expect(JSON.parse(r.out)).toEqual({});
+  });
+
   // The manifest names Codex's own hooks file instead of relying on Codex's
   // default discovery; `resume` keeps the mandate present after a restart.
   test("declares the hook in the Codex manifest", () => {
@@ -147,7 +154,7 @@ describe("SessionStart hook", () => {
     // be a valid Copilot sheet, so every case that injects gets setup's note.
     const wrap = config.parse ?? (runtime.startsWith("copilot") ? (out) => context(out, ["sheet invalid", setupNote]) : (out) => out);
     const injected = config.injected ?? (runtime.startsWith("minimax") ? minimaxMandate : mandate);
-    const expected = (off) => (off ? "" : injected);
+    const expected = (off) => (off ? (runtime === "agy" ? {} : "") : injected);
     describe(runtime, () => {
       test("injects the mandate when no sheet exists", () => {
         const r = runHook(runtime, null);
@@ -157,7 +164,7 @@ describe("SessionStart hook", () => {
       for (const { name, sheet, off } of sheetCases) {
         test(`${off ? "injects nothing" : "injects the mandate"} when the sheet has ${name}`, () => {
           const r = runHook(runtime, sheet);
-          expect({ ...r, out: off ? r.out : wrap(r.out) }).toEqual({ status: 0, out: expected(off), err: "" });
+          expect({ ...r, out: off && runtime !== "agy" ? r.out : wrap(r.out) }).toEqual({ status: 0, out: expected(off), err: "" });
         });
       }
     });

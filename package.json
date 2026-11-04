@@ -37,6 +37,10 @@
       "./plugins/pstack/pi/index.ts"
     ]
   },
+  "exports": {
+    "./server": "./plugins/pstack/index.js",
+    "./*": "./*"
+  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "typebox": "*"

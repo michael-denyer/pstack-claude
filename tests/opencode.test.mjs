@@ -4,6 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import plugin from "../plugins/pstack/index.js";
 
+test("Git package exposes the bundled OpenCode server", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  expect(manifest.exports["./server"]).toBe("./plugins/pstack/index.js");
+  expect(manifest.exports["./*"]).toBe("./*");
+  expect(readFileSync(new URL(`../${manifest.exports["./server"]}`, import.meta.url), "utf8")).toContain('id: "pstack"');
+});
+
 test("routes only while every registered pstack skill belongs to the plugin", async () => {
   const skills = new Map();
   let context;

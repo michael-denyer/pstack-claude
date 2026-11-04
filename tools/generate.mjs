@@ -996,7 +996,7 @@ export function problems(root, models) {
   // Windows stat modes cannot represent the POSIX execute bits; Unix checks
   // still verify them, and every host checks that the hook paths exist.
   const checkExecutable = process.platform !== "win32";
-  for (const packaged of packages) attempt(() => packaged.runtime.validate({ ...packaged, read, pathExists, statOf, checkExecutable }));
+  for (const packaged of packages) attempt(() => packaged.runtime.validate({ ...packaged, read, pathExists, statOf, checkExecutable, agentSkills: (dir) => agentSkills(join(root, dir)) }));
   attempt(() => validatePluginLayout(pluginRoot));
   attempt(() => validateAgentFrontmatter(pluginRoot));
   const hooksFiles = [

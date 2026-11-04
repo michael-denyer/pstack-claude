@@ -102,6 +102,13 @@ export const RUNTIMES = [
     validate: ({ manifest, read, statOf, checkExecutable }) =>
       validateAgyManifest(manifest, { claude: JSON.parse(read(`${PLUGIN}/.claude-plugin/plugin.json`)), read, statOf, checkExecutable }),
   },
+  {
+    name: "Grok Build",
+    mapping: "grok.md",
+    modelNames: grokModelNamesSection,
+    manifest: `${PLUGIN}/.grok-plugin/plugin.json`,
+    validate: ({ manifest, pathExists, agentSkills }) => validateGrokPlugin(manifest, { pathExists, agentSkills }),
+  },
 ].map((runtime) => ({
   ...runtime,
   tools: `${SKILLS}/poteto-mode/references/${runtime.mapping}`,
@@ -530,4 +537,32 @@ export function kimiModelNamesSection(models) {
     "KIMI_CODE_HOME defaults to `~/.kimi-code`. If the sheet is absent, use Kimi's configured default. " +
     "For diverse-model panels, use available distinct models and report if diversity is unavailable. " +
     "`setup-pstack` writes the model choices; `inherit-parent` and `auto` both omit `model` and use the configured default, which may differ from the parent model.";
+}
+
+// Grok discovers the common skills and the Grok-only routing skill through
+// its native manifest. Validate both paths and the routing skill's metadata.
+export function validateGrokPlugin(manifest, { pathExists, agentSkills }) {
+  if (manifest.name !== "pstack" || !isDeepStrictEqual(manifest.skills, ["./skills", "./grok/skills"])) {
+    throw new Error("Grok manifest must name pstack and list both skill directories");
+  }
+  for (const path of ["skills/poteto-mode/SKILL.md", "grok/skills/pstack-routing/SKILL.md"]) {
+    if (!pathExists(`${PLUGIN}/${path}`)) throw new Error(`Grok plugin missing ${path}`);
+  }
+  agentSkills(`${PLUGIN}/grok/skills`);
+}
+
+export function grokModelNamesSection(models) {
+  return (
+    "Skills name Claude Code model aliases in their Models sections. Grok Build's available models depend on " +
+    "the user's configuration; do not pass a Claude alias as a Grok model.\n\n" +
+    "- The model sheet is `${GROK_HOME:-~/.grok}/pstack-models.md`. Before a skill that needs a role model " +
+    `(${roleSkills(models).map(code).join(", ")}), read it. With no sheet, use the runtime default; run \`setup-pstack\` only when the user asks to configure roles.\n` +
+    "- The `spawn_subagent` tool says to omit `model` unless the user explicitly requests one. It has no effort parameter; " +
+    "when it cannot apply a sheet choice, report that limitation instead of claiming model diversity.\n" +
+    `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose.\n` +
+    `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): the strongest model the user chose.\n` +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`) require distinct models. " +
+    "Report when the available dispatch cannot provide that diversity.\n\n" +
+    "`/setup-pstack` writes the sheet. Choose only models the session exposes."
+  );
 }

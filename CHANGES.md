@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.128 - pi agent tools: off without the prompt sentence
+
+With `pi agent tools: off` set, the `pstack-pi-tools` system prompt section no longer adds the sentence from 0.9.127 that told the model to delegate with the session's own subagent tool. Live sessions with `pi-subagents` 0.84.0 installed beside pstack showed that it changed nothing. There were 10 sessions on `openai/gpt-6.1-sol`. Five had 0.9.127's sentence, three had a reworded sentence that also said Agent's fields do not carry over, and two had no sentence. In all 10, the model read `pi-tools.md`, called `subagents_enable` and then `subagent`, and never called `agent`. In all 10, `subagent` also rejected the call for an unknown `description` option, and the model stopped instead of retrying. The model takes `description` from the skill's own instruction to make an Agent call, which a system prompt sentence did not override. The sheet line still removes `agent`, `send_message`, `list_agents`, `stop_agent`, and `/pstack-agents`.
+
 ## 0.9.127 - pi agent tools: off, Codex prompt stubs removed
 
 A `pi agent tools: off` line in `~/.pi/agent/pstack-models.md` leaves delegation to another Pi extension, such as `pi-subagents`. With the line set, the Pi extension registers none of `agent`, `send_message`, `list_agents`, `stop_agent`, and `/pstack-agents`, so the model sees one set of delegation tools. The `pstack-pi-tools` system prompt section adds one sentence telling the model to delegate with the session's own subagent tool where `pi-tools.md` names pstack's, because `pi-subagents` registers a single `subagent` tool instead. Skills, `ask_user_question`, `schedule_wakeup`, `/loop`, and the other prompt sections stay. @foreztgump added this in [#384](https://github.com/michael-denyer/pstack-claude/pull/384).

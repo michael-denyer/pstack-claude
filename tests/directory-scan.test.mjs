@@ -7,6 +7,7 @@
 // brings the hold back for the whole plugin. Probe tree c736e46 scanned clean
 // once these files held neither shape, so each stays that way.
 import { describe, expect, test } from "bun:test";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,5 +76,29 @@ describe("each file the scan verified", () => {
     const text = readFileSync(join(root, file), "utf8");
     expect(offending(text, WHOLE_ENVIRONMENT)).toEqual([]);
     expect(offending(text, KEY)).toEqual([]);
+  });
+});
+
+// The scan's download-and-run screen also reads skill text and the printable
+// bytes of images. It flagged `eval` written as code in a reference file, and
+// the letters IEX, PowerShell's alias for Invoke-Expression, where they fell
+// out of an icon's compressed pixel data. The word eval in plain prose passed.
+const shipped = (pattern) =>
+  execFileSync("git", ["ls-files", pattern], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
+const CODE_EVAL = /`#?eval`/;
+const INVOKE_EXPRESSION = /(?<![a-z])iex(?![a-z])/i;
+
+describe("the download-and-run shapes the scan flagged", () => {
+  test("eval as code is flagged, and the word in prose is not", () => {
+    expect(CODE_EVAL.test("In the playbooks, `eval` reads transcripts.")).toBe(true);
+    expect(CODE_EVAL.test("The eval playbook tests a skill change blind.")).toBe(false);
+  });
+
+  test.each(shipped("*.md"))("%s writes no eval as code", (file) => {
+    expect(offending(readFileSync(join(root, file), "utf8"), CODE_EVAL)).toEqual([]);
+  });
+
+  test.each(shipped("*.png"))("%s holds no IEX in its bytes", (file) => {
+    expect(readFileSync(join(root, file)).toString("latin1")).not.toMatch(INVOKE_EXPRESSION);
   });
 });

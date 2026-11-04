@@ -1,6 +1,6 @@
 # MiniMax Code tool mapping for pstack
 
-MiniMax Code loads the pstack Claude Code plugin through its Claude Code reader: the skills, the four plugin agents, and the `SessionStart` hook. The model sees MiniMax Code's own tools, so resolve each Claude tool a skill names here.
+MiniMax Code discovers the pstack Claude Code plugin through its Claude Code reader, including the skills, four plugin agents, and `SessionStart` hook. On 0.7.4, guest sessions with a synthetic provider delivered routing and the explicit `pstack:poteto-mode` skill when enabled; disabled controls omitted them. Real-model behavior and agent dispatch are unverified. The model sees MiniMax Code's own tools, so resolve each Claude tool a skill names here.
 
 ## Tool actions
 
@@ -51,7 +51,7 @@ Skills name Claude Code model aliases in their Models sections. Those aliases ar
 
 ## Session routing hook
 
-MiniMax Code runs the Claude Code plugin's `SessionStart` hook through its Claude Code reader. The hook finds `MINIMAX_PLUGIN_ROOT` in its environment and injects the poteto-mode mandate in MiniMax Code wording, which points here. It reads `session hook` from the MiniMax Code sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/SKILL.md#other-runtimes); `session hook: off` disables injection. MiniMax Code passes hooks and the `bash` tool a fixed set of environment variables that leaves out `MINIMAX_DATA_DIR`, so pstack keeps the sheet at `~/.minimax/pstack-models.md` even when the data directory moves. The hook is a POSIX `sh` script, and it is untested on Windows.
+The Claude Code plugin's `SessionStart` hook is intended to run through MiniMax Code's Claude Code reader. When given `MINIMAX_PLUGIN_ROOT`, the hook injects the poteto-mode mandate in MiniMax Code wording, which points here. The hook delivered routing in a 0.7.4 guest session with a synthetic provider; a disabled-plugin control omitted it. It reads `session hook` from the MiniMax Code sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/SKILL.md#other-runtimes); `session hook: off` disables injection. MiniMax Code passes hooks and the `bash` tool a fixed set of environment variables that leaves out `MINIMAX_DATA_DIR`, so pstack keeps the sheet at `~/.minimax/pstack-models.md` even when the data directory moves. The hook is a POSIX `sh` script, and it is untested on Windows.
 
 A skills-only installation does not include the hook. Request `poteto-mode` explicitly or add a standing instruction to `AGENTS.md` in that case.
 

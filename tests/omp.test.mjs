@@ -70,7 +70,7 @@ describe("OMP marketplace plugin", () => {
     expect(event.systemPrompt).toEqual(["existing instructions"]);
   });
 
-  test("the global session-hook toggle stops main routing but keeps the subagent mapping", () => {
+  test("the global session-hook toggle stops main routing but keeps both mappings", () => {
     const home = mkdtempSync(join(tmpdir(), "pstack-omp-toggle-"));
     try {
       mkdirSync(join(home, ".omp"));
@@ -89,12 +89,13 @@ describe("OMP marketplace plugin", () => {
         rmSync(sheet, { recursive: true, force: true });
         writeSheet(sheet, contents);
         const result = run();
-        expect(result.main === undefined).toBe(off);
+        expect(result.main.systemPrompt[1]).toContain("OMP tool and model mappings");
+        expect(result.main.systemPrompt[1].includes("<EXTREMELY_IMPORTANT>")).toBe(!off);
         expect(result.sub.systemPrompt[1]).toContain("OMP tool and model mappings");
       }
       rmSync(sheet, { recursive: true, force: true });
       writeFileSync(sheet, "session hook: on\nsession hook: off\n");
-      expect(run().main).toBeUndefined();
+      expect(run().main.systemPrompt[1]).not.toContain("<EXTREMELY_IMPORTANT>");
       writeFileSync(sheet, "session hook: on\n");
       expect(run().main.systemPrompt[1]).toContain("<EXTREMELY_IMPORTANT>");
     } finally {

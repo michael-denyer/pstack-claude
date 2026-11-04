@@ -22,7 +22,7 @@ OMP provides its own subagent roster and model selection. Use the agents and mod
 
 OMP's `/loop` is an interactive session command, not a subagent tool. For a recurring interactive workflow, provide the user with the appropriate `/loop` command rather than emulating it with a sleep loop. If the current host does not expose it, follow that host's available scheduling mechanism or report the limitation.
 
-The plugin injects its routing instruction before each main-agent turn and this mapping pointer into subagent turns. The `session hook: off` line in `~/.omp/pstack-models.md` disables main-agent routing across OMP profiles; restart a session to clear previously injected context. Configure models through OMP's own model roles and agent overrides. The Pi extension and its agent tools are not loaded by the OMP marketplace plugin.
+The plugin injects its routing instruction before each main-agent turn and this mapping pointer into main and subagent turns. The `session hook: off` line in `~/.omp/pstack-models.md` disables main-agent routing across OMP profiles while retaining the mapping pointer; restart a session to clear previously injected context. Configure models through OMP's own model roles and agent overrides. The Pi extension and its agent tools are not loaded by the OMP marketplace plugin.
 
 OMP's marketplace skill discovery does not apply pstack's `paths` frontmatter as a file-triggered invocation rule. Invoke `typescript-best-practices` explicitly for TypeScript work when applicable.
 

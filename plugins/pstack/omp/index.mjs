@@ -30,7 +30,7 @@ function routingOff() {
 export default function pstack(omp) {
   omp.on("before_agent_start", (event, ctx) => {
     if (event.systemPrompt.some((section) => section.includes(marker))) return;
-    if (ctx.agent.kind === "main" && routingOff()) return;
-    return { systemPrompt: [...event.systemPrompt, instructions(ctx.agent.kind)] };
+    const kind = ctx.agent.kind === "main" && routingOff() ? "sub" : ctx.agent.kind;
+    return { systemPrompt: [...event.systemPrompt, instructions(kind)] };
   });
 }

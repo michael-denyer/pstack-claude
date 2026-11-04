@@ -90,6 +90,27 @@ The first command installs the native Muse plugin bundle. The second approves it
 </details>
 
 <details>
+<summary><strong>OMP</strong></summary>
+
+OMP 18.16.0 provides the marketplace and extension interfaces used here. Add the marketplace, then install pstack at user scope:
+
+```shell
+omp plugin marketplace add michael-denyer/pstack-claude
+omp plugin install --scope user pstack@pstack-claude
+```
+
+Restart OMP to load the plugin's extension. The marketplace package contains the skills and an OMP-specific routing extension. Refresh the marketplace and upgrade the plugin with:
+
+```shell
+omp plugin marketplace update pstack-claude
+omp plugin upgrade --scope user pstack@pstack-claude
+```
+
+To disable or remove it, use `omp plugin disable --scope user pstack@pstack-claude` or `omp plugin uninstall --scope user pstack@pstack-claude`. Restart OMP after disabling or removing the plugin to stop the routing extension. The interactive plugin manager can refresh skills in the current session, but that does not unload the extension. If installation reports a package-name conflict, inspect `omp plugin list --json` and resolve the existing installation before retrying. Do not remove an installation without checking its source and scope. If a skill name collides, use the name OMP shows in its skill list. Restart OMP if a newly installed extension is absent; `--no-extensions` also prevents the routing extension from loading. The extension uses OMP's native tools and model configuration, not Pi's model sheet. This integration has not yet been tested in a live OMP session.
+
+</details>
+
+<details>
 <summary><strong>MiniMax Code</strong></summary>
 
 Run in your terminal:

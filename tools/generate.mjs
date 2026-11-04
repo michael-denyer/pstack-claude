@@ -62,6 +62,7 @@ const repoRelative = (root, file) => relative(root, file).split(sep).join("/");
 
 const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
+  `${PLUGIN}/package.json`,
   `${PLUGIN}/.claude-plugin/plugin.json`,
   ...RUNTIMES.map((runtime) => runtime.manifest),
 ];

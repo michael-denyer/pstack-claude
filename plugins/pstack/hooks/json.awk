@@ -1,4 +1,4 @@
-# JSON helpers for the Copilot hooks. POSIX awk, run under LC_ALL=C.
+# JSON helpers for the Antigravity and Copilot hooks. POSIX awk, run under LC_ALL=C.
 
 # Escapes s as JSON string content: backslash, double quote, tab, and carriage
 # return are escaped, and other control characters are dropped.

@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateHooks } from "../tools/generate.mjs";
-import { MUSE_HOOKS, validateCodexMarketplace, validateCopilotManifest, validateMuseManifest, validatePiPackage } from "../tools/runtimes.mjs";
+import { AGY_HOOKS, MUSE_HOOKS, validateAgyManifest, validateCodexMarketplace, validateCopilotManifest, validateMuseManifest, validatePiPackage } from "../tools/runtimes.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -40,6 +40,30 @@ describe("validateCopilotManifest", () => {
       'hooks "hooks/nope.json" is not a file in the plugin',
     );
     expect(() => validateCopilotManifest({ name: "pstack" }, { claude, pathExists })).toThrow("is not a file in the plugin");
+  });
+});
+
+describe("validateAgyManifest", () => {
+  const manifest = { name: "pstack", logo: "assets/pstack-icon.png" };
+  const options = {
+    claude: { name: "pstack" },
+    read: () => JSON.stringify(AGY_HOOKS),
+    statOf: (rel) => [manifest.logo, "hooks/session-start.sh"].includes(rel) ? { mode: 0o755, isFile: () => true } : null,
+  };
+
+  test("checks the native manifest and its routing command", () => {
+    expect(() => validateAgyManifest(manifest, options)).not.toThrow();
+    expect(() => validateAgyManifest({ ...manifest, name: "other" }, options)).toThrow("!= Claude Code manifest name");
+    expect(() => validateAgyManifest({ ...manifest, logo: "missing.png" }, options)).toThrow("missing.png is not a file");
+    expect(() => validateAgyManifest(manifest, { ...options, read: () => "{}" })).toThrow("pstack-routing.SessionStart");
+  });
+
+  test("requires the hook script on every host and execute bits on POSIX", () => {
+    const plain = { ...options, statOf: () => ({ mode: 0o644, isFile: () => true }) };
+    expect(() => validateAgyManifest(manifest, plain)).toThrow("hooks/session-start.sh is not executable");
+    expect(() => validateAgyManifest(manifest, { ...plain, checkExecutable: false })).not.toThrow();
+    const missing = { ...options, statOf: (rel) => rel === manifest.logo ? options.statOf(rel) : null };
+    expect(() => validateAgyManifest(manifest, { ...missing, checkExecutable: false })).toThrow("hooks/session-start.sh is not a file");
   });
 });
 

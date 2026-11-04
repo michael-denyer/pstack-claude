@@ -105,6 +105,21 @@ MiniMax Code loads each directory under `plugins/` in its data directory as a lo
 
 </details>
 
+<details>
+<summary><strong>Antigravity (agy)</strong></summary>
+
+Run in your terminal:
+
+```shell
+git clone https://github.com/michael-denyer/pstack-claude
+cd pstack-claude
+agy plugin install ./plugins/pstack
+```
+
+This installs the native Antigravity plugin bundle (`skills`, `agents`, and `SessionStart` routing hook) into `~/.gemini/config/plugins/pstack`.
+
+</details>
+
 <a id="other-harnesses"></a>
 <details>
 <summary><strong>Other harnesses</strong></summary>

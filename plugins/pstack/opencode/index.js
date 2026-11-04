@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = dirname(fileURLToPath(import.meta.url));
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const skillsDir = join(root, "skills");
 
 function readSkills() {
@@ -13,9 +13,6 @@ function readSkills() {
     const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
     if (!match) throw new Error(`Missing skill frontmatter: ${path}`);
     const metadata = Bun.YAML.parse(match[1]);
-    if (metadata.name !== entry.name || typeof metadata.description !== "string") {
-      throw new Error(`Invalid skill frontmatter: ${path}`);
-    }
     return { id: `pstack-${entry.name}`, name: metadata.name, description: metadata.description, path, content: text.slice(match[0].length) };
   });
 }

@@ -1,11 +1,6 @@
 # OpenCode mapping
 
-The native plugin registers each pstack skill as `pstack-<name>`. Once per session before manually invoking a pstack skill, inspect `opencode api get /api/skill` and confirm the ID's `path` is inside the configured pstack plugin's `skills` directory. Recheck after plugin or skill changes. Use the `skill` tool with that ID when a pstack skill says to invoke another skill. For example, `pstack:how` becomes `pstack-how`. A user can mention `@pstack-poteto-mode` after confirming its path. Read relative references from the skill's returned base directory.
-
-Use OpenCode's available tools in place of Claude Code tools. Map `Read` to `read`, `Bash` to `shell`, and the `Skill` tool to `skill`. Use the available delegation tools for subagents and inspect their actual parameters before dispatching. Follow the active host's instructions if a tool or model is unavailable. Do not assume Claude model aliases are available; choose from the models configured in OpenCode. Use the session's available planning tool or keep the checklist in a task-specific local file when none is available.
-
-The plugin applies the routing instruction at each model step in a root session, including after compaction. It does not add that instruction to child sessions. The plugin leaves a preexisting skill with the same ID in place. If any pstack ID resolves to another path, the plugin suppresses routing so it cannot direct the agent to an unrelated skill. Resolve the conflicting ID before invoking it as pstack. Set `session hook: off` on its own line in `${XDG_CONFIG_HOME:-~/.config}/opencode/pstack-models.md` to turn routing off while keeping the skills registered.
-
+OpenCode 2 loads the native pstack plugin, which registers each skill as `pstack-<name>`. Invoke `pstack:how` as `pstack-how` with the `skill` tool, and resolve relative references from the skill's base directory. Map `Read` to `read`, `Bash` to `shell`, and the `Skill` tool to `skill`.
 
 ## Claude action mapping
 

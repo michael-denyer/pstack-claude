@@ -116,6 +116,7 @@ describe("manifests", () => {
   const piPackage = json("package.json");
   const copilot = json("plugins/pstack/.github/plugin/plugin.json");
   const muse = json("plugins/pstack/.muse-plugin/plugin.json");
+  const kimi = json("kimi.plugin.json");
 
   test("the plugin and marketplace manifests agree on every fact they repeat", () => {
     const shared = ({ name, author, homepage, repository, license, keywords }) =>
@@ -130,11 +131,29 @@ describe("manifests", () => {
     expect(copilot.version).toBe(claude.version);
     expect(muse.name).toBe(claude.name);
     expect(muse.version).toBe(claude.version);
+    expect(kimi.name).toBe(claude.name);
+    expect(kimi.version).toBe(claude.version);
     expect(codexMarketplace.name).toBe(claudeMarketplace.name);
     expect(codexMarketplace.interface.displayName).toBe(codex.interface.displayName);
     expect(codexMarketplace.plugins.map(({ name, source, category }) => [name, source.path, category])).toEqual([
       [codex.name, claudeMarketplace.plugins[0].source, codex.interface.category],
     ]);
+  });
+
+  test("the Kimi system prompt carries the routing instruction and the mapping pointer", () => {
+    const prompt = readFileSync(join(repoRoot, kimi.systemPromptPath), "utf8");
+    expect(prompt).toContain("pstack:poteto-mode");
+    expect(prompt).toContain(readFileSync(join(repoRoot, "plugins/pstack/hooks/session-start-context.md"), "utf8").trim());
+    expect(prompt).toContain("kimi-tools.md");
+  });
+
+  test("Kimi instructions locate the packaged mapping", () => {
+    const prompt = readFileSync(join(repoRoot, kimi.systemPromptPath), "utf8");
+    for (const instructions of [kimi.skillInstructions, prompt]) {
+      const path = instructions.match(/<KIMI_CODE_HOME>\/plugins\/managed\/pstack\/([^`\s]+kimi-tools\.md)/)?.[1];
+      expect(path).toBeDefined();
+      expect(existsSync(join(repoRoot, path))).toBe(true);
+    }
   });
 });
 

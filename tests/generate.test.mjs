@@ -464,7 +464,7 @@ describe("lead lines", () => {
   });
 
   test("Codex, Copilot, Muse, and Antigravity stamp a preamble on their noted skills, and Pi, MiniMax Code, and OpenCode 2 stamp none", () => {
-    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi", "GitHub Copilot", "Muse", "MiniMax Code", "OpenCode 2", "Antigravity"]);
+    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi", "GitHub Copilot", "Muse", "MiniMax Code", "OpenCode 2", "Kimi Code CLI", "Antigravity"]);
     expect(codex.preamble).toBe(
       "On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.",
     );
@@ -477,6 +477,7 @@ describe("lead lines", () => {
     expect(RUNTIMES.find((r) => r.name === "Antigravity").preamble).toBe(
       "On Antigravity, read the [platform mapping](../poteto-mode/references/agy-tools.md), including its per-skill notes, before following this skill.",
     );
+    expect(RUNTIMES.find((r) => r.name === "Kimi Code CLI").preamble).toBeNull();
     expect(pi.preamble).toBeNull();
     expect(RUNTIMES.find((r) => r.name === "MiniMax Code").preamble).toBeNull();
     expect(RUNTIMES.find((r) => r.name === "OpenCode 2").preamble).toBeNull();

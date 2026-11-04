@@ -90,6 +90,20 @@ The first command installs the native Muse plugin bundle. The second approves it
 </details>
 
 <details>
+<summary><strong>Kimi Code CLI</strong></summary>
+
+After a release containing `kimi.plugin.json` is published, close other Kimi sessions and install it in a fresh Kimi Code CLI session:
+
+```text
+/plugins install https://github.com/michael-denyer/pstack-claude
+/reload
+```
+
+To test an unreleased checkout, use `/plugins install /absolute/path/to/pstack-claude` instead, followed by `/reload`; Kimi copies the whole checkout, including Git metadata and local files, so use a clean, reviewed copy. To update, close other Kimi sessions, reinstall from the same source in a fresh session, and run `/reload`. Invoke a skill as `/skill:pstack:poteto-mode`; see the [Kimi mapping](plugins/pstack/skills/poteto-mode/references/kimi-tools.md) for tool guidance.
+
+</details>
+
+<details>
 <summary><strong>MiniMax Code</strong></summary>
 
 Run in your terminal:
@@ -108,7 +122,7 @@ MiniMax Code loads each directory under `plugins/` in its data directory as a lo
 <details>
 <summary><strong>OpenCode 2</strong></summary>
 
-Clone the repository, then add the absolute path to `plugins/pstack` to the existing `plugins` array in `~/.config/opencode/opencode.jsonc`. On Windows, use a path such as `C:/Users/name/pstack-claude/plugins/pstack`. Restart OpenCode after checkout updates.
+Clone the repository, then add the absolute path to `plugins/pstack/opencode` to the existing `plugins` array in `~/.config/opencode/opencode.jsonc`. On Windows, use a path such as `C:/Users/name/pstack-claude/plugins/pstack/opencode`. Restart OpenCode after checkout updates.
 
 Alternatively, install, check, or update the native Git package:
 
@@ -118,7 +132,9 @@ opencode plugin check 'github:michael-denyer/pstack-claude#main'
 opencode plugin update 'github:michael-denyer/pstack-claude#main'
 ```
 
-A commit-pinned reference does not advance. If a check immediately after installation reports no package plugins, wait for the server to load it and check again. Avoid concurrent OpenCode configuration changes during installation or removal; its manager can lose a concurrent update.
+A commit-pinned reference does not advance. If a check immediately after installation reports no package plugins, wait for the server to load it and check again.
+
+If you previously installed pstack skills into `~/.agents/skills`, inspect the links and remove only those pointing to your pstack checkout before using the plugin.
 
 The plugin registers `pstack-` skill IDs and adds routing in root sessions. If routing is missing, run `opencode api get /api/skill` and check that each `pstack-` path belongs to this plugin. Resolve any conflicting skill before manually invoking that ID. Use `session hook: off` in the OpenCode model sheet to disable routing. To remove the plugin, remove its configured path and restart the service, or use `opencode plugin remove` with the exact Git specifier. OpenCode 1 is unsupported. See the [OpenCode mapping](plugins/pstack/skills/poteto-mode/references/opencode-tools.md).
 
@@ -161,7 +177,7 @@ To update, run `git pull` in the clone, then run the `for` loop again to link sk
 
 ### Configure
 
-pstack routes tasks to `poteto-mode` automatically. At session start, a hook injects an instruction that points the agent at it: the plugin's hook on Claude Code, Codex, GitHub Copilot, Muse, and MiniMax Code, and the pstack extension on Pi. Codex runs the hook only after you trust it through `/hooks`, and Muse only after `muse plugins approve pstack`. Other harnesses have no hook.
+pstack routes tasks to `poteto-mode` automatically. At session start, a hook injects an instruction that points the agent at it: the plugin's hook on Claude Code, Codex, GitHub Copilot, Muse, MiniMax Code, and Antigravity; the Kimi plugin; the pstack extension on Pi; and the OpenCode plugin in root sessions at each model step. Codex runs the hook only after you trust it through `/hooks`, and Muse only after `muse plugins approve pstack`. Other skills-only installs have no hook.
 
 Run `setup-pstack` to turn automatic routing on or off, change model defaults, or set a reasoning effort per role (`arena runners: opus @xhigh, fable @max`).
 

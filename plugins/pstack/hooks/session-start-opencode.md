@@ -11,6 +11,7 @@ It routes to the right pstack skill from there. For smaller tasks, such as a con
 
 When the intent is already specific, enter that skill directly: `pstack-tdd`, `pstack-architect`, `pstack-how`, `pstack-why`, `pstack-arena`, `pstack-interrogate`.
 
-User instructions (CLAUDE.md, AGENTS.md, direct requests) take precedence. Other session-start mandates, such as superpowers, still apply. Their skill checks run as before, and when a task meets the criteria above they route implementation through poteto-mode.
+User instructions (AGENTS.md, direct requests) take precedence. Other session-start mandates, such as superpowers, still apply. Their skill checks run as before, and when a task meets the criteria above they route implementation through poteto-mode.
+
 Read `references/opencode-tools.md` from the installed `pstack-poteto-mode` skill directory for OpenCode tool and model translations. Use the `skill` tool with the `pstack-` skill IDs above.
 </EXTREMELY_IMPORTANT>

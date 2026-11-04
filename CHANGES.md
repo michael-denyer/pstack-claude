@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.127 - pi agent tools: off, Codex prompt stubs removed
+
+A `pi agent tools: off` line in `~/.pi/agent/pstack-models.md` leaves delegation to another Pi extension, such as `pi-subagents`. With the line set, the Pi extension registers none of `agent`, `send_message`, `list_agents`, `stop_agent`, and `/pstack-agents`, so the model sees one set of delegation tools. The `pstack-pi-tools` system prompt section adds one sentence telling the model to delegate with the session's own subagent tool where `pi-tools.md` names pstack's, because `pi-subagents` registers a single `subagent` tool instead. Skills, `ask_user_question`, `schedule_wakeup`, `/loop`, and the other prompt sections stay. @foreztgump added this in [#384](https://github.com/michael-denyer/pstack-claude/pull/384).
+
+The 43 Codex prompt stubs under `plugins/pstack/.codex-plugin/prompts/` are gone. Codex 0.166.0 loads none of them, through a plugin install or through the `~/.codex/prompts` recipe in `docs/reference.md`, which is gone too. Each skill already serves its own slash command. The generator no longer writes stubs, and a `commands/` folder still fails it ([#388](https://github.com/michael-denyer/pstack-claude/pull/388)). The stub frontmatter quoting from [#385](https://github.com/michael-denyer/pstack-claude/pull/385) went with the stubs.
+
+`watch-pr`'s `readSnapshot` carries upstream's CI chain again, with the no-checks wait as one added branch at its head, and its behavior is unchanged. It now replaces 3 upstream lines where it replaced 62, and the sync dry-run drops from 2,927 to 2,816 changed lines, so upstream edits to `policy.ts` conflict less ([#386](https://github.com/michael-denyer/pstack-claude/pull/386)).
+
 ## 0.9.126 - Pi agent frontmatter read as YAML, Ctrl-C handler on real Pi
 
 The Pi extension reads agent-file and `paths:` frontmatter with Pi's own `parseFrontmatter`, which Pi 1.0.0, 1.1.0, and 1.5.0 all export, in place of its partial YAML reader. When the frontmatter parses as YAML, a comment is no longer part of a value, so `model: inherit # use the session model` runs the agent on the parent's model where it failed as an unknown model. A double-quoted value with `\"` escapes reads as its text, where it kept its quotes and backslashes. When the YAML does not parse, the extension retries as Claude Code 2.1.310 does. It quotes each unquoted top-level value that holds YAML syntax, such as `description: Use for a: b`, turns leading tabs into spaces, and parses again. The extension skips a user agent file that fails both ways, as Claude Code does, where the old reader loaded what it could of it.

@@ -1,0 +1,10 @@
+{
+  "name": "pstack",
+  "version": "0.9.129",
+  "description": "pstack workflows for Kimi Code CLI",
+  "homepage": "https://github.com/michael-denyer/pstack-claude",
+  "license": "MIT",
+  "skills": "./plugins/pstack/skills",
+  "systemPromptPath": "./plugins/pstack/hooks/kimi-instructions.md",
+  "skillInstructions": "On Kimi Code CLI, read <KIMI_CODE_HOME>/plugins/managed/pstack/plugins/pstack/skills/poteto-mode/references/kimi-tools.md before following a pstack skill. KIMI_CODE_HOME defaults to ~/.kimi-code when unset."
+}

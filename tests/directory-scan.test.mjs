@@ -81,12 +81,13 @@ describe("each file the scan verified", () => {
 
 // The scan's download-and-run screen also reads skill text and the printable
 // bytes of images. It flagged `eval` written as code in a reference file, and
-// the letters IEX, PowerShell's alias for Invoke-Expression, where they fell
-// out of an icon's compressed pixel data. The word eval in plain prose passed.
+// PowerShell's IEX and then IWR aliases where they fell out of an icon's
+// compressed pixel data, inside longer runs of letters too. The word eval in
+// plain prose passed.
 const shipped = (pattern) =>
   execFileSync("git", ["ls-files", pattern], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
 const CODE_EVAL = /`#?eval`/;
-const INVOKE_EXPRESSION = /(?<![a-z])iex(?![a-z])/i;
+const POWERSHELL_ALIAS = /iex|iwr|irm/i;
 
 describe("the download-and-run shapes the scan flagged", () => {
   test("eval as code is flagged, and the word in prose is not", () => {
@@ -98,7 +99,7 @@ describe("the download-and-run shapes the scan flagged", () => {
     expect(offending(readFileSync(join(root, file), "utf8"), CODE_EVAL)).toEqual([]);
   });
 
-  test.each(shipped("*.png"))("%s holds no IEX in its bytes", (file) => {
-    expect(readFileSync(join(root, file)).toString("latin1")).not.toMatch(INVOKE_EXPRESSION);
+  test.each(shipped("*.png"))("%s holds no PowerShell alias in its bytes", (file) => {
+    expect(readFileSync(join(root, file)).toString("latin1")).not.toMatch(POWERSHELL_ALIAS);
   });
 });

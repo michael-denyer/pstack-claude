@@ -47,3 +47,4 @@ Skills name Claude Code model aliases in their Models sections. Grok Build's ava
 
 | Skill | On Grok Build |
 | --- | --- |
+| `why` | The parallel investigators and the synthesizer map to `spawn_subagent` fan-out. List MCP servers with `search_tool`, not from Claude Code's MCP files. |

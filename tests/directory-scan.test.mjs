@@ -8,7 +8,7 @@
 // once these files held neither shape, so each stays that way.
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -80,14 +80,15 @@ describe("each file the scan verified", () => {
 });
 
 // The scan's download-and-run screen also reads skill text and the printable
-// bytes of images. It flagged `eval` written as code in a reference file, and
-// PowerShell's IEX and then IWR aliases where they fell out of an icon's
-// compressed pixel data, inside longer runs of letters too. The word eval in
-// plain prose passed.
+// bytes of images. It flagged `eval` written as code in a reference file, while
+// the word eval in plain prose passed. It flagged the 1254-pixel icon in three
+// encodes of about 900 KB, whatever their bytes held, and passed the icon at
+// 512 pixels and 192,542 bytes, so the screen trips on the volume of image
+// bytes. A PNG stays within the size a scan has passed.
 const shipped = (pattern) =>
   execFileSync("git", ["ls-files", pattern], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
 const CODE_EVAL = /`#?eval`/;
-const POWERSHELL_ALIAS = /iex|iwr|irm/i;
+const PNG_BYTE_CEILING = 200_000;
 
 describe("the download-and-run shapes the scan flagged", () => {
   test("eval as code is flagged, and the word in prose is not", () => {
@@ -99,7 +100,7 @@ describe("the download-and-run shapes the scan flagged", () => {
     expect(offending(readFileSync(join(root, file), "utf8"), CODE_EVAL)).toEqual([]);
   });
 
-  test.each(shipped("*.png"))("%s holds no PowerShell alias in its bytes", (file) => {
-    expect(readFileSync(join(root, file)).toString("latin1")).not.toMatch(POWERSHELL_ALIAS);
+  test.each(shipped("*.png"))("%s is within the image size a scan has passed", (file) => {
+    expect(statSync(join(root, file)).size).toBeLessThanOrEqual(PNG_BYTE_CEILING);
   });
 });

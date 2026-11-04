@@ -2,7 +2,7 @@ import { CHART_STATES, type ConfigSection, RERUN_STATES, type Spec } from "../ir
 
 export function configText(sections: ConfigSection[], extra: string[]) {
   const lines: string[] = [];
-  for (const s of sections) lines.push(`${s.key} ${s.tokens.join(" ")}`);
+  for (const s of sections) lines.push(`${s.keyword} ${s.tokens.join(" ")}`);
   lines.push(...extra);
   return lines.join("\n");
 }

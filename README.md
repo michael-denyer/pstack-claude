@@ -104,6 +104,20 @@ To test an unreleased checkout, use `/plugins install /absolute/path/to/pstack-c
 </details>
 
 <details>
+<summary><strong>Grok Build</strong></summary>
+
+```shell
+git clone https://github.com/michael-denyer/pstack-claude
+cd pstack-claude
+grok plugin install "$PWD/plugins/pstack" --trust
+grok plugin enable pstack
+```
+
+Start a new session and use `/poteto-mode` to load the skill explicitly. To update a local install, quit Grok sessions, inspect `grok plugin details pstack` and back up any edits in the installed copy, pull the checkout, run `grok plugin uninstall pstack --keep-data`, and repeat the last two commands. If pstack was disabled, disable it again before restarting. `grok plugin update` does not refresh a local install.
+
+</details>
+
+<details>
 <summary><strong>MiniMax Code</strong></summary>
 
 For a first install, check that `${MINIMAX_DATA_DIR:-$HOME/.minimax}/plugins/pstack` does not already exist. Then run in your terminal:

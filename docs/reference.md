@@ -56,7 +56,7 @@ Find each skill's instructions in the [skills tree](../plugins/pstack/skills/).
 
 ## Runtime support
 
-All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code, Codex, GitHub Copilot, Muse, MiniMax Code, and Antigravity plugins install routing hooks. The Kimi plugin, Pi extension, and OpenCode plugin also inject routing.
+All runtimes share [one skills tree](../plugins/pstack/skills/). A skills-only installation includes the skills, scripts, agent references, and license notices. The Claude Code, Codex, GitHub Copilot, Muse, MiniMax Code, and Antigravity plugins install routing hooks. The Kimi plugin, Pi extension, and OpenCode plugin also inject routing, and the Pi extension supplies the subagent tools.
 
 | Runtime | Setup and recorded verification |
 | --- | --- |
@@ -205,6 +205,7 @@ plugins/pstack/
   .github/plugin/plugin.json      GitHub Copilot plugin manifest
   .muse-plugin/plugin.json        Muse native plugin manifest (skill list generated)
   pi/                            Pi extension (subagent, question, and wake-up tools)
+  opencode/                      OpenCode 2 server plugin
   skills/                        Shared skills, references, and scripts
   agents/                        Claude Code subagent definitions (Muse agent definitions too)
   hooks/                         Startup routing for Claude Code, Codex, Copilot, Muse, MiniMax Code, Antigravity, and OpenCode; Copilot tool checks

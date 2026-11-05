@@ -11,7 +11,8 @@ import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 // Platform Adaptation sentence, and a row with a `key` its
 // models.json block, checked by `checkModels`. A `skillPreambles` runtime also gets a preamble under
 // the first heading of each skill its Per-skill notes table lists. Pi has
-// none, so the Platform Adaptation pointer is its only one. `manifest` is the file the generator stamps VERSION
+// none: its one pointer is in poteto-mode's Platform
+// Adaptation section. `manifest` is the file the generator stamps VERSION
 // into, `validate` checks the runtime's packaging against the tree once that
 // manifest parses, and `hooks` lists the hooks files the manifest names,
 // relative to the plugin root. GitHub Copilot stamps preambles but has no
@@ -19,8 +20,8 @@ import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 // Muse declares its hooks inline in its native manifest, so it has no hooks
 // file either. Its `stampManifest` rewrites the manifest's skill list from the tree.
 // MiniMax Code reads the Claude Code build as it ships, so its row names the
-// Claude Code manifest and stamps no preambles, so, as for Pi, the Platform
-// Adaptation pointer is its only one.
+// Claude Code manifest and stamps no preambles; its one pointer is in
+// poteto-mode's Platform Adaptation section, as Pi's is.
 // Antigravity keys its hooks by group name instead of the shared hooks schema.
 export const RUNTIMES = [
   {

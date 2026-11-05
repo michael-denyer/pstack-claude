@@ -80,6 +80,13 @@ export const RUNTIMES = [
     validate: validateMiniMaxPackage,
   },
   {
+    name: "OpenCode 2",
+    mapping: "opencode-tools.md",
+    modelNames: openCodeModelNamesSection,
+    manifest: "package.json",
+    validate: ({ manifest, pathExists }) => validateOpenCodePackage(manifest, { pathExists }),
+  },
+  {
     name: "Kimi Code CLI",
     mapping: "kimi-tools.md",
     modelNames: kimiModelNamesSection,
@@ -457,6 +464,29 @@ export function minimaxModelNamesSection(models) {
     "reachable, vary reasoning effort and note in the verdict that diversity was reduced.\n\n" +
     "`/setup-pstack` writes the configured model list. On MiniMax Code, list the models with `mcode provider list` " +
     "or the `model` slash command and write only keys they show."
+  );
+}
+
+export function validateOpenCodePackage(manifest, { pathExists }) {
+  const entry = "./plugins/pstack/opencode/index.js";
+  if (manifest.exports?.["./server"] !== entry) throw new Error(`package.json: exports["./server"] must be ${entry}`);
+  if (!pathExists(entry.slice(2))) throw new Error(`package.json: ${entry} does not exist`);
+}
+
+export function openCodeModelNamesSection(models) {
+  return (
+    "Claude Code model aliases are not OpenCode model IDs. Select a configured chat model only when the user explicitly " +
+    "asks for a model or variant; otherwise let the subagent inherit its model. OpenCode accepts " +
+    "`providerID/modelID` or `providerID/modelID#variant` in the `subagent` tool's `model` field. " +
+    "Look up the ID and variant with the `models` tool; do not guess.\n\n" +
+    "- The model sheet is `${XDG_CONFIG_HOME:-~/.config}/opencode/pstack-models.md`. Add that path to the " +
+    "OpenCode configuration's `instructions` array to load role choices; the plugin reads the `session hook` setting directly.\n" +
+    `- For role-model skills (${roleSkills(models).map(code).join(", ")}), treat a saved user choice as an explicit ` +
+    "instruction only when it identifies a configured model. The `subagent` input has no separate effort field; " +
+    "use a listed `#variant` when requested. Omit `model` for `inherit-parent` or `auto`.\n" +
+    "- For diverse-model panels, use different available providers only when the user requests those models. " +
+    "Otherwise inherit and state that model diversity was not established.\n\n" +
+    "Use the `models` command to inspect configured models before writing the sheet."
   );
 }
 

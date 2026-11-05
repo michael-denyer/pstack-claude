@@ -12,9 +12,9 @@ Grok Build loads the pstack plugin's skills. It does not translate Claude Code t
 | Search (`Grep` / `Glob`) | `grep` / `list_dir` |
 | Web (`WebSearch` / `WebFetch`) | `web_search` / `run_terminal_command` with `curl` |
 | Skill (`Skill`) | Read the path from the session's skills list with `read_file`; `/poteto-mode` also expands the skill |
-| Subagent (`Agent` / `Task`) | `spawn_subagent` with `prompt`, `description`, and a listed `subagent_type`; use `background` and `isolation: "worktree"` where needed |
+| Subagent (`Agent` / `Task`) | `spawn_subagent` with `prompt` and `description`; `run_in_background` defaults to `true`; use `isolation: "worktree"` where needed |
 | Wait for a subagent (`TaskOutput`) | `get_command_or_subagent_output` with its task ID |
-| Send to a subagent (`SendMessage`) | Grok exposes no steering action; do not claim to have sent an update |
+| Send to a subagent (`SendMessage`) | `send_subagent_message`, off by default; `GROK_ACTIVE_AGENT_MESSAGES` or `[features] active_agent_messages` enables it. Without the tool, do not claim to have sent an update |
 | Stop a subagent (`TaskStop`) | `kill_command_or_subagent` |
 | Tasks (`TaskCreate` / `TaskUpdate` / `TodoWrite`) | `todo_write` |
 | Questions (`AskUserQuestion`) | `ask_user_question` |
@@ -28,7 +28,7 @@ Grok does not inject the Claude SessionStart hook output. The Grok-only routing 
 
 poteto-mode's Subagents section dispatches `subagent_type: "pstack:poteto-agent"`, and other skills name `general-purpose`. The Grok build ships skills and no agent definitions.
 
-- For `pstack:poteto-agent` or `general-purpose`, pass a `subagent_type` that the `spawn_subagent` schema lists.
+- For `pstack:poteto-agent` or `general-purpose`, omit `subagent_type`. Grok cannot select a built-in type by name and runs an omitted type as `general-purpose`.
 - Put the absolute path of `poteto-mode`'s `SKILL.md` in every brief that stands in for `pstack:poteto-agent`, as poteto-mode asks.
 
 ## Model names

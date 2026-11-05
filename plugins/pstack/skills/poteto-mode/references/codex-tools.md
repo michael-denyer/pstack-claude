@@ -19,6 +19,7 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 | Free a finished subagent slot | `close_agent`, when the session exposes it. Some Codex hosts don't. |
 | Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | `update_plan` |
 | Ask the human a fixed-choice question (`AskUserQuestion`) | Ask in plain text and let the user answer. Codex has no structured-choice tool. |
+| Read this workspace's session transcripts (Claude Code's `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/`) | Codex sessions live in `${CODEX_HOME:-~/.codex}/sessions/YYYY/MM/DD/rollout-<timestamp>-<id>.jsonl`. Archived sessions are in `${CODEX_HOME:-~/.codex}/archived_sessions/`. Older rollouts in both directories are zstd-compressed `rollout-<timestamp>-<id>.jsonl.zst` files. Read those with `zstd -dc`. The first line of each rollout is a `session_meta` record. Keep only rollouts whose `payload.cwd` is the workspace or one of its worktrees. Never read other projects' sessions. |
 
 Subagent dispatch needs `multi_agent` enabled. Add to `~/.codex/config.toml`:
 
@@ -94,6 +95,8 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | `arena` | The parallel candidates and the cross-judge map to `spawn_agent`; substitute your configured Codex models for the runners and the cross-judge pool (see Model names above). |
 | `how` | The parallel explorers and the explainer map to `spawn_agent` fan-out; substitute your configured Codex models. |
 | `reflect` | The three reviewers and the synthesizer map to `spawn_agent`; substitute your configured Codex models. The transcript finder reads Claude Code's layout under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`, so pass the session digest step 1 allows instead. |
+| `recall` | Search this workspace's Codex rollouts (see Tool actions). Do not list or read `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`. It holds Claude Code transcripts, not this session's history. In a rollout, chat messages are the `response_item` records whose `payload.type` is `message`, with the speaker in `payload.role`. Skip `developer` records, which are injected instructions. |
+| `show-me-your-work` | Check the log against this run's Codex rollout (see Tool actions). This run's rollout is the one whose name ends in `-$CODEX_THREAD_ID.jsonl`. If `CODEX_THREAD_ID` is unset, report that the audit could not run instead of guessing a rollout. Do not read Claude Code's projects directory. |
 | `swarm` | Each worker is a `spawn_agent` call on your configured Codex model, and those calls already run concurrently; give each writing worker its own worktree or output directory (see Subagent policy above). |
 | `why` | The parallel investigators and the synthesizer map to `spawn_agent`; substitute your configured Codex models. List MCP servers from the tools Codex exposes to the session, not from `.mcp.json` or `claude mcp list`. |
 

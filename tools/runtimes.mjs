@@ -563,14 +563,13 @@ export function validateKimiManifest(manifest, { pathExists }) {
 }
 
 export function kimiModelNamesSection(models) {
-  return "Skills name Claude model aliases, which Kimi does not accept. Use only models advertised by the current `Agent` tool. " +
-    "When permitted, `primary` selects the current model and thinking level; omitting `model` uses the configured default, which may differ. " +
-    "Forced secondary mode can prohibit overrides, including `primary`; omit `model` in that mode. " +
+  return "Skills name Claude model aliases; do not assume they are available on Kimi. Use only models advertised by the current `Agent` tool; " +
+    "if it has no `model` parameter, omit `model`. Omitting it uses the configured subagent default when present, otherwise the parent's model. " +
     "Kimi does not expose a per-call effort parameter.\n\n" +
     "Read `<KIMI_CODE_HOME>/pstack-models.md` before a skill that needs a role model (" + roleSkills(models).map(code).join(", ") + "). " +
-    "KIMI_CODE_HOME defaults to `~/.kimi-code`. If the sheet is absent, use Kimi's configured default. " +
+    "KIMI_CODE_HOME defaults to `~/.kimi-code`. If the sheet is absent, omit `model`. " +
     "For diverse-model panels, use available distinct models and report if diversity is unavailable. " +
-    "`setup-pstack` writes the model choices; `inherit-parent` and `auto` both omit `model` and use the configured default, which may differ from the parent model.";
+    "`setup-pstack` writes the model choices; `inherit-parent` and `auto` both omit `model`.";
 }
 
 // Grok discovers the common skills and the Grok-only routing skill through

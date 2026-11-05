@@ -196,5 +196,5 @@ test("each runtime mapping names exactly the skills with a panel role as its div
     })),
   );
   expect(lists.length).toBeGreaterThan(0);
-  for (const { file, skills } of lists) expect({ file, skills }).toEqual({ file, skills: panelSkills });
+  for (const list of lists) expect(list).toEqual({ ...list, skills: panelSkills });
 });

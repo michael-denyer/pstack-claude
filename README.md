@@ -129,9 +129,7 @@ mkdir -p "${MINIMAX_DATA_DIR:-$HOME/.minimax}/plugins"
 cp -R plugins/pstack "${MINIMAX_DATA_DIR:-$HOME/.minimax}/plugins/pstack"
 ```
 
-MiniMax Code loads each directory under `plugins/` in its data directory as a local plugin, and reads pstack through its Claude Code reader with the skills, agents, and routing hook. `mcode plugin list` shows it as `pstack@local`. To update, record its enabled state, quit every `mcode` process, and move `plugins/pstack` to an unused path outside `plugins/`. Run `git pull` and, only if it succeeds, run the `cp` line again. After a successful copy or restoration, check `mcode plugin list` and restore the previous enabled state if needed.
-
-If `git pull` fails, retry it or restore the previous copy before starting `mcode`. If the copy fails on install or update, keep `mcode` stopped and move any partial `plugins/pstack` to another unused path outside `plugins/` before retrying. For an update, you can instead restore the previous copy after moving the partial directory aside.
+MiniMax Code loads each directory under `plugins/` in its data directory as a local plugin, and reads pstack through its Claude Code reader with the skills, agents, and routing hook. `mcode plugin list` shows it as `pstack@local`. To update, record its enabled state, quit every `mcode` process, and move `plugins/pstack` to an unused path outside `plugins/`. Run `git pull` and the `cp` line again. Check `mcode plugin list` and restore the previous enabled state if needed.
 
 </details>
 

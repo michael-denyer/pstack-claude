@@ -222,36 +222,6 @@
       "since": "0.9.91",
       "upstream": "not-proposed"
     },
-    "plugins/pstack/skills/principle-encode-lessons-in-structure/SKILL.md": {
-      "kind": "policy",
-      "why": "Restores the rule to encode recurring fixes in mechanisms instead of text and the strongest-mechanism ladder, which upstream's density pass cut although the description and architect's runner prompt still name them.",
-      "since": "0.9.129",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/principle-exhaust-the-design-space/SKILL.md": {
-      "kind": "policy",
-      "why": "Restores the 2-3 prototype rule and its when-it-applies and when-it-doesn't scope, which upstream's density pass cut and left a body that began with a dangling \"It also applies\".",
-      "since": "0.9.129",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/principle-guard-the-context-window/SKILL.md": {
-      "kind": "policy",
-      "why": "Restores the isolate-large-payloads rule that routes bulk to subagents and keeps summaries in the main thread, which upstream's density pass cut although the description still promises it.",
-      "since": "0.9.129",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/principle-laziness-protocol/SKILL.md": {
-      "kind": "policy",
-      "why": "Restores the deletion bias, the flat-call-hierarchy rule with its three-file bound, and question-the-threading, which upstream's density pass cut although the description and architect's runner prompt still name them.",
-      "since": "0.9.129",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/principle-migrate-callers-then-delete-legacy-apis/SKILL.md": {
-      "kind": "policy",
-      "why": "Restores the one-line rule, the caller-inventory and delete-now bullets, and the time-boxed adapter exception that upstream PR #634 cut, so the leaf states the rule its description promises.",
-      "since": "0.9.129",
-      "upstream": "not-proposed"
-    },
     "plugins/pstack/skills/principle-prove-it-works/SKILL.md": {
       "kind": "policy",
       "why": "Adds checks that the process behind a result was sound, that a failing check fails for the predicted reason, and that a success report rests on the real state and exit code rather than truncated output.",
@@ -262,12 +232,6 @@
       "kind": "policy",
       "why": "Counts a constant pin as behavior when the value is a promise to users, such as a documented default.",
       "since": "0.9.82",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/principle-type-system-discipline/SKILL.md": {
-      "kind": "policy",
-      "why": "Restores the make-illegal-states-unrepresentable and exhaustive-matching bullets that upstream PR #634 cut, so the body delivers what its description still promises.",
-      "since": "0.9.129",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/recall/SKILL.md": {

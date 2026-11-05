@@ -14,6 +14,8 @@ import { roleCases, sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
 const mandate = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
 const minimaxMandate = readFileSync(join(pluginRoot, "hooks/session-start-minimax.md"), "utf8");
+const agyMandate = readFileSync(join(pluginRoot, "hooks/session-start-agy.md"), "utf8");
+const agyHooks = JSON.parse(readFileSync(join(pluginRoot, "hooks.json"), "utf8"));
 const codexManifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8"));
 const copilotManifest = JSON.parse(readFileSync(join(pluginRoot, ".github/plugin/plugin.json"), "utf8"));
 const models = JSON.parse(readFileSync(join(pluginRoot, "models.json"), "utf8"));
@@ -31,6 +33,14 @@ const sessionStart = Object.fromEntries(
 // relocated that runtime's directory. PLUGIN_ROOT is a generic name any shell
 // profile may export, so it must not move a Claude Code session to Codex's sheet.
 const runtimes = {
+  agy: {
+    command: agyHooks["pstack-routing"].SessionStart[0].command,
+    cwd: pluginRoot,
+    sheetDir: ".gemini/config",
+    env: () => ({ CLAUDE_PLUGIN_ROOT: undefined }),
+    injected: { injectSteps: [{ systemMessage: { systemMessage: agyMandate.trimEnd() } }] },
+    parse: JSON.parse,
+  },
   claude: { hooks: "claude", sheetDir: ".claude", env: () => ({}) },
   "claude with CLAUDE_CONFIG_DIR": {
     hooks: "claude",
@@ -70,16 +80,18 @@ const runtimes = {
   },
 };
 
-function runHook(runtime, sheet, command = sessionStart[runtimes[runtime].hooks].hooks[0].command) {
+function runHook(runtime, sheet, command) {
   const home = mkdtempSync(join(tmpdir(), "pstack-hook-"));
-  const { sheetDir, env } = runtimes[runtime];
+  const { sheetDir, env, cwd, hooks } = runtimes[runtime];
+  command ??= runtimes[runtime].command ?? sessionStart[hooks].hooks[0].command;
   const sheetRoot = join(home, sheetDir);
   if (sheet !== null) {
-    mkdirSync(sheetRoot);
+    mkdirSync(sheetRoot, { recursive: true });
     writeSheet(join(sheetRoot, "pstack-models.md"), sheet);
   }
   try {
     const r = spawnSync("sh", ["-c", command], {
+      cwd,
       env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot, ...env(sheetRoot) },
       encoding: "utf8",
     });
@@ -109,8 +121,9 @@ describe("SessionStart hook", () => {
   test.each([
     ["Claude Code", mandate],
     ["MiniMax Code", minimaxMandate],
-  ])("the %s mandate names only skills that exist", (_, text) => {
-    const named = [...text.matchAll(/(?:pstack:|`\/)([a-z0-9-]+)/g)].map((m) => m[1]);
+    ["Antigravity", agyMandate, /`([a-z0-9-]+)`/g],
+  ])("the %s mandate names only skills that exist", (_, text, pattern = /(?:pstack:|`\/)([a-z0-9-]+)/g) => {
+    const named = [...text.matchAll(pattern)].map((m) => m[1]);
     const skills = new Set(agentSkills(join(pluginRoot, "skills")).map(({ name }) => name));
     expect(named).toContain("poteto-mode");
     expect(named.filter((name) => !skills.has(name))).toEqual([]);
@@ -125,16 +138,16 @@ describe("SessionStart hook", () => {
       const r = runHook("claude", null, `"\${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh" ${arg}`);
       expect(r.status).not.toBe(0);
       expect(r.out).toBe("");
-      expect(r.err.trimEnd().split("\n")).toEqual([`session-start.sh: unknown runtime '${arg}' (expected claude, codex, copilot, or muse)`]);
+      expect(r.err.trimEnd().split("\n")).toEqual([`session-start.sh: unknown runtime '${arg}' (expected agy, claude, codex, copilot, or muse)`]);
     });
   }
 
-  for (const runtime of Object.keys(runtimes)) {
+  for (const [runtime, config] of Object.entries(runtimes)) {
     // Copilot wraps the mandate in JSON; the sheet cases name too few roles to
     // be a valid Copilot sheet, so every case that injects gets setup's note.
-    const wrap = runtime.startsWith("copilot") ? (out) => context(out, ["sheet invalid", setupNote]) : (out) => out;
-    const injected = runtime.startsWith("minimax") ? minimaxMandate : mandate;
-    const expected = (off) => (off ? "" : injected);
+    const wrap = config.parse ?? (runtime.startsWith("copilot") ? (out) => context(out, ["sheet invalid", setupNote]) : (out) => out);
+    const injected = config.injected ?? (runtime.startsWith("minimax") ? minimaxMandate : mandate);
+    const expected = (off) => (off ? (runtime === "agy" ? {} : "") : injected);
     describe(runtime, () => {
       test("injects the mandate when no sheet exists", () => {
         const r = runHook(runtime, null);
@@ -144,7 +157,7 @@ describe("SessionStart hook", () => {
       for (const { name, sheet, off } of sheetCases) {
         test(`${off ? "injects nothing" : "injects the mandate"} when the sheet has ${name}`, () => {
           const r = runHook(runtime, sheet);
-          expect({ ...r, out: off ? r.out : wrap(r.out) }).toEqual({ status: 0, out: expected(off), err: "" });
+          expect({ ...r, out: off && runtime !== "agy" ? r.out : wrap(r.out) }).toEqual({ status: 0, out: expected(off), err: "" });
         });
       }
     });

@@ -701,7 +701,7 @@ export function overrideSheetBlock(models) {
     "A model may carry a reasoning effort, as in `opus @xhigh` (levels: " + models.efforts.join(", ") + "); " +
     "the role's subagent then runs at that level, each entry of a panel list on its own. " +
     "`default effort` sets the level for a value without one; `session` uses the runtime's platform mapping to start from the parent session's effort. On Codex this requires active-turn metadata or an explicit effort choice. " +
-    "`session hook: off` stops the Claude Code, Codex, or Muse SessionStart hook, or the pstack Pi extension, from injecting the poteto-mode mandate; " +
+    "`session hook: off` stops the supported runtime's pstack routing hook from injecting the poteto-mode mandate; " +
     "any other value, or no line, leaves it on.\n\n" +
     rows +
     `\n\ndefault effort: ${models.defaultEffort}\nsession hook: on`
@@ -993,7 +993,10 @@ export function problems(root, models) {
   });
   attempt(() => validateSkillsTree(skillsDir));
   attempt(() => validateProsePaths(skillsDir));
-  for (const packaged of packages) attempt(() => packaged.runtime.validate({ ...packaged, read, pathExists }));
+  // Windows stat modes cannot represent the POSIX execute bits; Unix checks
+  // still verify them, and every host checks that the hook paths exist.
+  const checkExecutable = process.platform !== "win32";
+  for (const packaged of packages) attempt(() => packaged.runtime.validate({ ...packaged, read, pathExists, statOf, checkExecutable, agentSkills: (dir) => agentSkills(join(root, dir)) }));
   attempt(() => validatePluginLayout(pluginRoot));
   attempt(() => validateAgentFrontmatter(pluginRoot));
   const hooksFiles = [
@@ -1003,9 +1006,7 @@ export function problems(root, models) {
     ),
   ];
   for (const { file, root } of hooksFiles) {
-    // Windows stat modes cannot represent the POSIX execute bits; Unix checks
-    // still verify them, and every host checks that the hook paths exist.
-    attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file, root, checkExecutable: process.platform !== "win32" }));
+    attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file, root, checkExecutable }));
   }
   return failures;
 }

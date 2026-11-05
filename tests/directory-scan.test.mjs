@@ -7,7 +7,8 @@
 // brings the hold back for the whole plugin. Probe tree c736e46 scanned clean
 // once these files held neither shape, so each stays that way.
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -75,5 +76,31 @@ describe("each file the scan verified", () => {
     const text = readFileSync(join(root, file), "utf8");
     expect(offending(text, WHOLE_ENVIRONMENT)).toEqual([]);
     expect(offending(text, KEY)).toEqual([]);
+  });
+});
+
+// The scan's download-and-run screen also reads skill text and the printable
+// bytes of images. It flagged `eval` written as code in a reference file, while
+// the word eval in plain prose passed. It flagged the 1254-pixel icon in three
+// encodes of about 900 KB, whatever their bytes held, and passed the icon at
+// 512 pixels and 192,542 bytes, so the screen trips on the volume of image
+// bytes. A PNG stays within the size a scan has passed.
+const shipped = (pattern) =>
+  execFileSync("git", ["ls-files", pattern], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
+const CODE_EVAL = /`#?eval`/;
+const PNG_BYTE_CEILING = 200_000;
+
+describe("the download-and-run shapes the scan flagged", () => {
+  test("eval as code is flagged, and the word in prose is not", () => {
+    expect(CODE_EVAL.test("In the playbooks, `eval` reads transcripts.")).toBe(true);
+    expect(CODE_EVAL.test("The eval playbook tests a skill change blind.")).toBe(false);
+  });
+
+  test.each(shipped("*.md"))("%s writes no eval as code", (file) => {
+    expect(offending(readFileSync(join(root, file), "utf8"), CODE_EVAL)).toEqual([]);
+  });
+
+  test.each(shipped("*.png"))("%s is within the image size a scan has passed", (file) => {
+    expect(statSync(join(root, file)).size).toBeLessThanOrEqual(PNG_BYTE_CEILING);
   });
 });

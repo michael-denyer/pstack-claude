@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateHooks } from "../tools/generate.mjs";
-import { MUSE_HOOKS, validateCodexMarketplace, validateCopilotManifest, validateMuseManifest, validatePiPackage } from "../tools/runtimes.mjs";
+import { AGY_HOOKS, MUSE_HOOKS, validateAgyManifest, validateCodexMarketplace, validateCopilotManifest, validateMuseManifest, validatePiPackage } from "../tools/runtimes.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -40,6 +40,30 @@ describe("validateCopilotManifest", () => {
       'hooks "hooks/nope.json" is not a file in the plugin',
     );
     expect(() => validateCopilotManifest({ name: "pstack" }, { claude, pathExists })).toThrow("is not a file in the plugin");
+  });
+});
+
+describe("validateAgyManifest", () => {
+  const manifest = { name: "pstack", logo: "assets/pstack-icon.png" };
+  const options = {
+    claude: { name: "pstack" },
+    read: () => JSON.stringify(AGY_HOOKS),
+    statOf: (rel) => [manifest.logo, "hooks/session-start.sh"].includes(rel) ? { mode: 0o755, isFile: () => true } : null,
+  };
+
+  test("checks the native manifest and its routing command", () => {
+    expect(() => validateAgyManifest(manifest, options)).not.toThrow();
+    expect(() => validateAgyManifest({ ...manifest, name: "other" }, options)).toThrow("!= Claude Code manifest name");
+    expect(() => validateAgyManifest({ ...manifest, logo: "missing.png" }, options)).toThrow("missing.png is not a file");
+    expect(() => validateAgyManifest(manifest, { ...options, read: () => "{}" })).toThrow("pstack-routing.SessionStart");
+  });
+
+  test("requires the hook script on every host and execute bits on POSIX", () => {
+    const plain = { ...options, statOf: () => ({ mode: 0o644, isFile: () => true }) };
+    expect(() => validateAgyManifest(manifest, plain)).toThrow("hooks/session-start.sh is not executable");
+    expect(() => validateAgyManifest(manifest, { ...plain, checkExecutable: false })).not.toThrow();
+    const missing = { ...options, statOf: (rel) => rel === manifest.logo ? options.statOf(rel) : null };
+    expect(() => validateAgyManifest(manifest, { ...missing, checkExecutable: false })).toThrow("hooks/session-start.sh is not a file");
   });
 });
 
@@ -92,6 +116,7 @@ describe("manifests", () => {
   const piPackage = json("package.json");
   const copilot = json("plugins/pstack/.github/plugin/plugin.json");
   const muse = json("plugins/pstack/.muse-plugin/plugin.json");
+  const kimi = json("kimi.plugin.json");
 
   test("the plugin and marketplace manifests agree on every fact they repeat", () => {
     const shared = ({ name, author, homepage, repository, license, keywords }) =>
@@ -106,11 +131,29 @@ describe("manifests", () => {
     expect(copilot.version).toBe(claude.version);
     expect(muse.name).toBe(claude.name);
     expect(muse.version).toBe(claude.version);
+    expect(kimi.name).toBe(claude.name);
+    expect(kimi.version).toBe(claude.version);
     expect(codexMarketplace.name).toBe(claudeMarketplace.name);
     expect(codexMarketplace.interface.displayName).toBe(codex.interface.displayName);
     expect(codexMarketplace.plugins.map(({ name, source, category }) => [name, source.path, category])).toEqual([
       [codex.name, claudeMarketplace.plugins[0].source, codex.interface.category],
     ]);
+  });
+
+  test("the Kimi system prompt carries the routing instruction and the mapping pointer", () => {
+    const prompt = readFileSync(join(repoRoot, kimi.systemPromptPath), "utf8");
+    expect(prompt).toContain("pstack:poteto-mode");
+    expect(prompt).toContain(readFileSync(join(repoRoot, "plugins/pstack/hooks/session-start-context.md"), "utf8").trim());
+    expect(prompt).toContain("kimi-tools.md");
+  });
+
+  test("Kimi instructions locate the packaged mapping", () => {
+    const prompt = readFileSync(join(repoRoot, kimi.systemPromptPath), "utf8");
+    for (const instructions of [kimi.skillInstructions, prompt]) {
+      const path = instructions.match(/<KIMI_CODE_HOME>\/plugins\/managed\/pstack\/([^`\s]+kimi-tools\.md)/)?.[1];
+      expect(path).toBeDefined();
+      expect(existsSync(join(repoRoot, path))).toBe(true);
+    }
   });
 });
 

@@ -10,6 +10,11 @@ fi
 
 # Literal plugin paths, so a static reader of the hooks files can follow them.
 case "$runtime" in
+  agy)
+    # Antigravity starts hooks in the plugin root.
+    sheet="$HOME/.gemini/config/pstack-models.md"
+    reader=./skills/setup-pstack/scripts/read-sheet.sh
+    ;;
   claude)
     sheet="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md"
     reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
@@ -38,7 +43,7 @@ case "$runtime" in
     reader="${MUSE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
   *)
-    echo "session-start.sh: unknown runtime '${1:-}' (expected claude, codex, copilot, or muse)" >&2
+    echo "session-start.sh: unknown runtime '${1:-}' (expected agy, claude, codex, copilot, or muse)" >&2
     exit 2
     ;;
 esac
@@ -51,6 +56,12 @@ else
   normalized=
 fi
 if printf '%s\n' "$normalized" | grep -qx 'session hook: off'; then
+  [ "$runtime" != agy ] || printf '{}\n'
+  exit 0
+fi
+
+if [ "$runtime" = agy ]; then
+  LC_ALL=C awk -f ./hooks/json.awk -f ./hooks/agy-context.awk ./hooks/session-start-agy.md
   exit 0
 fi
 

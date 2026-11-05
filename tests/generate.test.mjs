@@ -463,8 +463,8 @@ describe("lead lines", () => {
     for (const text of ["# X\n\nA.\n", "# X\n\nA."]) expect(stampLeadLine(text, "A.")).toBe(text);
   });
 
-  test("Codex, Copilot, and Muse stamp a preamble on their noted skills, and Pi and MiniMax Code stamp none", () => {
-    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi", "GitHub Copilot", "Muse", "MiniMax Code"]);
+  test("Codex, Copilot, Muse, and Antigravity stamp a preamble on their noted skills, and Pi, MiniMax Code, OpenCode 2, Kimi Code CLI, OMP, and Grok Build stamp none", () => {
+    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi", "GitHub Copilot", "Muse", "MiniMax Code", "OpenCode 2", "Kimi Code CLI", "Antigravity", "OMP", "Grok Build"]);
     expect(codex.preamble).toBe(
       "On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.",
     );
@@ -474,8 +474,15 @@ describe("lead lines", () => {
     expect(RUNTIMES.find((r) => r.name === "Muse").preamble).toBe(
       "On Muse, read the [platform mapping](../poteto-mode/references/muse-tools.md), including its per-skill notes, before following this skill.",
     );
+    expect(RUNTIMES.find((r) => r.name === "Antigravity").preamble).toBe(
+      "On Antigravity, read the [platform mapping](../poteto-mode/references/agy-tools.md), including its per-skill notes, before following this skill.",
+    );
+    expect(RUNTIMES.find((r) => r.name === "Kimi Code CLI").preamble).toBeNull();
     expect(pi.preamble).toBeNull();
     expect(RUNTIMES.find((r) => r.name === "MiniMax Code").preamble).toBeNull();
+    expect(RUNTIMES.find((r) => r.name === "OpenCode 2").preamble).toBeNull();
+    expect(RUNTIMES.find((r) => r.name === "OMP").preamble).toBeNull();
+    expect(RUNTIMES.find((r) => r.name === "Grok Build").preamble).toBeNull();
     expect([...leads.values()].flat().filter((line) => /(?:pi|minimax)-tools\.md/.test(line))).toEqual([]);
   });
 

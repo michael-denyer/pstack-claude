@@ -2,6 +2,7 @@
 // generator iterates, with each runtime's Model names renderer, models.json
 // check, versioned manifest, packaging validator, and hooks files.
 
+import { isDeepStrictEqual } from "node:util";
 import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 
 // Every runtime other than Claude Code that reads the skills through a mapping
@@ -20,6 +21,7 @@ import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 // MiniMax Code reads the Claude Code build as it ships, so its row names the
 // Claude Code manifest and stamps no preambles; its one pointer is in
 // poteto-mode's Platform Adaptation section, as Pi's is.
+// Antigravity keys its hooks by group name instead of the shared hooks schema.
 export const RUNTIMES = [
   {
     name: "Codex",
@@ -76,6 +78,44 @@ export const RUNTIMES = [
     // hooks file of its own.
     manifest: `${PLUGIN}/.claude-plugin/plugin.json`,
     validate: validateMiniMaxPackage,
+  },
+  {
+    name: "OpenCode 2",
+    mapping: "opencode-tools.md",
+    modelNames: openCodeModelNamesSection,
+    manifest: "package.json",
+    validate: ({ manifest, pathExists }) => validateOpenCodePackage(manifest, { pathExists }),
+  },
+  {
+    name: "Kimi Code CLI",
+    mapping: "kimi-tools.md",
+    modelNames: kimiModelNamesSection,
+    manifest: "kimi.plugin.json",
+    validate: ({ manifest, pathExists }) => validateKimiManifest(manifest, { pathExists }),
+  },
+  {
+    name: "Antigravity",
+    mapping: "agy-tools.md",
+    modelNames: agyModelNamesSection,
+    skillPreambles: true,
+    manifest: `${PLUGIN}/.antigravity-plugin/plugin.json`,
+    validate: ({ manifest, read, statOf, checkExecutable }) =>
+      validateAgyManifest(manifest, { claude: JSON.parse(read(`${PLUGIN}/.claude-plugin/plugin.json`)), read, statOf, checkExecutable }),
+  },
+  {
+    name: "OMP",
+    mapping: "omp-tools.md",
+    modelNames: ompModelNamesSection,
+    manifest: `${PLUGIN}/package.json`,
+    validate: ({ manifest, read, pathExists }) =>
+      validateOmpPackage(manifest, { marketplace: JSON.parse(read(".claude-plugin/marketplace.json")), pathExists }),
+  },
+  {
+    name: "Grok Build",
+    mapping: "grok.md",
+    modelNames: grokModelNamesSection,
+    manifest: `${PLUGIN}/.grok-plugin/plugin.json`,
+    validate: ({ manifest, pathExists, agentSkills }) => validateGrokPlugin(manifest, { pathExists, agentSkills }),
   },
 ].map((runtime) => ({
   ...runtime,
@@ -424,5 +464,138 @@ export function minimaxModelNamesSection(models) {
     "reachable, vary reasoning effort and note in the verdict that diversity was reduced.\n\n" +
     "`/setup-pstack` writes the configured model list. On MiniMax Code, list the models with `mcode provider list` " +
     "or the `model` slash command and write only keys they show."
+  );
+}
+
+export function validateOpenCodePackage(manifest, { pathExists }) {
+  const entry = "./plugins/pstack/opencode/index.js";
+  if (manifest.exports?.["./server"] !== entry) throw new Error(`package.json: exports["./server"] must be ${entry}`);
+  if (!pathExists(entry.slice(2))) throw new Error(`package.json: ${entry} does not exist`);
+}
+
+export function openCodeModelNamesSection(models) {
+  return (
+    "Claude Code model aliases are not OpenCode model IDs. Select a configured chat model only when the user explicitly " +
+    "asks for a model or variant; otherwise let the subagent inherit its model. OpenCode accepts " +
+    "`providerID/modelID` or `providerID/modelID#variant` in the `subagent` tool's `model` field. " +
+    "Look up the ID and variant with the `models` tool; do not guess.\n\n" +
+    "- The model sheet is `${XDG_CONFIG_HOME:-~/.config}/opencode/pstack-models.md`. Add that path to the " +
+    "OpenCode configuration's `instructions` array to load role choices; the plugin reads the `session hook` setting directly.\n" +
+    `- For role-model skills (${roleSkills(models).map(code).join(", ")}), treat a saved user choice as an explicit ` +
+    "instruction only when it identifies a configured model. The `subagent` input has no separate effort field; " +
+    "use a listed `#variant` when requested. Omit `model` for `inherit-parent` or `auto`.\n" +
+    "- For diverse-model panels, use different available providers only when the user requests those models. " +
+    "Otherwise inherit and state that model diversity was not established.\n\n" +
+    "Use the `models` command to inspect configured models before writing the sheet."
+  );
+}
+
+const agyScript = "hooks/session-start.sh";
+const agyCommand = `./${agyScript} agy`;
+export const AGY_HOOKS = {
+  "pstack-routing": { SessionStart: [{ type: "command", command: agyCommand }] },
+};
+
+export function validateAgyManifest(manifest, { claude, read, statOf, checkExecutable = true }) {
+  const at = `${PLUGIN}/.antigravity-plugin/plugin.json`;
+  if (manifest.name !== claude.name) throw new Error(`${at}: name "${manifest.name}" != Claude Code manifest name "${claude.name}"`);
+  if (manifest.logo && !statOf(manifest.logo)?.isFile()) throw new Error(`${at}: ${manifest.logo} is not a file in the plugin`);
+  const hooksFile = `${PLUGIN}/hooks.json`;
+  if (!isDeepStrictEqual(JSON.parse(read(hooksFile)), AGY_HOOKS)) {
+    throw new Error(`${hooksFile}: expected pstack-routing.SessionStart to run ${agyCommand}`);
+  }
+  const script = statOf(agyScript);
+  if (!script?.isFile()) throw new Error(`${hooksFile}: ${agyScript} is not a file in the plugin`);
+  if (checkExecutable && !(script.mode & 0o111)) throw new Error(`${hooksFile}: ${agyScript} is not executable`);
+}
+
+export function agyModelNamesSection(models) {
+  return (
+    "Skills name Claude Code model aliases in their Models sections. On Antigravity (`agy`), `invoke_subagent`'s " +
+    "`Model` parameter accepts `inherit` (default, uses the parent's model), `flash_lite`, `flash`, and `pro`.\n\n" +
+    "- The model sheet is `~/.gemini/config/pstack-models.md`. Before a skill that needs a role model " +
+    `(${roleSkills(models).map(code).join(", ")}), read it. With no sheet, read \`setup-pstack\`'s \`SKILL.md\` ` +
+    "and finish it first.\n" +
+    "- Pass the role's model as `Model` on `invoke_subagent`. For `inherit-parent` or `auto`, omit `Model`.\n" +
+    `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose.\n` +
+    `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): the strongest model the user chose.\n` +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
+    "signal comes from model diversity. Use distinct available models and report when the panel shares a model family.\n\n" +
+    "`/setup-pstack` writes the sheet. Antigravity accepts `flash_lite`; the Copilot sheet checker rejects underscores " +
+    "in model IDs and does not apply to Antigravity."
+  );
+}
+
+export function validateOmpPackage(manifest, { marketplace, pathExists }) {
+  const entry = marketplace.plugins?.find((plugin) => plugin.name === "pstack");
+  if (manifest.name !== "pstack" || entry?.source !== "./plugins/pstack" || entry.version !== manifest.version) {
+    throw new Error("OMP package must match the pstack marketplace entry and version");
+  }
+  if (!isDeepStrictEqual(manifest.omp?.extensions, ["./omp/index.mjs"])) {
+    throw new Error("OMP package must load ./omp/index.mjs");
+  }
+  for (const path of ["omp/index.mjs", "skills/poteto-mode/SKILL.md", "hooks/session-start-context.md"]) {
+    if (!pathExists(`${PLUGIN}/${path}`)) throw new Error(`OMP package missing ${path}`);
+  }
+}
+
+export function ompModelNamesSection() {
+  return (
+    "OMP uses its own model selection; without a pstack sheet, use the runtime's defaults. " +
+    "The global `~/.omp/pstack-models.md` is shared across OMP profiles; `session hook: off` there disables " +
+    "main-session routing while retaining the subagent mapping. Configure models only when the user asks. " +
+    "List available chat models with `omp models --kind chat` and inspect the active OMP configuration with " +
+    "`omp config`. Ask which available models the user wants for routine, worker and demanding roles. Configure " +
+    "OMP's own `modelRoles` and `task.agentModelOverrides` through its configuration interface, preserving unrelated " +
+    "settings. Use only models listed by the active installation; do not copy Claude model aliases into OMP. " +
+    "If the available agent roster cannot select distinct models for a requested panel, report that limitation."
+  );
+}
+
+export function validateKimiManifest(manifest, { pathExists }) {
+  if (manifest.name !== "pstack") throw new Error("kimi.plugin.json: expected pstack name");
+  if (manifest.skills !== "./plugins/pstack/skills" || !pathExists("plugins/pstack/skills/poteto-mode/SKILL.md")) {
+    throw new Error("kimi.plugin.json: skills must point to the packaged skill tree");
+  }
+  if (manifest.systemPromptPath !== "./plugins/pstack/hooks/kimi-instructions.md" || !pathExists("plugins/pstack/hooks/kimi-instructions.md")) {
+    throw new Error("kimi.plugin.json: systemPromptPath must point to the packaged instructions");
+  }
+}
+
+export function kimiModelNamesSection(models) {
+  return "Skills name Claude model aliases; do not assume they are available on Kimi. Use only models advertised by the current `Agent` tool; " +
+    "if it has no `model` parameter, omit `model`. Omitting it uses the configured subagent default when present, otherwise the parent's model. " +
+    "Kimi does not expose a per-call effort parameter.\n\n" +
+    "Read `<KIMI_CODE_HOME>/pstack-models.md` before a skill that needs a role model (" + roleSkills(models).map(code).join(", ") + "). " +
+    "KIMI_CODE_HOME defaults to `~/.kimi-code`. If the sheet is absent, omit `model`. " +
+    "For diverse-model panels, use available distinct models and report if diversity is unavailable. " +
+    "`setup-pstack` writes the model choices; `inherit-parent` and `auto` both omit `model`.";
+}
+
+// Grok discovers the common skills and the Grok-only routing skill through
+// its native manifest. Validate both paths and the routing skill's metadata.
+export function validateGrokPlugin(manifest, { pathExists, agentSkills }) {
+  if (manifest.name !== "pstack" || !isDeepStrictEqual(manifest.skills, ["./skills", "./grok/skills"])) {
+    throw new Error("Grok manifest must name pstack and list both skill directories");
+  }
+  for (const path of ["skills/poteto-mode/SKILL.md", "grok/skills/pstack-routing/SKILL.md"]) {
+    if (!pathExists(`${PLUGIN}/${path}`)) throw new Error(`Grok plugin missing ${path}`);
+  }
+  agentSkills(`${PLUGIN}/grok/skills`);
+}
+
+export function grokModelNamesSection(models) {
+  return (
+    "Skills name Claude Code model aliases in their Models sections. Grok Build's available models depend on " +
+    "the user's configuration; do not pass a Claude alias as a Grok model.\n\n" +
+    "- The model sheet is `${GROK_HOME:-~/.grok}/pstack-models.md`. Before a skill that needs a role model " +
+    `(${roleSkills(models).map(code).join(", ")}), read it. With no sheet, use the runtime default; run \`setup-pstack\` only when the user asks to configure roles.\n` +
+    "- The `spawn_subagent` tool says to omit `model` unless the user explicitly requests one. It has no effort parameter; " +
+    "when it cannot apply a sheet choice, report that limitation instead of claiming model diversity.\n" +
+    `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose.\n` +
+    `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): the strongest model the user chose.\n` +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`) require distinct models. " +
+    "Report when the available dispatch cannot provide that diversity.\n\n" +
+    "`/setup-pstack` writes the sheet. Choose only models the session exposes."
   );
 }

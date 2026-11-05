@@ -36,6 +36,12 @@
       "since": "0.9.29",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/how/references/explainer-prompt.md": {
+      "kind": "policy",
+      "why": "Tells a lone explainer on the simple path that no explorers ran and that it traces the code itself with Read, Grep, and Glob before explaining.",
+      "since": "0.9.130",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/no-comments/SKILL.md": {
       "kind": "policy",
       "why": "Treats a HOLD that names its dependency, platform, vendor, or protocol rule and where to check it as settled for the run, restores as a HOLD any kill of such a comment without a refuting page or file, and limits a second rejected report's failure to that report's findings so the accepted work still lands. Sets comment-sicko's model from the no-comments reviewer line in pstack-models.md.",
@@ -104,7 +110,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/session-pickup.md": {
       "kind": "policy",
-      "why": "Reads the project checkpoint first and applies the human-rulings epistemics when reconstructing state.",
+      "why": "Reads the project checkpoint first and applies the human-rulings epistemics when reconstructing state, and verifies inherited claims before it routes and ends.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
@@ -364,6 +370,14 @@
       "kind": "policy",
       "why": "Adds a step that applies the human-rulings epistemics, and gives the Direct-claim example a URL the link validator resolves.",
       "since": "0.9.17",
+      "upstream": "not-proposed"
+    }
+  },
+  "cursor-team-kit": {
+    "plugins/pstack/skills/deslop/SKILL.md": {
+      "kind": "policy",
+      "why": "Scopes the diff to the PR's base branch, else the branch it was cut from, else the default branch, with uncommitted changes, and reruns the verifying checks after editing, reverting any edit whose check fails.",
+      "since": "0.9.130",
       "upstream": "not-proposed"
     }
   },

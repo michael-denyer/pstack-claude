@@ -270,7 +270,8 @@ const tierRoles = (models, tier) =>
     .map((r) => code(r.role))
     .join(", ");
 
-const panelSkills = (models) => codeList([...new Set(models.roles.filter((r) => r.tier === "panel").map((r) => r.skill))]);
+const panelSkills = (models) =>
+  codeList([...new Set(models.roles.filter((r) => r.tier === "panel").map((r) => r.skill))]);
 
 // The Model names section of a runtime whose models.json block gives a model
 // per tier. `panel` follows "A good default panel", `dispatch` is an optional

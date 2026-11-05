@@ -205,7 +205,8 @@ test("moving a skill's roles off the panel tier drops it from every runtime's pa
   const skill = models.roles.find((r) => r.tier === "panel").skill;
   const moved = { ...models, roles: models.roles.map((r) => (r.skill === skill ? { ...r, tier: "default" } : r)) };
   const panelLists = (m) => RUNTIMES.map((runtime) => runtime.modelNames(m).match(/Diverse-model panels \(([^)]*)\)/)?.[1]).filter(Boolean);
-  expect(panelLists(models).length).toBeGreaterThan(0);
-  for (const list of panelLists(models)) expect(list).toContain(code(skill));
+  const before = panelLists(models);
+  expect(before.length).toBeGreaterThan(0);
+  for (const list of before) expect(list).toContain(code(skill));
   for (const list of panelLists(moved)) expect(list).not.toContain(code(skill));
 });

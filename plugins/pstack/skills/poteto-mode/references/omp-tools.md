@@ -18,15 +18,15 @@ OMP loads these skills from the installed pstack marketplace plugin. Skill names
 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects` transcripts | Use OMP session history and the paths or internal URLs exposed by the active session |
 | `loop` | Use OMP's interactive `/loop` when available |
 
-OMP provides its own subagent roster and model selection. Use the agents and model options listed by the active `task` tool. Map Claude's `pstack:poteto-agent` to an available OMP agent and include the poteto-mode instructions in its brief. Map a review panel to separate task items. Do not pass Claude-specific `subagent_type` or model aliases. If a workflow calls for distinct models but the available roster does not provide them, report that limit. Give concurrent writers separate worktrees. Follow the active OMP tool schema for background work, isolation and effort. A task result is evidence; inspect the actual artifact before reporting it as complete.
+OMP provides its own subagent roster and model selection. Use the agents and model options listed by the active `task` tool. Map a review panel to separate task items. Do not pass Claude-specific `subagent_type` or model aliases. Follow the active OMP tool schema for effort. A task result is evidence; inspect the actual artifact before reporting it as complete.
 
 OMP's `/loop` is an interactive session command, not a subagent tool. For a recurring interactive workflow, provide the user with the appropriate `/loop` command rather than emulating it with a sleep loop. If the current host does not expose it, follow that host's available scheduling mechanism or report the limitation.
 
-The plugin injects its routing instruction before each main-agent turn and this mapping pointer into main and subagent turns. The `session hook: off` line in `~/.omp/pstack-models.md` disables main-agent routing across OMP profiles while retaining the mapping pointer; restart a session to clear previously injected context. Configure models through OMP's own model roles and agent overrides. The Pi extension and its agent tools are not loaded by the OMP marketplace plugin.
+The plugin injects its routing instruction before each main-agent turn and this mapping pointer into main and subagent turns. Restart a session after changing `session hook` to clear previously injected context. The Pi extension and its agent tools are not loaded by the OMP marketplace plugin.
 
 OMP's marketplace skill discovery does not apply pstack's `paths` frontmatter as a file-triggered invocation rule. Invoke `typescript-best-practices` explicitly for TypeScript work when applicable.
 
-Use the OMP session's available browser or project verification tools to drive applications. Project instructions take precedence over generic driver guidance. OMP session history and task outputs are separate from Claude Code transcript files; use the paths or internal URLs exposed by the active OMP session.
+Use the OMP session's available browser or project verification tools to drive applications. Project instructions take precedence over generic driver guidance.
 
 ## Model names
 

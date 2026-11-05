@@ -120,7 +120,7 @@ Start a new session and use `/poteto-mode` to load the skill explicitly. To upda
 <details>
 <summary><strong>MiniMax Code</strong></summary>
 
-Run in your terminal:
+For a first install, check that `${MINIMAX_DATA_DIR:-$HOME/.minimax}/plugins/pstack` does not already exist. Then run in your terminal:
 
 ```shell
 git clone https://github.com/michael-denyer/pstack-claude
@@ -129,7 +129,7 @@ mkdir -p "${MINIMAX_DATA_DIR:-$HOME/.minimax}/plugins"
 cp -R plugins/pstack "${MINIMAX_DATA_DIR:-$HOME/.minimax}/plugins/pstack"
 ```
 
-MiniMax Code loads each directory under `plugins/` in its data directory as a local plugin, and reads pstack through its Claude Code reader with the skills, agents, and routing hook. `mcode plugin list` shows it as `pstack@local`. To update after a `git pull`, delete the old `plugins/pstack` copy first, then run the `cp` line again; copying onto an existing copy nests it inside.
+MiniMax Code loads each directory under `plugins/` in its data directory as a local plugin, and reads pstack through its Claude Code reader with the skills, agents, and routing hook. `mcode plugin list` shows it as `pstack@local`. To update, record its enabled state, quit every `mcode` process, and move `plugins/pstack` to an unused path outside `plugins/`. Run `git pull` and the `cp` line again. Check `mcode plugin list` and restore the previous enabled state if needed.
 
 </details>
 

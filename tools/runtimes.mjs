@@ -80,6 +80,13 @@ export const RUNTIMES = [
     validate: validateMiniMaxPackage,
   },
   {
+    name: "OpenCode 2",
+    mapping: "opencode-tools.md",
+    modelNames: openCodeModelNamesSection,
+    manifest: "package.json",
+    validate: ({ manifest, pathExists }) => validateOpenCodePackage(manifest, { pathExists }),
+  },
+  {
     name: "Kimi Code CLI",
     mapping: "kimi-tools.md",
     modelNames: kimiModelNamesSection,
@@ -94,6 +101,14 @@ export const RUNTIMES = [
     manifest: `${PLUGIN}/.antigravity-plugin/plugin.json`,
     validate: ({ manifest, read, statOf, checkExecutable }) =>
       validateAgyManifest(manifest, { claude: JSON.parse(read(`${PLUGIN}/.claude-plugin/plugin.json`)), read, statOf, checkExecutable }),
+  },
+  {
+    name: "OMP",
+    mapping: "omp-tools.md",
+    modelNames: ompModelNamesSection,
+    manifest: `${PLUGIN}/package.json`,
+    validate: ({ manifest, read, pathExists }) =>
+      validateOmpPackage(manifest, { marketplace: JSON.parse(read(".claude-plugin/marketplace.json")), pathExists }),
   },
   {
     name: "Grok Build",
@@ -452,6 +467,29 @@ export function minimaxModelNamesSection(models) {
   );
 }
 
+export function validateOpenCodePackage(manifest, { pathExists }) {
+  const entry = "./plugins/pstack/opencode/index.js";
+  if (manifest.exports?.["./server"] !== entry) throw new Error(`package.json: exports["./server"] must be ${entry}`);
+  if (!pathExists(entry.slice(2))) throw new Error(`package.json: ${entry} does not exist`);
+}
+
+export function openCodeModelNamesSection(models) {
+  return (
+    "Claude Code model aliases are not OpenCode model IDs. Select a configured chat model only when the user explicitly " +
+    "asks for a model or variant; otherwise let the subagent inherit its model. OpenCode accepts " +
+    "`providerID/modelID` or `providerID/modelID#variant` in the `subagent` tool's `model` field. " +
+    "Look up the ID and variant with the `models` tool; do not guess.\n\n" +
+    "- The model sheet is `${XDG_CONFIG_HOME:-~/.config}/opencode/pstack-models.md`. Add that path to the " +
+    "OpenCode configuration's `instructions` array to load role choices; the plugin reads the `session hook` setting directly.\n" +
+    `- For role-model skills (${roleSkills(models).map(code).join(", ")}), treat a saved user choice as an explicit ` +
+    "instruction only when it identifies a configured model. The `subagent` input has no separate effort field; " +
+    "use a listed `#variant` when requested. Omit `model` for `inherit-parent` or `auto`.\n" +
+    "- For diverse-model panels, use different available providers only when the user requests those models. " +
+    "Otherwise inherit and state that model diversity was not established.\n\n" +
+    "Use the `models` command to inspect configured models before writing the sheet."
+  );
+}
+
 const agyScript = "hooks/session-start.sh";
 const agyCommand = `./${agyScript} agy`;
 export const AGY_HOOKS = {
@@ -485,6 +523,32 @@ export function agyModelNamesSection(models) {
     "signal comes from model diversity. Use distinct available models and report when the panel shares a model family.\n\n" +
     "`/setup-pstack` writes the sheet. Antigravity accepts `flash_lite`; the Copilot sheet checker rejects underscores " +
     "in model IDs and does not apply to Antigravity."
+  );
+}
+
+export function validateOmpPackage(manifest, { marketplace, pathExists }) {
+  const entry = marketplace.plugins?.find((plugin) => plugin.name === "pstack");
+  if (manifest.name !== "pstack" || entry?.source !== "./plugins/pstack" || entry.version !== manifest.version) {
+    throw new Error("OMP package must match the pstack marketplace entry and version");
+  }
+  if (!isDeepStrictEqual(manifest.omp?.extensions, ["./omp/index.mjs"])) {
+    throw new Error("OMP package must load ./omp/index.mjs");
+  }
+  for (const path of ["omp/index.mjs", "skills/poteto-mode/SKILL.md", "hooks/session-start-context.md"]) {
+    if (!pathExists(`${PLUGIN}/${path}`)) throw new Error(`OMP package missing ${path}`);
+  }
+}
+
+export function ompModelNamesSection() {
+  return (
+    "OMP uses its own model selection; without a pstack sheet, use the runtime's defaults. " +
+    "The global `~/.omp/pstack-models.md` is shared across OMP profiles; `session hook: off` there disables " +
+    "main-session routing while retaining the subagent mapping. Configure models only when the user asks. " +
+    "List available chat models with `omp models --kind chat` and inspect the active OMP configuration with " +
+    "`omp config`. Ask which available models the user wants for routine, worker and demanding roles. Configure " +
+    "OMP's own `modelRoles` and `task.agentModelOverrides` through its configuration interface, preserving unrelated " +
+    "settings. Use only models listed by the active installation; do not copy Claude model aliases into OMP. " +
+    "If the available agent roster cannot select distinct models for a requested panel, report that limitation."
   );
 }
 

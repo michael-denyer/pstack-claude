@@ -54,7 +54,7 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 
 import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
-import { RUNTIMES, roleSkills } from "./runtimes.mjs";
+import { PLATFORM_ADAPTATION_OPEN, platformAdaptation, RUNTIMES, roleSkills } from "./runtimes.mjs";
 import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -387,6 +387,12 @@ export function regions(models) {
       name: "override sheet",
       locate: fenceUnder("Write the override sheet", "markdown"),
       render: () => [overrideSheetBlock(models)],
+    },
+    {
+      file: skillFile("poteto-mode"),
+      name: "Platform Adaptation sentence",
+      locate: lineStartingWith(PLATFORM_ADAPTATION_OPEN),
+      render: () => [platformAdaptation()],
     },
     ...RUNTIMES.map((runtime) => ({
       file: runtime.tools,

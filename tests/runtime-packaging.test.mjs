@@ -1,6 +1,6 @@
 // Runtime packaging contracts: manifests and hook commands.
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateHooks } from "../tools/generate.mjs";
@@ -145,6 +145,19 @@ describe("manifests", () => {
     expect(prompt).toContain("pstack:poteto-mode");
     expect(prompt).toContain(readFileSync(join(repoRoot, "plugins/pstack/hooks/session-start-context.md"), "utf8").trim());
     expect(prompt).toContain("kimi-tools.md");
+  });
+
+  test("every Build's copy of the routing mandate keeps the base mandate's criteria and routing paragraph", () => {
+    const hooks = join(repoRoot, "plugins/pstack/hooks");
+    const base = "session-start-context.md";
+    const lines = readFileSync(join(hooks, base), "utf8").split("\n");
+    const shared = lines.slice(lines.findIndex((l) => l.startsWith("- ")), lines.findIndex((l) => l.startsWith("It routes")) + 1).join("\n");
+    const copies = readdirSync(hooks).filter(
+      (file) => file !== base && file.endsWith(".md") && readFileSync(join(hooks, file), "utf8").includes("when a task meets any of these:"),
+    );
+    expect(shared.split("\n").length).toBeGreaterThan(3);
+    expect(copies.length).toBeGreaterThanOrEqual(5);
+    for (const copy of copies) expect({ copy, shared: readFileSync(join(hooks, copy), "utf8").includes(shared) }).toEqual({ copy, shared: true });
   });
 
   test("Kimi instructions locate the packaged mapping", () => {

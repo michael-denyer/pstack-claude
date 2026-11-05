@@ -7,11 +7,11 @@ import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 
 // Every runtime other than Claude Code that reads the skills through a mapping
 // file under poteto-mode/references/. A row gives the runtime the generated
-// Model names section in its mapping file, and a row with a `key` its
+// Model names section in its mapping file, a pointer in poteto-mode's
+// Platform Adaptation sentence, and a row with a `key` its
 // models.json block, checked by `checkModels`. A `skillPreambles` runtime also gets a preamble under
 // the first heading of each skill its Per-skill notes table lists. Pi has
-// none: its one pointer is hand-written in poteto-mode's Platform
-// Adaptation section. `manifest` is the file the generator stamps VERSION
+// none, so the Platform Adaptation pointer is its only one. `manifest` is the file the generator stamps VERSION
 // into, `validate` checks the runtime's packaging against the tree once that
 // manifest parses, and `hooks` lists the hooks files the manifest names,
 // relative to the plugin root. GitHub Copilot stamps preambles but has no
@@ -19,8 +19,8 @@ import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 // Muse declares its hooks inline in its native manifest, so it has no hooks
 // file either. Its `stampManifest` rewrites the manifest's skill list from the tree.
 // MiniMax Code reads the Claude Code build as it ships, so its row names the
-// Claude Code manifest and stamps no preambles; its one pointer is in
-// poteto-mode's Platform Adaptation section, as Pi's is.
+// Claude Code manifest and stamps no preambles, so, as for Pi, the Platform
+// Adaptation pointer is its only one.
 // Antigravity keys its hooks by group name instead of the shared hooks schema.
 export const RUNTIMES = [
   {
@@ -80,20 +80,6 @@ export const RUNTIMES = [
     validate: validateMiniMaxPackage,
   },
   {
-    name: "OpenCode 2",
-    mapping: "opencode-tools.md",
-    modelNames: openCodeModelNamesSection,
-    manifest: "package.json",
-    validate: ({ manifest, pathExists }) => validateOpenCodePackage(manifest, { pathExists }),
-  },
-  {
-    name: "Kimi Code CLI",
-    mapping: "kimi-tools.md",
-    modelNames: kimiModelNamesSection,
-    manifest: "kimi.plugin.json",
-    validate: ({ manifest, pathExists }) => validateKimiManifest(manifest, { pathExists }),
-  },
-  {
     name: "Antigravity",
     mapping: "agy-tools.md",
     modelNames: agyModelNamesSection,
@@ -111,11 +97,25 @@ export const RUNTIMES = [
       validateOmpPackage(manifest, { marketplace: JSON.parse(read(".claude-plugin/marketplace.json")), pathExists }),
   },
   {
+    name: "Kimi Code CLI",
+    mapping: "kimi-tools.md",
+    modelNames: kimiModelNamesSection,
+    manifest: "kimi.plugin.json",
+    validate: ({ manifest, pathExists }) => validateKimiManifest(manifest, { pathExists }),
+  },
+  {
     name: "Grok Build",
     mapping: "grok.md",
     modelNames: grokModelNamesSection,
     manifest: `${PLUGIN}/.grok-plugin/plugin.json`,
     validate: ({ manifest, pathExists, agentSkills }) => validateGrokPlugin(manifest, { pathExists, agentSkills }),
+  },
+  {
+    name: "OpenCode 2",
+    mapping: "opencode-tools.md",
+    modelNames: openCodeModelNamesSection,
+    manifest: "package.json",
+    validate: ({ manifest, pathExists }) => validateOpenCodePackage(manifest, { pathExists }),
   },
 ].map((runtime) => ({
   ...runtime,
@@ -126,6 +126,23 @@ export const RUNTIMES = [
       "including its per-skill notes, before following this skill."
     : null,
 }));
+
+// poteto-mode's Platform Adaptation sentence points at each mapping in row
+// order, so the order of RUNTIMES is the order a reader meets the runtimes.
+export const PLATFORM_ADAPTATION_OPEN = "These skills use Claude Code tool names";
+
+export function platformAdaptation() {
+  const pointer = (runtime) => `On ${runtime.name}, read [\`references/${runtime.mapping}\`](references/${runtime.mapping})`;
+  const [first, ...rest] = RUNTIMES;
+  return [
+    `${PLATFORM_ADAPTATION_OPEN} (the \`Skill\` tool, the \`Agent\` tool, \`AskUserQuestion\`) and the Claude model names ` +
+      "the `Agent` tool accepts, as each Models section lists them. On Claude Code they work as written.",
+    `${pointer(first)} for the ${first.name} equivalent of a Claude tool, model, or skill named by these workflows.`,
+    ...rest.map((runtime) => `${pointer(runtime)} instead.`),
+    "Other runtimes can discover the same Agent Skills tree, but they must use their own tool, model, and " +
+      "configuration equivalents. No one of these mappings is a cross-runtime map.",
+  ].join(" ");
+}
 
 // Codex and Muse have no Claude aliases, so each block gives a model per tier.
 // A declaration, so the RUNTIMES rows above can call it at module load.

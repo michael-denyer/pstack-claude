@@ -34,8 +34,6 @@ Once all explorers have returned, spawn one explainer with `references/explainer
 
 ## 4. Present
 
-Before presenting, check that the files and functions the explanation names exist, for example with grep. Fix or flag any that do not.
-
 Present the explainer's output. Light edits for clarity or context from the conversation are fine. Do not substantially rewrite it.
 
 ## Output format

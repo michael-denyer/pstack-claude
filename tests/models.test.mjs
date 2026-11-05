@@ -186,3 +186,15 @@ describe("role labels reach the prose", () => {
     });
   }
 });
+
+test("each runtime mapping names exactly the skills with a panel role as its diverse-model panels", () => {
+  const panelSkills = [...new Set(models.roles.filter((r) => r.tier === "panel").map((r) => r.skill))].sort();
+  const lists = markdownFiles(join(skillsDir, "poteto-mode/references")).flatMap((file) =>
+    [...readFileSync(file, "utf8").matchAll(/Diverse-model panels \(([^)]*)\)/g)].map((m) => ({
+      file: relative(repoRoot, file),
+      skills: [...m[1].matchAll(/`([^`]+)`/g)].map((s) => s[1]).sort(),
+    })),
+  );
+  expect(lists.length).toBeGreaterThan(0);
+  for (const { file, skills } of lists) expect({ file, skills }).toEqual({ file, skills: panelSkills });
+});

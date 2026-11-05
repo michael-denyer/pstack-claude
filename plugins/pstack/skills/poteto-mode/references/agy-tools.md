@@ -43,7 +43,7 @@ Skills name Claude Code model aliases in their Models sections. On Antigravity (
 - Pass the role's model as `Model` on `invoke_subagent`. For `inherit-parent` or `auto`, omit `Model`.
 - Roles that default to the worker model (`feature, refactoring`): the worker model the user chose.
 - Roles that default to the strongest model (`strongest judgment`): the strongest model the user chose.
-- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial signal comes from model diversity. Use distinct available models and report when the panel shares a model family.
+- Diverse-model panels (`arena`, `architect`, `interrogate`): the adversarial signal comes from model diversity. Use distinct available models and report when the panel shares a model family.
 
 `/setup-pstack` writes the sheet. Antigravity accepts `flash_lite`; the Copilot sheet checker rejects underscores in model IDs and does not apply to Antigravity.
 

@@ -100,6 +100,13 @@ test('ignores links inside fenced code blocks of a note with CRLF line endings',
   assert.equal(run('read').status, 0);
 }));
 
+test('ignores links inside a fenced code block that opens a note with a byte order mark', () => fixture(({ run }) => {
+  const text = '\uFEFF~~~\r\n[z](gone.md)\r\n~~~\r\n\r\nStart with [Q](q.md).\r\n';
+  const published = publishNote(run, text, ['q.md']);
+  assert.equal(published.status, 0, published.value.detail);
+  assert.equal(run('read').status, 0);
+}));
+
 test('failed publication leaves the last complete pointer intact', () => fixture(({ run }) => {
   const first = note(run);
   assert.equal(run('publish', '--note', first.note, '--artifact', first.artifact).status, 0);

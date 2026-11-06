@@ -48,6 +48,7 @@ function resolveLink(note, link, target) {
 }
 function verifyLinks(note, artifacts) {
   const prose = readFileSync(note.path, 'utf8')
+    .replace(/^\uFEFF/, '')
     .replaceAll('\r\n', '\n')
     .replace(/^ {0,3}((`|~)\2{2,}).*\n[\s\S]*?(?:^ {0,3}\1\2*[ \t]*$|(?![\s\S]))/gm, ' ')
     .replace(/(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g, ' ');

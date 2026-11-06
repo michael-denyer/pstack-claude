@@ -464,7 +464,7 @@ describe("lead lines", () => {
   });
 
   test("Codex, Copilot, Muse, and Antigravity stamp a preamble on their noted skills, and Pi, MiniMax Code, OpenCode 2, Kimi Code CLI, OMP, and Grok Build stamp none", () => {
-    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi", "GitHub Copilot", "Muse", "MiniMax Code", "OpenCode 2", "Kimi Code CLI", "Antigravity", "OMP", "Grok Build"]);
+    expect(RUNTIMES.map((r) => r.name)).toEqual(["Codex", "Pi", "GitHub Copilot", "Muse", "MiniMax Code", "Antigravity", "OMP", "Kimi Code CLI", "Grok Build", "OpenCode 2"]);
     expect(codex.preamble).toBe(
       "On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md), including its per-skill notes, before following this skill.",
     );
@@ -484,6 +484,12 @@ describe("lead lines", () => {
     expect(RUNTIMES.find((r) => r.name === "OMP").preamble).toBeNull();
     expect(RUNTIMES.find((r) => r.name === "Grok Build").preamble).toBeNull();
     expect([...leads.values()].flat().filter((line) => /(?:pi|minimax)-tools\.md/.test(line))).toEqual([]);
+  });
+
+  test("poteto-mode's Platform Adaptation sentence points at every runtime's mapping in RUNTIMES order", () => {
+    const text = readFileSync(join(repoRoot, "plugins/pstack/skills/poteto-mode/SKILL.md"), "utf8");
+    const pointers = [...text.matchAll(/On ([^,.]+), read \[`references\/([^`]+)`\]/g)].map(([, name, mapping]) => [name, mapping]);
+    expect(pointers).toEqual(RUNTIMES.map((r) => [r.name, r.mapping]));
   });
 
   test("a notes table lists its skills in row order and rejects a row without one", () => {

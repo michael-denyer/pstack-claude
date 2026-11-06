@@ -91,7 +91,7 @@ describe("Copilot preambles", () => {
 
   test("poteto-mode's Platform Adaptation names the Copilot mapping", () => {
     const text = readFileSync(join(skillsDir, "poteto-mode/SKILL.md"), "utf8");
-    expect(text).toContain("On GitHub Copilot, CLI or app, read [`references/copilot-tools.md`](references/copilot-tools.md)");
+    expect(text).toContain("On GitHub Copilot, read [`references/copilot-tools.md`](references/copilot-tools.md)");
   });
 });
 

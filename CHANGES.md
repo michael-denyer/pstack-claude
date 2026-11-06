@@ -2,6 +2,12 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.132 - resume links in CRLF and BOM notes
+
+`resume.mjs` now ignores links inside the fenced code blocks of a note saved with CRLF line endings, as its link rule says. The fence pattern's opening line ends in `.*\n`, and `.` does not match a carriage return. In a CRLF note the pattern missed each tilde fence, so `publish` read the links inside it and failed with `does not resolve (ENOENT)`. A leading byte order mark did the same to a fence on the note's first line. `verifyLinks` now strips the mark and folds CRLF to LF before it removes code, as `check-playbooks.mjs` does. The recorded sha256 does not change, because `fileInfo` hashes the file's bytes. @wattanartongtipsukon-create found and fixed the CRLF case in [#416](https://github.com/michael-denyer/pstack-claude/pull/416), and a follow-up commit on that PR added the byte order mark case.
+
+The generator now writes the Platform Adaptation sentence in `poteto-mode/SKILL.md` from the rows of `RUNTIMES` in `tools/runtimes.mjs` (#413). It also writes each runtime mapping's list of diverse-model panel skills from the `panel` roles in `models.json` (#412). A new runtime or a role change no longer needs a hand edit to either. The one shipped text change drops "CLI or app," after "GitHub Copilot" in the Platform Adaptation sentence. A test in `tests/runtime-packaging.test.mjs` fails when a Build's copy of the routing mandate in `plugins/pstack/hooks/` stops matching `session-start-context.md` (#415).
+
 ## 0.9.131 - Panel skill list, Grok subagent rows
 
 The Model names section of every runtime mapping (`codex-tools.md`, `pi-tools.md`, `copilot-tools.md`, `muse-tools.md`, `minimax-tools.md`, `agy-tools.md`, and `grok.md`) named `how` critics and `reflect` as diverse-model panels. Only `arena`, `architect`, and `interrogate` have a role on the `panel` tier in `models.json`. The sync to upstream e8d856f (#67) retired the `how critics` role, and `reflect` never had a panel role. The mappings now name the three. `tests/models.test.mjs` compares each mapping's panel list with the skills that have a `panel` role, so a role change that leaves the list stale fails the test.

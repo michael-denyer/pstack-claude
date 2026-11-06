@@ -45,7 +45,7 @@ Skills name Claude Code model aliases in their Models sections. Those aliases ar
 - A role line in the sheet is the user's explicit model instruction, so pass it as the `task` tool's `model`. Pass the role's `@level`, or the sheet's `default effort`, as `effort`. The `task` tool fails a model other than the parent's that offers effort levels when `effort` is missing or names a level the model does not offer, such as `high` on MiniMax M3, which offers only `on` and `off`. When the level is not one the model offers, ask the user which to use. `inherit-parent` or `auto` omits `model` and `effort`.
 - Roles that default to the worker model (`feature, refactoring`): the worker model the user chose.
 - Roles that default to the strongest model (`strongest judgment`): the strongest model the user chose.
-- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial signal comes from model diversity, so fill a panel from distinct providers. If only one model family is reachable, vary reasoning effort and note in the verdict that diversity was reduced.
+- Diverse-model panels (`arena`, `architect`, `interrogate`): the adversarial signal comes from model diversity, so fill a panel from distinct providers. If only one model family is reachable, vary reasoning effort and note in the verdict that diversity was reduced.
 
 `/setup-pstack` writes the configured model list. On MiniMax Code, list the models with `mcode provider list` or the `model` slash command and write only keys they show.
 

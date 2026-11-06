@@ -47,7 +47,7 @@ Skills name Claude Code model aliases in their Models sections. Those aliases ar
 - The plugin's `PreToolUse` hook enforces this for pstack agents. While the sheet is valid, it denies a `task` call whose `agent_type` starts with `pstack:` and whose `model` is not one of the sheet's values, and its reason lists the saved IDs. Retry with the role's saved model; never retry on another unsaved model. It leaves calls with no `model` and other agent types alone.
 - Roles that default to the worker model (`feature, refactoring`): the worker model the user chose.
 - Roles that default to the strongest model (`strongest judgment`): the strongest model the user chose.
-- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial signal comes from model diversity, so fill a panel from distinct vendors in the `task` tool's `model` list (Claude, GPT, Gemini, Grok, and so on). pstack ships no default Copilot panel. If only one vendor is reachable, vary reasoning effort and note in the verdict that diversity was reduced.
+- Diverse-model panels (`arena`, `architect`, `interrogate`): the adversarial signal comes from model diversity, so fill a panel from distinct vendors in the `task` tool's `model` list (Claude, GPT, Gemini, Grok, and so on). pstack ships no default Copilot panel. If only one vendor is reachable, vary reasoning effort and note in the verdict that diversity was reduced.
 
 `setup-pstack` lists the models from the `model` enum of the `task` tool and writes only IDs it saw there. After it writes the sheet, it runs its `check-sheet.sh` script, which applies the hook's checks.
 

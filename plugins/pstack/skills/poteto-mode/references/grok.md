@@ -39,7 +39,7 @@ Skills name Claude Code model aliases in their Models sections. Grok Build's ava
 - The `spawn_subagent` tool says to omit `model` unless the user explicitly requests one. It has no effort parameter; when it cannot apply a sheet choice, report that limitation instead of claiming model diversity.
 - Roles that default to the worker model (`feature, refactoring`): the worker model the user chose.
 - Roles that default to the strongest model (`strongest judgment`): the strongest model the user chose.
-- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`) require distinct models. Report when the available dispatch cannot provide that diversity.
+- Diverse-model panels (`arena`, `architect`, `interrogate`) require distinct models. Report when the available dispatch cannot provide that diversity.
 
 `/setup-pstack` writes the sheet. Choose only models the session exposes.
 

@@ -283,7 +283,7 @@ function tierModelNamesSection(models, { label, block, worker, panel, dispatch, 
     `your ${worker} (for example ${code(block.worker)}).\n` +
     `- Roles that default to the strongest Claude model (${tierRoles(models, "strongest")}): ` +
     `your strongest ${label} model (for example ${code(block.strongest)}).\n` +
-    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`): the adversarial " +
     `signal comes from model diversity, so use the distinct ${label} models available to you. A good default panel ` +
     panel(codeList(block.panel)) +
     "\n\n" +
@@ -340,7 +340,7 @@ export function piModelNamesSection(models) {
     `ID and the ${code("agent")} call fails with ${code(`No API key found for ${fallback}`)}. ` +
     "The `agent` tool also takes a full " +
     "`provider/id`, passed through unchanged, and `inherit-parent`, `auto`, or no `model` runs the child on the " +
-    "parent's current model. Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`) " +
+    "parent's current model. Diverse-model panels (`arena`, `architect`, `interrogate`) " +
     "stay diverse only while their aliases resolve to distinct models. If one model family is all you can reach, " +
     "vary the reasoning effort and note in the verdict that diversity was reduced.\n\n" +
     "`/setup-pstack` writes the configured model list. On Pi, keep the aliases and remap them with `pi models:`."
@@ -428,7 +428,7 @@ export function copilotModelNamesSection(models) {
     `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose.\n` +
     `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): ` +
     "the strongest model the user chose.\n" +
-    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`): the adversarial " +
     "signal comes from model diversity, so fill a panel from distinct vendors in the `task` tool's `model` " +
     "list (Claude, GPT, Gemini, Grok, and so on). pstack ships no default Copilot panel. If only one vendor is " +
     "reachable, vary reasoning effort and note in the verdict that diversity was reduced.\n\n" +
@@ -459,7 +459,7 @@ export function minimaxModelNamesSection(models) {
     `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose.\n` +
     `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): ` +
     "the strongest model the user chose.\n" +
-    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`): the adversarial " +
     "signal comes from model diversity, so fill a panel from distinct providers. If only one model family is " +
     "reachable, vary reasoning effort and note in the verdict that diversity was reduced.\n\n" +
     "`/setup-pstack` writes the configured model list. On MiniMax Code, list the models with `mcode provider list` " +
@@ -519,7 +519,7 @@ export function agyModelNamesSection(models) {
     "- Pass the role's model as `Model` on `invoke_subagent`. For `inherit-parent` or `auto`, omit `Model`.\n" +
     `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose.\n` +
     `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): the strongest model the user chose.\n` +
-    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`): the adversarial " +
     "signal comes from model diversity. Use distinct available models and report when the panel shares a model family.\n\n" +
     "`/setup-pstack` writes the sheet. Antigravity accepts `flash_lite`; the Copilot sheet checker rejects underscores " +
     "in model IDs and does not apply to Antigravity."
@@ -594,7 +594,7 @@ export function grokModelNamesSection(models) {
     "when it cannot apply a sheet choice, report that limitation instead of claiming model diversity.\n" +
     `- Roles that default to the worker model (${tierRoles(models, "worker")}): the worker model the user chose.\n` +
     `- Roles that default to the strongest model (${tierRoles(models, "strongest")}): the strongest model the user chose.\n` +
-    "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`) require distinct models. " +
+    "- Diverse-model panels (`arena`, `architect`, `interrogate`) require distinct models. " +
     "Report when the available dispatch cannot provide that diversity.\n\n" +
     "`/setup-pstack` writes the sheet. Choose only models the session exposes."
   );

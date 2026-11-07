@@ -86,7 +86,7 @@ The Claude Code, Codex, and GitHub Copilot plugins load the same short [routing 
 
 Smaller tasks proceed directly. The full skill loads when invoked, and explicit user instructions take precedence.
 
-To disable routing on runtimes that support the session hook setting, run `setup-pstack` and turn it off, or write `session hook: off` in the runtime's sheet at the path in [setup-pstack's runtime table](../plugins/pstack/skills/setup-pstack/SKILL.md#other-runtimes). In Claude Code, use `/pstack:setup-pstack`. Without the setting, routing stays on. On OMP this setting applies across profiles. On Kimi, disable the plugin to stop its routing instruction. Grok's routing hint is not controlled by the session hook setting.
+To disable routing on runtimes that support the session hook setting, run `setup-pstack` and turn it off, or write `session hook: off` in the runtime's sheet at the path in [setup-pstack's runtime table](../plugins/pstack/skills/setup-pstack/references/runtimes.md). In Claude Code, use `/pstack:setup-pstack`. Without the setting, routing stays on. On OMP this setting applies across profiles. On Kimi, disable the plugin to stop its routing instruction. Grok's routing hint is not controlled by the session hook setting.
 
 Skills-only installs and other runtimes do not include these integrations. Request `poteto-mode` explicitly, or add a standing instruction to the runtime's instruction file.
 
@@ -167,7 +167,7 @@ Update an installed copy after a `git pull` with `muse plugins update pstack`, a
 
 ## Configuration and dependencies
 
-Invoke [setup-pstack](../plugins/pstack/skills/setup-pstack/SKILL.md) to choose models for each role. It detects available models, confirms the choices, and writes an override sheet. Its [runtime table](../plugins/pstack/skills/setup-pstack/SKILL.md#other-runtimes) names the sheet path and loading mechanism for each runtime. Defaults live in [models.json](../plugins/pstack/models.json).
+Invoke [setup-pstack](../plugins/pstack/skills/setup-pstack/SKILL.md) to choose models for each role. It detects available models, confirms the choices, and writes an override sheet. Its [runtime table](../plugins/pstack/skills/setup-pstack/references/runtimes.md) names the sheet path and loading mechanism for each runtime. Defaults live in [models.json](../plugins/pstack/models.json).
 
 For design comparisons and reviews, choose distinct models available to your runtime. The default panel uses different Claude models.
 

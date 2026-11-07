@@ -59,7 +59,7 @@ Skills name Claude defaults (a single-role default for code/prose/judgment, a wo
 
 ## Session routing hook
 
-The native pstack plugin bundles the same `SessionStart` routing instruction as the Claude Code plugin, through `session-start.sh` on macOS and Linux and `session-start.ps1` on Windows. Codex runs the hook on startup, resume, clear, and compact after the user trusts the hook through `/hooks`. The hook reads `session hook` from the Codex sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/SKILL.md#other-runtimes); `session hook: off` disables injection.
+The native pstack plugin bundles the same `SessionStart` routing instruction as the Claude Code plugin, through `session-start.sh` on macOS and Linux and `session-start.ps1` on Windows. Codex runs the hook on startup, resume, clear, and compact after the user trusts the hook through `/hooks`. The hook reads `session hook` from the Codex sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/references/runtimes.md); `session hook: off` disables injection.
 
 A skills-only installation does not include plugin hooks. Request `poteto-mode` explicitly or add a standing instruction to `AGENTS.md` in that case.
 
@@ -81,7 +81,7 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | Skill | On Codex |
 |-------|----------|
 | `interrogate` | The `subagent_type`/`model` dispatch fields map to `spawn_agent`; substitute your configured Codex models and keep the adversary panel model-diverse. |
-| `setup-pstack` | The skill's Other runtimes table names the Codex sheet path and how it loads; the slugs are your Codex models (see Model names above). The role rows are identical. |
+| `setup-pstack` | The skill's [Other runtimes](../../setup-pstack/references/runtimes.md) table names the Codex sheet path and how it loads; the slugs are your Codex models (see Model names above). The role rows are identical. |
 | `no-comments` | There is no `comment-sicko` subagent type; see Subagent policy above. |
 | `thermos` | There are no thermo-nuclear subagent types; see Subagent policy above. |
 | `teach` | Running `how` and `why` in parallel maps to `spawn_agent` fan-out; image generation uses the configured Codex equivalent. |

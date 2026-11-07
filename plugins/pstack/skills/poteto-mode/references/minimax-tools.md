@@ -51,7 +51,7 @@ Skills name Claude Code model aliases in their Models sections. Those aliases ar
 
 ## Session routing hook
 
-MiniMax Code runs the Claude Code plugin's `SessionStart` hook through its Claude Code reader. The hook finds `MINIMAX_PLUGIN_ROOT` in its environment and injects the poteto-mode mandate in MiniMax Code wording, which points here. It reads `session hook` from the MiniMax Code sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/SKILL.md#other-runtimes); `session hook: off` disables injection. MiniMax Code passes hooks and the `bash` tool a fixed set of environment variables that leaves out `MINIMAX_DATA_DIR`, so pstack keeps the sheet at `~/.minimax/pstack-models.md` even when the data directory moves. The hook is a POSIX `sh` script, and it is untested on Windows.
+MiniMax Code runs the Claude Code plugin's `SessionStart` hook through its Claude Code reader. The hook finds `MINIMAX_PLUGIN_ROOT` in its environment and injects the poteto-mode mandate in MiniMax Code wording, which points here. It reads `session hook` from the MiniMax Code sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/references/runtimes.md); `session hook: off` disables injection. MiniMax Code passes hooks and the `bash` tool a fixed set of environment variables that leaves out `MINIMAX_DATA_DIR`, so pstack keeps the sheet at `~/.minimax/pstack-models.md` even when the data directory moves. The hook is a POSIX `sh` script, and it is untested on Windows.
 
 A skills-only installation does not include the hook. Request `poteto-mode` explicitly or add a standing instruction to `AGENTS.md` in that case.
 
@@ -74,7 +74,7 @@ Most skills need only the tables above. These need one more mapping:
 
 | Skill | On MiniMax Code |
 |-------|-----------------|
-| `setup-pstack` | The skill's Other runtimes table names the MiniMax Code sheet path. List models with `mcode provider list` or the `model` slash command. |
+| `setup-pstack` | The skill's [Other runtimes](../../setup-pstack/references/runtimes.md) table names the MiniMax Code sheet path. List models with `mcode provider list` or the `model` slash command. |
 | `no-comments` | The `comment-sicko` dispatch is a `task` call with `agent_name: "pstack:comment-sicko"`. |
 | `thermos` | Both review dispatches are `task` calls with the agents' `pstack:` names. |
 | `swarm` | Each worker is a `task` call. Give each writing worker its own worktree first (see Subagent policy). |

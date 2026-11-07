@@ -44,7 +44,7 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | A06 | Agent file body as the child's system prompt | Appended with `--append-system-prompt`, keeping Pi's skill list visible to the child | extension | `the effort parameter passes --thinking to any agent type, keeps a pstack agent's body as a 0600 system prompt file, and no effort runs at the parent's level` | VERIFIED |
 | H01 | `SessionStart` hook | The routing instruction is added at every agent start, so it survives resume, clear, and compaction | extension | `injects the mandate and the full sheet on every agent start` | VERIFIED |
 | H02 | `CLAUDE_PLUGIN_ROOT` | The extension locates the plugin from its own file path | extension | `injects the mandate when there is no sheet` | n/a |
-| H03 | `~/.claude` config directory | `$PI_CODING_AGENT_DIR` or `~/.pi/agent` | mapping | setup-pstack Other runtimes | n/a |
+| H03 | `~/.claude` config directory | `$PI_CODING_AGENT_DIR` or `~/.pi/agent` | mapping | setup-pstack references/runtimes.md | n/a |
 | H04 | Override sheet plus `@` include | The extension adds the whole sheet to the system prompt, children included | extension | `a child pi gets the sheet but not the mandate` | VERIFIED |
 | H05 | `CLAUDE.md` instructions file | Pi loads `AGENTS.md` or `CLAUDE.md` per directory, plus `~/.pi/agent/AGENTS.md` | native | pi-tools.md Instructions file | n/a |
 | H06 | `.claude/settings.local.json` env for todo tools | Pi has no todo tools; the `todo.md` fallback applies | n/a | poteto-mode Platform Adaptation | n/a |

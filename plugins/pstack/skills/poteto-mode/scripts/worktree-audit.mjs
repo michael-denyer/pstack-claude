@@ -12,6 +12,9 @@
 // and archived_sessions under $CODEX_HOME, and Pi's sessions and pstack subagent
 // sessions under $PI_CODING_AGENT_DIR (defaults: ~/.claude, ~/.codex, ~/.pi/agent).
 //
+// Compressed .jsonl.zst rollouts require zstd on PATH. A decode failure leaves
+// the chat fact unknown, so the affected worktrees cannot reach safe.
+//
 // Every probe yields a Fact, { known: true, value } or { known: false }. A hold
 // bucket needs only its own fact; `safe` needs every fact known.
 import { execFileSync } from "node:child_process";
@@ -203,7 +206,7 @@ function transcriptNeedles(spellings) {
 export function lastChats(roots, spellings) {
   const needles = [...spellings].map(([path, forms]) => [path, transcriptNeedles(forms)]);
   const latest = new Map();
-  for (const { path: file } of roots.flatMap((root) => candidates(root, Infinity))) {
+  for (const { path: file } of roots.flatMap((root) => candidates(root, Infinity, { includeCompressed: true }))) {
     let text, mtime;
     try {
       text = readFileSync(file);
@@ -213,6 +216,17 @@ export function lastChats(roots, spellings) {
     } catch (error) {
       rethrowUnlessRemoved(error);
       continue;
+    }
+    if (file.endsWith(".jsonl.zst")) {
+      try {
+        // The CLI reads every concatenated frame and rejects truncated input.
+        text = execFileSync("zstd", ["-d", "-c"], {
+          input: text, stdio: ["pipe", "pipe", "pipe"], maxBuffer: Infinity, timeout: 30_000,
+        });
+      } catch (error) {
+        // A missing decoder is not a transcript removed during enumeration.
+        throw new Error(`cannot decode ${file}; zstd must be available: ${String(error.stderr ?? "").trim() || error.message}`);
+      }
     }
     for (const [path, forms] of needles) {
       if (mtime > (latest.get(path) ?? 0) && forms.some((needle) => mentions(text, needle))) latest.set(path, mtime);

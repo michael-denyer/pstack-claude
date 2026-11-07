@@ -753,6 +753,7 @@ const HOOK_TYPES = {
   command: hookType("command", {
     command: Type.String(),
     commandWindows: Type.Optional(Type.String()),
+    powershell: Type.Optional(Type.String()),
     args: Type.Optional(Type.Array(Type.String())),
     async: Type.Optional(Type.Boolean()),
     asyncRewake: Type.Optional(Type.Boolean()),
@@ -811,8 +812,14 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", ro
         continue;
       }
       if (hook.type !== "command") continue;
-      for (const command of [hook.command, hook.commandWindows].filter((value) => value !== undefined)) {
-        const refs = [...command.matchAll(new RegExp(`\\$\\{${root}\\}/([^"\\s]+)`, "g"))].map((m) => m[1]);
+      const commands = [
+        [hook.command, `\\$\\{${root}\\}/`],
+        [hook.commandWindows, `\\$\\{${root}\\}/`],
+        [hook.powershell, `\\$env:${root}/`],
+      ];
+      for (const [command, reference] of commands) {
+        if (command === undefined) continue;
+        const refs = [...command.matchAll(new RegExp(`${reference}([^"\\s]+)`, "g"))].map((m) => m[1]);
         if (!refs.length) {
           faults.push(`${event}: command does not reference \${${root}}: ${command}`);
           continue;

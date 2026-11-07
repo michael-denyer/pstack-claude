@@ -12,6 +12,10 @@ import { fileURLToPath } from "node:url";
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
 const preToolUse = JSON.parse(readFileSync(join(pluginRoot, "hooks/copilot-hooks.json"), "utf8")).hooks.PreToolUse;
 const command = preToolUse[0].hooks[0].command;
+const shellContracts = readFileSync(join(pluginRoot, "hooks/script-contracts.awk"), "utf8")
+  .matchAll(/CONTRACT\["([^"]+)"\]\s*=\s*"([^"]+)"/g);
+const windowsContracts = readFileSync(join(pluginRoot, "hooks/pre-tool-use.ps1"), "utf8")
+  .matchAll(/\$script:Contracts\['([^']+)'\]\s*=\s*'([^']+)'/g);
 const allow = '{"permissionDecision":"allow"}\n';
 const playbook = join(pluginRoot, "skills/poteto-mode/playbooks/bug-fix.md");
 
@@ -30,6 +34,10 @@ function run(input, env = { COPILOT_PLUGIN_ROOT: pluginRoot }) {
 }
 
 describe("PreToolUse hook", () => {
+  test("keeps the Windows script registry in sync with the shared contracts", () => {
+    expect([...windowsContracts].map((match) => match.slice(1))).toEqual([...shellContracts].map((match) => match.slice(1)));
+  });
+
   test("matches only the tools it decides", () => {
     expect(preToolUse).toHaveLength(1);
     expect(preToolUse[0].matcher).toBe("view|task|bash");

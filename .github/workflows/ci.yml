@@ -56,8 +56,8 @@ jobs:
       - name: Warm up Windows PowerShell
         shell: powershell
         run: "'{}' | ConvertFrom-Json | Out-Null"
-      - name: Test Windows session hooks
-        run: bun test --timeout 10000 tests/session-hook-windows.test.mjs
+      - name: Test Windows session and tool hooks
+        run: bun test --timeout 10000 --max-concurrency=1 tests/session-hook-windows.test.mjs tests/pre-tool-use-windows.test.mjs
         env:
           PSTACK_REQUIRE_WINDOWS_HOOK: "1"
 

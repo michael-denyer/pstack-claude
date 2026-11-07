@@ -234,8 +234,8 @@ describe("validatePiPackage", () => {
 });
 
 describe("validateHooks", () => {
-  const hooks = (command, commandWindows) =>
-    JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command, commandWindows }] }] } });
+  const hooks = (command, commandWindows, powershell) =>
+    JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command, commandWindows, powershell }] }] } });
   const exec = { mode: 0o755 };
   const plain = { mode: 0o644 };
 
@@ -291,6 +291,27 @@ describe("validateHooks", () => {
     expect(() => validateHooks(cmd, { statOf: (rel) => rel.endsWith(".sh") ? exec : null })).toThrow(
       "SessionStart: hooks/session-start.ps1 does not exist",
     );
+  });
+
+  test("checks PowerShell overrides under the runtime's plugin root", () => {
+    const statOf = (rel) => (rel.endsWith(".ps1") ? plain : exec);
+    const copilotCommand = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:COPILOT_PLUGIN_ROOT/hooks/session-start.ps1" copilot';
+    for (const [root, runtime] of [["COPILOT_PLUGIN_ROOT", "copilot"], ["MUSE_PLUGIN_ROOT", "muse"]]) {
+      const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:${root}/hooks/session-start.ps1" ${runtime}`;
+      expect(() => validateHooks(hooks(`"\${${root}}/hooks/session-start.sh"`, undefined, command), {
+        statOf,
+        root,
+      })).not.toThrow();
+    }
+    expect(() => validateHooks(hooks('"${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh"', undefined, copilotCommand), {
+      statOf: () => null,
+      root: "COPILOT_PLUGIN_ROOT",
+    })).toThrow("hooks/session-start.ps1 does not exist");
+    expect(() => validateHooks(hooks(
+      '"${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh"',
+      undefined,
+      'powershell.exe -File "$env:CLAUDE_PLUGIN_ROOT/hooks/session-start.ps1"',
+    ), { statOf, root: "COPILOT_PLUGIN_ROOT" })).toThrow("does not reference ${COPILOT_PLUGIN_ROOT}");
   });
 
   test("names a hook without a command, even when it has a Windows override", () => {

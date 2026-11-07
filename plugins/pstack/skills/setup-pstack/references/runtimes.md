@@ -43,7 +43,12 @@ Follow [the Copilot setup](../copilot.md); its opening names the steps it replac
 
 ## OpenCode 2
 
+- **Steps 3 and 5 (effort, validate).** The `subagent` tool has no effort field. Skip the effort questions in step 3 and effort validation in step 5, and omit the `default effort` line and `@<level>` suffixes. A variant the user asks for goes in the model ID as `providerID/modelID#variant`.
 - **Step 4 (session hook).** The native plugin adds the mandate to root-session model requests.
+
+## Antigravity
+
+- **Steps 3 and 5 (effort, validate).** `invoke_subagent` takes a `Model` and no effort parameter. Skip the effort questions in step 3 and effort validation in step 5, and omit the `default effort` line and `@<level>` suffixes.
 
 ## Kimi Code CLI
 

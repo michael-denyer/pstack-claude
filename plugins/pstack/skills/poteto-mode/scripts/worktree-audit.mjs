@@ -268,7 +268,7 @@ function remoteState(path, branch, head) {
   const sha = git(path, "for-each-ref", "--format=%(objectname)", `refs/remotes/origin/${branch}`);
   if (!sha) return "no-remote";
   if (sha === head) return "pushed";
-  return `ahead${git(path, "rev-list", "--count", `origin/${branch}..HEAD`)}`;
+  return `ahead${git(path, "rev-list", "--count", `refs/remotes/origin/${branch}..HEAD`)}`;
 }
 
 export function duSize(output) {

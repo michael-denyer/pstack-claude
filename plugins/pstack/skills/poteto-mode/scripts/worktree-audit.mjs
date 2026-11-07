@@ -316,7 +316,11 @@ function auditWorktree({ path, locked }, { repo, trunk, fetched, prs, chats, bra
     return name === "HEAD" ? null : name;
   });
   const remote = bind(branch, (name) => (name === null ? known("detached") : probe(() => remoteState(path, name, head.value))));
-  const pr = bind(prs, (list) => bind(branch, (name) => known(list.find((entry) => name !== null && entry.headRefName === name) ?? null)));
+  const pr = bind(prs, (list) => bind(branch, (name) => {
+    const matching = list.filter((entry) => name !== null && entry.headRefName === name);
+    // A branch can target several bases; a newer closed PR does not end an older open one.
+    return known(matching.find((entry) => entry.state === "OPEN") ?? matching[0] ?? null);
+  }));
   const lastChat = chats.get(path);
   const recent = bind(lastChat, (ts) => known(ts !== null && Math.trunc((now - ts) / DAY) <= RECENT_DAYS));
   const bucket = classify({ trunk: fetched, head, age, ancestry, dirty, orphans, remote, pr, recent, locked: known(locked) });

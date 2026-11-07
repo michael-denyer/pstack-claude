@@ -140,7 +140,7 @@ describe.skipIf(process.platform !== "win32" && !required)("Windows Codex Sessio
       expect({ status: r.status, out: r.stdout, err: r.stderr.trimEnd() }).toEqual({
         status: 2,
         out: "",
-        err: `session-start.ps1: unknown runtime '${arg}' (expected codex or muse)`,
+        err: `session-start.ps1: unknown runtime '${arg}' (expected codex, copilot, or muse)`,
       });
     });
   }

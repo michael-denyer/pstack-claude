@@ -14,6 +14,11 @@ function AsLines([string] $text) {
     if ($text -and -not $text.EndsWith("`n", [System.StringComparison]::Ordinal)) { $text + "`n" } else { $text }
 }
 
+# copilot-context.awk's text() omits the file's final newline.
+function AsText([string] $text) {
+    if ($text.EndsWith("`n", [System.StringComparison]::Ordinal)) { $text.Substring(0, $text.Length - 1) } else { $text }
+}
+
 # Follow session-start.sh's runtime -> sheet/off -> output flow. Native home
 # paths and Muse's interop guard are Windows compatibility.
 switch -CaseSensitive ($Runtime) {
@@ -36,8 +41,14 @@ switch -CaseSensitive ($Runtime) {
         $sheet = Join-Path (Join-Path $sheetRoot 'muse') 'pstack-models.md'
         $context = 'session-start-muse.md'
     }
+    'copilot' {
+        $userHomePath = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
+        $sheetRoot = if ($env:COPILOT_HOME) { $env:COPILOT_HOME } else { Join-Path $userHomePath '.copilot' }
+        $sheet = Join-Path $sheetRoot 'pstack-models.md'
+        $context = 'session-start-context.md'
+    }
     default {
-        [Console]::Error.WriteLine("session-start.ps1: unknown runtime '$Runtime' (expected codex or muse)")
+        [Console]::Error.WriteLine("session-start.ps1: unknown runtime '$Runtime' (expected codex, copilot, or muse)")
         exit 2
     }
 }
@@ -58,6 +69,26 @@ switch -CaseSensitive ($Runtime) {
         if ($roleLines.Count -gt 0) {
             $output += "`n" + (AsLines (ReadHookFile 'session-start-muse-sheet.md')) + (($roleLines -join "`n") + "`n")
         }
+    }
+    'copilot' {
+        $output = AsText (ReadHookFile $context)
+        $notes = AsText (ReadHookFile 'session-start-copilot.md')
+        $sheetState = if ($null -eq $sheetLines) { $null } else { Get-SheetState $sheetLines }
+        if ($null -ne $sheetState -and $sheetState.Problems -eq '') {
+            $notes += "`n`n" + (AsText (ReadHookFile 'session-start-copilot-sheet.md')) + "`n"
+            $notes += "`n" + ($sheetState.RoleLines -join "`n")
+        } else {
+            if ($null -ne $sheetState) { $notes += "`n`nsheet invalid: $($sheetState.Problems)" }
+            $notes += "`n`n" + (AsText (ReadHookFile 'session-start-copilot-setup.md'))
+        }
+        $closeTag = '</EXTREMELY_IMPORTANT>'
+        $index = $output.IndexOf($closeTag, [System.StringComparison]::Ordinal)
+        if ($index -ge 0) {
+            $output = $output.Substring(0, $index) + "`n" + $notes + "`n" + $output.Substring($index)
+        } else {
+            $output += "`n" + $notes
+        }
+        $output = (ConvertTo-Json -InputObject @{ additionalContext = $output + "`n" } -Compress) + "`n"
     }
 }
 

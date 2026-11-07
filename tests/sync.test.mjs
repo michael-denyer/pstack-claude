@@ -25,6 +25,7 @@ import {
   denylistHits,
   mergeFile,
   parseForks,
+  parseUpstream,
   parseRule,
   parseSubstitutions,
   syncComponent,
@@ -260,12 +261,64 @@ describe("parseSubstitutions", () => {
     expect(() => parseRule(rule({ pattern: "a", file: "^skills/" }), 0)).toThrow('unknown field "file"');
   });
 
+  test("a null or non-object rule fails naming the entry instead of a bare TypeError", () => {
+    expect(() => parseRule(null, 4)).toThrow("substitutions[4]: must be an object");
+    expect(() => parseRule(undefined, 1)).toThrow("substitutions[1]: must be an object");
+    expect(() => parseRule(["pattern"], 0)).toThrow("substitutions[0]: must be an object");
+    expect(() => parseRule("Cursor", 2)).toThrow("substitutions[2]: must be an object");
+    expect(() => parseSubstitutions({ substitutions: [null], denylist: [] })).toThrow(
+      "substitutions[0]: must be an object",
+    );
+  });
+
+  test("a non-array substitutions or denylist fails naming the field instead of a bare TypeError", () => {
+    expect(() => parseSubstitutions(null)).toThrow("substitutions.json: must be an object");
+    expect(() => parseSubstitutions([])).toThrow("substitutions.json: must be an object");
+    expect(() => parseSubstitutions({})).toThrow("substitutions: must be an array");
+    expect(() => parseSubstitutions({ substitutions: null })).toThrow("substitutions: must be an array");
+    expect(() => parseSubstitutions({ substitutions: {} })).toThrow("substitutions: must be an array");
+    expect(() => parseSubstitutions({ substitutions: [], denylist: null })).toThrow("denylist: must be an array");
+    expect(() => parseSubstitutions({ substitutions: [], denylist: {} })).toThrow("denylist: must be an array");
+    expect(parseSubstitutions({ substitutions: [] })).toEqual({ substitutions: [], denylist: [] });
+  });
+
   test("a rule needs exactly one matcher, a replacement, and a rationale", () => {
     expect(() => parseRule(rule({}), 0)).toThrow("exactly one of a non-empty pattern or regex");
     expect(() => parseRule(rule({ pattern: "a", regex: "a" }), 0)).toThrow("exactly one");
     expect(() => parseRule(rule({ pattern: "" }), 0)).toThrow("exactly one");
     expect(() => parseRule({ pattern: "a", rationale: "fixture" }, 0)).toThrow("needs a replacement string");
     expect(() => parseRule({ pattern: "a", replacement: "X" }, 0)).toThrow("needs a rationale");
+  });
+
+  test("an invalid regex or files regex fails naming the rule and the source", () => {
+    expect(() => parseRule(rule({ regex: "a(" }), 7)).toThrow('substitutions[7]: regex "a(" is not a valid regex');
+    expect(() => parseRule(rule({ pattern: "a", files: "^skills/[" }), 2)).toThrow(
+      'substitutions[2]: files "^skills/[" is not a valid regex',
+    );
+  });
+
+  test("a denylist entry needs exactly one matcher and a hint, and a bad regex names the entry", () => {
+    const empty = { substitutions: [], denylist: [{ hint: "x" }] };
+    expect(() => parseSubstitutions(empty)).toThrow(
+      "denylist[0]: needs exactly one of a non-empty token or regex",
+    );
+    expect(() => parseSubstitutions({ substitutions: [], denylist: [{ token: "a", regex: "a", hint: "x" }] })).toThrow(
+      "exactly one of a non-empty token or regex",
+    );
+    expect(() => parseSubstitutions({ substitutions: [], denylist: [{ token: "", hint: "x" }] })).toThrow(
+      "exactly one of a non-empty token or regex",
+    );
+    expect(() => parseSubstitutions({ substitutions: [], denylist: [{ token: "a" }] })).toThrow("denylist[0]: needs a hint");
+    expect(() => parseSubstitutions({ substitutions: [], denylist: [{ tokn: "a", hint: "x" }] })).toThrow(
+      'denylist[0]: unknown field "tokn"',
+    );
+    expect(() => parseSubstitutions({ substitutions: [], denylist: [{ regex: "a(", hint: "x" }] })).toThrow(
+      'denylist[0]: regex "a(" is not a valid regex',
+    );
+    const { denylist } = parseSubstitutions({ substitutions: [], denylist: [{ token: "Cursor", hint: "rewrite it" }] });
+    expect(denylistHits("f.md", "no\nCursor here\nok", denylist)).toEqual([
+      'f.md:2: "Cursor" — rewrite it',
+    ]);
   });
 
   test("a pattern that contains an earlier rule's pattern fails, since it could never match", () => {
@@ -293,6 +346,29 @@ describe("parseSubstitutions", () => {
   });
 });
 
+describe("parseUpstream", () => {
+  test("a null or non-object root or components map fails naming it instead of a bare TypeError", () => {
+    expect(() => parseUpstream(null)).toThrow("upstream.json: must be an object");
+    expect(() => parseUpstream(undefined)).toThrow("upstream.json: must be an object");
+    expect(() => parseUpstream([])).toThrow("upstream.json: must be an object");
+    expect(() => parseUpstream("x")).toThrow("upstream.json: must be an object");
+    expect(() => parseUpstream({})).toThrow('upstream.json: "components" must be an object');
+    expect(() => parseUpstream({ components: null })).toThrow('upstream.json: "components" must be an object');
+    expect(() => parseUpstream({ components: [] })).toThrow('upstream.json: "components" must be an object');
+    expect(() => parseUpstream({ components: { kit: null } })).toThrow(
+      'upstream.json: component "kit" must be an object',
+    );
+    expect(() => parseUpstream({ components: { kit: [] } })).toThrow(
+      'upstream.json: component "kit" must be an object',
+    );
+    expect(parseUpstream({ components: {} })).toEqual({ components: {} });
+    expect(parseUpstream({ remote: "https://example.invalid", components: { kit: { sha: "abc" } } })).toEqual({
+      remote: "https://example.invalid",
+      components: { kit: { sha: "abc" } },
+    });
+  });
+});
+
 describe("parseForks", () => {
   const components = { kit: { localPath: "plugins/pstack/skills" } };
   const path = "plugins/pstack/skills/s.md";
@@ -314,6 +390,15 @@ describe("parseForks", () => {
   test("an unknown component or a path outside the component fails", () => {
     expect(() => parseForks({ other: {} }, components)).toThrow('forks.json: unknown component "other"');
     expect(() => parseForks({ kit: { "tools/s.md": entry } }, components)).toThrow("not under plugins/pstack/skills");
+  });
+
+  test("a null or non-object registry or component map fails naming it instead of a bare TypeError", () => {
+    expect(() => parseForks(null, components)).toThrow("forks.json: must be an object");
+    expect(() => parseForks([], components)).toThrow("forks.json: must be an object");
+    expect(() => parseForks({ kit: null }, components)).toThrow("forks.json kit: must be an object");
+    expect(() => parseForks({ kit: [] }, components)).toThrow("forks.json kit: must be an object");
+    expect(parseForks({}, components)).toEqual({});
+    expect(parseForks({ kit: {} }, components).kit).toEqual(new Map());
   });
 });
 

@@ -71,7 +71,7 @@ Most skills need only the tables above. These need one more mapping:
 | Skill | On Antigravity |
 |-------|----------------|
 | `interrogate` | Each adversary is an `invoke_subagent` call with `Model` from the sheet. |
-| `setup-pstack` | The Other runtimes table gives the sheet path. Use the `Model` values listed in [Model names](#model-names). |
+| `setup-pstack` | The [Other runtimes](../../setup-pstack/references/runtimes.md) table gives the sheet path. Use the `Model` values listed in [Model names](#model-names). |
 | `architect` | The runner panel goes through the **arena** skill: one `invoke_subagent` call per runner, each with a `Model` from the sheet's `architect runners` line. |
 | `how` | The parallel explorers and the explainer map to `invoke_subagent` fan-out with the sheet's `how` role models. |
 | `arena` | The parallel candidates and the cross-judge map to `invoke_subagent` calls with the sheet's panel lines. |

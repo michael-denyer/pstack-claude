@@ -23,7 +23,7 @@ Infer the need from the message and the conversation. A named situation, such as
 
 Check the state that changes the answer, and mention it only when it does:
 
-- For model or routing questions, identify the runtime and installation type, then read [`setup-pstack`](../setup-pstack/SKILL.md#other-runtimes) for the sheet's location and how that runtime loads it. Check that configuration before saying whether defaults or overrides apply.
+- For model or routing questions, identify the runtime and installation type, then read [`setup-pstack`](../setup-pstack/references/runtimes.md) for the sheet's location and how that runtime loads it. Check that configuration before saying whether defaults or overrides apply.
 - No project `verify` or `verify-*` skill or other app harness means agents have no scripted way to drive the app. Mention `/create-verification-skill` when the question is about proving a change works.
 - No formal verification skill in the project means no property is checked past what tests reach. Mention `/create-formal-verification-skill` when the question is about a race, an invariant, or another case tests rarely hit. When one exists and the code it covers changed after the commit it records as last in sync, mention `/maintain-formal-verification-skill` if the question touches that code.
 
@@ -35,7 +35,7 @@ When the model sheet is missing and it matters, ask whether the user wants to pi
 ## Get set up
 
 1. Identify the user's runtime and whether they want a native plugin/package or skills-only installation. Read its section in the [README](https://github.com/michael-denyer/pstack-claude/blob/main/README.md#install) or [shared installation reference](https://github.com/michael-denyer/pstack-claude/blob/main/docs/reference.md#shared-skills-installation), then give the matching install command.
-2. Read [`/setup-pstack`](../setup-pstack/SKILL.md), including its Other runtimes table, before explaining model choices, effort, sheet loading, or automatic routing. For a bundled routing hook or extension, use its persistent `session hook: off` setting in the current runtime's sheet to turn routing off. After the model sheet, it offers once each to generate a verification skill and a formal verification skill for the project, unless the project already has one.
+2. Read [`/setup-pstack`](../setup-pstack/SKILL.md), including its [Other runtimes](../setup-pstack/references/runtimes.md) table, before explaining model choices, effort, sheet loading, or automatic routing. For a bundled routing hook or extension, use its persistent `session hook: off` setting in the current runtime's sheet to turn routing off. After the model sheet, it offers once each to generate a verification skill and a formal verification skill for the project, unless the project already has one.
 3. Offer a first task prompt with a goal and a check that can pass or fail, per [`references/prompting.md`](references/prompting.md). Use the current runtime's invocation syntax from the [slash-command reference](https://github.com/michael-denyer/pstack-claude/blob/main/docs/reference.md#slash-commands).
 
 Before giving runtime-specific instructions or adapting a recipe, read the [Codex mapping](../poteto-mode/references/codex-tools.md) or [Pi mapping](../poteto-mode/references/pi-tools.md) when applicable. Their routing sections cover hook trust, extension loading, and skills-only installs. For other runtimes, use the [runtime support reference](https://github.com/michael-denyer/pstack-claude/blob/main/docs/reference.md#runtime-support).
@@ -128,7 +128,7 @@ Principles are one-rule skills that `/poteto-mode` reads and cites in its replie
 |---|---|
 | The mode stopped applying after a few turns | Check the current runtime's routing configuration through the sources under Get set up. Without automatic routing, invoke `poteto-mode` for each task. |
 | A question got treated as the next step of the last task | Say "new task", or say the turn doesn't need the mode. |
-| A new model choice had no effect | Read [setup-pstack](../setup-pstack/SKILL.md#other-runtimes) and the current runtime's mapping, then check its sheet location and loading method. |
+| A new model choice had no effect | Read [setup-pstack](../setup-pstack/references/runtimes.md) and the current runtime's mapping, then check its sheet location and loading method. |
 | Runs cost more than expected | See the cost paragraph under Get set up. |
 | A skill didn't load on its own | Read its description and the current runtime's skill-loading instructions. Invoke it explicitly when needed; `/poteto-mode` doesn't run every skill. |
 | Parallel agents overwrote each other | Give each agent its own worktree. |

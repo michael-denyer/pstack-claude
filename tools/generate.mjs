@@ -883,6 +883,7 @@ export function plan(root, models) {
     }
     put(path, read(source));
   }
+  put(`${PLUGIN}/LICENSE`, read("LICENSE"));
   return { files, ownedDirs: OWNED_DIRS };
 }
 

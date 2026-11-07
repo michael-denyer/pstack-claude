@@ -230,7 +230,7 @@ function trunkName(repo) {
 
 function isAncestor(repo, head, trunk) {
   try {
-    git(repo, "merge-base", "--is-ancestor", head, `origin/${trunk}`);
+    git(repo, "merge-base", "--is-ancestor", head, `refs/remotes/origin/${trunk}`);
     return true;
   } catch (error) {
     if (error.status === 1) return false;

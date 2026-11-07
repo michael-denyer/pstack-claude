@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.133 - worktree audit ref and PR fixes, setup-pstack runtime notes
+
+`worktree-audit.mjs` now checks a worktree's ancestry against `refs/remotes/origin/<trunk>`. git resolves the shorthand `origin/<trunk>` to a tag or local branch of that name before the remote-tracking ref. Such a ref pointing at unmerged work made the audit report the worktree merged and safe. The REMOTE column's ahead count reads `refs/remotes/origin/<branch>` for the same reason. @EthanYoQ found and fixed the trunk case in [#423](https://github.com/michael-denyer/pstack-claude/pull/423).
+
+When a branch has several PRs, the audit now holds its worktree for an open one even when `gh` lists a newer closed or merged PR first. The first record listed used to decide, so a merged record at the worktree's head marked it safe while another PR from the branch was still open. @EthanYoQ fixed this in [#424](https://github.com/michael-denyer/pstack-claude/pull/424).
+
+`setup-pstack`'s `SKILL.md` now covers the Claude Code path only, at 8,978 bytes instead of 17,690. The sheet-path table and each other runtime's step changes are in [`references/runtimes.md`](plugins/pstack/skills/setup-pstack/references/runtimes.md), which `SKILL.md` tells every other runtime to read first. Step 3 lets a role value carry an `@<level>` effort suffix on any runtime whose dispatch takes an effort; OpenCode 2 and Antigravity skip the effort questions, because their subagent calls have no effort field. `copilot.md` lists step 10 among the steps that still apply on GitHub Copilot. @younes-io made the split in [#422](https://github.com/michael-denyer/pstack-claude/pull/422).
+
 ## 0.9.132 - resume links in CRLF and BOM notes
 
 `resume.mjs` now ignores links inside the fenced code blocks of a note saved with CRLF line endings, as its link rule says. The fence pattern's opening line ends in `.*\n`, and `.` does not match a carriage return. In a CRLF note the pattern missed each tilde fence, so `publish` read the links inside it and failed with `does not resolve (ENOENT)`. A leading byte order mark did the same to a fence on the note's first line. `verifyLinks` now strips the mark and folds CRLF to LF before it removes code, as `check-playbooks.mjs` does. The recorded sha256 does not change, because `fileInfo` hashes the file's bytes. @wattanartongtipsukon-create found and fixed the CRLF case in [#416](https://github.com/michael-denyer/pstack-claude/pull/416), and a follow-up commit on that PR added the byte order mark case.

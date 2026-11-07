@@ -761,6 +761,14 @@ describe("plan, changes, apply", () => {
     }
   });
 
+  test("plan copies the root LICENSE to the plugin root, so an edited license leaves the plugin copy stale", () => {
+    const root = repoCopy();
+    append(root, "LICENSE", "\nAmended.\n");
+    const intended = plan(root);
+    expect(intended.files["plugins/pstack/LICENSE"]).toBe(readFileSync(join(root, "LICENSE"), "utf8"));
+    expect(changes(root, intended)).toContainEqual({ kind: "write", path: "plugins/pstack/LICENSE" });
+  });
+
   test.each(RUNTIMES.map((runtime) => [runtime.name, runtime]))("a %s per-skill note for a skill that does not exist fails", (_, runtime) => {
     const root = repoCopy();
     const tools = join(root, runtime.tools);

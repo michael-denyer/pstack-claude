@@ -2,6 +2,12 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.134 - current Codex rollout for session effort
+
+`codex-session-effort.mjs` now reads the current thread's `rollout_path` from Codex's state database before reading its active-turn effort ([#431](https://github.com/michael-denyer/pstack-claude/issues/431)). `thread/revert` keeps the old log and creates a replacement with a separate rollout ID in its filename. The helper previously selected only the original filename, so it could report effort unavailable or return an unfinished retired turn's effort.
+
+The index is opened read-only through Node's built-in `node:sqlite`, with `CODEX_SQLITE_HOME` support. The helper rechecks the selected path after reading. A selected log that is missing, compressed, or lacks active-turn metadata makes effort unavailable. The helper does not fall back to a retired log or use the database's saved effort. A unique ordinary log remains supported when no indexed row or replacement exists. The Codex mapping documents these limits and the current-rollout lookup for decision-trail audits.
+
 ## 0.9.133 - worktree audit ref and PR fixes, setup-pstack runtime notes
 
 `worktree-audit.mjs` now checks a worktree's ancestry against `refs/remotes/origin/<trunk>`. git resolves the shorthand `origin/<trunk>` to a tag or local branch of that name before the remote-tracking ref. Such a ref pointing at unmerged work made the audit report the worktree merged and safe. The REMOTE column's ahead count reads `refs/remotes/origin/<branch>` for the same reason. @EthanYoQ found and fixed the trunk case in [#423](https://github.com/michael-denyer/pstack-claude/pull/423).

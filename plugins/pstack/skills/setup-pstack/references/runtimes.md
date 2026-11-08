@@ -1,6 +1,6 @@
 # Other runtimes
 
-The role lines are the same everywhere. What differs is the sheet path, how the runtime loads it, and how you list models. Detect models with the runtime's own tool and never write a slug you have not seen listed. A runtime whose subagent call has no model parameter still gets the sheet, as the record of the user's choice, and applies it where it can. The `session hook` line applies to the Claude Code, Codex, GitHub Copilot, Muse, MiniMax Code, Antigravity, OMP, and OpenCode 2 plugins and to the pstack Pi extension.
+The role lines are the same on runtimes with a sheet. DeepSeek Harness's skills-only setup has no sheet; follow its section below instead. What differs elsewhere is the sheet path, how the runtime loads it, and how you list models. Detect models with the runtime's own tool and never write a slug you have not seen listed. A runtime whose subagent call has no model parameter still gets the sheet, as the record of the user's choice, and applies it where it can. The `session hook` line applies to the Claude Code, Codex, GitHub Copilot, Muse, MiniMax Code, Antigravity, OMP, and OpenCode 2 plugins and to the pstack Pi extension.
 
 `<codex-home>` is `$CODEX_HOME` when that variable is set and `~/.codex` otherwise.
 
@@ -17,10 +17,23 @@ The role lines are the same everywhere. What differs is the sheet path, how the 
 | OMP | `~/.omp/pstack-models.md` (global across profiles; hook only) | read by the OMP plugin for routing | `omp models --kind chat`; model roles use OMP configuration, see [omp-tools.md](../../poteto-mode/references/omp-tools.md#model-names) | installation, skill access, and the routing toggle checked on OMP 18.16.0 with a synthetic provider; model compliance untested |
 | Grok Build | `${GROK_HOME:-~/.grok}/pstack-models.md` | read by the agent before a role-model skill; the `session hook` line does not control the Grok routing hint | the `spawn_subagent` tool's advertised models; use overrides only at the user's explicit request; see [grok.md](../../poteto-mode/references/grok.md#model-names) | synthetic-provider plugin and skill loading tested |
 | OpenCode 2 | `${XDG_CONFIG_HOME:-~/.config}/opencode/pstack-models.md` | add the path to the `instructions` array in `opencode.jsonc`; the plugin reads the hook setting directly | the `models` command in the session; see [opencode-tools.md](../../poteto-mode/references/opencode-tools.md#model-names) | native skill activation and routing tested on 2.2.5 with a loopback provider |
+| DeepSeek Harness | no automatic role sheet | use the native delegation defaults; project instructions only at the user's request | `list_subagent_models` when exposed, see [dsh-tools.md](../../poteto-mode/references/dsh-tools.md#model-names) | skills-only; no SessionStart hook or native pstack extension |
 | Gemini CLI | `~/.gemini/pstack-models.md` | `@~/.gemini/pstack-models.md` in `~/.gemini/GEMINI.md` | the `model` slash command in the session | from published docs, no live session |
 | Prime Agent | no documented sheet path; Prime's configuration chooses models | | | no live session |
 
 Every runtime uses its row above in place of the Claude Code paths and step 7's include line. A section below exists only for a step change the table cannot express.
+
+## DeepSeek Harness
+
+Read the [DSH mapping](../../poteto-mode/references/dsh-tools.md) first. DSH is the runtime even when its selected model comes from GitHub Copilot or another provider; do not use that provider's CLI mapping.
+
+Replace steps 1 through 8 with this setup:
+
+1. Inspect the tools this session actually exposes. If `list_subagent_models` is available, list providers, models for a provider, then reasoning efforts for the exact provider/model pair. A configured model is not automatically an allowed subagent route.
+2. Default to omitting route selectors on the native delegation tool. This uses that tool's documented defaults; it does not select a Claude alias or create a pstack role configuration.
+3. Only when the user asks to configure roles, choose available routes and efforts together. Pass `provider`, `model`, and `reasoning_effort` only when the live schema supports them. Report unavailable model diversity rather than naming the same model as different panel members.
+4. This skills-only installation has no automatic role-sheet reader or SessionStart hook. Do not write a pstack sheet into DSH, Pi, Claude Code, or Copilot home directories, and do not claim that a saved setting will route later calls. If the user wants persistent role instructions, inspect and preserve their project instruction file before adding the choices there; runtime configuration changes must use the host's supported mechanism.
+5. Confirm which choices this session can apply and which remain instructions only. Invoke `poteto-mode` explicitly; adding routing instructions to a project is a separate user choice. Continue with steps 9 and 10 only when their optional verification setup is useful and wanted.
 
 ## Codex
 

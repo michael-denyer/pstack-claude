@@ -183,11 +183,23 @@ This installs the native Antigravity plugin bundle (`skills`, `agents`, and `Ses
 
 </details>
 
+<a id="deepseek-harness"></a>
+<details>
+<summary><strong>DeepSeek Harness (skills-only)</strong></summary>
+
+Use the [shared skills installation](#other-harnesses) below to link each pstack skill directory into `~/.agents/skills/`, which DSH's filesystem skill provider scans by default. Alternatively, configure that provider's `customSkillDirs` with the absolute path to this checkout's `plugins/pstack/skills` directory. Discovery is one level deep: link each skill, not the parent pstack directory.
+
+Ask the agent to use `poteto-mode` by name. The [DSH mapping](plugins/pstack/skills/poteto-mode/references/dsh-tools.md) uses the tools available in the current DSH session; it does not load the Pi extension or add an automatic routing hook. Models inherit the session defaults unless explicitly configured through supported DSH capabilities. The model provider does not select the mapping: a DSH session using GitHub Copilot still uses the DSH mapping.
+
+This is not a native DSH plugin or bundle. Do not install this repository with `dsh plugin add` or `plugin_manager`'s `install_bundle`. See the [DSH reference](docs/reference.md#deepseek-harness) for discovery, update, and verification limits.
+
+</details>
+
 <a id="other-harnesses"></a>
 <details>
 <summary><strong>Other harnesses</strong></summary>
 
-Gemini CLI, Prime Agent, and skills-only Codex installs read skills from `~/.agents/skills/`. Run in your terminal:
+Gemini CLI, Prime Agent, DeepSeek Harness skills-only installs, and skills-only Codex installs read skills from `~/.agents/skills/`. Run in your terminal:
 
 ```shell
 git clone https://github.com/michael-denyer/pstack-claude

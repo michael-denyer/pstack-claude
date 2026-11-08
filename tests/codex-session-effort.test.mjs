@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,12 +23,40 @@ function fixture() {
   const file = (id = "current", directory = sessions) => join(directory, `rollout-2026-10-30-${id}.jsonl`);
   const write = (text, id = "current") => writeFileSync(file(id), text);
   const run = (env = {}) => {
-    const result = spawnSync("node", [cli], { env: { ...process.env, CODEX_HOME: home, CODEX_THREAD_ID: "current", ...env }, encoding: "utf8" });
+    const result = spawnSync("node", [cli], { env: { ...process.env, CODEX_HOME: home, CODEX_SQLITE_HOME: "", CODEX_THREAD_ID: "current", ...env }, encoding: "utf8" });
     expect(result.stderr).toBe("");
     return { status: result.status, value: JSON.parse(result.stdout) };
   };
   return { home, sessions, file, write, run };
 }
+
+function selectRollout(home, path, id = "current") {
+  const db = new Database(join(home, "state_5.sqlite"));
+  try {
+    db.exec("CREATE TABLE IF NOT EXISTS threads (id TEXT PRIMARY KEY, rollout_path TEXT NOT NULL)");
+    db.query("INSERT OR REPLACE INTO threads VALUES (?, ?)").run(id, path);
+  } finally {
+    db.close();
+  }
+}
+
+for (const retired of [start("old"), start("old") + context("old", "high")]) {
+  test(`reads the indexed replacement after revert when the retired log has ${retired.includes("turn_context") ? "a stale effort" : "no effort"}`, () => {
+    const { home, file, write, run } = fixture();
+    write(meta() + retired);
+    const replacement = file("current_new-rollout");
+    writeFileSync(replacement, meta() + start("new") + context("new", "max"));
+    selectRollout(home, replacement);
+    expect(run()).toEqual({ status: 0, value: { effort: "max" } });
+  });
+}
+
+test("does not guess which retained rollout is current without an index", () => {
+  const { file, write, run } = fixture();
+  write(meta() + start("old") + context("old", "high"));
+  writeFileSync(file("current_new-rollout"), meta() + start("new") + context("new", "max"));
+  expect(run().value.effort).toBeNull();
+});
 
 test("reads the active turn from the exact thread, ignoring newer unrelated logs and message text", () => {
   const { write, run } = fixture();

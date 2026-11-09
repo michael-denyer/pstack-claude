@@ -813,18 +813,17 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", ro
       }
       if (hook.type !== "command") continue;
       // Copilot runs powershell on Windows in place of command, and PowerShell
-      // reads the root from $env. Inline PowerShell may name no plugin file,
-      // but one that names a plugin root must name this runtime's.
+      // reads the root from $env. `exit 0`, a PreToolUse hook that leaves each
+      // call to Copilot, is the one override that names no plugin file.
       const commands = [
-        [hook.command, `\\$\\{${root}\\}/`, false],
-        [hook.commandWindows, `\\$\\{${root}\\}/`, false],
-        [hook.powershell, `\\$env:${root}/`, true],
+        [hook.command, `\\$\\{${root}\\}/`],
+        [hook.commandWindows, `\\$\\{${root}\\}/`],
+        [hook.powershell === "exit 0" ? undefined : hook.powershell, `\\$env:${root}/`],
       ];
-      for (const [command, reference, mayBeInline] of commands) {
+      for (const [command, reference] of commands) {
         if (command === undefined) continue;
         const refs = [...command.matchAll(new RegExp(`${reference}([^"\\s]+)`, "g"))].map((m) => m[1]);
-        const inline = mayBeInline && !/\$env:\w+_PLUGIN_ROOT/.test(command);
-        if (!refs.length && !inline) {
+        if (!refs.length) {
           faults.push(`${event}: command does not reference \${${root}}: ${command}`);
           continue;
         }

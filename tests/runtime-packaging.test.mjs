@@ -306,9 +306,17 @@ describe("validateHooks", () => {
     expect(() => validateHooks(hooks(sh, undefined, otherRoot), { statOf, root })).toThrow("does not reference ${COPILOT_PLUGIN_ROOT}");
   });
 
-  test("accepts an inline PowerShell override that names no plugin file", () => {
-    const cmd = hooks('"${COPILOT_PLUGIN_ROOT}/hooks/pre-tool-use.sh"', undefined, "exit 0");
-    expect(() => validateHooks(cmd, { statOf: () => exec, root: "COPILOT_PLUGIN_ROOT" })).not.toThrow();
+  test("accepts exit 0 as the only PowerShell override that names no plugin file", () => {
+    const root = "COPILOT_PLUGIN_ROOT";
+    const sh = '"${COPILOT_PLUGIN_ROOT}/hooks/pre-tool-use.sh"';
+    expect(() => validateHooks(hooks(sh, undefined, "exit 0"), { statOf: () => exec, root })).not.toThrow();
+    for (const ps of [
+      'powershell.exe -File "$env:COPILOT_PLUGN_ROOT/hooks/session-start.ps1" copilot',
+      'powershell.exe -File "${COPILOT_PLUGIN_ROOT}/hooks/missing.ps1" copilot',
+      "Write-Output allow",
+    ]) {
+      expect(() => validateHooks(hooks(sh, undefined, ps), { statOf: () => exec, root })).toThrow("does not reference ${COPILOT_PLUGIN_ROOT}");
+    }
   });
 
   test("names a hook without a command, even when it has a Windows override", () => {

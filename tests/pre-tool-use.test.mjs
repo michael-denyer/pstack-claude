@@ -372,6 +372,8 @@ describe("PreToolUse vendored script runs", () => {
     "a relative flag that climbs into a sibling": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project=../outside`,
     "a relative flag naming the parent": `node ${root}/skills/poteto-mode/scripts/resume.mjs begin --project=..`,
     "an absolute argument outside the workspace": `bash ${log} /etc/profile review decision why evidence result`,
+    // The reflect call the Copilot mapping documents: it reads past the workspace.
+    "a transcript search of Copilot's session-state directory": `node ${find} ${copilotHome}/session-state prompt ${workspace}`,
     // A path operand in the plugin could rewrite the context every session loads.
     "a log appended to the plugin's session context": `bash ${log} ${root}/hooks/session-start-copilot.md review decision why evidence result`,
     "a path in the plugin": `node ${root}/skills/poteto-mode/scripts/check-plan.mjs ${root}/skills/reflect/SKILL.md`,

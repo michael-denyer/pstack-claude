@@ -48,12 +48,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, posix, relative, sep } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
-import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
+import { code, codeList, isMain, PLUGIN, SKILLS } from "./plugin.mjs";
 import { PLATFORM_ADAPTATION_OPEN, platformAdaptation, RUNTIMES, roleSkills } from "./runtimes.mjs";
 import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, walk } from "./validate-skills.mjs";
 
@@ -1056,7 +1056,7 @@ function main() {
 
 // Guarded so importing the generator's validation and rendering functions does
 // not regenerate the repo as a side effect.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta.url)) {
   try {
     main();
   } catch (err) {

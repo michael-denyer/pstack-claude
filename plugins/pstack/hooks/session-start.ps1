@@ -24,38 +24,12 @@ function AsText([string] $text) {
     if ($text.EndsWith("`n", [System.StringComparison]::Ordinal)) { $text.Substring(0, $text.Length - 1) } else { $text }
 }
 
-# The sheet's role lines whose entries are all model IDs or aliases, each with
-# an optional known effort, then a usable default effort, in models.json order.
-# These are the lines sheet.awk accepts for muse-context.awk.
-function MuseRoleLines([string[]] $lines) {
-    $models = [System.IO.File]::ReadAllText((Join-Path (Split-Path $PSScriptRoot -Parent) 'models.json'), [System.Text.Encoding]::UTF8) | ConvertFrom-Json
-    $efforts = @($models.efforts)
-    $value = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
-    foreach ($line in $lines) {
-        $colon = $line.IndexOf(':')
-        if ($colon -lt 0 -or $line -cmatch '^[ \t]') { continue }
-        $value[$line.Substring(0, $colon).Trim([char[]]" `t")] = $line.Substring($colon + 1).Trim([char[]]" `t")
-    }
-    foreach ($role in $models.roles.role) {
-        if (-not $value.ContainsKey($role)) { continue }
-        $usable = $true
-        foreach ($raw in $value[$role].Split(',')) {
-            $entry = $raw.Trim([char[]]" `t")
-            if ($entry -cmatch '[ \t]+@([a-z]+)$' -and (HasOrdinal $efforts $Matches[1])) {
-                $entry = $entry.Substring(0, $entry.Length - $Matches[0].Length)
-            }
-            $usable = $usable -and $entry -cmatch '^[a-z0-9][a-z0-9.-]*$'
-        }
-        if ($usable) { "$($role): $($value[$role])" }
-    }
-    $effort = $value['default effort']
-    if (HasOrdinal (@('session') + $efforts) $effort) { "default effort: $effort" }
-}
-
-# sheet.awk's sheet_problems(), in its order and wording, and the sheet's role
-# lines. Copilot takes the role lines only from a sheet with no problems, and a
+# sheet.awk's sheet_problems(), in its order and wording, and the role lines
+# whose entries are all model IDs or aliases, each with an optional known
+# effort, then a usable default effort, in models.json order. Muse keeps each
+# usable line. Copilot takes the lines only from a sheet with no problems. A
 # problem quotes no unchecked sheet text, since both reach the session context.
-function CopilotSheet([string[]] $lines) {
+function ModelSheet([string[]] $lines) {
     $models = [System.IO.File]::ReadAllText((Join-Path (Split-Path $PSScriptRoot -Parent) 'models.json'), [System.Text.Encoding]::UTF8) | ConvertFrom-Json
     $efforts = @($models.efforts)
     $value = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
@@ -74,6 +48,7 @@ function CopilotSheet([string[]] $lines) {
     if ($value.ContainsKey('default effort') -and -not (HasOrdinal (@('session') + $efforts) $value['default effort'])) {
         $problems += '; default effort is not session or a level'
     }
+    $roleLines = @()
     foreach ($role in $models.roles) {
         $name = $role.role
         if (-not $value.ContainsKey($name)) { continue }
@@ -83,6 +58,7 @@ function CopilotSheet([string[]] $lines) {
         }
         $vendors = [System.Collections.Generic.List[string]]::new()
         $real = $false
+        $usable = $true
         foreach ($raw in $value[$name].Split(',')) {
             $entry = $raw.Trim([char[]]" `t")
             if ($entry -cmatch '[ \t]+@([a-z]+)$' -and (HasOrdinal $efforts $Matches[1])) {
@@ -90,25 +66,27 @@ function CopilotSheet([string[]] $lines) {
             }
             if ($entry.Length -eq 0) {
                 $problems += "; an empty entry in ``$name``"
+                $usable = $false
                 continue
             }
             if (HasOrdinal @('inherit-parent', 'auto') $entry) { continue }
             if ($entry -cnotmatch '^[a-z0-9][a-z0-9.-]*$') {
                 $problems += "; ``$name`` has an entry that is not a model ID"
+                $usable = $false
                 continue
             }
             $real = $true
             $vendor = $entry -replace '-.*$', ''
             if (-not $vendors.Contains($vendor)) { $vendors.Add($vendor) }
         }
+        if ($usable) { $roleLines += "$($name): $($value[$name])" }
         if ($role.models -ceq 'panel' -and $real -and $vendors.Count -lt 2 -and -not $anyVendor) {
             $problems += "; ``$name`` has models from one vendor ($($vendors -join ', '))"
         }
     }
-    if ($problems) { return [pscustomobject]@{ Problems = $problems.Substring(2); RoleLines = @() } }
-    $roleLines = @(foreach ($name in $models.roles.role) { "$($name): $($value[$name])" })
-    if ($value.ContainsKey('default effort')) { $roleLines += "default effort: $($value['default effort'])" }
-    [pscustomobject]@{ Problems = ''; RoleLines = $roleLines }
+    $effort = $value['default effort']
+    if (HasOrdinal (@('session') + $efforts) $effort) { $roleLines += "default effort: $effort" }
+    [pscustomobject]@{ Problems = $(if ($problems) { $problems.Substring(2) } else { '' }); RoleLines = $roleLines }
 }
 
 # Each runtime's hooks file passes its own name, as for session-start.sh.
@@ -165,7 +143,7 @@ $output = ReadHookFile $context
 # the mandate, as muse-context.awk prints them.
 if ($Runtime -ceq 'muse') {
     $output = AsLines $output
-    $roleLines = if ($null -eq $sheetLines) { @() } else { @(MuseRoleLines $sheetLines) }
+    $roleLines = if ($null -eq $sheetLines) { @() } else { @((ModelSheet $sheetLines).RoleLines) }
     if ($roleLines.Count -gt 0) {
         $output += "`n" + (AsLines (ReadHookFile 'session-start-muse-sheet.md')) + (($roleLines -join "`n") + "`n")
     }
@@ -175,7 +153,7 @@ if ($Runtime -ceq 'muse') {
 # closing tag.
 if ($Runtime -ceq 'copilot') {
     $notes = AsText (ReadHookFile 'session-start-copilot.md')
-    $state = if ($null -eq $sheetLines) { $null } else { CopilotSheet $sheetLines }
+    $state = if ($null -eq $sheetLines) { $null } else { ModelSheet $sheetLines }
     if ($null -ne $state -and $state.Problems.Length -eq 0) {
         $notes += "`n`n" + (AsText (ReadHookFile 'session-start-copilot-sheet.md')) + "`n`n" + ($state.RoleLines -join "`n")
     } else {

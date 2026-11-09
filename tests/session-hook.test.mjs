@@ -2,7 +2,7 @@
 // injected unless that runtime's model sheet turns it off.
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -197,7 +197,7 @@ function copilotContext(sheet) {
 describe("Copilot SessionStart context", () => {
   test("the Copilot manifest names its own hooks file", () => {
     expect(copilotManifest.hooks).toBe("hooks/copilot-hooks.json");
-    expect(sessionStart.copilot.hooks[0].command).toBe('"${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh" copilot');
+    expect(sessionStart.copilot.hooks[0].command).toBe('sh "${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh" copilot');
   });
 
   test("a valid sheet adds every role line, in models.json order, and no setup note", () => {
@@ -254,6 +254,25 @@ describe("Copilot SessionStart context", () => {
         encoding: "utf8",
       });
       expect(JSON.parse(r.stdout).additionalContext).toContain(`\n\n${odd}\n${close}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // VS Code's agents window runs a plugin from its own copy, which can lose the
+  // execute bit.
+  test("runs from a plugin copy whose hook script is not executable", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-noexec-"));
+    try {
+      cpSync(join(pluginRoot, "hooks"), join(root, "hooks"), { recursive: true });
+      cpSync(join(pluginRoot, "skills/setup-pstack/scripts"), join(root, "skills/setup-pstack/scripts"), { recursive: true });
+      chmodSync(join(root, "hooks/session-start.sh"), 0o644);
+      const r = spawnSync("sh", ["-c", sessionStart.copilot.hooks[0].command], {
+        env: { PATH: process.env.PATH, HOME: root, COPILOT_PLUGIN_ROOT: root },
+        encoding: "utf8",
+      });
+      expect({ status: r.status, err: r.stderr }).toEqual({ status: 0, err: "" });
+      expect(JSON.parse(r.stdout).additionalContext).toContain(setupNote);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

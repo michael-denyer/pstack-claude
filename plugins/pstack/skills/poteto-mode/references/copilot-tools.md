@@ -27,6 +27,7 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "pstack:poteto-agent"`, `run_in_background: true`). On GitHub Copilot:
 
 - The plugin's agents load as `task` agent types under their namespaced names, `pstack:poteto-agent`, `pstack:comment-sicko`, `pstack:thermo-nuclear-review-subagent`, and `pstack:thermo-nuclear-code-quality-review-subagent`. Pass the skill's `subagent_type` as `agent_type` unchanged.
+- The VS Code agents window rejects those agent types as unknown. There, dispatch `agent_type: "general-purpose"` and tell it in the prompt to read its instructions in full first: the `poteto-mode` skill for `pstack:poteto-agent`, `poteto-mode/references/agents/comment-sicko.md` for `pstack:comment-sicko`, and the `thermo-nuclear-review` or `thermo-nuclear-code-quality-review` skill for the two reviewers.
 - `subagent_type: "general-purpose"` maps to `agent_type: "general-purpose"`. Where a skill leaves the type unset, use `pstack:poteto-agent`.
 - `readonly: true` (reviewers, explorers, critics) maps to a read-only agent type: `explore` for code reading, `code-review` for diff review. When a read-only role must run commands or reach MCP tools, use `general-purpose` and tell it in the prompt not to write files; review its diff anyway.
 - `readonly: false`, or a role that needs MCP tools, maps to `general-purpose` or `pstack:poteto-agent`.

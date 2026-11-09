@@ -4,7 +4,7 @@
 // everything else.
 import { afterAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,6 +38,21 @@ describe("PreToolUse hook", () => {
   test("approves view inside the plugin root", () => {
     expect(run(claudeInput("Read", playbook))).toEqual({ status: 0, out: allow, err: "" });
     expect(run(JSON.stringify({ toolName: "view", toolArgs: { path: playbook } }))).toEqual({ status: 0, out: allow, err: "" });
+  });
+
+  // VS Code's agents window runs a plugin from its own copy, which can lose the
+  // execute bit; a failing PreToolUse hook makes VS Code skip the tool call.
+  test("runs from a plugin copy whose hook script is not executable", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-noexec-"));
+    try {
+      cpSync(join(pluginRoot, "hooks"), join(root, "hooks"), { recursive: true });
+      cpSync(join(pluginRoot, "skills/setup-pstack/scripts"), join(root, "skills/setup-pstack/scripts"), { recursive: true });
+      chmodSync(join(root, "hooks/pre-tool-use.sh"), 0o644);
+      const own = join(root, "hooks/json.awk");
+      expect(run(claudeInput("Read", own), { COPILOT_PLUGIN_ROOT: root })).toEqual({ status: 0, out: allow, err: "" });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test("keeps literal dotted keys separate from nested hook arguments", () => {

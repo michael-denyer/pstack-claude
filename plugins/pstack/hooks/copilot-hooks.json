@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh\" copilot"
+            "command": "sh \"${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh\" copilot"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${COPILOT_PLUGIN_ROOT}/hooks/pre-tool-use.sh\"",
+            "command": "sh \"${COPILOT_PLUGIN_ROOT}/hooks/pre-tool-use.sh\"",
             "timeout": 5
           }
         ]

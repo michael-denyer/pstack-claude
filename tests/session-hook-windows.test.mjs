@@ -287,7 +287,7 @@ describe.skipIf(process.platform !== "win32" && !required)("Windows Copilot Sess
     const lines = [...roleLines(), "default effort: high"];
     const want = copilotContext(`${asText(copilotRead("session-start-copilot-sheet.md"))}\n\n${lines.join("\n")}`);
     expect(copilotSessionContext(fullSheet(lines))).toBe(want);
-    expect(copilotSessionContext(Buffer.from(`﻿${fullSheet(lines).replaceAll("\n", "\r\n")}`, "utf16le"))).toBe(want);
+    expect(copilotSessionContext(Buffer.from(`\uFEFF${fullSheet(lines).replaceAll("\n", "\r\n")}`, "utf16le"))).toBe(want);
   });
 
   // The problems read as sheet.awk words them, and no unchecked sheet text

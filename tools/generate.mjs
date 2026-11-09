@@ -823,7 +823,8 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", ro
       for (const [command, reference, mayBeInline] of commands) {
         if (command === undefined) continue;
         const refs = [...command.matchAll(new RegExp(`${reference}([^"\\s]+)`, "g"))].map((m) => m[1]);
-        if (!refs.length && !(mayBeInline && !/\$env:\w+_PLUGIN_ROOT/.test(command))) {
+        const inline = mayBeInline && !/\$env:\w+_PLUGIN_ROOT/.test(command);
+        if (!refs.length && !inline) {
           faults.push(`${event}: command does not reference \${${root}}: ${command}`);
           continue;
         }

@@ -198,6 +198,9 @@ describe("Copilot SessionStart context", () => {
   test("the Copilot manifest names its own hooks file", () => {
     expect(copilotManifest.hooks).toBe("hooks/copilot-hooks.json");
     expect(sessionStart.copilot.hooks[0].command).toBe('sh "${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh" copilot');
+    expect(sessionStart.copilot.hooks[0].powershell).toBe(
+      'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:COPILOT_PLUGIN_ROOT/hooks/session-start.ps1" copilot',
+    );
   });
 
   test("a valid sheet adds every role line, in models.json order, and no setup note", () => {

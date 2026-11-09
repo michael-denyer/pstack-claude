@@ -35,6 +35,12 @@ describe("PreToolUse hook", () => {
     expect(preToolUse[0].matcher).toBe("view|task|bash");
   });
 
+  // Windows Copilot runs powershell instead of command. No decision leaves
+  // each call to Copilot's normal permission flow.
+  test("leaves Windows calls to Copilot's permission flow", () => {
+    expect(preToolUse[0].hooks[0].powershell).toBe("exit 0");
+  });
+
   test("approves view inside the plugin root", () => {
     expect(run(claudeInput("Read", playbook))).toEqual({ status: 0, out: allow, err: "" });
     expect(run(JSON.stringify({ toolName: "view", toolArgs: { path: playbook } }))).toEqual({ status: 0, out: allow, err: "" });

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadLeadLines, loadModels, noteSkills } from "../tools/generate.mjs";
+import { loadLeadLines, loadModels, noteSkills, section } from "../tools/generate.mjs";
 import { agyModelNamesSection, roleSkills, RUNTIMES } from "../tools/runtimes.mjs";
 import { mappingCoverage } from "./mapping-coverage.mjs";
 
@@ -61,5 +61,42 @@ describe("agy-tools.md Model names", () => {
 
   test("is the section the mapping file carries", () => {
     expect(mapping).toContain(section);
+  });
+});
+
+describe("agy-tools.md Subagent policy", () => {
+  const lines = mapping.split("\n");
+  const subagentPolicy = lines.slice(...section("Subagent policy")(lines)).join("\n");
+  const perSkillNotes = lines.slice(...section("Per-skill notes")(lines)).join("\n");
+
+  test("explains that plugin agent files without a tools frontmatter list load as read-only", () => {
+    expect(subagentPolicy).toContain("`tools:`");
+    for (const tool of ["`write_file`", "`edit_file`", "`run_command`", "MCP"]) {
+      expect(subagentPolicy).toContain(tool);
+    }
+  });
+
+  test("maps pstack:poteto-agent and general-purpose to TypeName self when writing, running commands, or using MCP", () => {
+    expect(subagentPolicy).toContain("`pstack:poteto-agent`");
+    expect(subagentPolicy).toContain("`general-purpose`");
+    expect(subagentPolicy).toContain('`TypeName: "self"`');
+    expect(subagentPolicy).toContain('`TypeName: "poteto-agent"`');
+    expect(subagentPolicy).toContain('`TypeName: "research"`');
+  });
+
+  test("maps thermos to TypeName self when a review must run gh, glab, or rg via run_command", () => {
+    const thermosRow = perSkillNotes.split("\n").find((line) => line.startsWith("| `thermos` |"));
+    expect(thermosRow).toBeDefined();
+    for (const token of [
+      '`TypeName: "self"`',
+      "`thermo-nuclear-review`",
+      "`thermo-nuclear-code-quality-review`",
+      "`gh`",
+      "`glab`",
+      "`rg`",
+      "`run_command`",
+    ]) {
+      expect(thermosRow).toContain(token);
+    }
   });
 });

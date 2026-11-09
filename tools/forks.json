@@ -80,7 +80,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/bug-fix.md": {
       "kind": "policy",
-      "why": "Adds safe diagnostic output and a runtime handoff, a focused-fix exception for a demonstrated local cause with preserved interfaces and state semantics and regression evidence, and explicit architecture and independent correctness review triggers for higher-risk fixes.",
+      "why": "Quotes decisive failing and passing output trimmed to the assertion and counts, separates verified code, publication, observed runtime behavior, and blockers, selects non-sensitive diagnostic fields before printing, and adds a focused-fix exception with explicit architecture and independent correctness review triggers for higher-risk fixes.",
       "since": "0.9.10",
       "upstream": "not-proposed"
     },

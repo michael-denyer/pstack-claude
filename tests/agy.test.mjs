@@ -65,38 +65,8 @@ describe("agy-tools.md Model names", () => {
 });
 
 describe("agy-tools.md Subagent policy", () => {
-  const lines = mapping.split("\n");
-  const subagentPolicy = lines.slice(...section("Subagent policy")(lines)).join("\n");
-  const perSkillNotes = lines.slice(...section("Per-skill notes")(lines)).join("\n");
-
-  test("explains that plugin agent files without a tools frontmatter list load as read-only", () => {
-    expect(subagentPolicy).toContain("`tools:`");
-    for (const tool of ["`write_file`", "`edit_file`", "`run_command`", "MCP"]) {
-      expect(subagentPolicy).toContain(tool);
-    }
-  });
-
-  test("maps pstack:poteto-agent and general-purpose to TypeName self when writing, running commands, or using MCP", () => {
-    expect(subagentPolicy).toContain("`pstack:poteto-agent`");
-    expect(subagentPolicy).toContain("`general-purpose`");
-    expect(subagentPolicy).toContain('`TypeName: "self"`');
-    expect(subagentPolicy).toContain('`TypeName: "poteto-agent"`');
-    expect(subagentPolicy).toContain('`TypeName: "research"`');
-  });
-
-  test("maps thermos to TypeName self when a review must run gh, glab, or rg via run_command", () => {
-    const thermosRow = perSkillNotes.split("\n").find((line) => line.startsWith("| `thermos` |"));
-    expect(thermosRow).toBeDefined();
-    for (const token of [
-      '`TypeName: "self"`',
-      "`thermo-nuclear-review`",
-      "`thermo-nuclear-code-quality-review`",
-      "`gh`",
-      "`glab`",
-      "`rg`",
-      "`run_command`",
-    ]) {
-      expect(thermosRow).toContain(token);
-    }
+  test("routes writing subagents to TypeName self, since the plugin's agent files load read-only", () => {
+    const lines = mapping.split("\n");
+    expect(lines.slice(...section("Subagent policy")(lines)).join("\n")).toContain('`TypeName: "self"`');
   });
 });

@@ -77,7 +77,7 @@ Most skills need only the tables above. These need one more mapping:
 | `how` | The parallel explorers and the explainer map to `invoke_subagent` fan-out with the sheet's `how` role models. |
 | `arena` | The parallel candidates and the cross-judge map to `invoke_subagent` calls with the sheet's panel lines. |
 | `no-comments` | Dispatch `comment-sicko` via `invoke_subagent` with `TypeName: "comment-sicko"`. |
-| `thermos` | Dispatch both review subagents via `invoke_subagent` with `TypeName: "thermo-nuclear-review-subagent"` and `"thermo-nuclear-code-quality-review-subagent"` when the prompt already includes the full diff and file excerpts. When a review must run `gh`, `glab`, or `rg` via `run_command`, dispatch `TypeName: "self"` and tell each subagent in `Prompt` to read `thermo-nuclear-review` or `thermo-nuclear-code-quality-review` in full first and not to edit files. |
+| `thermos` | Dispatch both review subagents via `invoke_subagent` with `TypeName: "thermo-nuclear-review-subagent"` and `"thermo-nuclear-code-quality-review-subagent"`, with the full diff and file excerpts in `Prompt`, since both types are read-only. |
 | `swarm` | Each worker is an `invoke_subagent` call; use `Workspace: "share"` or `git worktree add` for writing workers. |
 | `teach` | Running `how` and `why` in parallel maps to two `invoke_subagent` calls in one response; image generation uses `image-generator` via `invoke_subagent`. |
 | `why` | The parallel investigators and synthesizer map to `invoke_subagent` fan-out. |

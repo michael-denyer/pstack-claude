@@ -72,6 +72,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { deriveSkill, loadLeadLines, loadModels } from "./generate.mjs";
+import { isMain } from "./plugin.mjs";
 import { walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -674,6 +675,6 @@ function main() {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main();
 }

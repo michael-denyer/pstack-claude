@@ -1,6 +1,19 @@
 import { describe, expect, it } from "bun:test";
 import { WatchDeadline } from "./deadline.ts";
-import { ChecksUnavailable, WatcherQueryError, discoverStack, orderStack, parseFastCheck, parsePullRequest, parseReviewThreadPage, PR_FACTS_QUERY, resolveChecks, resolveContext, resolveReviewThreads, runJson } from "./github.ts";
+import {
+  ChecksUnavailable,
+  WatcherQueryError,
+  discoverStack,
+  orderStack,
+  parseFastCheck,
+  parsePullRequest,
+  parseReviewThreadPage,
+  PR_FACTS_QUERY,
+  resolveChecks,
+  resolveContext,
+  resolveReviewThreads,
+  runJson,
+} from "./github.ts";
 import { fakeReader } from "./fakes.test-helper.ts";
 import type { PrContext } from "./types.ts";
 import { parsePrNumber } from "./types.ts";

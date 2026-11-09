@@ -1,8 +1,21 @@
 import { describe, expect, it } from "bun:test";
 import { WatchDeadline } from "./deadline.ts";
-import { classifyPr, noChecksConfirmer, readSnapshot, runQueued, runSimple, selectTierMajorStackDecision } from "./policy.ts";
+import {
+  classifyPr,
+  noChecksConfirmer,
+  readSnapshot,
+  runQueued,
+  runSimple,
+  selectTierMajorStackDecision,
+} from "./policy.ts";
 import { fakeReader, failedCheck, pendingCheck } from "./fakes.test-helper.ts";
-import type { GitHubReader, NonEmpty, PollingOptions, PrContext, ProgressVerdict } from "./types.ts";
+import type {
+  GitHubReader,
+  NonEmpty,
+  PollingOptions,
+  PrContext,
+  ProgressVerdict,
+} from "./types.ts";
 import { parsePrNumber } from "./types.ts";
 
 const context = (number: number): PrContext => ({
@@ -22,7 +35,10 @@ describe("review gate", () => {
   it("blocks on a required review instead of reporting a blocked PR ready", async () => {
     const snapshot = await readSnapshot({
       reader: fakeReader({
-        facts: { reviewDecision: "REVIEW_REQUIRED", mergeStateStatus: "BLOCKED" },
+        facts: {
+          reviewDecision: "REVIEW_REQUIRED",
+          mergeStateStatus: "BLOCKED",
+        },
       }),
       context: context(23),
       pendingHistory: "omit",
@@ -30,10 +46,14 @@ describe("review gate", () => {
     });
     expect(classifyPr(snapshot)).toEqual({
       kind: "blocker",
-      blocker: { kind: "merge-gate", pr: context(23), reason: "review-required" },
+      blocker: {
+        kind: "merge-gate",
+        pr: context(23),
+        reason: "review-required",
+      },
     });
     expect(
-      selectTierMajorStackDecision([snapshot] as NonEmpty<typeof snapshot>),
+      selectTierMajorStackDecision([snapshot] as NonEmpty<typeof snapshot>)
     ).toMatchObject({
       kind: "blocker",
       blocker: { kind: "merge-gate", reason: "review-required" },
@@ -56,7 +76,10 @@ describe("review gate", () => {
   it("waits for pending checks before reporting the review gate", async () => {
     const snapshot = await readSnapshot({
       reader: fakeReader({
-        facts: { reviewDecision: "REVIEW_REQUIRED", mergeStateStatus: "BLOCKED" },
+        facts: {
+          reviewDecision: "REVIEW_REQUIRED",
+          mergeStateStatus: "BLOCKED",
+        },
         fastPath: { kind: "checks", checks: [pendingCheck()] },
       }),
       context: context(26),
@@ -69,7 +92,10 @@ describe("review gate", () => {
   it("still reports changes requested as a merge-gate blocker", async () => {
     const snapshot = await readSnapshot({
       reader: fakeReader({
-        facts: { reviewDecision: "CHANGES_REQUESTED", mergeStateStatus: "BLOCKED" },
+        facts: {
+          reviewDecision: "CHANGES_REQUESTED",
+          mergeStateStatus: "BLOCKED",
+        },
       }),
       context: context(25),
       pendingHistory: "omit",
@@ -96,7 +122,7 @@ describe("facts that change while the snapshot is read", () => {
       read({
         facts: { mergeStateStatus: "BLOCKED" },
         factsOnReread: { mergeStateStatus: "CLEAN" },
-      }),
+      })
     ).rejects.toMatchObject({
       failure: { kind: "snapshot-changed", retryable: true },
     });
@@ -134,13 +160,13 @@ describe("facts that change while the snapshot is read", () => {
       await read({
         facts: unknown,
         factsOnReread: { mergeable: "MERGEABLE", mergeStateStatus: "CLEAN" },
-      }),
+      })
     ).toMatchObject({ kind: "open", facts: unknown });
     await expect(
       read({
         facts: unknown,
         factsOnReread: { reviewDecision: "CHANGES_REQUESTED" },
-      }),
+      })
     ).rejects.toMatchObject({ failure: { kind: "snapshot-changed" } });
   });
 });
@@ -162,7 +188,7 @@ const dependencies = (
   reader: GitHubReader,
   clock: { now: () => number; sleep: (seconds: number) => Promise<void> },
   emitted: ProgressVerdict[],
-  timeout = 0,
+  timeout = 0
 ) => ({
   reader,
   emit: (verdict: ProgressVerdict) => {
@@ -175,7 +201,7 @@ const kinds = (emitted: readonly ProgressVerdict[]) =>
   emitted.map((verdict) =>
     verdict.kind === "WAITING"
       ? `${verdict.kind}:${verdict.reason.kind}`
-      : verdict.kind,
+      : verdict.kind
   );
 
 describe("mergeability", () => {
@@ -194,7 +220,7 @@ describe("mergeability", () => {
   const watch = async (
     reader: GitHubReader,
     polling: Partial<PollingOptions> = {},
-    statusOnly = false,
+    statusOnly = false
   ) => {
     const clock = ticking();
     const emitted: ProgressVerdict[] = [];
@@ -229,7 +255,7 @@ describe("mergeability", () => {
       fakeReader({
         facts: unknown,
         factsOnReread: { mergeable: "MERGEABLE", mergeStateStatus: "CLEAN" },
-      }),
+      })
     );
     expect(emitted).toEqual(["WAITING:mergeability-unknown"]);
     expect(elapsed).toBe(options.interval);
@@ -239,7 +265,7 @@ describe("mergeability", () => {
   it("times out at the caller's deadline when GitHub never computes it", async () => {
     const { verdict, emitted, elapsed } = await watch(
       fakeReader({ facts: unknown }),
-      { timeout: 25 },
+      { timeout: 25 }
     );
     expect(emitted).toEqual([
       "WAITING:mergeability-unknown",
@@ -258,7 +284,7 @@ describe("mergeability", () => {
     const { verdict, emitted, elapsed } = await watch(
       fakeReader({ facts: unknown }),
       {},
-      true,
+      true
     );
     expect(emitted).toEqual([]);
     expect(elapsed).toBe(0);
@@ -292,15 +318,15 @@ describe("mergeability", () => {
     ] as const;
     for (const [overrides, blocker] of cases)
       expect(
-        classifyPr(await read({ facts: unknown, ...overrides })),
+        classifyPr(await read({ facts: unknown, ...overrides }))
       ).toMatchObject({ kind: "blocker", blocker });
   });
 
   it("defers a required review, and names pending checks first, while mergeability is unknown", async () => {
     expect(
       classifyPr(
-        await read({ facts: { ...unknown, reviewDecision: "REVIEW_REQUIRED" } }),
-      ),
+        await read({ facts: { ...unknown, reviewDecision: "REVIEW_REQUIRED" } })
+      )
     ).toMatchObject({
       kind: "waiting",
       reason: { kind: "mergeability-unknown" },
@@ -310,8 +336,8 @@ describe("mergeability", () => {
         await read({
           facts: unknown,
           fastPath: { kind: "checks", checks: [pendingCheck()] },
-        }),
-      ),
+        })
+      )
     ).toMatchObject({ kind: "waiting", reason: { kind: "pending-checks" } });
   });
 
@@ -324,7 +350,7 @@ describe("mergeability", () => {
         ticking(() => {
           if (++sleeps === 2) throw new Error("stop after two polls");
         }),
-        emitted,
+        emitted
       ),
       contexts: [context(27)],
       options,
@@ -361,8 +387,8 @@ describe("mergeability", () => {
     ] as const)
       expect(
         classifyPr(
-          await read({ facts: { mergeStateStatus: "BEHIND" }, ...checks }),
-        ),
+          await read({ facts: { mergeStateStatus: "BEHIND" }, ...checks })
+        )
       ).toEqual({
         kind: "blocker",
         blocker: { kind: "merge-gate", pr: context(27), reason: "behind-base" },
@@ -379,8 +405,8 @@ describe("mergeability", () => {
           await read({
             facts: { mergeStateStatus: "BEHIND", reviewDecision },
             fastPath: { kind: "checks", checks: [pendingCheck()] },
-          }),
-        ),
+          })
+        )
       ).toMatchObject({ kind: "blocker", blocker: { reason } });
   });
 });
@@ -393,7 +419,7 @@ describe("a PR with no checks configured", () => {
   } as const;
   const read = (
     overrides: Parameters<typeof fakeReader>[0] = {},
-    confirmNoChecks = () => true,
+    confirmNoChecks = () => true
   ) =>
     readSnapshot({
       reader: fakeReader({ ...noChecks, ...overrides }),
@@ -477,7 +503,7 @@ describe("a PR with no checks configured", () => {
         context: context(30),
         pendingHistory: "omit",
         allowDraft: false,
-      }),
+      })
     ).toMatchObject({ kind: "open", ci: { kind: "ci-unreported" } });
   });
 
@@ -487,7 +513,7 @@ describe("a PR with no checks configured", () => {
     const verdict = await run(
       fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
       clock,
-      emitted,
+      emitted
     );
     expect(kinds(emitted)).toEqual(sixPolls("WAITING:checks-unreported"));
     expect(clock.now()).toBe(60);
@@ -506,7 +532,7 @@ describe("a PR with no checks configured", () => {
         facts: { mergeStateStatus: "BLOCKED", reviewDecision: null },
       }),
       clock,
-      emitted,
+      emitted
     );
     expect(kinds(emitted)).toEqual(sixPolls("WAITING:checks-unreported"));
     expect(clock.now()).toBe(60);
@@ -539,7 +565,7 @@ describe("a PR with no checks configured", () => {
       ticking(() => {
         if (++sleeps === 2) throw new Error("stop after two polls");
       }),
-      emitted,
+      emitted
     );
     await expect(running).rejects.toThrow("stop after two polls");
     expect(kinds(emitted)).toEqual([
@@ -558,10 +584,10 @@ describe("a PR with no checks configured", () => {
         fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
         ticking(),
         emitted,
-        timeout,
+        timeout
       );
       expect(kinds(emitted)).toEqual(
-        Array.from({ length: polls }, () => "WAITING:checks-unreported"),
+        Array.from({ length: polls }, () => "WAITING:checks-unreported")
       );
       expect(verdict).toMatchObject({
         kind: "TIMEOUT",
@@ -578,7 +604,7 @@ describe("a PR with no checks configured", () => {
       dependencies: dependencies(
         fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
         clock,
-        emitted,
+        emitted
       ),
       contexts: [context(30), context(31)],
       mode: "stack",
@@ -611,7 +637,7 @@ describe("a PR with no checks configured", () => {
     const queued = dependencies(
       fakeReader({ ...noChecks, facts: { reviewDecision: null } }),
       clock,
-      emitted,
+      emitted
     );
     const running = runQueued({
       dependencies: {
@@ -652,7 +678,10 @@ describe("a PR with no checks configured", () => {
         { facts: { mergeStateStatus: "BLOCKED" } },
         { kind: "merge-gate", reason: "merge-blocked" },
       ],
-      [{ facts: { isDraft: true } }, { kind: "merge-gate", reason: "draft-pr" }],
+      [
+        { facts: { isDraft: true } },
+        { kind: "merge-gate", reason: "draft-pr" },
+      ],
     ] as const;
     for (const [overrides, blocker] of cases)
       expect(classifyPr(await read(overrides))).toMatchObject({

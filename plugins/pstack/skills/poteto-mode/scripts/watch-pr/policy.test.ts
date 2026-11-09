@@ -65,7 +65,7 @@ describe("readiness truth table", () => {
     ];
     for (const [mergeStateStatus, headRollupState, expected] of cases) {
       expect(
-        assessGitHubMerge({ mergeStateStatus, headRollupState }).kind,
+        assessGitHubMerge({ mergeStateStatus, headRollupState }).kind
       ).toBe(expected);
     }
   });
@@ -148,7 +148,7 @@ describe("snapshot query planning", () => {
           pendingHistory: "include",
           allowDraft: false,
         })
-      ).kind,
+      ).kind
     ).toBe("merged");
     expect(reader.calls).toEqual(["pullRequest"]);
   });
@@ -325,7 +325,7 @@ describe("queued-stack cadence", () => {
       state,
       await openSnapshot(queue[0]),
       0,
-      options,
+      options
     );
     expect(first.completedSweepRows).toBeNull();
     state = first.state;
@@ -333,10 +333,10 @@ describe("queued-stack cadence", () => {
       state,
       await openSnapshot(queue[1]),
       5,
-      options,
+      options
     );
     expect(
-      second.completedSweepRows?.map((row) => Number(row.context.number)),
+      second.completedSweepRows?.map((row) => Number(row.context.number))
     ).toEqual([30, 31]);
     expect(second.state.nextSweepAt).toBe(305);
   });
@@ -408,7 +408,7 @@ describe("queued-stack cadence", () => {
       state,
       await openSnapshot(queue[0]),
       0,
-      options,
+      options
     ).state;
     const first = evaluateQueue(state, options);
     expect(first.kind).toBe("waiting");
@@ -488,4 +488,5 @@ describe("polling deadline sleeps", () => {
     expect(result.kind).toBe("READY");
     expect(sleeps).toEqual([60]);
   });
+
 });

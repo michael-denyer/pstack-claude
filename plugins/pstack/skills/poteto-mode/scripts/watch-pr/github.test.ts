@@ -52,11 +52,7 @@ describe("checks fallback chain", () => {
     const reader = fakeReader({
       fastPath: { kind: "unusable", exitCode: 8, stderr: "" },
       rollupPages: [
-        {
-          kind: "contexts",
-          checks: [passingCheck("first")],
-          endCursor: "next",
-        },
+        { kind: "contexts", checks: [passingCheck("first")], endCursor: "next" },
         { kind: "contexts", checks: [failedCheck("second")], endCursor: null },
       ],
     });
@@ -73,13 +69,7 @@ describe("checks fallback chain", () => {
   it("falls back when valid fast-path JSON represented an empty list", async () => {
     const reader = fakeReader({
       fastPath: { kind: "checks", checks: [] },
-      rollupPages: [
-        {
-          kind: "contexts",
-          checks: [pendingCheck("fallback")],
-          endCursor: null,
-        },
-      ],
+      rollupPages: [{ kind: "contexts", checks: [pendingCheck("fallback")], endCursor: null }],
     });
     expect(reported(await resolveChecks(reader, context)).checks[0].name).toBe(
       "fallback"
@@ -457,7 +447,6 @@ describe("context and stack discovery", () => {
     ]);
     expect(ordered.map((item) => Number(item.number))).toEqual([41, 42, 43]);
   });
-
   it("does not use a fork's same-named head as a stack parent", () => {
     const ordered = orderStack(context, "main", [
       { number: parsePrNumber(41), headRefName: "base-feature", baseRefName: "main", headRepository: { owner: "contributor", repo: "repo" } },

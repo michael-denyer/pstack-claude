@@ -14,6 +14,8 @@ Before the fan-out in steps 2–3, check the [focused-fix exception](#focused-fi
    This is the canonical **sequence-verifiable-units** principle skill, the failing test first and the fix on top.
 6. Run **Opening a PR**.
 
+For any bug fix, run `architect` in step 3 before implementing changes to interfaces, ownership, schema, migration behavior, concurrency or transaction guarantees, or deployment or routing contracts, even within one function. Before marking the fix merge-ready, require an independent correctness reviewer for changes to code that enforces a security or data-integrity invariant, including an atomic eligibility guard, even when the fix preserves that invariant. Follow the closed-review-gate rule in Subagents if a reviewer cannot run.
+
 **Reply:** what was broken, root cause, fix, how you verified. Quote the decisive failing and passing output, trimmed to the assertion and the counts.
 
 When publication or deployment is part of the task, also state what code was fixed and verified, what was published, what version and behavior the affected runtime actually served (through the authenticated path when relevant), and any blocker with the next action needed to resolve it. Missing or contradictory runtime evidence leaves the incident unresolved, even after a successful publication. Remove credentials and customer data from quoted evidence.
@@ -23,7 +25,7 @@ When publication or deployment is part of the task, also state what code was fix
 One scoped bug-fix delegate may investigate the reproduced failure with a focused code and local-history read before invoking `how` or `why`. Skip those skills and step 3's `architect`, even across a function boundary, only when all of these hold:
 
 - Runtime evidence establishes the cause in one subsystem.
-- The correction preserves interfaces and state semantics, with no signature, ownership, schema, migration, authentication, authorization, concurrency, transaction, or deployment/routing change.
+- The correction preserves interfaces and state semantics, with no signature, ownership, schema, migration, security, concurrency, transaction, or deployment/routing change. Security changes include authentication, authorization, cryptography, and secret handling.
 - A cheap regression check exercises the failure under the relevant runtime settings, and verification on the original surface is available.
 - No competing design or contradictory evidence remains.
 

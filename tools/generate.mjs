@@ -739,8 +739,8 @@ export function strayModelSlugs(file, text, models) {
 
 // The hook handler shapes Claude Code documents, one schema per `type`
 // (https://code.claude.com/docs/en/hooks, "Hook handler fields"), plus Codex's
-// commandWindows on a command hook. A key no type lists is a fault, so a
-// misspelt override cannot be dropped without notice.
+// commandWindows and Copilot's powershell on a command hook. A key no type
+// lists is a fault, so a misspelt override cannot be dropped without notice.
 const HOOK_FIELDS = {
   if: Type.Optional(Type.String()),
   timeout: Type.Optional(Type.Number()),
@@ -753,6 +753,7 @@ const HOOK_TYPES = {
   command: hookType("command", {
     command: Type.String(),
     commandWindows: Type.Optional(Type.String()),
+    powershell: Type.Optional(Type.String()),
     args: Type.Optional(Type.Array(Type.String())),
     async: Type.Optional(Type.Boolean()),
     asyncRewake: Type.Optional(Type.Boolean()),
@@ -811,9 +812,18 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", ro
         continue;
       }
       if (hook.type !== "command") continue;
-      for (const command of [hook.command, hook.commandWindows].filter((value) => value !== undefined)) {
-        const refs = [...command.matchAll(new RegExp(`\\$\\{${root}\\}/([^"\\s]+)`, "g"))].map((m) => m[1]);
-        if (!refs.length) {
+      // Copilot runs powershell on Windows in place of command, and PowerShell
+      // reads the root from $env. Inline PowerShell may name no plugin file,
+      // but one that names a plugin root must name this runtime's.
+      const commands = [
+        [hook.command, `\\$\\{${root}\\}/`, false],
+        [hook.commandWindows, `\\$\\{${root}\\}/`, false],
+        [hook.powershell, `\\$env:${root}/`, true],
+      ];
+      for (const [command, reference, mayBeInline] of commands) {
+        if (command === undefined) continue;
+        const refs = [...command.matchAll(new RegExp(`${reference}([^"\\s]+)`, "g"))].map((m) => m[1]);
+        if (!refs.length && !(mayBeInline && !/\$env:\w+_PLUGIN_ROOT/.test(command))) {
           faults.push(`${event}: command does not reference \${${root}}: ${command}`);
           continue;
         }

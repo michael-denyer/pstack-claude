@@ -19,6 +19,11 @@ function AsLines([string] $text) {
     if ($text -and -not $text.EndsWith("`n", [System.StringComparison]::Ordinal)) { $text + "`n" } else { $text }
 }
 
+# copilot-context.awk's text() drops only the file's final newline.
+function AsText([string] $text) {
+    if ($text.EndsWith("`n", [System.StringComparison]::Ordinal)) { $text.Substring(0, $text.Length - 1) } else { $text }
+}
+
 # The sheet's role lines whose entries are all model IDs or aliases, each with
 # an optional known effort, then a usable default effort, in models.json order.
 # These are the lines sheet.awk accepts for muse-context.awk.
@@ -47,6 +52,65 @@ function MuseRoleLines([string[]] $lines) {
     if (HasOrdinal (@('session') + $efforts) $effort) { "default effort: $effort" }
 }
 
+# sheet.awk's sheet_problems(), in its order and wording, and the sheet's role
+# lines. Copilot takes the role lines only from a sheet with no problems, and a
+# problem quotes no unchecked sheet text, since both reach the session context.
+function CopilotSheet([string[]] $lines) {
+    $models = [System.IO.File]::ReadAllText((Join-Path (Split-Path $PSScriptRoot -Parent) 'models.json'), [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+    $efforts = @($models.efforts)
+    $value = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::Ordinal)
+    $anyVendor = $false
+    foreach ($line in $lines) {
+        $colon = $line.IndexOf(':')
+        if ($colon -lt 0 -or $line -cmatch '^[ \t]') { continue }
+        $key = $line.Substring(0, $colon).Trim([char[]]" `t")
+        $value[$key] = $line.Substring($colon + 1).Trim([char[]]" `t")
+        if ($key.Equals('panel vendors', [System.StringComparison]::Ordinal) -and $value[$key].Equals('any', [System.StringComparison]::Ordinal)) { $anyVendor = $true }
+    }
+    $problems = ''
+    foreach ($role in $models.roles.role) {
+        if (-not $value.ContainsKey($role)) { $problems += "; missing role ``$role``" }
+    }
+    if ($value.ContainsKey('default effort') -and -not (HasOrdinal (@('session') + $efforts) $value['default effort'])) {
+        $problems += '; default effort is not session or a level'
+    }
+    foreach ($role in $models.roles) {
+        $name = $role.role
+        if (-not $value.ContainsKey($name)) { continue }
+        if ($value[$name].Length -eq 0) {
+            $problems += "; no model in ``$name``"
+            continue
+        }
+        $vendors = [System.Collections.Generic.List[string]]::new()
+        $real = $false
+        foreach ($raw in $value[$name].Split(',')) {
+            $entry = $raw.Trim([char[]]" `t")
+            if ($entry -cmatch '[ \t]+@([a-z]+)$' -and (HasOrdinal $efforts $Matches[1])) {
+                $entry = $entry.Substring(0, $entry.Length - $Matches[0].Length)
+            }
+            if ($entry.Length -eq 0) {
+                $problems += "; an empty entry in ``$name``"
+                continue
+            }
+            if (HasOrdinal @('inherit-parent', 'auto') $entry) { continue }
+            if ($entry -cnotmatch '^[a-z0-9][a-z0-9.-]*$') {
+                $problems += "; ``$name`` has an entry that is not a model ID"
+                continue
+            }
+            $real = $true
+            $vendor = $entry -replace '-.*$', ''
+            if (-not $vendors.Contains($vendor)) { $vendors.Add($vendor) }
+        }
+        if ($role.models -ceq 'panel' -and $real -and $vendors.Count -lt 2 -and -not $anyVendor) {
+            $problems += "; ``$name`` has models from one vendor ($($vendors -join ', '))"
+        }
+    }
+    if ($problems) { return [pscustomobject]@{ Problems = $problems.Substring(2); RoleLines = @() } }
+    $roleLines = @(foreach ($name in $models.roles.role) { "$($name): $($value[$name])" })
+    if ($value.ContainsKey('default effort')) { $roleLines += "default effort: $($value['default effort'])" }
+    [pscustomobject]@{ Problems = ''; RoleLines = $roleLines }
+}
+
 # Each runtime's hooks file passes its own name, as for session-start.sh.
 switch -CaseSensitive ($Runtime) {
     'codex' {
@@ -68,8 +132,13 @@ switch -CaseSensitive ($Runtime) {
         $sheet = Join-Path (Join-Path $sheetRoot 'muse') 'pstack-models.md'
         $context = 'session-start-muse.md'
     }
+    'copilot' {
+        $sheetRoot = if ($env:COPILOT_HOME) { $env:COPILOT_HOME } else { Join-Path $env:USERPROFILE '.copilot' }
+        $sheet = Join-Path $sheetRoot 'pstack-models.md'
+        $context = 'session-start-context.md'
+    }
     default {
-        [Console]::Error.WriteLine("session-start.ps1: unknown runtime '$Runtime' (expected codex or muse)")
+        [Console]::Error.WriteLine("session-start.ps1: unknown runtime '$Runtime' (expected codex, copilot, or muse)")
         exit 2
     }
 }
@@ -100,6 +169,23 @@ if ($Runtime -ceq 'muse') {
     if ($roleLines.Count -gt 0) {
         $output += "`n" + (AsLines (ReadHookFile 'session-start-muse-sheet.md')) + (($roleLines -join "`n") + "`n")
     }
+}
+# Copilot reads one JSON object, as copilot-context.awk prints it: the mandate
+# with the Copilot notes and the sheet's role lines or setup's note before its
+# closing tag.
+if ($Runtime -ceq 'copilot') {
+    $notes = AsText (ReadHookFile 'session-start-copilot.md')
+    $state = if ($null -eq $sheetLines) { $null } else { CopilotSheet $sheetLines }
+    if ($null -ne $state -and $state.Problems.Length -eq 0) {
+        $notes += "`n`n" + (AsText (ReadHookFile 'session-start-copilot-sheet.md')) + "`n`n" + ($state.RoleLines -join "`n")
+    } else {
+        if ($null -ne $state) { $notes += "`n`nsheet invalid: $($state.Problems)" }
+        $notes += "`n`n" + (AsText (ReadHookFile 'session-start-copilot-setup.md'))
+    }
+    $output = AsText $output
+    $close = $output.IndexOf('</EXTREMELY_IMPORTANT>', [System.StringComparison]::Ordinal)
+    if ($close -ge 0) { $output = $output.Substring(0, $close) + "`n" + $notes + "`n" + $output.Substring($close) } else { $output += "`n" + $notes }
+    $output = (ConvertTo-Json -InputObject @{ additionalContext = $output + "`n" } -Compress) + "`n"
 }
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 [Console]::Write($output)

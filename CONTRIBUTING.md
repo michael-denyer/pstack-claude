@@ -114,6 +114,7 @@ uvx zizmor@1.29.0 --persona pedantic --min-severity low --collect all -- .
 - **A workflow file that fails `actionlint`.** Invalid YAML, a malformed expression, an unknown runner label, or a `needs:` pointing at a job that does not exist. Run `actionlint` from the repository root.
 - **A Markdown correctness error.** Reversed link syntax, an empty link target, a missing image alt, a fragment link to a heading that is not there, or an undefined or unused reference definition. The rule set is deliberately correctness-only and lives in `.markdownlint-cli2.jsonc`. Run `npx --yes markdownlint-cli2@0.18.1 '**/*.md'`.
 - **A broken relative link in any Markdown file.** The link job resolves file and fragment targets offline and never touches a remote URL, so external link rot cannot fail your PR. Run `lychee --offline --include-fragments --exclude-path node_modules --exclude-path .git '**/*.md'`.
+- **A plugin-scanner score below 75.** The `HOL Plugin Scanner` job runs HOL's `plugin-scanner`, the check the [awesome-ai-plugins](https://github.com/hashgraph-online/awesome-ai-plugins) catalog runs before it lists a plugin, and fails when the score drops below 75. A finding alone does not fail the job. A missing `plugins/pstack/LICENSE` and a long placeholder `api_key` in a test each cost points before [#427](https://github.com/michael-denyer/pstack-claude/pull/427).
 
 ## Dependency updates
 

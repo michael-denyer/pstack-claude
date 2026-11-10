@@ -17,6 +17,12 @@ case "$runtime" in
     ;;
   claude)
     sheet="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md"
+    # A sheet committed with the project replaces the user's in that project.
+    # Claude Code may start in a subdirectory, so look at the repository root.
+    if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+      root=$(git -C "$CLAUDE_PROJECT_DIR" rev-parse --show-toplevel 2>/dev/null) || root=$CLAUDE_PROJECT_DIR
+      [ ! -f "$root/.claude/pstack-models.md" ] || sheet="$root/.claude/pstack-models.md"
+    fi
     reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
   minimax)

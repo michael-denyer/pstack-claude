@@ -4,6 +4,9 @@ import { chmodSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, s
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import zlib from "node:zlib";
+
+import { candidates } from "../plugins/pstack/skills/reflect/scripts/find-transcript.mjs";
 
 import { defaultSettings, PSTACK_STATE_DIR } from "../plugins/pstack/pi/config.ts";
 import { audit, classify, defaultTranscriptRoots, duSize, lastChats, pathSpellings, symlinkTargets } from "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs";
@@ -837,6 +840,75 @@ describe("the trunk comes from the remote", () => {
   });
 });
 
+// git resolves the shorthand origin/<name> to a tag or local branch of that name before the remote-tracking ref.
+describe("a local ref named origin/<name> does not stand in for the remote", () => {
+  const tagger = ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid"];
+  for (const [label, ...create] of [["a tag", "tag"], ["an annotated tag", ...tagger, "tag", "-a", "-m", "not the trunk"], ["a branch", "branch"]]) {
+    test(`${label} named origin/<trunk> at unmerged work leaves it in review`, () => {
+      const fixture = createFixture({ trunk: "release" });
+      const topic = addWorktree(fixture, "topic");
+      commit(topic, "unmerged work");
+      git("-C", fixture.repo, ...create, "origin/release", "topic");
+      const { rows, warnings } = runAudit(fixture);
+      expect(warnings).toEqual([]);
+      const row = rowFor(rows, topic);
+      expect([row[2], row[7]]).toEqual(["no", "review"]);
+    });
+  }
+
+  test("a stale tag named origin/<trunk> does not hide work that landed", () => {
+    const fixture = createFixture();
+    git("-C", fixture.repo, "tag", "origin/main");
+    const landed = addWorktree(fixture, "landed");
+    commit(landed, "landed on trunk");
+    git("-C", landed, "push", "origin", "HEAD:main");
+    const row = rowFor(runAudit(fixture).rows, landed);
+    expect([row[2], row[7]]).toEqual(["YES", "safe"]);
+  });
+
+  test("a tag named origin/<branch> does not change the REMOTE ahead count", () => {
+    const fixture = createFixture();
+    const topic = addWorktree(fixture, "topic");
+    commit(topic, "pushed");
+    git("-C", topic, "push", "origin", "topic");
+    commit(topic, "local only");
+    git("-C", fixture.repo, "tag", "origin/topic", "topic");
+    expect(rowFor(runAudit(fixture).rows, topic)[4]).toBe("ahead1");
+  });
+});
+
+// gh lists a branch's PRs newest first, and a branch can have several, one per base.
+describe("a branch with several PR records", () => {
+  for (const state of ["CLOSED", "MERGED"]) {
+    test(`an older open PR holds the worktree when a newer ${state} one is listed first`, () => {
+      const fixture = createFixture();
+      const topic = addWorktree(fixture, "topic");
+      const headRefOid = head(topic);
+      const { rows } = runAudit(fixture, {
+        prs: [
+          { number: 12, state, headRefName: "topic", headRefOid },
+          { number: 11, state: "OPEN", headRefName: "topic", headRefOid },
+        ],
+      });
+      expect(rowFor(rows, topic).slice(5, 8)).toEqual(["#11/OPEN", "-", "hold-open-pr"]);
+    });
+  }
+
+  test("without an open PR, the first record listed stands", () => {
+    const fixture = createFixture();
+    const topic = addWorktree(fixture, "topic");
+    commit(topic, "not on trunk");
+    const headRefOid = head(topic);
+    const { rows } = runAudit(fixture, {
+      prs: [
+        { number: 12, state: "CLOSED", headRefName: "topic", headRefOid },
+        { number: 11, state: "MERGED", headRefName: "topic", headRefOid },
+      ],
+    });
+    expect(rowFor(rows, topic).slice(5, 8)).toEqual(["#12/CLOSED", "-", "review"]);
+  });
+});
+
 test("the CLI exits 1 outside a git repo", () => {
   const outside = realpathSync(mkdtempSync(join(tmpdir(), "worktree-audit-outside-")));
   fixtures.push(outside);
@@ -851,4 +923,180 @@ test.each([
   [" 48M\t/x/wt\n", "48M"],
 ])("reads the size from du output %j", (output, expected) => {
   expect(duSize(output)).toBe(expected);
+});
+
+describe("compressed Codex rollouts", () => {
+  const jsonl = (cwd) => `${JSON.stringify({ type: "session_meta", payload: { cwd } })}\n`;
+  const packed = (cwd) => zlib.zstdCompressSync(Buffer.from(jsonl(cwd)));
+  const scan = (fixture, path) => lastChats([fixture.transcripts], new Map([[path, [path]]]));
+  const writePacked = (fixture, name, bytes) => {
+    const file = join(fixture.transcripts, name);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, bytes);
+    return file;
+  };
+
+  test("compressed enumeration is opt-in and respects depth", () => {
+    const fixture = createFixture();
+    const plain = writePacked(fixture, "plain.jsonl", jsonl("/x"));
+    const compressed = writePacked(fixture, "2026/11/07/rollout.jsonl.zst", packed("/x"));
+    writePacked(fixture, "other.gz", "");
+    expect(candidates(fixture.transcripts).map(({ path }) => path)).toEqual([plain]);
+    expect(candidates(fixture.transcripts, 2, { includeCompressed: true }).map(({ path }) => path)).toEqual([plain]);
+    expect(candidates(fixture.transcripts, Infinity, { includeCompressed: true }).map(({ path }) => path).sort()).toEqual([plain, compressed].sort());
+  });
+
+  test("a compressed rollout retains Unicode paths and its timestamp", () => {
+    const fixture = createFixture();
+    const path = "/workspace/with spaces/项目";
+    const file = writePacked(fixture, "rollout.jsonl.zst", packed(path));
+    utimesSync(file, 1700000000, 1700000000);
+    expect(scan(fixture, path).get(path)).toBe(1700000000);
+  });
+
+  test.each([true, false])("the newest plain or compressed transcript wins (compressed newer: %s)", (compressedNewer) => {
+    const fixture = createFixture();
+    const path = "/workspace/project";
+    const plain = writePacked(fixture, "plain.jsonl", jsonl(path));
+    const compressed = writePacked(fixture, "rollout.jsonl.zst", packed(path));
+    utimesSync(plain, 100, compressedNewer ? 100 : 200);
+    utimesSync(compressed, 100, compressedNewer ? 200 : 100);
+    expect(scan(fixture, path).get(path)).toBe(200);
+  });
+
+  test("every concatenated frame is scanned, without matching sibling prefixes", () => {
+    const fixture = createFixture();
+    writePacked(fixture, "rollout.jsonl.zst", Buffer.concat([packed("/workspace/project-other"), packed("/workspace/second")]));
+    const chats = lastChats([fixture.transcripts], new Map([
+      ["/workspace/project", ["/workspace/project"]], ["/workspace/second", ["/workspace/second"]],
+    ]));
+    expect(chats.has("/workspace/project")).toBe(false);
+    expect(chats.has("/workspace/second")).toBe(true);
+  });
+
+  test.each(["corrupt", "truncated first", "truncated later"])("%s input is not an empty or partially successful history", (kind) => {
+    const fixture = createFixture();
+    const frame = packed("/workspace/project");
+    const bytes = kind === "corrupt" ? Buffer.from("not zstd")
+      : kind === "truncated first" ? frame.subarray(0, -2)
+      : Buffer.concat([packed("/unrelated"), frame.subarray(0, -2)]);
+    writePacked(fixture, "bad.jsonl.zst", bytes);
+    expect(() => scan(fixture, "/workspace/project")).toThrow(/cannot decode.*bad\.jsonl\.zst/);
+  });
+
+  test("the full audit holds compressed activity and leaves an unrelated worktree safe", () => {
+    const fixture = createFixture();
+    const chatted = addWorktree(fixture, "chatted");
+    const quiet = addWorktree(fixture, "quiet");
+    writePacked(fixture, "rollout.jsonl.zst", packed(chatted.replaceAll("/", sep)));
+    const { rows, warnings } = runAudit(fixture);
+    expect(warnings).toEqual([]);
+    expect(rowFor(rows, chatted).slice(6, 8)).toEqual([ymd(Math.floor(Date.now() / 1000)), "verify-recent-chat"]);
+    expect(rowFor(rows, quiet).slice(6, 8)).toEqual(["-", "safe"]);
+  });
+
+  test("a failed decode makes the whole scan unknown, including previously readable logs", () => {
+    const fixture = createFixture();
+    const first = addWorktree(fixture, "first");
+    const second = addWorktree(fixture, "second");
+    writeTranscript(fixture, "plain.jsonl", first);
+    writePacked(fixture, "bad.jsonl.zst", "not zstd");
+    const { rows, warnings } = runAudit(fixture);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/transcript scan failed.*cannot decode/);
+    for (const path of [first, second]) expect(rowFor(rows, path).slice(6, 8)).toEqual(["-", "review"]);
+  });
+
+  // Patch built-ins in a separate Node process, as removeDuring does. No global
+  // mutation can leak into another test or into Bun's module cache.
+  const inNode = (fixture, setup, body, emptyPath = false) => {
+    const code = `
+      import assert from "node:assert/strict";
+      import zlib from "node:zlib";
+      import cp from "node:child_process";
+      import { syncBuiltinESMExports } from "node:module";
+      ${setup}
+      syncBuiltinESMExports();
+      const { lastChats } = await import(${JSON.stringify(scriptUrl)});
+      const scan = () => lastChats([${JSON.stringify(fixture.transcripts)}], new Map([["/workspace/project", ["/workspace/project"]]]));
+      ${body}
+    `;
+    // Resolve node before clearing PATH; no shell or executable fixtures are needed.
+    const node = execFileSync("node", ["-p", "process.execPath"], { encoding: "utf8" }).trim();
+    const env = emptyPath ? { PATH: fixture.transcripts, ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}) } : undefined;
+    const run = spawnSync(node, ["--input-type=module", "-e", code], { env, encoding: "utf8" });
+    expect(run.status).toBe(0);
+    expect(run.stderr).toBe("");
+  };
+
+  test.skipIf(noNode)("the real native decoder works without a CLI when its whole-stream behavior is supported", () => {
+    const fixture = createFixture();
+    writePacked(fixture, "rollout.jsonl.zst", Buffer.concat([packed("/unrelated"), packed("/workspace/project")]));
+    inNode(fixture, "", `
+      const first = zlib.zstdCompressSync(Buffer.from("first"));
+      const second = zlib.zstdCompressSync(Buffer.from("second"));
+      let complete = zlib.zstdDecompressSync(Buffer.concat([first, second])).toString() === "firstsecond";
+      for (const bytes of [first.subarray(0, -1), Buffer.concat([first, second]).subarray(0, -1)]) {
+        try { zlib.zstdDecompressSync(bytes); complete = false; } catch {}
+      }
+      if (complete) assert.equal(scan().has("/workspace/project"), true);
+      else assert.throws(scan, /cannot decode.*install zstd/);
+    `, true);
+  });
+
+  test.skipIf(noNode)("a complete native decoder needs no CLI, and a native data error is not retried through the CLI", () => {
+    const fixture = createFixture();
+    const bytes = packed("/workspace/project");
+    writePacked(fixture, "rollout.jsonl.zst", bytes);
+    inNode(fixture, `
+      const payload = Buffer.from(${JSON.stringify(bytes.toString("base64"))}, "base64");
+      const frame = Buffer.from("28b52ffd200109000061", "hex");
+      let fail = false, calls = 0;
+      zlib.zstdDecompressSync = (input) => {
+        if (input.equals(Buffer.concat([frame, frame]))) return Buffer.from("aa");
+        if (input.equals(frame.subarray(0, -1)) || input.equals(Buffer.concat([frame, frame]).subarray(0, -1))) throw new Error("truncated");
+        assert.deepEqual(input, payload);
+        calls++;
+        if (fail) throw new Error("native data error");
+        return Buffer.from(${JSON.stringify(jsonl("/workspace/project"))});
+      };
+      cp.execFileSync = () => { throw new Error("must not start a decoder process"); };
+    `, `
+      assert.equal(scan().has("/workspace/project"), true);
+      assert.equal(scan().has("/workspace/project"), true);
+      assert.equal(calls, 2);
+      fail = true;
+      assert.throws(scan, /native data error/);
+    `, true);
+  });
+
+  test.skipIf(noNode).each(["absent", "first frame only", "accepts truncation"])("a native API that is %s uses the CLI fallback", (kind) => {
+    const fixture = createFixture();
+    const bytes = packed("/workspace/project");
+    writePacked(fixture, "rollout.jsonl.zst", bytes);
+    const native = kind === "absent" ? "undefined" : kind === "first frame only" ? '() => Buffer.from("a")' : '() => Buffer.from("aa")';
+    inNode(fixture, `
+      zlib.zstdDecompressSync = ${native};
+      let calls = 0;
+      cp.execFileSync = (command, args, options) => {
+        calls++;
+        assert.equal(command, "zstd");
+        assert.deepEqual(args, ["-d", "-c"]);
+        assert.deepEqual(options.input, Buffer.from(${JSON.stringify(bytes.toString("base64"))}, "base64"));
+        return Buffer.from(${JSON.stringify(jsonl("/workspace/project"))});
+      };
+    `, 'assert.equal(scan().has("/workspace/project"), true); assert.equal(calls, 1);', true);
+  });
+
+  test.skipIf(noNode)("no native API and no CLI fails clearly instead of swallowing ENOENT", () => {
+    const fixture = createFixture();
+    writePacked(fixture, "rollout.jsonl.zst", packed("/workspace/project"));
+    inNode(fixture, 'zlib.zstdDecompressSync = undefined;', 'assert.throws(scan, /cannot decode.*install zstd/);', true);
+  });
+
+  test.skipIf(noNode)("plain JSONL needs neither a native decoder nor a CLI", () => {
+    const fixture = createFixture();
+    writePacked(fixture, "plain.jsonl", jsonl("/workspace/project"));
+    inNode(fixture, 'zlib.zstdDecompressSync = undefined;', 'assert.equal(scan().has("/workspace/project"), true);', true);
+  });
 });

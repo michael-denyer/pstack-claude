@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadLeadLines, loadModels, noteSkills } from "../tools/generate.mjs";
+import { loadLeadLines, loadModels, noteSkills, section } from "../tools/generate.mjs";
 import { agyModelNamesSection, roleSkills, RUNTIMES } from "../tools/runtimes.mjs";
 import { mappingCoverage } from "./mapping-coverage.mjs";
 
@@ -61,5 +61,12 @@ describe("agy-tools.md Model names", () => {
 
   test("is the section the mapping file carries", () => {
     expect(mapping).toContain(section);
+  });
+});
+
+describe("agy-tools.md Subagent policy", () => {
+  test("routes writing subagents to TypeName self, since the plugin's agent files load read-only", () => {
+    const lines = mapping.split("\n");
+    expect(lines.slice(...section("Subagent policy")(lines)).join("\n")).toContain('`TypeName: "self"`');
   });
 });

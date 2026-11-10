@@ -48,12 +48,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, posix, relative, sep } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
-import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
+import { code, codeList, isMain, PLUGIN, SKILLS } from "./plugin.mjs";
 import { PLATFORM_ADAPTATION_OPEN, platformAdaptation, RUNTIMES, roleSkills } from "./runtimes.mjs";
 import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, walk } from "./validate-skills.mjs";
 
@@ -739,8 +739,8 @@ export function strayModelSlugs(file, text, models) {
 
 // The hook handler shapes Claude Code documents, one schema per `type`
 // (https://code.claude.com/docs/en/hooks, "Hook handler fields"), plus Codex's
-// commandWindows on a command hook. A key no type lists is a fault, so a
-// misspelt override cannot be dropped without notice.
+// commandWindows and Copilot's powershell on a command hook. A key no type
+// lists is a fault, so a misspelt override cannot be dropped without notice.
 const HOOK_FIELDS = {
   if: Type.Optional(Type.String()),
   timeout: Type.Optional(Type.Number()),
@@ -753,6 +753,7 @@ const HOOK_TYPES = {
   command: hookType("command", {
     command: Type.String(),
     commandWindows: Type.Optional(Type.String()),
+    powershell: Type.Optional(Type.String()),
     args: Type.Optional(Type.Array(Type.String())),
     async: Type.Optional(Type.Boolean()),
     asyncRewake: Type.Optional(Type.Boolean()),
@@ -811,8 +812,17 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", ro
         continue;
       }
       if (hook.type !== "command") continue;
-      for (const command of [hook.command, hook.commandWindows].filter((value) => value !== undefined)) {
-        const refs = [...command.matchAll(new RegExp(`\\$\\{${root}\\}/([^"\\s]+)`, "g"))].map((m) => m[1]);
+      // Copilot runs powershell on Windows in place of command, and PowerShell
+      // reads the root from $env. `exit 0`, a PreToolUse hook that leaves each
+      // call to Copilot, is the one override that names no plugin file.
+      const commands = [
+        [hook.command, `\\$\\{${root}\\}/`],
+        [hook.commandWindows, `\\$\\{${root}\\}/`],
+        [hook.powershell === "exit 0" ? undefined : hook.powershell, `\\$env:${root}/`],
+      ];
+      for (const [command, reference] of commands) {
+        if (command === undefined) continue;
+        const refs = [...command.matchAll(new RegExp(`${reference}([^"\\s]+)`, "g"))].map((m) => m[1]);
         if (!refs.length) {
           faults.push(`${event}: command does not reference \${${root}}: ${command}`);
           continue;
@@ -883,6 +893,7 @@ export function plan(root, models) {
     }
     put(path, read(source));
   }
+  put(`${PLUGIN}/LICENSE`, read("LICENSE"));
   return { files, ownedDirs: OWNED_DIRS };
 }
 
@@ -1045,7 +1056,7 @@ function main() {
 
 // Guarded so importing the generator's validation and rendering functions does
 // not regenerate the repo as a side effect.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta.url)) {
   try {
     main();
   } catch (err) {

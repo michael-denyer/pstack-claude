@@ -54,7 +54,7 @@ Pass a role's model where the dispatch takes one: a Workflow child's `model`, or
 
 ## Session routing hook
 
-The native pstack Muse plugin bundles a `SessionStart` hook that injects the poteto-mode mandate in Muse wording, plus the saved role lines from the Muse sheet when the sheet has any. The manifest declares it twice, as `session-start` for the shell script and `session-start-windows` for the PowerShell script, and each stands down on the OS the other owns. On a machine without `sh` or without `powershell.exe`, that hook records a failed spawn at session start and the other delivers the context. Muse runs plugin hooks only after the user approves them (`muse plugins approve pstack`), so a fresh install routes nothing until then. Both hooks read `session hook` from the Muse sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/SKILL.md#other-runtimes); `session hook: off` disables injection.
+The native pstack Muse plugin bundles a `SessionStart` hook that injects the poteto-mode mandate in Muse wording, plus the saved role lines from the Muse sheet when the sheet has any. The manifest declares it twice, as `session-start` for the shell script and `session-start-windows` for the PowerShell script, and each stands down on the OS the other owns. On a machine without `sh` or without `powershell.exe`, that hook records a failed spawn at session start and the other delivers the context. Muse runs plugin hooks only after the user approves them (`muse plugins approve pstack`), so a fresh install routes nothing until then. Both hooks read `session hook` from the Muse sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/references/runtimes.md); `session hook: off` disables injection.
 
 A skills-only installation does not include the hook. Request `poteto-mode` explicitly or add a standing instruction to `AGENTS.md` in that case.
 
@@ -76,7 +76,7 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | Skill | On Muse |
 |-------|---------|
 | `interrogate` | The reviewer dispatch maps to parallel `subagent_spawn` calls or Workflow children; use Workflow children when the panel needs distinct models, and keep the panel model-diverse (see Model names). |
-| `setup-pstack` | The skill's Other runtimes table names the Muse sheet path; the plugin hook injects its role lines, so no include line is needed. The role rows are identical. |
+| `setup-pstack` | The skill's [Other runtimes](../../setup-pstack/references/runtimes.md) table names the Muse sheet path; the plugin hook injects its role lines, so no include line is needed. The role rows are identical. |
 | `no-comments` | The `comment-sicko` dispatch resolves through `subagent_spawn` as written, with the scoped id (see Subagent policy). Run it without worktree isolation, so it sees the scope's uncommitted changes. |
 | `thermos` | Both review dispatches resolve through `subagent_spawn` with their scoped ids (see Subagent policy). |
 | `teach` | Running `how` and `why` in parallel maps to two `subagent_spawn` calls in one response. Draw with Mermaid or plain text when no image tool is available. |

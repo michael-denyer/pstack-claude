@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh\" copilot"
+            "command": "sh \"${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh\" copilot",
+            "powershell": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"$env:COPILOT_PLUGIN_ROOT/hooks/session-start.ps1\" copilot"
           }
         ]
       }
@@ -17,7 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${COPILOT_PLUGIN_ROOT}/hooks/pre-tool-use.sh\"",
+            "command": "sh \"${COPILOT_PLUGIN_ROOT}/hooks/pre-tool-use.sh\"",
+            "powershell": "exit 0",
             "timeout": 5
           }
         ]

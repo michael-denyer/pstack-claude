@@ -7,12 +7,16 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { expandSlash, parseCommandArgs, stripFrontmatter, substituteArgs } from "../../plugins/pstack/pi/slash.ts";
-import { findPiPackage } from "../../tools/pi-package.mjs";
+import { installedPi, PI_FLOOR } from "../../tools/pi-package.mjs";
 
-const piDir = findPiPackage();
+const pi = installedPi();
+const piDir = pi?.dir;
 const piModule = (rel) => import(pathToFileURL(join(piDir, rel)).href);
 // CI's pi-types job installs Pi and sets this, so there a missing Pi fails instead of skipping.
-if (process.env.PSTACK_PI_REQUIRE_RUNTIME === "1" && !piDir) throw new Error("The slash expansion checks require an installed Pi package.");
+const required = process.env.PSTACK_PI_REQUIRE_RUNTIME === "1";
+if (required && !piDir) throw new Error("The slash expansion checks require an installed Pi package.");
+// slash.ts copies the code of Pi PI_FLOOR, and an older Pi's own code differs from it.
+const tooOld = pi && !pi.supported;
 
 const quoteRules = `--title="fix bug" it's "say \\"hi\\"" 'it\\'s' "a\\b" "open 'quote`;
 const argLines = ["", "a b  c", ' --title="fix bug" 42', 'a"b c"d', "it's fine", `'single' "double"`, "tab\tsep\nnewline", 'open "quote here', `x 'a"b' y`, quoteRules, '"ends in an escape\\"'];
@@ -20,7 +24,7 @@ const templates = ["$1 $2 $3", "$@|$ARGUMENTS", "${1:-def} ${3:-none}", "${@:-em
 const argSets = [[], ["a"], ["a", "b c", "d"]];
 const files = ["no frontmatter\n", "---\nname: x\n---\nbody\n", "\uFEFF---\r\nname: x\r\n---\r\n  body  \r\n", "---\nunterminated", "---\na: 1\n----\nbody", "  ---\nx: 1\n---\ny\r"];
 
-describe.skipIf(!piDir)("slash expansion matches the installed pi", () => {
+describe.skipIf(!pi || (tooOld && !required))(`slash expansion matches the installed pi${tooOld ? ` (pi ${pi.version} is older than the supported ${PI_FLOOR})` : ""}`, () => {
   test("parseCommandArgs", async () => {
     const pi = await piModule("dist/core/prompt-templates.js");
     for (const line of argLines) expect([line, parseCommandArgs(line)]).toEqual([line, pi.parseCommandArgs(line)]);

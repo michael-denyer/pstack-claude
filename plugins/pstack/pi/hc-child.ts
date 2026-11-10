@@ -8,6 +8,7 @@ import { assistantText, type ChildExit } from "./child.ts";
 
 const execHc = promisify(execFile);
 const SCREEN_LINES = "30";
+const NOT_THE_CHILD = new Set(["timeout", "message"]);
 
 const waitResult = Type.Object({
   reason: Type.String(),
@@ -86,13 +87,13 @@ export class HcChild {
     const ready = await this.wait();
     if (ready.status !== "idle" || this.ending) return ready;
     const { wait } = await hc(sendResult, ["send", "--json", "--wait", this.name, prompt]);
-    return wait && wait.reason !== "timeout" ? wait : this.wait();
+    return wait && !NOT_THE_CHILD.has(wait.reason) ? wait : this.wait();
   }
 
   private async wait(): Promise<WaitResult> {
     for (;;) {
       const state = await hc(waitResult, ["wait", "--json", this.name]);
-      if (state.reason !== "timeout") return state;
+      if (!NOT_THE_CHILD.has(state.reason)) return state;
     }
   }
 

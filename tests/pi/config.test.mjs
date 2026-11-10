@@ -32,6 +32,13 @@ test("only an exact pi agent tools: off line turns the agent tools off", () => {
   }
 });
 
+test("only an exact pi agent host: hc line moves agents into hc terminals", () => {
+  expect(parseSheet("bug-fix: opus\r\npi agent host: hc\r\n").hcHost).toBe(true);
+  for (const sheet of ["bug-fix: opus\n", "pi agent host: rpc\n", "pi agent host: hc \n", "agent host: hc\n", "pi agent tools: off\n"]) {
+    expect({ sheet, hc: parseSheet(sheet).hcHost }).toEqual({ sheet, hc: false });
+  }
+});
+
 test("an agent file loads as pstack:<name> with its body and model, and an effort is checked against models.json", () => {
   const root = mkdtempSync(join(tmpdir(), "pstack-agents-"));
   try {

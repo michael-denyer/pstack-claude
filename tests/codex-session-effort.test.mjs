@@ -23,7 +23,7 @@ function fixture() {
   const file = (id = "current", directory = sessions) => join(directory, `rollout-2026-10-30-${id}.jsonl`);
   const write = (text, id = "current") => writeFileSync(file(id), text);
   const run = (env = {}) => {
-    const result = spawnSync("node", [cli], { env: { ...process.env, CODEX_HOME: home, CODEX_SQLITE_HOME: "", CODEX_THREAD_ID: "current", ...env }, encoding: "utf8" });
+    const result = spawnSync("node", [cli], { env: { ...process.env, CODEX_HOME: home, CODEX_THREAD_ID: "current", ...env }, encoding: "utf8" });
     expect(result.stderr).toBe("");
     return { status: result.status, value: JSON.parse(result.stdout) };
   };
@@ -55,7 +55,7 @@ test("does not guess which retained rollout is current without an index", () => 
   const { file, write, run } = fixture();
   write(meta() + start("old") + context("old", "high"));
   writeFileSync(file("current_new-rollout"), meta() + start("new") + context("new", "max"));
-  expect(run().value.effort).toBeNull();
+  expect(run()).toMatchObject({ status: 1, value: { effort: null } });
 });
 
 test("follows a changed index on the next call even when the original log is absent", () => {
@@ -68,18 +68,6 @@ test("follows a changed index on the next call even when the original log is abs
   expect(run().value).toEqual({ effort: "max" });
   selectRollout(home, first);
   expect(run().value).toEqual({ effort: "high" });
-});
-
-test("reads the configured SQLite home instead of a retained index in CODEX_HOME", () => {
-  const { home, file, write, run } = fixture();
-  write(meta() + start("old") + context("old", "high"));
-  selectRollout(home, file());
-  const sqliteHome = join(home, "sqlite");
-  mkdirSync(sqliteHome);
-  const replacement = file("current_new-rollout");
-  writeFileSync(replacement, meta() + start("new") + context("new", "max"));
-  selectRollout(sqliteHome, replacement);
-  expect(run({ CODEX_SQLITE_HOME: sqliteHome }).value).toEqual({ effort: "max" });
 });
 
 test("falls back to a unique legacy log when the index has only another thread", () => {
@@ -101,7 +89,7 @@ for (const [name, text] of [
   const replacement = file("current_new-rollout");
   if (text !== null) writeFileSync(replacement, text);
   selectRollout(home, replacement);
-  expect(run().value.effort).toBeNull();
+  expect(run()).toMatchObject({ status: 1, value: { effort: null } });
 });
 
 test("does not use a retired log when the current rollout is compressed", () => {
@@ -109,9 +97,9 @@ test("does not use a retired log when the current rollout is compressed", () => 
   write(meta() + start("old") + context("old", "high"));
   const replacement = file("current_new-rollout") + ".zst";
   writeFileSync(replacement, "compressed rollout fixture");
-  expect(run().value.effort).toBeNull();
+  expect(run()).toMatchObject({ status: 1, value: { effort: null } });
   selectRollout(home, replacement);
-  expect(run().value.effort).toBeNull();
+  expect(run()).toMatchObject({ status: 1, value: { effort: null } });
 });
 
 test("does not fall back when the state database is corrupt, unsupported, or ambiguous", () => {
@@ -119,22 +107,24 @@ test("does not fall back when the state database is corrupt, unsupported, or amb
   write(meta() + start("old") + context("old", "high"));
   const path = join(home, "state_5.sqlite");
   writeFileSync(path, "not a SQLite database");
-  expect(run().value.effort).toBeNull();
+  expect(run()).toMatchObject({ status: 1, value: { effort: null } });
   rmSync(path);
   new Database(path).close();
-  expect(run().value.effort).toBeNull();
+  expect(run()).toMatchObject({ status: 1, value: { effort: null } });
   selectRollout(home, file());
   writeFileSync(join(home, "state_6.sqlite"), readFileSync(path));
-  expect(run().value.effort).toBeNull();
+  expect(run()).toMatchObject({ status: 1, value: { effort: null } });
 });
 
-test("uses legacy logs without node:sqlite but refuses to bypass an existing index", () => {
+test("falls back without node:sqlite only when no replacement exists", () => {
   const { home, file, write, run } = fixture();
   write(meta() + start("new") + context("new", "max"));
   const env = { NODE_OPTIONS: "--no-experimental-sqlite" };
-  expect(run(env).value).toEqual({ effort: "max" });
+  expect(run(env)).toEqual({ status: 0, value: { effort: "max" } });
   selectRollout(home, file());
-  expect(run(env).value.effort).toBeNull();
+  expect(run(env)).toEqual({ status: 0, value: { effort: "max" } });
+  writeFileSync(file("current_new-rollout"), meta() + start("newer") + context("newer", "high"));
+  expect(run(env)).toMatchObject({ status: 1, value: { effort: null } });
 });
 
 test("reads a current path from WAL without changing the database or its journal", () => {
@@ -153,32 +143,6 @@ test("reads a current path from WAL without changing the database or its journal
   } finally {
     db.close();
   }
-});
-
-test("refuses an effort if a revert changes the index while the log is read", () => {
-  const { home, file, write, run } = fixture();
-  write(meta() + start("old") + context("old", "high"));
-  const replacement = file("current_new-rollout");
-  writeFileSync(replacement, meta() + start("new") + context("new", "max"));
-  selectRollout(home, file());
-  const preload = join(home, "revert.mjs");
-  writeFileSync(preload, `
-    import fs from "node:fs";
-    import { syncBuiltinESMExports } from "node:module";
-    import { DatabaseSync } from "node:sqlite";
-    const read = fs.createReadStream;
-    fs.createReadStream = (...args) => {
-      const stream = read(...args);
-      stream.once("end", () => {
-        const db = new DatabaseSync(${JSON.stringify(join(home, "state_5.sqlite"))});
-        db.prepare("UPDATE threads SET rollout_path = ? WHERE id = ?").run(${JSON.stringify(replacement)}, "current");
-        db.close();
-      });
-      return stream;
-    };
-    syncBuiltinESMExports();
-  `);
-  expect(run({ NODE_OPTIONS: `--import=${JSON.stringify(preload)}` }).value.effort).toBeNull();
 });
 
 test("reads the active turn from the exact thread, ignoring newer unrelated logs and message text", () => {

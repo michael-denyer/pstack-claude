@@ -41,12 +41,11 @@ export async function activeEffort(stream, threadId) {
 }
 
 async function currentRollout(threadId, home) {
-  const sqliteHome = process.env.CODEX_SQLITE_HOME?.trim() || home;
-  const databases = readdirSync(sqliteHome).filter((name) => /^state_\d+\.sqlite$/.test(name));
+  const databases = readdirSync(home).filter((name) => /^state_\d+\.sqlite$/.test(name));
   if (databases.length > 1) throw new Error("current thread state database is ambiguous");
-  if (databases.length === 1) {
-    const { DatabaseSync } = await import("node:sqlite");
-    const db = new DatabaseSync(join(sqliteHome, databases[0]), { readOnly: true });
+  const sqlite = databases.length === 1 ? await import("node:sqlite").catch(() => null) : null;
+  if (sqlite) {
+    const db = new sqlite.DatabaseSync(join(home, databases[0]), { readOnly: true });
     try {
       const row = db.prepare("SELECT rollout_path FROM threads WHERE id = ?").get(threadId);
       if (row) {
@@ -82,9 +81,7 @@ export async function sessionEffort(threadId = process.env.CODEX_THREAD_ID, code
   if (!threadId || !/^[a-zA-Z0-9_-]+$/.test(threadId)) throw new Error("CODEX_THREAD_ID is unavailable or invalid");
   const home = codexHome || join(homedir(), ".codex");
   const path = await currentRollout(threadId, home);
-  const effort = await activeEffort(createReadStream(path, { encoding: "utf8" }), threadId);
-  if (await currentRollout(threadId, home) !== path) throw new Error("current thread runtime log changed while reading");
-  return effort;
+  return activeEffort(createReadStream(path, { encoding: "utf8" }), threadId);
 }
 
 if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {

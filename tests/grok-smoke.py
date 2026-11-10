@@ -29,7 +29,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 server=http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler)
 threading.Thread(target=server.serve_forever,daemon=True).start()
 port=server.server_address[1]
-(grok/'config.toml').write_text('[models]\ndefault = "probe"\n[model.probe]\nmodel = "probe"\nbase_url = "http://127.0.0.1:%d/v1"\napi_key = "synthetic"\napi_backend = "chat_completions"\ncontext_window = 100000\n'%port)
+(grok/'config.toml').write_text('[models]\ndefault = "probe"\n[model.probe]\nmodel = "probe"\nbase_url = "http://127.0.0.1:%d/v1"\napi_key = "dummy"\napi_backend = "chat_completions"\ncontext_window = 100000\n'%port)
 env={'HOME':str(home),'GROK_HOME':str(grok),'XDG_CONFIG_HOME':str(root/'config'),'XDG_DATA_HOME':str(root/'data'),'XDG_CACHE_HOME':str(root/'cache'),'XDG_STATE_HOME':str(root/'state'),'PATH':'/opt/homebrew/bin:/usr/bin:/bin','GROK_MODELS_BASE_URL':'http://127.0.0.1:%d/v1'%port,'XAI_API_KEY':'synthetic','GROK_TELEMETRY_DISABLED':'1','NO_COLOR':'1','TERM':'dumb'}
 def run(label,args,timeout=25):
     try:

@@ -72,6 +72,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { deriveSkill, isObject, loadLeadLines, loadModels } from "./generate.mjs";
+import { isMain } from "./plugin.mjs";
 import { walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -400,6 +401,11 @@ const FORK_OUTCOMES = new Set(["forked", "mode-only", "merged", "conflicted"]);
 // an entry `dir` lists under another spelling.
 const lstatIn = (dir, name) => lstatSync(join(dir, name), { throwIfNoEntry: false });
 
+// The one rule for a sync that must stop. The write gate and the exit code
+// both read it, so a run cannot print FAIL and still move the pin.
+const blocked = (report, atPin) =>
+  Boolean(report.hits.length || report.binaryConflicts.length || report.collisions.length || report.undeclared.length || (atPin && (report.stale.length || report.written.length)));
+
 // Compare old-upstream vs new-upstream vs local for one component tree.
 // `derive(rel, text)` turns substituted upstream text into the port's form;
 // the default is identity. `forks`, from parseForks, adds the registry check:
@@ -557,7 +563,7 @@ export function syncComponent({
     }
   }
 
-  if (report.hits.length || report.binaryConflicts.length || report.collisions.length || report.undeclared.length || (atPin && (report.stale.length || report.written.length)) || dryRun) return report;
+  if (blocked(report, atPin) || dryRun) return report;
   for (const { rel, kind, write } of outcomes) {
     const localFile = join(localDir, rel);
     if (write) {
@@ -730,7 +736,7 @@ function main() {
       console.error(`\nFAIL: forks with no entry under ${component} in tools/forks.json; declare each or restore upstream's form, then rerun:`);
       for (const rel of report.undeclared) console.error(`  ${spec.localPath}/${rel}`);
     }
-    if (report.binaryConflicts.length || report.collisions.length || report.hits.length || report.undeclared.length || (atPin && (report.stale.length || report.written.length))) {
+    if (blocked(report, atPin)) {
       process.exitCode = 1;
       return;
     }
@@ -748,6 +754,6 @@ function main() {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main();
 }

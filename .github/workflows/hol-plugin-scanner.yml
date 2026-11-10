@@ -1,0 +1,32 @@
+name: HOL Plugin Scanner
+
+# Runs the plugin-scanner check that the awesome-ai-plugins catalog uses for
+# its listings, so a change that drops the score below 75 fails here first.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hol-plugin-scanner-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: HOL Plugin Scanner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashgraph-online/ai-plugin-scanner-action@c96833de5070fab4e564010b5ab6e3c3d7e07a3e # v1.2.806
+        with:
+          plugin_dir: "."
+          min_score: 75
+          fail_on_severity: none
+          pr_comment: "off"

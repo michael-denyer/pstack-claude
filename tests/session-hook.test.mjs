@@ -162,6 +162,53 @@ describe("SessionStart hook", () => {
       }
     });
   }
+
+  test("a Claude Code project's own sheet replaces the user's sheet", () => {
+    const home = mkdtempSync(join(tmpdir(), "pstack-hook-"));
+    const project = join(home, "project");
+    const sheet = (dir, text) => {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "pstack-models.md"), text);
+    };
+    const run = (projectDir) =>
+      spawnSync("sh", ["-c", sessionStart.claude.hooks[0].command], {
+        env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot, CLAUDE_PROJECT_DIR: projectDir },
+        encoding: "utf8",
+      }).stdout;
+    try {
+      mkdirSync(project);
+      sheet(join(home, ".claude"), "session hook: off\n");
+      expect(run(project)).toBe("");
+      sheet(join(project, ".claude"), "session hook: on\n");
+      expect(run(project)).toBe(mandate);
+      expect(run(undefined)).toBe("");
+      sheet(join(project, ".claude"), "session hook: off\n");
+      rmSync(join(home, ".claude"), { recursive: true });
+      expect(run(project)).toBe("");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  // Claude Code sets CLAUDE_PROJECT_DIR to the directory it starts in, which
+  // can be below the repository root that holds the committed sheet.
+  test("a Claude Code session started in a subdirectory reads the repository's sheet", () => {
+    const home = mkdtempSync(join(tmpdir(), "pstack-hook-"));
+    const repo = join(home, "repo");
+    try {
+      mkdirSync(join(repo, ".claude"), { recursive: true });
+      mkdirSync(join(repo, "sub", "deep"), { recursive: true });
+      writeFileSync(join(repo, ".claude", "pstack-models.md"), "session hook: off\n");
+      expect(spawnSync("git", ["init", repo]).status).toBe(0);
+      const out = spawnSync("sh", ["-c", sessionStart.claude.hooks[0].command], {
+        env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot, CLAUDE_PROJECT_DIR: join(repo, "sub", "deep") },
+        encoding: "utf8",
+      }).stdout;
+      expect(out).toBe("");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
 });
 
 const close = "</EXTREMELY_IMPORTANT>";

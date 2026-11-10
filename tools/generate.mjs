@@ -512,9 +512,14 @@ export function resolveModels(models) {
 const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
 const TIERS = ["default", "strongest", "worker", "panel"];
 
+export const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
 // Check models.json's shape and resolve its tiers, throwing with the offending
-// role, tier, or slug named. `skillExists(skill)` reports whether a role's
-// skill directory carries a SKILL.md.
+// role, tier, or slug named. Parse fails naming the document or entry when the
+// root or a roles entry is missing or not an object, so a typo cannot throw a
+// bare TypeError mid-load.
+// `skillExists(skill)` reports whether a role's skill directory carries a
+// SKILL.md.
 export function parseModels(raw, skillExists) {
   const fail = (message) => {
     throw new Error(`models.json: ${message}`);
@@ -526,7 +531,9 @@ export function parseModels(raw, skillExists) {
       seen.add(item);
     }
   };
-  const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  // A typo that makes the document null or a non-object must name models.json,
+  // not throw a bare TypeError when the first field is read.
+  if (!isObject(raw)) fail("must be an object");
   for (const key of ["available", "efforts", "roles"]) if (!Array.isArray(raw[key])) fail(`"${key}" must be a list`);
   for (const key of ["tiers", ...RUNTIMES.filter((runtime) => runtime.key).map((runtime) => runtime.key)]) {
     if (!isObject(raw[key])) fail(`"${key}" must be an object`);
@@ -546,7 +553,10 @@ export function parseModels(raw, skillExists) {
     tierLists.set(slugs.join(), tier);
   }
   const labels = new Set();
-  for (const role of raw.roles) {
+  for (const [i, role] of raw.roles.entries()) {
+    // A typo that makes a role entry null or a non-object must name the entry,
+    // not throw a bare TypeError when the first field is read.
+    if (!isObject(role)) fail(`roles[${i}] must be an object`);
     if (labels.has(role.role)) fail(`role "${role.role}" appears twice`);
     labels.add(role.role);
     if (!skillExists(role.skill)) fail(`role "${role.role}" names skill "${role.skill}", which has no SKILL.md`);

@@ -57,6 +57,21 @@ describe("parseModels", () => {
     expect(role(resolved, "strongest judgment").models).toEqual([raw.tiers.strongest]);
   });
 
+  test("a null or non-object root fails naming models.json instead of a bare TypeError", () => {
+    expect(() => parseModels(null, anySkill)).toThrow("models.json: must be an object");
+    expect(() => parseModels(undefined, anySkill)).toThrow("models.json: must be an object");
+    expect(() => parseModels([], anySkill)).toThrow("models.json: must be an object");
+    expect(() => parseModels("x", anySkill)).toThrow("models.json: must be an object");
+  });
+
+  test("a null or non-object role fails naming the entry instead of a bare TypeError", () => {
+    expect(parse((p) => (p.roles = [null]))).toThrow("models.json: roles[0] must be an object");
+    expect(parse((p) => (p.roles = [undefined]))).toThrow("models.json: roles[0] must be an object");
+    expect(parse((p) => (p.roles = ["x"]))).toThrow("models.json: roles[0] must be an object");
+    expect(parse((p) => (p.roles = [[]]))).toThrow("models.json: roles[0] must be an object");
+    expect(parse((p) => p.roles.splice(1, 0, null))).toThrow("models.json: roles[1] must be an object");
+  });
+
   test("a missing top-level key throws naming it", () => {
     expect(parse((p) => delete p.efforts)).toThrow('models.json: "efforts" must be a list');
     expect(parse((p) => delete p.codex)).toThrow('models.json: "codex" must be an object');

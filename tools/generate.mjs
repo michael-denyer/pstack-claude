@@ -512,6 +512,8 @@ export function resolveModels(models) {
 const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
 const TIERS = ["default", "strongest", "worker", "panel"];
 
+export const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
 // Check models.json's shape and resolve its tiers, throwing with the offending
 // role, tier, or slug named. Parse fails naming the document or entry when the
 // root or a roles entry is missing or not an object, so a typo cannot throw a
@@ -529,7 +531,6 @@ export function parseModels(raw, skillExists) {
       seen.add(item);
     }
   };
-  const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
   // A typo that makes the document null or a non-object must name models.json,
   // not throw a bare TypeError when the first field is read.
   if (!isObject(raw)) fail("must be an object");

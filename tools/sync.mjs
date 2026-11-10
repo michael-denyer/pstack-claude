@@ -71,7 +71,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { deriveSkill, loadLeadLines, loadModels } from "./generate.mjs";
+import { deriveSkill, isObject, loadLeadLines, loadModels } from "./generate.mjs";
 import { walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -87,7 +87,7 @@ export function parseRule(rule, i) {
   const fail = (message) => {
     throw new Error(`substitutions[${i}]: ${message}`);
   };
-  if (rule === null || typeof rule !== "object" || Array.isArray(rule)) fail("must be an object");
+  if (!isObject(rule)) fail("must be an object");
   const unknown = Object.keys(rule).filter((field) => !RULE_FIELDS.has(field));
   if (unknown.length) fail(`unknown field ${unknown.map((f) => `"${f}"`).join(", ")}`);
   const { pattern, regex, files, replacement, rationale } = rule;
@@ -125,7 +125,7 @@ export function parseDenylistEntry(entry, i) {
   const fail = (message) => {
     throw new Error(`denylist[${i}]: ${message}`);
   };
-  if (entry === null || typeof entry !== "object" || Array.isArray(entry)) fail("must be an object");
+  if (!isObject(entry)) fail("must be an object");
   const unknown = Object.keys(entry).filter((field) => !DENY_FIELDS.has(field));
   if (unknown.length) fail(`unknown field ${unknown.map((f) => `"${f}"`).join(", ")}`);
   const { token, regex, hint } = entry;
@@ -149,7 +149,7 @@ export function parseDenylistEntry(entry, i) {
 // denylist array. Parse fails naming the field when either is missing or not
 // an array, so a typo cannot throw a bare TypeError mid-load.
 export function parseSubstitutions(doc) {
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+  if (!isObject(doc)) {
     throw new Error("substitutions.json: must be an object");
   }
   const { substitutions, denylist = [] } = doc;
@@ -173,14 +173,14 @@ export function parseSubstitutions(doc) {
 // entry is missing or not an object, so a typo cannot throw a bare TypeError
 // mid-load.
 export function parseUpstream(doc) {
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+  if (!isObject(doc)) {
     throw new Error("upstream.json: must be an object");
   }
-  if (doc.components === null || typeof doc.components !== "object" || Array.isArray(doc.components)) {
+  if (!isObject(doc.components)) {
     throw new Error('upstream.json: "components" must be an object');
   }
   for (const [name, spec] of Object.entries(doc.components)) {
-    if (spec === null || typeof spec !== "object" || Array.isArray(spec)) {
+    if (!isObject(spec)) {
       throw new Error(`upstream.json: component "${name}" must be an object`);
     }
   }
@@ -197,14 +197,14 @@ const UPSTREAM_LINK = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/(pull|issues)\/
 // component when either is missing or not an object, so a typo cannot throw a
 // bare TypeError mid-load.
 export function parseForks(registry, components) {
-  if (registry === null || typeof registry !== "object" || Array.isArray(registry)) {
+  if (!isObject(registry)) {
     throw new Error("forks.json: must be an object");
   }
   return Object.fromEntries(
     Object.entries(registry).map(([component, entries]) => {
       const spec = components[component];
       if (!spec) throw new Error(`forks.json: unknown component "${component}"`);
-      if (entries === null || typeof entries !== "object" || Array.isArray(entries)) {
+      if (!isObject(entries)) {
         throw new Error(`forks.json ${component}: must be an object`);
       }
       const prefix = `${spec.localPath}/`;
@@ -214,7 +214,7 @@ export function parseForks(registry, components) {
           throw new Error(`forks.json ${component} "${path}": ${message}`);
         };
         if (!path.startsWith(prefix)) fail(`not under ${spec.localPath}`);
-        if (entry === null || typeof entry !== "object" || Array.isArray(entry)) fail("must be an object");
+        if (!isObject(entry)) fail("must be an object");
         const unknown = Object.keys(entry).filter((field) => !FORK_FIELDS.includes(field));
         if (unknown.length) fail(`unknown field ${unknown.map((f) => `"${f}"`).join(", ")}`);
         const missing = FORK_FIELDS.filter((field) => entry[field] == null);

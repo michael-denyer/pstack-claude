@@ -86,7 +86,7 @@ The Claude Code, Codex, and GitHub Copilot plugins load the same short [routing 
 
 Smaller tasks proceed directly. The full skill loads when invoked, and explicit user instructions take precedence.
 
-To disable routing on runtimes that support the session hook setting, run `setup-pstack` and turn it off, or write `session hook: off` in the runtime's sheet at the path in [setup-pstack's runtime table](../plugins/pstack/skills/setup-pstack/references/runtimes.md). In Claude Code, use `/pstack:setup-pstack`. Without the setting, routing stays on. On OMP this setting applies across profiles. On Kimi, disable the plugin to stop its routing instruction. Grok's routing hint is not controlled by the session hook setting.
+To disable routing on runtimes that support the session hook setting, run `setup-pstack` and turn it off, or write `session hook: off` in the runtime's sheet at the path in [setup-pstack's runtime table](../plugins/pstack/skills/setup-pstack/references/runtimes.md). In Claude Code, use `/pstack:setup-pstack`. On Claude Code, a project's committed `.claude/pstack-models.md` replaces the user's sheet in that project, so `session hook: off` there turns routing off for that project alone. Without the setting, routing stays on. On OMP this setting applies across profiles. On Kimi, disable the plugin to stop its routing instruction. Grok's routing hint is not controlled by the session hook setting.
 
 Skills-only installs and other runtimes do not include these integrations. Request `poteto-mode` explicitly, or add a standing instruction to the runtime's instruction file.
 

@@ -16,7 +16,11 @@ case "$runtime" in
     reader=./skills/setup-pstack/scripts/read-sheet.sh
     ;;
   claude)
-    sheet="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md"
+    # A sheet committed with the project replaces the user's in that project.
+    sheet="${CLAUDE_PROJECT_DIR:-}/.claude/pstack-models.md"
+    if [ -z "${CLAUDE_PROJECT_DIR:-}" ] || [ ! -f "$sheet" ]; then
+      sheet="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pstack-models.md"
+    fi
     reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
   minimax)

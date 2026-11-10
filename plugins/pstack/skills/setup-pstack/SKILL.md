@@ -17,13 +17,13 @@ Write the current runtime's per-role model override sheet. Each pstack skill nam
 
 On any runtime other than Claude Code, read [Other runtimes](references/runtimes.md) first. Its table gives the sheet path, how the sheet loads, and how to list models, and your runtime's section says which steps change. The rest of this file describes Claude Code.
 
-On Claude Code the config directory is `$CLAUDE_CONFIG_DIR` when that variable is set and `~/.claude` otherwise. This skill calls it `<config>`, and the sheet is `<config>/pstack-models.md`. Claude Code has no auto-applied "rules" mechanism like Cursor's `.mdc`, so inclusion is explicit: the user adds a line to `<config>/CLAUDE.md` (or their project `CLAUDE.md`) such as:
+On Claude Code the config directory is `$CLAUDE_CONFIG_DIR` when that variable is set and `~/.claude` otherwise. This skill calls it `<config>`, and the user sheet is `<config>/pstack-models.md`. A project sheet, `.claude/pstack-models.md` at the project root, is committed with the repository and replaces the user sheet in that project, for the model rows and for the session hook. Claude Code has no auto-applied "rules" mechanism like Cursor's `.mdc`, so inclusion is explicit: the user adds a line to `<config>/CLAUDE.md` such as:
 
 ```text
 @<config>/pstack-models.md
 ```
 
-with `<config>` written as the resolved path, so the file is loaded as context for every session.
+with `<config>` written as the resolved path, so the file is loaded as context for every session. A project sheet loads from `@.claude/pstack-models.md` in the project's `CLAUDE.md`.
 
 ## Steps
 
@@ -32,6 +32,8 @@ with `<config>` written as the resolved path, so the file is loaded as context f
 Enumerate the model names the `Agent` tool's `model` parameter accepts in this session. That is the dependable source. On Claude Code they are the family names listed in [Models](#models) below, each running that family's current model, and a full model ID is rejected. The default panel is listed there too. The panel is chosen for cross-family diversity. Ask the user to confirm or paste any additional slugs they want available. Never write a real slug you have not confirmed is available. The aliases `inherit-parent` and `auto` are always valid even though they are not detected slugs. Both mean the role runs on the parent session's model, which the `Agent` call expresses by omitting `model`.
 
 ### 2. Load current state
+
+On Claude Code, first ask whether to configure the user sheet, for every project, or the project sheet, for this repository on any machine. The rest of the steps use the chosen sheet.
 
 The default role-to-model mapping is the rule shape shown in the Write the override sheet step below. If the current runtime's sheet already exists, read it and treat its values as the current choices. Otherwise start from those defaults. A line whose role is not in that shape, such as `how critics`, is from a retired role. Drop it. An older sheet may name full model IDs that start with `claude-`, which the `Agent` tool rejects. Replace each with its family name, the word after `claude-`.
 
@@ -51,7 +53,7 @@ Every real slug written must be in the detected set. `inherit-parent` and `auto`
 
 ### 6. Write the override sheet
 
-Write the current runtime's sheet with the shape below. Overwrite the whole file so re-runs stay idempotent.
+Write the current runtime's sheet with the shape below. Overwrite the whole file so re-runs stay idempotent. A project sheet also gets this line under its heading, so a session that loads both sheets knows which one counts: `This project's sheet. In this repository it replaces the user's pstack-models.md; ignore that sheet's lines.`
 
 ```markdown
 # pstack model configuration
@@ -84,7 +86,7 @@ session hook: on
 
 ### 7. Wire it in
 
-On Claude Code, if `<config>/CLAUDE.md` does not already include `<config>/pstack-models.md`, append an `@` line naming the sheet's resolved path, such as `@~/.claude/pstack-models.md`, so the model rows load on every session. If the user prefers project scope, add the include to the project's `CLAUDE.md` instead.
+On Claude Code, if `<config>/CLAUDE.md` does not already include `<config>/pstack-models.md`, append an `@` line naming the sheet's resolved path, such as `@~/.claude/pstack-models.md`, so the model rows load on every session. For a project sheet, append `@.claude/pstack-models.md` to the project's `CLAUDE.md` instead, if it is not there, and tell the user to commit both files.
 
 ### 8. Confirm
 

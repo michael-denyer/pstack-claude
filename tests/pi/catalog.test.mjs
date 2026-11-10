@@ -33,6 +33,8 @@ const required = process.env.PSTACK_PI_REQUIRE_CATALOG === "1";
 // A Pi older than PI_FLOOR predates models that the tables name, so its catalog cannot check them.
 const tooOld = catalog && !catalog.supported;
 const found = `pi-ai ${catalog?.version ?? "not found"}${tooOld ? `, older than the supported Pi ${PI_FLOOR}` : ""}`;
+// bun prints the names of skipped tests only in CI, so say why this one did not run.
+if (tooOld && !required) console.warn(`tests/pi/catalog.test.mjs skips its check against the installed catalog (${found}). Set PI_PACKAGE_DIR to a newer Pi package to run it.`);
 
 describe("models.json pi block", () => {
   test.skipIf((!catalog || tooOld) && !required)(`every provider table maps each family name to a model in the installed Pi catalog (${found})`, () => {

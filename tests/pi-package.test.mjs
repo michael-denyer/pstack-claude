@@ -117,6 +117,7 @@ test("CI installs PI_FLOOR, and each doc that states the oldest supported Pi nam
     ["docs/reference.md", `verified on Pi ${PI_FLOOR}`],
     ["docs/pi-equivalence.md", `how Pi ${PI_FLOOR} provides`],
     ["CONTRIBUTING.md", `\`pi\` ${PI_FLOOR}`],
+    ["plugins/pstack/pi/slash.ts", `code from pi ${PI_FLOOR}`],
   ];
   const stale = stated.filter(([file, phrase]) => !readFileSync(resolve(import.meta.dir, "..", file), "utf8").includes(phrase));
   expect(stale).toEqual([]);

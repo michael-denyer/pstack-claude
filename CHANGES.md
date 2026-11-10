@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.135 - worktree audit reads compressed Codex rollouts
+
+`worktree-audit.mjs` now reads the `.jsonl.zst` rollouts under Codex's `sessions` and `archived_sessions`. It used to skip them, so a worktree whose latest chat sat in a compressed rollout showed no LAST_CHAT and could be reported safe. Plain `.jsonl` transcripts are read as before, and `find-transcript.mjs` lists compressed files only for a caller that passes `includeCompressed`, so the **reflect** skill's search is unchanged. @EthanYoQ found and fixed this in [#425](https://github.com/michael-denyer/pstack-claude/pull/425).
+
+The audit decodes in the process with `zlib.zstdDecompressSync` when that decoder reads every frame of a file and rejects a truncated one. It checks both once at start-up. Node 26.13.0 passes the check. Bun 1.4.4 returns the partial output of a truncated frame without an error, so the audit runs the `zstd` command there, as it does on a Node that has no Zstd decoder. Only a machine that has compressed rollouts needs a decoder.
+
+A compressed rollout that cannot be decoded, because it is corrupt or truncated or because no decoder is available, leaves LAST_CHAT unknown for every worktree. The audit warns `transcript scan failed` with the file's path, and no worktree reaches safe until the file decodes or is removed.
+
 ## 0.9.134 - Fable 5.2 on Pi, Pi 1.5.1 as the oldest supported Pi
 
 On Pi, the `anthropic` provider's `fable` role runs `claude-fable-5-2`, where it ran `claude-fable-5-1`. A session on a provider that has no table of its own uses the `anthropic` table, so its `fable` role changes too. Claude Code sessions need no change, because Claude Code 2.1.321 moved its own `fable` alias to Fable 5.2. The model first appears in Pi 1.5.1's catalog. Pi 1.5.0 does not have it. It warns `Model "claude-fable-5-2" not found for provider "anthropic". Using custom model id.` and runs that ID with the context window, pricing, and thinking settings of the provider's default model. To stay on Fable 5.1, add the line `pi models: fable=anthropic/claude-fable-5-1` to the override sheet.

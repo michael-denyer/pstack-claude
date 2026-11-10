@@ -935,6 +935,19 @@ describe("compressed Codex rollouts", () => {
     writeFileSync(file, bytes);
     return file;
   };
+  // Bun 1.4.4 accepts truncated Zstd input, so under `bun test` the audit
+  // decodes through the zstd CLI, and without that CLI nothing decodes here.
+  const canDecode = (() => {
+    const dir = mkdtempSync(join(tmpdir(), "zstd-probe-"));
+    try {
+      writeFileSync(join(dir, "probe.jsonl.zst"), packed("/probe"));
+      return lastChats([dir], new Map([["/probe", ["/probe"]]])).has("/probe");
+    } catch {
+      return false;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  })();
 
   test("compressed enumeration is opt-in and respects depth", () => {
     const fixture = createFixture();
@@ -946,7 +959,7 @@ describe("compressed Codex rollouts", () => {
     expect(candidates(fixture.transcripts, Infinity, { includeCompressed: true }).map(({ path }) => path).sort()).toEqual([plain, compressed].sort());
   });
 
-  test("a compressed rollout retains Unicode paths and its timestamp", () => {
+  test.skipIf(!canDecode)("a compressed rollout retains Unicode paths and its timestamp", () => {
     const fixture = createFixture();
     const path = "/workspace/with spaces/项目";
     const file = writePacked(fixture, "rollout.jsonl.zst", packed(path));
@@ -954,7 +967,7 @@ describe("compressed Codex rollouts", () => {
     expect(scan(fixture, path).get(path)).toBe(1700000000);
   });
 
-  test.each([true, false])("the newest plain or compressed transcript wins (compressed newer: %s)", (compressedNewer) => {
+  test.skipIf(!canDecode).each([true, false])("the newest plain or compressed transcript wins (compressed newer: %s)", (compressedNewer) => {
     const fixture = createFixture();
     const path = "/workspace/project";
     const plain = writePacked(fixture, "plain.jsonl", jsonl(path));
@@ -964,7 +977,7 @@ describe("compressed Codex rollouts", () => {
     expect(scan(fixture, path).get(path)).toBe(200);
   });
 
-  test("every concatenated frame is scanned, without matching sibling prefixes", () => {
+  test.skipIf(!canDecode)("every concatenated frame is scanned, without matching sibling prefixes", () => {
     const fixture = createFixture();
     writePacked(fixture, "rollout.jsonl.zst", Buffer.concat([packed("/workspace/project-other"), packed("/workspace/second")]));
     const chats = lastChats([fixture.transcripts], new Map([
@@ -984,7 +997,7 @@ describe("compressed Codex rollouts", () => {
     expect(() => scan(fixture, "/workspace/project")).toThrow(/cannot decode.*bad\.jsonl\.zst/);
   });
 
-  test("the full audit holds compressed activity and leaves an unrelated worktree safe", () => {
+  test.skipIf(!canDecode)("the full audit holds compressed activity and leaves an unrelated worktree safe", () => {
     const fixture = createFixture();
     const chatted = addWorktree(fixture, "chatted");
     const quiet = addWorktree(fixture, "quiet");

@@ -12,7 +12,7 @@
 // and archived_sessions under $CODEX_HOME, and Pi's sessions and pstack subagent
 // sessions under $PI_CODING_AGENT_DIR (defaults: ~/.claude, ~/.codex, ~/.pi/agent).
 //
-// Compressed rollouts use native Zstd when it reads complete streams. Older
+// Compressed rollouts use native Zstd when it reads complete streams. Other
 // runtimes fall back to zstd on PATH. A decode failure makes the whole chat
 // scan unknown, so no worktree can be declared safe from that scan.
 //
@@ -204,8 +204,9 @@ function transcriptNeedles(spellings) {
   return [...new Set(forms)].map((form) => Buffer.from(JSON.stringify(form).slice(1, -1)));
 }
 
-// Early Node Zstd APIs stop after one frame and accept truncated input
-// (nodejs/node#64741, #64592). Check once, not once per transcript.
+// Bun 1.4.4 returns the partial output of a truncated frame without an error,
+// and nodejs/node#64592 reports the same for Node. The check also turns down a
+// decoder that stops after the first frame. It runs once, not once per transcript.
 function nativeZstdDecoder() {
   const decode = zlib.zstdDecompressSync;
   if (typeof decode !== "function") return undefined;

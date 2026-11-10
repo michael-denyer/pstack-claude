@@ -1,11 +1,11 @@
 // The compiler options the Pi typecheck derives from where Pi is installed.
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 
-import { piCompilerPaths, piDependency } from "../tools/pi-package.mjs";
+import { PI_FLOOR, piCompilerPaths, piDependency, versionAtLeast } from "../tools/pi-package.mjs";
 
 const DEP_FILES = [
   "@types/node/index.d.ts",
@@ -102,4 +102,23 @@ test("findPiPackage still finds a Pi under HOME's default bun directory", () => 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("versionAtLeast compares each part of a version as a number", () => {
+  const cases = [["1.5.1", "1.5.1"], ["1.5.2", "1.5.1"], ["1.10.0", "1.9.2"], ["2.0.0", "1.5.1"], ["1.5.0", "1.5.1"], ["1.4.9", "1.5.1"], ["0.9.9", "1.0.0"]];
+  expect(cases.map(([version, floor]) => versionAtLeast(version, floor))).toEqual([true, true, true, true, false, false, false]);
+});
+
+test("CI installs PI_FLOOR, and each doc that states the oldest supported Pi names it", () => {
+  const stated = [
+    [".github/workflows/ci.yml", `@earendil-works/pi-coding-agent@${PI_FLOOR} `],
+    ["README.md", `Pi ${PI_FLOOR} or later`],
+    ["docs/reference.md", `Pi ${PI_FLOOR} or later`],
+    ["docs/reference.md", `verified on Pi ${PI_FLOOR}`],
+    ["docs/pi-equivalence.md", `how Pi ${PI_FLOOR} provides`],
+    ["CONTRIBUTING.md", `\`pi\` ${PI_FLOOR}`],
+    ["plugins/pstack/pi/slash.ts", `code from pi ${PI_FLOOR}`],
+  ];
+  const stale = stated.filter(([file, phrase]) => !readFileSync(resolve(import.meta.dir, "..", file), "utf8").includes(phrase));
+  expect(stale).toEqual([]);
 });

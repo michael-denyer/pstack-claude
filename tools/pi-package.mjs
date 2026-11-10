@@ -2,9 +2,13 @@
 // set, otherwise the first global install under npm's root, Homebrew's, or
 // bun's, or null.
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
+// The oldest Pi release the port supports. CI's Pi job installs it, and
+// tests/pi-package.test.mjs fails when the workflow or a doc names another.
+export const PI_FLOOR = "1.5.1";
 
 // Where `bun add -g` puts node_modules: bun's own order is BUN_INSTALL_GLOBAL_DIR,
 // then $BUN_INSTALL/install/global, then $XDG_CACHE_HOME/.bun/install/global,
@@ -43,6 +47,21 @@ export function findPiPackage() {
   if (process.env.PI_PACKAGE_DIR) return process.env.PI_PACKAGE_DIR;
   const roots = [npmRoot(), homebrewRoot(), ...bunRoots()];
   return roots.filter(Boolean).map((root) => join(root, "@earendil-works/pi-coding-agent")).find((dir) => existsSync(join(dir, "package.json"))) ?? null;
+}
+
+// Compares major.minor.patch as numbers, so 1.10.0 is newer than 1.9.2.
+export function versionAtLeast(version, floor) {
+  const [have, need] = [version, floor].map((v) => v.split(".").map((part) => parseInt(part, 10)));
+  for (let i = 0; i < 3; i++) if (have[i] !== need[i]) return have[i] > need[i];
+  return true;
+}
+
+// The installed Pi, its version, and whether the port supports that version, or null when no Pi is installed.
+export function installedPi() {
+  const dir = findPiPackage();
+  if (!dir) return null;
+  const { version } = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
+  return { dir, version, supported: versionAtLeast(version, PI_FLOOR) };
 }
 
 // npm nests the package's dependencies in its own node_modules; bun's global

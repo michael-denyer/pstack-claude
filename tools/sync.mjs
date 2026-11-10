@@ -114,9 +114,6 @@ export function parseRule(rule, i) {
   };
 }
 
-// Rules apply in order, each to the output of the ones before it, so a rule
-// whose pattern contains an earlier rule's pattern could never match. Such a
-// pair fails here: put the longer, more specific pattern first.
 const DENY_FIELDS = new Set(["token", "regex", "hint"]);
 
 // A denylist entry matches a literal `token` or a `regex` and carries a `hint`.
@@ -149,6 +146,10 @@ export function parseDenylistEntry(entry, i) {
 // substitutions.json is an object with a substitutions array and an optional
 // denylist array. Parse fails naming the field when either is missing or not
 // an array, so a typo cannot throw a bare TypeError mid-load.
+//
+// Rules apply in order, each to the output of the ones before it, so a rule
+// whose pattern contains an earlier rule's pattern could never match. Such a
+// pair fails here: put the longer, more specific pattern first.
 export function parseSubstitutions(doc) {
   if (!isObject(doc)) {
     throw new Error("substitutions.json: must be an object");

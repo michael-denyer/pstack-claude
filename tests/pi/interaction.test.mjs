@@ -261,8 +261,8 @@ describe("schedule_wakeup", () => {
     const [skill, template, quoted, ...plain] = woken(pi);
     expect(skill).toBe(`<skill name="babysit" location="${join(dir, "SKILL.md")}">\nReferences are relative to ${dir}.\n\nSKILL-BODY-MARKER watch the PR\n</skill>\n\nPR 42`);
     expect(template).toBe("TEMPLATE-MARKER first=a rest=b c d all=a b c d");
-    // As pi's parser: a quote inside a word joins it with the quoted text.
-    expect(quoted).toBe("TEMPLATE-MARKER first=--title=fix bug rest=42 all=--title=fix bug 42");
+    // As pi's parser: a quote inside a word is text, so the space after it still splits.
+    expect(quoted).toBe('TEMPLATE-MARKER first=--title="fix rest=bug" 42 all=--title="fix bug" 42');
     // An extension command is never run for the agent, and an unknown or unreadable one is left as typed.
     expect(plain).toEqual(["/clash x", "/skill:gone", "/skill:unknown y", "/nothing"]);
     expect(ui.calls.filter((c) => c.kind === "notify").map((c) => c.message)).toEqual([

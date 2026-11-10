@@ -319,7 +319,7 @@ export const tableRows = (header, rowPrefix) => (lines) => {
 };
 
 // The lines strictly between the line `open` and the next line `close`.
-export const between = (open, close) => (lines) => {
+const between = (open, close) => (lines) => {
   const start = lines.indexOf(open);
   if (start === -1) return null;
   const end = lines.indexOf(close, start + 1);
@@ -327,7 +327,7 @@ export const between = (open, close) => (lines) => {
 };
 
 // The one line that starts with `prefix`.
-export const lineStartingWith = (prefix) => (lines) => {
+const lineStartingWith = (prefix) => (lines) => {
   const at = lines.findIndex((l) => l.startsWith(prefix));
   return at === -1 ? null : [at, at + 1];
 };
@@ -629,7 +629,7 @@ export function deriveSkill(file, text, models, leads) {
   return applyRegions(file, lines.join("\n"), models, { strict: false });
 }
 
-export function modelsSection(roles) {
+function modelsSection(roles) {
   const bullets = roles.map((r) => `- ${r.role}: ${codeList(r.models)}`).join("\n");
   return (
     "Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). " +
@@ -669,7 +669,7 @@ export function pluginAgentPaths(pluginRoot) {
 
 // Claude Code's loader tolerates frontmatter that strict YAML rejects, so an
 // agent file can load locally and still be unreadable to another parser.
-export function validateAgentFrontmatter(pluginRoot) {
+function validateAgentFrontmatter(pluginRoot) {
   const failures = pluginAgentPaths(pluginRoot).flatMap((path) => {
     try {
       const { data } = parseFrontmatter(readFileSync(join(pluginRoot, path), "utf8"));
@@ -683,7 +683,7 @@ export function validateAgentFrontmatter(pluginRoot) {
   if (failures.length) throw new Error(`agent frontmatter is not readable YAML:\n${failures.join("\n")}`);
 }
 
-export function setupModelsSection(models) {
+function setupModelsSection(models) {
   return (
     "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
     `- Available Claude models: ${codeList(models.available)}\n` +
@@ -696,7 +696,7 @@ export function setupModelsSection(models) {
 
 // The override sheet the setup skill writes for users. The preamble is fixed;
 // the role rows come from models.json.
-export function overrideSheetBlock(models) {
+function overrideSheetBlock(models) {
   const rows = models.roles.map((r) => `${r.role}: ${r.models.join(", ")}`).join("\n");
   return (
     "# pstack model configuration\n\n" +

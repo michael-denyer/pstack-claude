@@ -178,7 +178,7 @@ jobs:
       # extension against, is the latest release; this job checks the oldest
       # one the port supports.
       - name: Install Pi
-        run: npm install -g --ignore-scripts --before=2026-10-11 @earendil-works/pi-coding-agent@1.1.0 # zizmor: ignore[adhoc-packages]
+        run: npm install -g --ignore-scripts --before=2026-11-10 @earendil-works/pi-coding-agent@1.5.1 # zizmor: ignore[adhoc-packages]
       - name: Typecheck the extension against Pi
         run: bun tools/typecheck-pi.mjs
       - name: Install test dependencies

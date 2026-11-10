@@ -14,7 +14,8 @@ const piModule = (rel) => import(pathToFileURL(join(piDir, rel)).href);
 // CI's pi-types job installs Pi and sets this, so there a missing Pi fails instead of skipping.
 if (process.env.PSTACK_PI_REQUIRE_RUNTIME === "1" && !piDir) throw new Error("The slash expansion checks require an installed Pi package.");
 
-const argLines = ["", "a b  c", ' --title="fix bug" 42', 'a"b c"d', "it's fine", `'single' "double"`, "tab\tsep\nnewline", 'open "quote here', `x 'a"b' y`];
+const quoteRules = `--title="fix bug" it's "say \\"hi\\"" 'it\\'s' "a\\b" "open 'quote`;
+const argLines = ["", "a b  c", ' --title="fix bug" 42', 'a"b c"d', "it's fine", `'single' "double"`, "tab\tsep\nnewline", 'open "quote here', `x 'a"b' y`, quoteRules, '"ends in an escape\\"'];
 const templates = ["$1 $2 $3", "$@|$ARGUMENTS", "${1:-def} ${3:-none}", "${@:-empty}", "${ARGUMENTS:-empty}", "${@:2}", "${@:2:1}", "${@:0}", "$10", "$ARGUMENTS$1"];
 const argSets = [[], ["a"], ["a", "b c", "d"]];
 const files = ["no frontmatter\n", "---\nname: x\n---\nbody\n", "\uFEFF---\r\nname: x\r\n---\r\n  body  \r\n", "---\nunterminated", "---\na: 1\n----\nbody", "  ---\nx: 1\n---\ny\r"];
@@ -54,4 +55,8 @@ describe.skipIf(!piDir)("slash expansion matches the installed pi", () => {
 
 test("an empty quoted argument is kept, as in pi 1.4.0", () => {
   expect(parseCommandArgs(`a "" '' b`)).toEqual(["a", "", "", "b"]);
+});
+
+test("a quote opens only at the start of an argument, takes a backslash escape, and is text when it never closes, as in pi 1.5.1", () => {
+  expect(parseCommandArgs(quoteRules)).toEqual(['--title="fix', 'bug"', "it's", 'say "hi"', "it's", "a\\b", '"open', "'quote"]);
 });

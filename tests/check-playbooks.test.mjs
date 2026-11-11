@@ -82,6 +82,16 @@ describe("project playbooks", () => {
     expect(result.out).toContain(".agents/playbooks/bug-fix.md: a change has no straight-quoted step text to anchor on");
   });
 
+  test.each([
+    ["a quoted extends and when", '---\nextends: "bug-fix"\nwhen: \'Use it for any bug report.\'\n---\n'],
+    ["an extends flow list", "---\nextends: [bug-fix, 'feature']\nwhen: Use it for any bug report.\n---\n"],
+    ["blanks after a delimiter", "--- \nextends: bug-fix\nwhen: Use it for any bug report.\n---\t\n"],
+    ["a closing delimiter at the end of the file", "---\nextends: bug-fix\nwhen: Use it for any bug report.\n---"],
+  ])("frontmatter written as valid YAML passes: %s", (_, front) => {
+    const result = run({ "bug-fix.md": `${front}${front.endsWith("---") ? "" : '- **In** "Binary-search the cause": compare with main.\n'}` });
+    expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
+  });
+
   test("a playbook saved with CRLF line endings passes", () => {
     const result = run({
       "bug-fix.md": '---\r\nextends: bug-fix\r\nwhen: Use it for any bug report.\r\n---\r\n- **In** "Binary-search the cause": compare with main.\r\n',

@@ -9,6 +9,8 @@ const BUNDLED = resolve(dirname(fileURLToPath(import.meta.url)), "../playbooks")
 const CHANGE = /^\s*(?:[-*]|\d+\.)\s+\*\*(?:After|Before|Replace|In)\*\*\s+"([^"]+)"/;
 const CHANGE_VERB = /^\s*(?:[-*]|\d+\.)\s+\*\*(?:After|Before|Replace|In)\*\*/;
 const flat = (text) => text.replace(/\s+/g, " ");
+// A frontmatter value as YAML reads a one-line scalar: trimmed, one pair of matching quotes removed.
+const yamlScalar = (value) => value.trim().replace(/^(["'])(.*)\1$/, "$2").trim();
 
 export function checkPlaybooks(root, bundled = BUNDLED) {
   const dir = join(root, ".agents/playbooks");
@@ -17,12 +19,14 @@ export function checkPlaybooks(root, bundled = BUNDLED) {
   for (const name of readdirSync(dir).filter((file) => file.endsWith(".md")).sort()) {
     const path = `.agents/playbooks/${name}`;
     const text = readFileSync(join(dir, name), "utf8").replace(/^\uFEFF/, "").replaceAll("\r\n", "\n");
-    const front = text.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? "";
-    const field = (fieldName) => front.match(new RegExp(`^${fieldName}:[ \\t]*(.*)$`, "m"))?.[1].trim() ?? "";
+    // YAML allows trailing blanks on a delimiter and a closing one at the end of the file.
+    const front = text.match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/)?.[1] ?? "";
+    const field = (fieldName) => yamlScalar(front.match(new RegExp(`^${fieldName}:[ \\t]*(.*)$`, "m"))?.[1] ?? "");
     if (!field("when")) problems.push(`${path}: its frontmatter needs a "when:" line`);
     const bases = field("extends")
+      .replace(/^\[(.*)\]$/, "$1")
       .split(",")
-      .map((stem) => stem.trim())
+      .map((stem) => yamlScalar(stem))
       .filter(Boolean)
       .map((stem) => {
         const file = join(bundled, `${stem}.md`);

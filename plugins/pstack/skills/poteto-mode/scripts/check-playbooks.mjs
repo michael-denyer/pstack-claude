@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -56,16 +57,23 @@ function invokedDirectly() {
 
 if (invokedDirectly()) {
   const root = resolve(process.argv[2] ?? ".");
+  const home = homedir();
   const directory = join(root, ".agents/playbooks");
-  const problems = statSync(root, { throwIfNoEntry: false })?.isDirectory()
-    ? checkPlaybooks(root)
-    : [`${root} is not a directory`];
+  const homeDirectory = join(home, ".agents/playbooks");
+  const atHome = root === resolve(home);
+  let problems = [`${root} is not a directory`];
+  if (statSync(root, { throwIfNoEntry: false })?.isDirectory()) {
+    problems = atHome ? [] : checkPlaybooks(home).map((problem) => `~/${problem}`);
+    problems.push(...checkPlaybooks(root));
+  }
   if (problems.length > 0) {
     console.error(problems.join("\n"));
     process.exitCode = 1;
-  } else if (existsSync(directory)) {
+  } else if (existsSync(directory) || existsSync(homeDirectory)) {
     console.log("Every project playbook matches this pstack's playbooks.");
-  } else {
+  } else if (atHome) {
     console.log(`No project playbooks to check: ${directory} does not exist.`);
+  } else {
+    console.log(`No project playbooks to check: neither ${directory} nor ${homeDirectory} exists.`);
   }
 }

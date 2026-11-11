@@ -321,6 +321,29 @@ test("a commit only the worktree's HEAD reflog reaches holds it, a rebased branc
   expect([row(rebased)[2], row(rebased)[3], row(rebased)[7]]).toEqual(["YES", "clean", "safe"]);
 });
 
+test("the REMOTE column counts commits on each side of the pushed branch", () => {
+  const fixture = createFixture();
+  const ahead = addWorktree(fixture, "ahead");
+  git("-C", ahead, "push", "-q", "origin", "HEAD:ahead");
+  commit(ahead, "local only");
+  const behind = addWorktree(fixture, "behind");
+  git("-C", behind, "push", "-q", "origin", "HEAD:behind");
+  commit(behind, "pushed by someone else");
+  git("-C", behind, "push", "-q", "origin", "HEAD:behind");
+  git("-C", behind, "reset", "-q", "--hard", "HEAD~1");
+  const diverged = addWorktree(fixture, "diverged");
+  git("-C", diverged, "push", "-q", "origin", "HEAD:diverged");
+  commit(diverged, "theirs");
+  git("-C", diverged, "push", "-q", "origin", "HEAD:diverged");
+  git("-C", diverged, "reset", "-q", "--hard", "HEAD~1");
+  commit(diverged, "mine");
+  git("-C", fixture.repo, "fetch", "-q", "origin");
+  const { rows } = runAudit(fixture);
+  expect(rowFor(rows, ahead)[4]).toBe("ahead1");
+  expect(rowFor(rows, behind)[4]).toBe("behind1");
+  expect(rowFor(rows, diverged)[4]).toBe("ahead1,behind1");
+});
+
 // Windows caps a path near 260 bytes, so a mebibyte of status output would take thousands of files there.
 test.skipIf(process.platform === "win32")("untracked files are counted when git status prints more than a mebibyte", () => {
   const fixture = createFixture();

@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.136 - project playbooks from the home folder
+
+poteto-mode now reads project playbooks from `~/.agents/playbooks/` as well as from the repository's `.agents/playbooks/`, so a playbook that extends a bundled one can apply in every repository without a copy in each. Home playbooks take the same frontmatter and changes. When playbooks from both folders fit a task, the home folder's changes apply first. `check-playbooks.mjs` checks both folders, names a home playbook by its `~/.agents/playbooks/` path, and checks a repository at the home folder once. The path is the `~/.agents/` folder that Copilot and the skills-only install already read skills from, so it works on every runtime. @MrBinnacle asked for this in [#449](https://github.com/michael-denyer/pstack-claude/issues/449).
+
 ## 0.9.135 - worktree audit reads compressed Codex rollouts
 
 `worktree-audit.mjs` now reads the `.jsonl.zst` rollouts under Codex's `sessions` and `archived_sessions`. It used to skip them, so a worktree whose latest chat sat in a compressed rollout showed no LAST_CHAT and could be reported safe. Plain `.jsonl` transcripts are read as before, and `find-transcript.mjs` lists compressed files only for a caller that passes `includeCompressed`, so the **reflect** skill's search is unchanged. @EthanYoQ found and fixed this in [#425](https://github.com/michael-denyer/pstack-claude/pull/425).

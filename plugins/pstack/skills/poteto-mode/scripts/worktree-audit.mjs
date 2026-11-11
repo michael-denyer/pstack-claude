@@ -309,7 +309,7 @@ function remoteState(path, branch, head) {
   const sha = git(path, "for-each-ref", "--format=%(objectname)", `refs/remotes/origin/${branch}`);
   if (!sha) return "no-remote";
   if (sha === head) return "pushed";
-  // A remote someone else pushed to is behind-only or diverged, not "ahead0".
+  // `--left-right` prints the remote-only count, then the HEAD-only count.
   const [behind, ahead] = git(path, "rev-list", "--left-right", "--count", `refs/remotes/origin/${branch}...HEAD`).split(/\s+/).map(Number);
   return [ahead > 0 && `ahead${ahead}`, behind > 0 && `behind${behind}`].filter(Boolean).join(",");
 }

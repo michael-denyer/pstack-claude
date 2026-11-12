@@ -92,6 +92,14 @@ describe("project playbooks", () => {
     expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
   });
 
+  test("a quoted flow list is one stem, as YAML reads it", () => {
+    const result = run({ "ship.md": '---\nextends: "[shipping]"\nwhen: Use it to ship.\n---\n' });
+    expect(result).toEqual({
+      code: 1,
+      out: ".agents/playbooks/ship.md: extends `[shipping]`, which this pstack has no playbook for\n",
+    });
+  });
+
   test("a playbook saved with CRLF line endings passes", () => {
     const result = run({
       "bug-fix.md": '---\r\nextends: bug-fix\r\nwhen: Use it for any bug report.\r\n---\r\n- **In** "Binary-search the cause": compare with main.\r\n',

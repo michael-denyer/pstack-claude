@@ -21,12 +21,12 @@ export function checkPlaybooks(root, bundled = BUNDLED) {
     const text = readFileSync(join(dir, name), "utf8").replace(/^\uFEFF/, "").replaceAll("\r\n", "\n");
     // YAML allows trailing blanks on a delimiter and a closing one at the end of the file.
     const front = text.match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/)?.[1] ?? "";
-    const field = (fieldName) => yamlScalar(front.match(new RegExp(`^${fieldName}:[ \\t]*(.*)$`, "m"))?.[1] ?? "");
-    if (!field("when")) problems.push(`${path}: its frontmatter needs a "when:" line`);
+    const field = (fieldName) => front.match(new RegExp(`^${fieldName}:[ \\t]*(.*)$`, "m"))?.[1].trim() ?? "";
+    if (!yamlScalar(field("when"))) problems.push(`${path}: its frontmatter needs a "when:" line`);
     const bases = field("extends")
       .replace(/^\[(.*)\]$/, "$1")
       .split(",")
-      .map((stem) => yamlScalar(stem))
+      .map(yamlScalar)
       .filter(Boolean)
       .map((stem) => {
         const file = join(bundled, `${stem}.md`);

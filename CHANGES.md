@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.138 - worktree audit shows behind and diverged remotes
+
+The REMOTE column of `worktree-audit.mjs` counted only the commits a worktree had that its pushed branch lacked. A worktree whose pushed branch someone else had advanced printed `ahead0`, which reads as in sync, and a diverged one printed only its ahead count. The column now counts both sides and prints `aheadN`, `behindN`, or `aheadN,behindN`. The pushed, no-remote, and detached cases are unchanged, and no worktree changes bucket, because the bucket reads only whether the remote state is known. The 0.9.137 package already carried this change, and its entry left it out. @wattanartongtipsukon-create found and fixed this in [#453](https://github.com/michael-denyer/pstack-claude/pull/453).
+
 ## 0.9.137 - project playbook frontmatter read as YAML
 
 `check-playbooks.mjs` matched a project playbook's frontmatter as raw text, so frontmatter that is valid YAML failed with the wrong error. A quoted `extends: "bug-fix"` or a one-line flow list `extends: [bug-fix, feature]` reported an unknown base. Blanks after an opening or closing `---`, or a closing `---` at the end of the file, kept the script from finding the frontmatter, so it reported a missing `when:` line. The script now drops one pair of matching quotes from `when` and from each `extends` item, reads a one-line flow list, and accepts both delimiter forms. A quoted `"[bug-fix]"` stays one stem, as YAML reads it. A `when` that is empty once unquoted now fails as a missing `when:` line. The script still does not read a block list under `extends:` or a trailing `# comment`. @wattanartongtipsukon-create found and fixed this in [#455](https://github.com/michael-denyer/pstack-claude/pull/455), and a follow-up commit on that PR unquotes each `extends` item instead of the whole value.

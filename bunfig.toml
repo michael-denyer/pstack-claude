@@ -2,3 +2,6 @@
 # scripts carry their own dependencies and run from their own directory.
 [test]
 root = "tests"
+
+# Name the install fix when the test copy of Pi is missing.
+preload = ["./tests/preflight.mjs"]

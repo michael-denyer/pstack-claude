@@ -8,7 +8,8 @@ import { Value } from "typebox/value";
 
 import { noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
-import { type Activity, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
+import { type Activity, type AgentChild, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
+import { HcChild } from "./hc-child.ts";
 import { loadAgentTypes } from "./agent-files.ts";
 import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
@@ -73,7 +74,7 @@ export type EndedRecord = Static<typeof endedSchema>;
 export type AgentRecord = Static<typeof recordSchema>;
 
 interface Run {
-  child: PiChild;
+  child: AgentChild;
   background: boolean;
   // Set once the run is told to end: the exit code no longer decides the
   // status. teardown means the session is going away, so no notice follows.
@@ -135,7 +136,7 @@ function settle(worktree: Worktree): { kept: boolean; note: string } {
 }
 
 function childArgs(identity: AgentIdentity, depth: number): string[] {
-  const args = ["--mode", "rpc", "--session-id", identity.sessionId, "--session-dir", identity.sessionDir];
+  const args = ["--session-id", identity.sessionId, "--session-dir", identity.sessionDir];
   if (identity.model) args.push("--model", identity.model);
   if (identity.thinking) args.push("--thinking", identity.thinking);
   if (identity.systemPromptFile) args.push("--append-system-prompt", identity.systemPromptFile);
@@ -273,13 +274,7 @@ export class AgentRunner {
       }
       throw e;
     }
-    const { command, args } = this.settings.pi;
-    const child = new PiChild(
-      command,
-      [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills"), ...childArgs(identity, this.settings.depth)],
-      { cwd: identity.cwd, env: { [PARENT_SESSION_ENV]: this.ownSessionId }, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() },
-      prompt,
-    );
+    const child = this.spawnChild(identity, prompt);
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
     const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
@@ -287,6 +282,18 @@ export class AgentRunner {
     this.persist(record);
     this.showStatus();
     return record;
+  }
+
+  private spawnChild(identity: AgentIdentity, prompt: string): AgentChild {
+    const { command, args } = this.settings.pi;
+    const base = [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills")];
+    const flags = childArgs(identity, this.settings.depth);
+    const env = { [PARENT_SESSION_ENV]: this.ownSessionId };
+    if (readSheet(this.settings.agentDir)?.hcHost && process.env.HC_TERMINAL_ID) {
+      const transcript = () => sessionFile(identity);
+      return new HcChild(identity.id, command, [...base, ...flags], { cwd: identity.cwd, env: { ...env, PI_CODING_AGENT_DIR: this.settings.agentDir }, transcript }, prompt);
+    }
+    return new PiChild(command, [...base, "--mode", "rpc", ...flags], { cwd: identity.cwd, env, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() }, prompt);
   }
 
   // From session_start too: a reloaded session can resume an agent with
@@ -409,7 +416,6 @@ export class AgentRunner {
     if (state.kind === "ended") return state.record;
     const { run } = state;
     if (run.ending !== "teardown") run.ending = ending;
-    void run.child.command({ type: "abort" });
     run.child.end(this.settings.killGraceMs);
     return run.done;
   }

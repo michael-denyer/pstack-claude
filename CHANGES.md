@@ -2,12 +2,6 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.134 - DeepSeek Harness skills-only support
-
-DeepSeek Harness can read the shared skills tree through its local filesystem provider. The new [DSH mapping](plugins/pstack/skills/poteto-mode/references/dsh-tools.md) translates skill loading, native subagents, model discovery, tasks, and file tools while keeping DSH's permissions, scheduling authorization, and session boundaries. The generator adds its pointer to `poteto-mode` without copying the skill tree or changing other runtimes' mappings.
-
-This is a skills-only installation, not a native DSH bundle. It supplies no routing hook, role-sheet reader, Pi extension, or new execution tools. `setup-pstack` uses the native delegation defaults unless the user explicitly chooses available routes; it does not write another runtime's model sheet. Runtime rows can now omit a native manifest while retaining their generated mapping and shared skill checks.
-
 ## 0.9.133 - worktree audit ref and PR fixes, setup-pstack runtime notes
 
 `worktree-audit.mjs` now checks a worktree's ancestry against `refs/remotes/origin/<trunk>`. git resolves the shorthand `origin/<trunk>` to a tag or local branch of that name before the remote-tracking ref. Such a ref pointing at unmerged work made the audit report the worktree merged and safe. The REMOTE column's ahead count reads `refs/remotes/origin/<branch>` for the same reason. @EthanYoQ found and fixed the trunk case in [#423](https://github.com/michael-denyer/pstack-claude/pull/423).

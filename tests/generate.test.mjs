@@ -788,7 +788,9 @@ describe("plan, changes, apply", () => {
   test.each(RUNTIMES.map((runtime) => [runtime.name, runtime]))("a %s per-skill note for a skill that does not exist fails", (_, runtime) => {
     const root = repoCopy();
     const tools = join(root, runtime.tools);
-    writeFileSync(tools, readFileSync(tools, "utf8").replace(/^\| `why` \|/m, "| `gone` |"));
+    const markdown = readFileSync(tools, "utf8");
+    const [skill] = noteSkills(runtime, markdown);
+    writeFileSync(tools, markdown.replace(`| \`${skill}\` |`, "| `gone` |"));
     expect(() => loadLeadLines(root)).toThrow(`${runtime.tools}: per-skill note for "gone", which has no SKILL.md`);
   });
 

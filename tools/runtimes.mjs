@@ -592,8 +592,8 @@ export function dshModelNamesSection(models) {
     `Roles used by ${roleSkills(models).map(code).join(", ")} are prompt responsibilities, not DSH model IDs or built-in agent types. ` +
     `Diverse-model panels (${panelSkills(models)}) require distinct available model families; report when that is unavailable. ` +
     "Do not manufacture diversity by relabeling the same model.\n\n" +
-    "This skills-only integration has no automatic per-role sheet reader. `setup-pstack` follows the " +
-    "DeepSeek Harness section of its Other runtimes reference, not Claude Code's model-sheet steps."
+    "This skills-only integration has no automatic per-role sheet reader. `setup-pstack` uses the " +
+    "native delegation defaults, as its Other runtimes table describes."
   );
 }
 

@@ -187,11 +187,7 @@ This installs the native Antigravity plugin bundle (`skills`, `agents`, and `Ses
 <details>
 <summary><strong>DeepSeek Harness (skills-only)</strong></summary>
 
-Use the [shared skills installation](#other-harnesses) below to link each pstack skill directory into `~/.agents/skills/`, which DSH's filesystem skill provider scans by default. Alternatively, configure that provider's `customSkillDirs` with the absolute path to this checkout's `plugins/pstack/skills` directory. Discovery is one level deep: link each skill, not the parent pstack directory.
-
-Ask the agent to use `poteto-mode` by name. The [DSH mapping](plugins/pstack/skills/poteto-mode/references/dsh-tools.md) uses the tools available in the current DSH session; it does not load the Pi extension or add an automatic routing hook. Models inherit the session defaults unless explicitly configured through supported DSH capabilities. The model provider does not select the mapping: a DSH session using GitHub Copilot still uses the DSH mapping.
-
-This is not a native DSH plugin or bundle. Do not install this repository with `dsh plugin add` or `plugin_manager`'s `install_bundle`. See the [DSH reference](docs/reference.md#deepseek-harness) for discovery, update, and verification limits.
+Use the [shared skills installation](#other-harnesses) below to link each pstack skill directory into `~/.agents/skills/`, which DSH discovers by default. Ask for `poteto-mode` by name and use the [DSH mapping](plugins/pstack/skills/poteto-mode/references/dsh-tools.md), regardless of the model provider. This skills-only installation adds no native DSH bundle, Pi extension, routing hook, or role sheet.
 
 </details>
 

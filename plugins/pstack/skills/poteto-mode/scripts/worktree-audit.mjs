@@ -286,7 +286,12 @@ function dirtyState(path) {
     .split("\n").filter(Boolean);
   const untracked = lines.filter((line) => line.startsWith("??")).length;
   const ignoredLines = lines.filter((line) => line.startsWith("!!"));
-  const ignored = ignoredLines.filter((line) => {
+  // Superproject status omits ignored files inside initialized submodules,
+  // even with --ignore-submodules=none. Force-removing the worktree deletes them.
+  const submoduleIgnored = git(path, "submodule", "foreach", "--quiet", "--recursive",
+    "git status --porcelain --untracked-files=all --ignored=matching --ignore-submodules=none")
+    .split("\n").filter((line) => line.startsWith("!!"));
+  const ignored = [...ignoredLines, ...submoduleIgnored].filter((line) => {
     const parts = line.slice(3).replace(/^"|"$/g, "").split("/");
     return !parts.some((part) => DISPOSABLE.has(part));
   }).length;

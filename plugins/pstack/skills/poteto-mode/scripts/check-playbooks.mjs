@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -8,6 +9,8 @@ const BUNDLED = resolve(dirname(fileURLToPath(import.meta.url)), "../playbooks")
 const CHANGE = /^\s*(?:[-*]|\d+\.)\s+\*\*(?:After|Before|Replace|In)\*\*\s+"([^"]+)"/;
 const CHANGE_VERB = /^\s*(?:[-*]|\d+\.)\s+\*\*(?:After|Before|Replace|In)\*\*/;
 const flat = (text) => text.replace(/\s+/g, " ");
+// A frontmatter value as YAML reads a one-line scalar: trimmed, one pair of matching quotes removed.
+const yamlScalar = (value) => value.trim().replace(/^(["'])(.*)\1$/, "$2").trim();
 
 export function checkPlaybooks(root, bundled = BUNDLED) {
   const dir = join(root, ".agents/playbooks");
@@ -16,12 +19,14 @@ export function checkPlaybooks(root, bundled = BUNDLED) {
   for (const name of readdirSync(dir).filter((file) => file.endsWith(".md")).sort()) {
     const path = `.agents/playbooks/${name}`;
     const text = readFileSync(join(dir, name), "utf8").replace(/^\uFEFF/, "").replaceAll("\r\n", "\n");
-    const front = text.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? "";
+    // YAML allows trailing blanks on a delimiter and a closing one at the end of the file.
+    const front = text.match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/)?.[1] ?? "";
     const field = (fieldName) => front.match(new RegExp(`^${fieldName}:[ \\t]*(.*)$`, "m"))?.[1].trim() ?? "";
-    if (!field("when")) problems.push(`${path}: its frontmatter needs a "when:" line`);
+    if (!yamlScalar(field("when"))) problems.push(`${path}: its frontmatter needs a "when:" line`);
     const bases = field("extends")
+      .replace(/^\[(.*)\]$/, "$1")
       .split(",")
-      .map((stem) => stem.trim())
+      .map(yamlScalar)
       .filter(Boolean)
       .map((stem) => {
         const file = join(bundled, `${stem}.md`);
@@ -56,16 +61,23 @@ function invokedDirectly() {
 
 if (invokedDirectly()) {
   const root = resolve(process.argv[2] ?? ".");
+  const home = homedir();
   const directory = join(root, ".agents/playbooks");
-  const problems = statSync(root, { throwIfNoEntry: false })?.isDirectory()
-    ? checkPlaybooks(root)
-    : [`${root} is not a directory`];
+  const homeDirectory = join(home, ".agents/playbooks");
+  const atHome = root === resolve(home);
+  let problems = [`${root} is not a directory`];
+  if (statSync(root, { throwIfNoEntry: false })?.isDirectory()) {
+    problems = atHome ? [] : checkPlaybooks(home).map((problem) => `~/${problem}`);
+    problems.push(...checkPlaybooks(root));
+  }
   if (problems.length > 0) {
     console.error(problems.join("\n"));
     process.exitCode = 1;
-  } else if (existsSync(directory)) {
+  } else if (existsSync(directory) || existsSync(homeDirectory)) {
     console.log("Every project playbook matches this pstack's playbooks.");
-  } else {
+  } else if (atHome) {
     console.log(`No project playbooks to check: ${directory} does not exist.`);
+  } else {
+    console.log(`No project playbooks to check: neither ${directory} nor ${homeDirectory} exists.`);
   }
 }

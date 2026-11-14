@@ -48,12 +48,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, posix, relative, sep } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
-import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
+import { code, codeList, isMain, PLUGIN, SKILLS } from "./plugin.mjs";
 import { PLATFORM_ADAPTATION_OPEN, platformAdaptation, RUNTIMES, roleSkills } from "./runtimes.mjs";
 import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree, walk } from "./validate-skills.mjs";
 
@@ -319,7 +319,7 @@ export const tableRows = (header, rowPrefix) => (lines) => {
 };
 
 // The lines strictly between the line `open` and the next line `close`.
-export const between = (open, close) => (lines) => {
+const between = (open, close) => (lines) => {
   const start = lines.indexOf(open);
   if (start === -1) return null;
   const end = lines.indexOf(close, start + 1);
@@ -327,7 +327,7 @@ export const between = (open, close) => (lines) => {
 };
 
 // The one line that starts with `prefix`.
-export const lineStartingWith = (prefix) => (lines) => {
+const lineStartingWith = (prefix) => (lines) => {
   const at = lines.findIndex((l) => l.startsWith(prefix));
   return at === -1 ? null : [at, at + 1];
 };
@@ -512,9 +512,14 @@ export function resolveModels(models) {
 const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
 const TIERS = ["default", "strongest", "worker", "panel"];
 
+export const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
 // Check models.json's shape and resolve its tiers, throwing with the offending
-// role, tier, or slug named. `skillExists(skill)` reports whether a role's
-// skill directory carries a SKILL.md.
+// role, tier, or slug named. Parse fails naming the document or entry when the
+// root or a roles entry is missing or not an object, so a typo cannot throw a
+// bare TypeError mid-load.
+// `skillExists(skill)` reports whether a role's skill directory carries a
+// SKILL.md.
 export function parseModels(raw, skillExists) {
   const fail = (message) => {
     throw new Error(`models.json: ${message}`);
@@ -526,7 +531,9 @@ export function parseModels(raw, skillExists) {
       seen.add(item);
     }
   };
-  const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  // A typo that makes the document null or a non-object must name models.json,
+  // not throw a bare TypeError when the first field is read.
+  if (!isObject(raw)) fail("must be an object");
   for (const key of ["available", "efforts", "roles"]) if (!Array.isArray(raw[key])) fail(`"${key}" must be a list`);
   for (const key of ["tiers", ...RUNTIMES.filter((runtime) => runtime.key).map((runtime) => runtime.key)]) {
     if (!isObject(raw[key])) fail(`"${key}" must be an object`);
@@ -546,7 +553,10 @@ export function parseModels(raw, skillExists) {
     tierLists.set(slugs.join(), tier);
   }
   const labels = new Set();
-  for (const role of raw.roles) {
+  for (const [i, role] of raw.roles.entries()) {
+    // A typo that makes a role entry null or a non-object must name the entry,
+    // not throw a bare TypeError when the first field is read.
+    if (!isObject(role)) fail(`roles[${i}] must be an object`);
     if (labels.has(role.role)) fail(`role "${role.role}" appears twice`);
     labels.add(role.role);
     if (!skillExists(role.skill)) fail(`role "${role.role}" names skill "${role.skill}", which has no SKILL.md`);
@@ -629,7 +639,7 @@ export function deriveSkill(file, text, models, leads) {
   return applyRegions(file, lines.join("\n"), models, { strict: false });
 }
 
-export function modelsSection(roles) {
+function modelsSection(roles) {
   const bullets = roles.map((r) => `- ${r.role}: ${codeList(r.models)}`).join("\n");
   return (
     "Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). " +
@@ -669,7 +679,7 @@ export function pluginAgentPaths(pluginRoot) {
 
 // Claude Code's loader tolerates frontmatter that strict YAML rejects, so an
 // agent file can load locally and still be unreadable to another parser.
-export function validateAgentFrontmatter(pluginRoot) {
+function validateAgentFrontmatter(pluginRoot) {
   const failures = pluginAgentPaths(pluginRoot).flatMap((path) => {
     try {
       const { data } = parseFrontmatter(readFileSync(join(pluginRoot, path), "utf8"));
@@ -683,7 +693,7 @@ export function validateAgentFrontmatter(pluginRoot) {
   if (failures.length) throw new Error(`agent frontmatter is not readable YAML:\n${failures.join("\n")}`);
 }
 
-export function setupModelsSection(models) {
+function setupModelsSection(models) {
   return (
     "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
     `- Available Claude models: ${codeList(models.available)}\n` +
@@ -696,7 +706,7 @@ export function setupModelsSection(models) {
 
 // The override sheet the setup skill writes for users. The preamble is fixed;
 // the role rows come from models.json.
-export function overrideSheetBlock(models) {
+function overrideSheetBlock(models) {
   const rows = models.roles.map((r) => `${r.role}: ${r.models.join(", ")}`).join("\n");
   return (
     "# pstack model configuration\n\n" +
@@ -739,8 +749,8 @@ export function strayModelSlugs(file, text, models) {
 
 // The hook handler shapes Claude Code documents, one schema per `type`
 // (https://code.claude.com/docs/en/hooks, "Hook handler fields"), plus Codex's
-// commandWindows on a command hook. A key no type lists is a fault, so a
-// misspelt override cannot be dropped without notice.
+// commandWindows and Copilot's powershell on a command hook. A key no type
+// lists is a fault, so a misspelt override cannot be dropped without notice.
 const HOOK_FIELDS = {
   if: Type.Optional(Type.String()),
   timeout: Type.Optional(Type.Number()),
@@ -753,6 +763,7 @@ const HOOK_TYPES = {
   command: hookType("command", {
     command: Type.String(),
     commandWindows: Type.Optional(Type.String()),
+    powershell: Type.Optional(Type.String()),
     args: Type.Optional(Type.Array(Type.String())),
     async: Type.Optional(Type.Boolean()),
     asyncRewake: Type.Optional(Type.Boolean()),
@@ -811,8 +822,17 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", ro
         continue;
       }
       if (hook.type !== "command") continue;
-      for (const command of [hook.command, hook.commandWindows].filter((value) => value !== undefined)) {
-        const refs = [...command.matchAll(new RegExp(`\\$\\{${root}\\}/([^"\\s]+)`, "g"))].map((m) => m[1]);
+      // Copilot runs powershell on Windows in place of command, and PowerShell
+      // reads the root from $env. `exit 0`, a PreToolUse hook that leaves each
+      // call to Copilot, is the one override that names no plugin file.
+      const commands = [
+        [hook.command, `\\$\\{${root}\\}/`],
+        [hook.commandWindows, `\\$\\{${root}\\}/`],
+        [hook.powershell === "exit 0" ? undefined : hook.powershell, `\\$env:${root}/`],
+      ];
+      for (const [command, reference] of commands) {
+        if (command === undefined) continue;
+        const refs = [...command.matchAll(new RegExp(`${reference}([^"\\s]+)`, "g"))].map((m) => m[1]);
         if (!refs.length) {
           faults.push(`${event}: command does not reference \${${root}}: ${command}`);
           continue;
@@ -1046,7 +1066,7 @@ function main() {
 
 // Guarded so importing the generator's validation and rendering functions does
 // not regenerate the repo as a side effect.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta.url)) {
   try {
     main();
   } catch (err) {

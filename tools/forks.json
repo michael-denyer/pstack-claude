@@ -56,7 +56,7 @@
     },
     "plugins/pstack/skills/poteto-mode/SKILL.md": {
       "kind": "policy",
-      "why": "Adds the Platform Adaptation section, whose runtime sentence the generator stamps from RUNTIMES, with its task-tool and todo.md fallback (per task slug when sessions share a checkout, and beside the desktop app's short update_plan list), the run-or-verify driver line, the deploy-platform and defect-severity triggers, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it points the Agent-call defaults at the Models section with full tool access and the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and describes Autopilot-full as stopping at merge-ready for the operator's click and Autopilot-stack as Autopilot-full for PRs that build on each other.",
+      "why": "Adds the Platform Adaptation section, whose runtime sentence the generator stamps from RUNTIMES, with its task-tool and todo.md fallback (per task slug when sessions share a checkout, and beside the desktop app's short update_plan list), the run-or-verify driver line, the deploy-platform and defect-severity triggers, the focused-fix exception to the how and architect triggers, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it points the Agent-call defaults at the Models section with full tool access and the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and describes Autopilot-full as stopping at merge-ready for the operator's click and Autopilot-stack as Autopilot-full for PRs that build on each other.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },
@@ -80,7 +80,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/bug-fix.md": {
       "kind": "policy",
-      "why": "The reply quotes the decisive failing and passing output trimmed to the assertion and counts, not the whole repro verbatim.",
+      "why": "Quotes decisive failing and passing output trimmed to the assertion and counts, separates verified code, publication, observed runtime behavior, and blockers, selects non-sensitive diagnostic fields before printing, and adds a focused-fix exception with explicit architecture and independent correctness review triggers for higher-risk fixes.",
       "since": "0.9.10",
       "upstream": "not-proposed"
     },
@@ -170,7 +170,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/github.test.ts": {
       "kind": "policy",
-      "why": "Covers the port's GitHub reader: completed conclusions that gh buckets as pending, a checkout PR paired with a different explicit repository, a full open-PR page refused as a possibly cut stack, a stack that never takes a PR headed at the default branch as parent, child, or seed under the default branch the repository reports, while a fork branch of the same name still stacks, a check-rollup cursor that repeats or returns to an earlier page, a review-thread cursor that repeats, a review-thread page that promises more pages without a cursor, a binary that cannot be spawned, the base revision field, and a no-checks reading that needs both check reads to agree and fails closed otherwise. Expects the `missing-field` query failure.",
+      "why": "Adapts upstream's cases to the port's GitHub reader: a `reported` helper that narrows each check read to reported checks, rollup pages tagged `contexts`, the base revision read from `baseRef`, an empty `reviewDecision` rejected like any other unknown enum value, the `missing-field` query failure, `orderStack` taking the default branch and each head's repository in place of `isCrossRepository`, and a reader built with the shared deadline. The port's own cases are in `github.port.test.ts`.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
@@ -182,7 +182,7 @@
     },
     "plugins/pstack/skills/poteto-mode/scripts/watch-pr/policy.test.ts": {
       "kind": "policy",
-      "why": "Covers the review-required and branch-protection merge gates and their wait for pending checks, the behind-base gate that stops without waiting for pending or unreported checks and outranks a required review but not requested changes, the wait while GitHub has not computed mergeability (never ready and never a query error, re-polled at the interval, timing out at the caller's deadline, one status row on a one-shot pass, and blockers that do not depend on it still stopping at once), a PR with no checks configured (waiting in single, stack, and queued mode until the reading has persisted for 60 seconds however short the interval, each PR timed from its own first sighting and unconfirmed when the caller supplies no confirmer, timing out there under a shorter deadline, ready once it has, still stopped by conflicts, threads, and gates, honouring checks that register on the next poll, and failing closed while the head may not have reported), the second facts read in the snapshot plan and the retry when the PR's state, merge time, head branch, gate, review, draft, or conflict state changes between the two reads, except mergeability that the first read had not computed, and the shared deadline in the poll loop.",
+      "why": "Adapts upstream's cases to the port's policy: the second facts read in the snapshot plan and the read it adds to each sweep, a stack wait that carries its reason, `evaluateQueue` without a clock reading, and the shared deadline in the poll loop. The port's own cases are in `policy.port.test.ts`.",
       "since": "0.9.24",
       "upstream": "not-proposed"
     },
@@ -242,7 +242,7 @@
     },
     "plugins/pstack/skills/setup-pstack/SKILL.md": {
       "kind": "port-feature",
-      "why": "Writes the override sheet at each runtime's own path, loaded by @-include on Claude Code, pasted into AGENTS.md on Codex, and read directly by the Muse plugin hook since none has Cursor's always-applied rules, replaces Cursor's budget step with a default effort and per-role effort levels and explains Codex's active-turn metadata requirement for session effort, adds the SessionStart hook toggle and names the Pi extension and OpenCode plugin as readers of it, keeps every runtime's sheet path table and per-runtime step changes in references/runtimes.md, routing GitHub Copilot to copilot.md, Kimi and Grok to runtime-specific setup, and OMP to native model configuration and its global routing toggle, and numbers its verification and formal verification offers as steps 9 and 10.",
+      "why": "Writes the override sheet at each runtime's own path, loaded by @-include on Claude Code with a committed project sheet that replaces the user's, pasted into AGENTS.md on Codex, and read directly by the Muse plugin hook since none has Cursor's always-applied rules, replaces Cursor's budget step with a default effort and per-role effort levels and explains Codex's active-turn metadata requirement for session effort, adds the SessionStart hook toggle and names the Pi extension and OpenCode plugin as readers of it, keeps every runtime's sheet path table and per-runtime step changes in references/runtimes.md, routing GitHub Copilot to copilot.md, Kimi and Grok to runtime-specific setup, and OMP to native model configuration and its global routing toggle, and numbers its verification and formal verification offers as steps 9 and 10.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },

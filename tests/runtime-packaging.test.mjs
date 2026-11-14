@@ -234,8 +234,8 @@ describe("validatePiPackage", () => {
 });
 
 describe("validateHooks", () => {
-  const hooks = (command, commandWindows) =>
-    JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command, commandWindows }] }] } });
+  const hooks = (command, commandWindows, powershell) =>
+    JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command, commandWindows, powershell }] }] } });
   const exec = { mode: 0o755 };
   const plain = { mode: 0o644 };
 
@@ -291,6 +291,32 @@ describe("validateHooks", () => {
     expect(() => validateHooks(cmd, { statOf: (rel) => rel.endsWith(".sh") ? exec : null })).toThrow(
       "SessionStart: hooks/session-start.ps1 does not exist",
     );
+  });
+
+  test("checks a Copilot PowerShell override under the runtime's own root variable", () => {
+    const root = "COPILOT_PLUGIN_ROOT";
+    const sh = '"${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh" copilot';
+    const ps = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:COPILOT_PLUGIN_ROOT/hooks/session-start.ps1" copilot';
+    const statOf = (rel) => (rel.endsWith(".sh") ? exec : plain);
+    expect(() => validateHooks(hooks(sh, undefined, ps), { statOf, root })).not.toThrow();
+    expect(() => validateHooks(hooks(sh, undefined, ps), { statOf: (rel) => (rel.endsWith(".sh") ? exec : null), root })).toThrow(
+      "SessionStart: hooks/session-start.ps1 does not exist",
+    );
+    const otherRoot = 'powershell.exe -File "$env:CLAUDE_PLUGIN_ROOT/hooks/session-start.ps1"';
+    expect(() => validateHooks(hooks(sh, undefined, otherRoot), { statOf, root })).toThrow("does not reference ${COPILOT_PLUGIN_ROOT}");
+  });
+
+  test("accepts exit 0 as the only PowerShell override that names no plugin file", () => {
+    const root = "COPILOT_PLUGIN_ROOT";
+    const sh = '"${COPILOT_PLUGIN_ROOT}/hooks/pre-tool-use.sh"';
+    expect(() => validateHooks(hooks(sh, undefined, "exit 0"), { statOf: () => exec, root })).not.toThrow();
+    for (const ps of [
+      'powershell.exe -File "$env:COPILOT_PLUGN_ROOT/hooks/session-start.ps1" copilot',
+      'powershell.exe -File "${COPILOT_PLUGIN_ROOT}/hooks/missing.ps1" copilot',
+      "Write-Output allow",
+    ]) {
+      expect(() => validateHooks(hooks(sh, undefined, ps), { statOf: () => exec, root })).toThrow("does not reference ${COPILOT_PLUGIN_ROOT}");
+    }
   });
 
   test("names a hook without a command, even when it has a Windows override", () => {

@@ -12,6 +12,10 @@
 // and archived_sessions under $CODEX_HOME, and Pi's sessions and pstack subagent
 // sessions under $PI_CODING_AGENT_DIR (defaults: ~/.claude, ~/.codex, ~/.pi/agent).
 //
+// Compressed rollouts use native Zstd when it reads complete streams. Other
+// runtimes fall back to zstd on PATH. A decode failure makes the whole chat
+// scan unknown, so no worktree can be declared safe from that scan.
+//
 // Every probe yields a Fact, { known: true, value } or { known: false }. A hold
 // bucket needs only its own fact; `safe` needs every fact known.
 import { execFileSync } from "node:child_process";
@@ -20,6 +24,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
 
 import { candidates, rethrowUnlessRemoved } from "../../reflect/scripts/find-transcript.mjs";
 
@@ -199,11 +204,38 @@ function transcriptNeedles(spellings) {
   return [...new Set(forms)].map((form) => Buffer.from(JSON.stringify(form).slice(1, -1)));
 }
 
+// Bun 1.4.4 returns the partial output of a truncated frame without an error,
+// and nodejs/node#64592 reports the same for Node. The check also turns down a
+// decoder that stops after the first frame. It runs once, not once per transcript.
+function nativeZstdDecoder() {
+  const decode = zlib.zstdDecompressSync;
+  if (typeof decode !== "function") return undefined;
+  // A complete Zstd frame containing "a", independent of compressor availability.
+  const frame = Buffer.from("28b52ffd200109000061", "hex");
+  const joined = Buffer.concat([frame, frame]);
+  try {
+    if (decode(joined).toString() !== "aa") return undefined;
+  } catch {
+    return undefined;
+  }
+  for (const partial of [frame.subarray(0, -1), joined.subarray(0, -1)]) {
+    try {
+      decode(partial);
+      return undefined;
+    } catch { /* A complete-stream decoder must reject an unfinished frame. */ }
+  }
+  return decode;
+}
+
+const decodeZstd = nativeZstdDecoder() ?? ((input) => execFileSync("zstd", ["-d", "-c"], {
+  input, stdio: ["pipe", "pipe", "pipe"], maxBuffer: Infinity, timeout: 30_000,
+}));
+
 // `spellings` maps each worktree path to every spelling a session could use.
 export function lastChats(roots, spellings) {
   const needles = [...spellings].map(([path, forms]) => [path, transcriptNeedles(forms)]);
   const latest = new Map();
-  for (const { path: file } of roots.flatMap((root) => candidates(root, Infinity))) {
+  for (const { path: file } of roots.flatMap((root) => candidates(root, Infinity, { includeCompressed: true }))) {
     let text, mtime;
     try {
       text = readFileSync(file);
@@ -213,6 +245,15 @@ export function lastChats(roots, spellings) {
     } catch (error) {
       rethrowUnlessRemoved(error);
       continue;
+    }
+    if (file.endsWith(".jsonl.zst")) {
+      try {
+        text = decodeZstd(text);
+      } catch (error) {
+        // A missing fallback executable is not a transcript removed during enumeration.
+        const hint = error.code === "ENOENT" ? " Use a runtime with complete native Zstd support or install zstd." : "";
+        throw new Error(`cannot decode ${file}: ${String(error.stderr ?? "").trim() || error.message}${hint}`);
+      }
     }
     for (const [path, forms] of needles) {
       if (mtime > (latest.get(path) ?? 0) && forms.some((needle) => mentions(text, needle))) latest.set(path, mtime);
@@ -268,7 +309,9 @@ function remoteState(path, branch, head) {
   const sha = git(path, "for-each-ref", "--format=%(objectname)", `refs/remotes/origin/${branch}`);
   if (!sha) return "no-remote";
   if (sha === head) return "pushed";
-  return `ahead${git(path, "rev-list", "--count", `refs/remotes/origin/${branch}..HEAD`)}`;
+  // `--left-right` prints the remote-only count, then the HEAD-only count.
+  const [behind, ahead] = git(path, "rev-list", "--left-right", "--count", `refs/remotes/origin/${branch}...HEAD`).split(/\s+/).map(Number);
+  return [ahead > 0 && `ahead${ahead}`, behind > 0 && `behind${behind}`].filter(Boolean).join(",");
 }
 
 export function duSize(output) {

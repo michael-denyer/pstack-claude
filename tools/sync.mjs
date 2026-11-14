@@ -71,7 +71,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { deriveSkill, loadLeadLines, loadModels } from "./generate.mjs";
+import { deriveSkill, isObject, loadLeadLines, loadModels } from "./generate.mjs";
+import { isMain } from "./plugin.mjs";
 import { walk } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -81,11 +82,13 @@ const RULE_FIELDS = new Set(["pattern", "regex", "files", "replacement", "ration
 // A rule matches a literal `pattern` or a `regex`, optionally only in files
 // whose upstream-relative path matches `files`, and rewrites each match to the
 // literal `replacement`. Its count is keyed by the pattern, or by the regex and
-// its `files` scope.
+// its `files` scope. Parse fails naming the rule when the shape is wrong or a
+// regex does not compile, so a typo cannot throw a bare TypeError mid-load.
 export function parseRule(rule, i) {
   const fail = (message) => {
     throw new Error(`substitutions[${i}]: ${message}`);
   };
+  if (!isObject(rule)) fail("must be an object");
   const unknown = Object.keys(rule).filter((field) => !RULE_FIELDS.has(field));
   if (unknown.length) fail(`unknown field ${unknown.map((f) => `"${f}"`).join(", ")}`);
   const { pattern, regex, files, replacement, rationale } = rule;
@@ -96,18 +99,64 @@ export function parseRule(rule, i) {
   if (typeof replacement !== "string") fail("needs a replacement string");
   if (typeof rationale !== "string" || !rationale) fail("needs a rationale");
   if (files != null && typeof files !== "string") fail("files must be a regex source string");
+  const compile = (field, src, flags) => {
+    try {
+      return new RegExp(src, flags);
+    } catch (error) {
+      fail(`${field} ${JSON.stringify(src)} is not a valid regex: ${error.message}`);
+    }
+  };
   return {
     key: pattern ?? (files ? `${regex} in ${files}` : regex),
-    match: pattern ?? new RegExp(regex, "g"),
-    files: files ? new RegExp(files) : null,
+    match: pattern ?? compile("regex", regex, "g"),
+    files: files ? compile("files", files) : null,
     replacement,
   };
 }
 
+const DENY_FIELDS = new Set(["token", "regex", "hint"]);
+
+// A denylist entry matches a literal `token` or a `regex` and carries a `hint`.
+// Parse fails naming the entry when the shape is wrong or the regex does not
+// compile, so a typo cannot match every line or throw a bare SyntaxError mid-scan.
+export function parseDenylistEntry(entry, i) {
+  const fail = (message) => {
+    throw new Error(`denylist[${i}]: ${message}`);
+  };
+  if (!isObject(entry)) fail("must be an object");
+  const unknown = Object.keys(entry).filter((field) => !DENY_FIELDS.has(field));
+  if (unknown.length) fail(`unknown field ${unknown.map((f) => `"${f}"`).join(", ")}`);
+  const { token, regex, hint } = entry;
+  const source = token ?? regex;
+  if ((token == null) === (regex == null) || typeof source !== "string" || !source) {
+    fail("needs exactly one of a non-empty token or regex");
+  }
+  if (typeof hint !== "string" || !hint) fail("needs a hint");
+  let match = null;
+  if (regex != null) {
+    try {
+      match = new RegExp(regex);
+    } catch (error) {
+      fail(`regex ${JSON.stringify(regex)} is not a valid regex: ${error.message}`);
+    }
+  }
+  return { token: token ?? null, match, label: source, hint };
+}
+
+// substitutions.json is an object with a substitutions array and an optional
+// denylist array. Parse fails naming the field when either is missing or not
+// an array, so a typo cannot throw a bare TypeError mid-load.
+//
 // Rules apply in order, each to the output of the ones before it, so a rule
 // whose pattern contains an earlier rule's pattern could never match. Such a
 // pair fails here: put the longer, more specific pattern first.
-export function parseSubstitutions({ substitutions, denylist }) {
+export function parseSubstitutions(doc) {
+  if (!isObject(doc)) {
+    throw new Error("substitutions.json: must be an object");
+  }
+  const { substitutions, denylist = [] } = doc;
+  if (!Array.isArray(substitutions)) throw new Error("substitutions: must be an array");
+  if (!Array.isArray(denylist)) throw new Error("denylist: must be an array");
   const rules = substitutions.map(parseRule);
   substitutions.forEach((later, j) => {
     const earlier = substitutions.slice(0, j).findIndex((r) => r.pattern && later.pattern?.includes(r.pattern));
@@ -118,7 +167,26 @@ export function parseSubstitutions({ substitutions, denylist }) {
       );
     }
   });
-  return { substitutions: rules, denylist };
+  return { substitutions: rules, denylist: denylist.map(parseDenylistEntry) };
+}
+
+// tools/upstream.json names the remote and each component pin. Parse fails
+// naming the document or field when the root, components map, or a component
+// entry is missing or not an object, so a typo cannot throw a bare TypeError
+// mid-load.
+export function parseUpstream(doc) {
+  if (!isObject(doc)) {
+    throw new Error("upstream.json: must be an object");
+  }
+  if (!isObject(doc.components)) {
+    throw new Error('upstream.json: "components" must be an object');
+  }
+  for (const [name, spec] of Object.entries(doc.components)) {
+    if (!isObject(spec)) {
+      throw new Error(`upstream.json: component "${name}" must be an object`);
+    }
+  }
+  return doc;
 }
 
 const FORK_FIELDS = ["kind", "why", "since", "upstream"];
@@ -127,12 +195,20 @@ const UPSTREAM_LINK = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/(pull|issues)\/
 
 // tools/forks.json maps each component to the repo-relative paths it forks on
 // purpose. Returns, per component, a Map from the component-relative path the
-// sync compares to that path's entry.
+// sync compares to that path's entry. Parse fails naming the registry or
+// component when either is missing or not an object, so a typo cannot throw a
+// bare TypeError mid-load.
 export function parseForks(registry, components) {
+  if (!isObject(registry)) {
+    throw new Error("forks.json: must be an object");
+  }
   return Object.fromEntries(
     Object.entries(registry).map(([component, entries]) => {
       const spec = components[component];
       if (!spec) throw new Error(`forks.json: unknown component "${component}"`);
+      if (!isObject(entries)) {
+        throw new Error(`forks.json ${component}: must be an object`);
+      }
       const prefix = `${spec.localPath}/`;
       const forks = new Map();
       for (const [path, entry] of Object.entries(entries)) {
@@ -140,7 +216,7 @@ export function parseForks(registry, components) {
           throw new Error(`forks.json ${component} "${path}": ${message}`);
         };
         if (!path.startsWith(prefix)) fail(`not under ${spec.localPath}`);
-        if (entry === null || typeof entry !== "object" || Array.isArray(entry)) fail("must be an object");
+        if (!isObject(entry)) fail("must be an object");
         const unknown = Object.keys(entry).filter((field) => !FORK_FIELDS.includes(field));
         if (unknown.length) fail(`unknown field ${unknown.map((f) => `"${f}"`).join(", ")}`);
         const missing = FORK_FIELDS.filter((field) => entry[field] == null);
@@ -192,13 +268,13 @@ export function unmatchedRules(rules, trees) {
   return rules.map((rule) => rule.key).filter((key) => !matched.has(key));
 }
 
-// An entry is a literal `token` or a `regex`; either fails the line it matches.
+// Entries come from parseDenylistEntry: a literal `token` or a compiled `match`.
 export function denylistHits(path, text, denylist) {
   const hits = [];
   text.split("\n").forEach((line, i) => {
-    for (const { token, regex, hint } of denylist) {
-      if (token ? line.includes(token) : new RegExp(regex).test(line)) {
-        hits.push(`${path}:${i + 1}: "${token ?? regex}" — ${hint}`);
+    for (const entry of denylist) {
+      if (entry.token != null ? line.includes(entry.token) : entry.match.test(line)) {
+        hits.push(`${path}:${i + 1}: "${entry.label}" — ${entry.hint}`);
       }
     }
   });
@@ -325,6 +401,11 @@ const FORK_OUTCOMES = new Set(["forked", "mode-only", "merged", "conflicted"]);
 // target. Where the filesystem folds case or normalises Unicode, that can be
 // an entry `dir` lists under another spelling.
 const lstatIn = (dir, name) => lstatSync(join(dir, name), { throwIfNoEntry: false });
+
+// The one rule for a sync that must stop. The write gate and the exit code
+// both read it, so a run cannot print FAIL and still move the pin.
+const blocked = (report, atPin) =>
+  Boolean(report.hits.length || report.binaryConflicts.length || report.collisions.length || report.undeclared.length || (atPin && (report.stale.length || report.written.length)));
 
 // Compare old-upstream vs new-upstream vs local for one component tree.
 // `derive(rel, text)` turns substituted upstream text into the port's form;
@@ -483,7 +564,7 @@ export function syncComponent({
     }
   }
 
-  if (report.hits.length || report.binaryConflicts.length || report.collisions.length || report.undeclared.length || (atPin && (report.stale.length || report.written.length)) || dryRun) return report;
+  if (blocked(report, atPin) || dryRun) return report;
   for (const { rel, kind, write } of outcomes) {
     const localFile = join(localDir, rel);
     if (write) {
@@ -524,7 +605,7 @@ function pathsOtherComponentsCarry(clone, components, component) {
 // A rule that only an older pin needed is dead weight. Text that upstream may
 // bring back belongs on the denylist, which fails the sync that reintroduces it.
 function checkRules() {
-  const upstream = JSON.parse(readFileSync(join(repo, "tools/upstream.json"), "utf8"));
+  const upstream = parseUpstream(JSON.parse(readFileSync(join(repo, "tools/upstream.json"), "utf8")));
   const { substitutions } = parseSubstitutions(
     JSON.parse(readFileSync(join(repo, "tools/substitutions.json"), "utf8")),
   );
@@ -557,7 +638,7 @@ function main() {
   const dryRun = args.includes("--dry-run");
   const [component, newSha, ...stray] = args.filter((a) => a !== "--dry-run");
   const upstreamPath = join(repo, "tools/upstream.json");
-  const upstream = JSON.parse(readFileSync(upstreamPath, "utf8"));
+  const upstream = parseUpstream(JSON.parse(readFileSync(upstreamPath, "utf8")));
   const spec = upstream.components[component];
   if (stray.length || !spec || !newSha?.match(/^[0-9a-f]{7,40}$/)) {
     for (const arg of stray) console.error(`unexpected argument: ${JSON.stringify(arg)}`);
@@ -656,7 +737,7 @@ function main() {
       console.error(`\nFAIL: forks with no entry under ${component} in tools/forks.json; declare each or restore upstream's form, then rerun:`);
       for (const rel of report.undeclared) console.error(`  ${spec.localPath}/${rel}`);
     }
-    if (report.binaryConflicts.length || report.collisions.length || report.hits.length || report.undeclared.length || (atPin && (report.stale.length || report.written.length))) {
+    if (blocked(report, atPin)) {
       process.exitCode = 1;
       return;
     }
@@ -674,6 +755,6 @@ function main() {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main();
 }

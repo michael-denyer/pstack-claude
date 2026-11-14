@@ -2,7 +2,7 @@
 // injected unless that runtime's model sheet turns it off.
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -162,6 +162,53 @@ describe("SessionStart hook", () => {
       }
     });
   }
+
+  test("a Claude Code project's own sheet replaces the user's sheet", () => {
+    const home = mkdtempSync(join(tmpdir(), "pstack-hook-"));
+    const project = join(home, "project");
+    const sheet = (dir, text) => {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "pstack-models.md"), text);
+    };
+    const run = (projectDir) =>
+      spawnSync("sh", ["-c", sessionStart.claude.hooks[0].command], {
+        env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot, CLAUDE_PROJECT_DIR: projectDir },
+        encoding: "utf8",
+      }).stdout;
+    try {
+      mkdirSync(project);
+      sheet(join(home, ".claude"), "session hook: off\n");
+      expect(run(project)).toBe("");
+      sheet(join(project, ".claude"), "session hook: on\n");
+      expect(run(project)).toBe(mandate);
+      expect(run(undefined)).toBe("");
+      sheet(join(project, ".claude"), "session hook: off\n");
+      rmSync(join(home, ".claude"), { recursive: true });
+      expect(run(project)).toBe("");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  // Claude Code sets CLAUDE_PROJECT_DIR to the directory it starts in, which
+  // can be below the repository root that holds the committed sheet.
+  test("a Claude Code session started in a subdirectory reads the repository's sheet", () => {
+    const home = mkdtempSync(join(tmpdir(), "pstack-hook-"));
+    const repo = join(home, "repo");
+    try {
+      mkdirSync(join(repo, ".claude"), { recursive: true });
+      mkdirSync(join(repo, "sub", "deep"), { recursive: true });
+      writeFileSync(join(repo, ".claude", "pstack-models.md"), "session hook: off\n");
+      expect(spawnSync("git", ["init", repo]).status).toBe(0);
+      const out = spawnSync("sh", ["-c", sessionStart.claude.hooks[0].command], {
+        env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot, CLAUDE_PROJECT_DIR: join(repo, "sub", "deep") },
+        encoding: "utf8",
+      }).stdout;
+      expect(out).toBe("");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
 });
 
 const close = "</EXTREMELY_IMPORTANT>";
@@ -197,7 +244,10 @@ function copilotContext(sheet) {
 describe("Copilot SessionStart context", () => {
   test("the Copilot manifest names its own hooks file", () => {
     expect(copilotManifest.hooks).toBe("hooks/copilot-hooks.json");
-    expect(sessionStart.copilot.hooks[0].command).toBe('"${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh" copilot');
+    expect(sessionStart.copilot.hooks[0].command).toBe('sh "${COPILOT_PLUGIN_ROOT}/hooks/session-start.sh" copilot');
+    expect(sessionStart.copilot.hooks[0].powershell).toBe(
+      'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:COPILOT_PLUGIN_ROOT/hooks/session-start.ps1" copilot',
+    );
   });
 
   test("a valid sheet adds every role line, in models.json order, and no setup note", () => {
@@ -254,6 +304,25 @@ describe("Copilot SessionStart context", () => {
         encoding: "utf8",
       });
       expect(JSON.parse(r.stdout).additionalContext).toContain(`\n\n${odd}\n${close}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // VS Code's agents window runs a plugin from its own copy, which can lose the
+  // execute bit.
+  test("runs from a plugin copy whose hook script is not executable", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-noexec-"));
+    try {
+      cpSync(join(pluginRoot, "hooks"), join(root, "hooks"), { recursive: true });
+      cpSync(join(pluginRoot, "skills/setup-pstack/scripts"), join(root, "skills/setup-pstack/scripts"), { recursive: true });
+      chmodSync(join(root, "hooks/session-start.sh"), 0o644);
+      const r = spawnSync("sh", ["-c", sessionStart.copilot.hooks[0].command], {
+        env: { PATH: process.env.PATH, HOME: root, COPILOT_PLUGIN_ROOT: root },
+        encoding: "utf8",
+      });
+      expect({ status: r.status, err: r.stderr }).toEqual({ status: 0, err: "" });
+      expect(JSON.parse(r.stdout).additionalContext).toContain(setupNote);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

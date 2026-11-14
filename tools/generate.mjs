@@ -63,7 +63,7 @@ const repoRelative = (root, file) => relative(root, file).split(sep).join("/");
 const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
   `${PLUGIN}/.claude-plugin/plugin.json`,
-  ...RUNTIMES.map((runtime) => runtime.manifest),
+  ...RUNTIMES.filter((runtime) => runtime.manifest).map((runtime) => runtime.manifest),
 ];
 
 export const PORTABLE_ASSETS = [
@@ -968,7 +968,7 @@ export function problems(root, models) {
   const skillsDir = join(root, SKILLS);
   const read = (rel) => readFileSync(join(root, rel), "utf8");
   const pathExists = (rel) => existsSync(join(root, rel));
-  const packages = RUNTIMES.map((runtime) =>
+  const packages = RUNTIMES.filter((runtime) => runtime.manifest).map((runtime) =>
     attempt(() => {
       const text = read(runtime.manifest);
       let manifest;

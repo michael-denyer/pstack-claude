@@ -140,6 +140,7 @@ export function platformAdaptation() {
       "the `Agent` tool accepts, as each Models section lists them. On Claude Code they work as written.",
     `${pointer(first)} for the ${first.name} equivalent of a Claude tool, model, or skill named by these workflows.`,
     ...rest.map((runtime) => `${pointer(runtime)} instead.`),
+    "Inside the T3 Code host, also read [`references/t3-code.md`](references/t3-code.md) on top of the runtime's mapping.",
     "Other runtimes can discover the same Agent Skills tree, but they must use their own tool, model, and " +
       "configuration equivalents. No one of these mappings is a cross-runtime map.",
   ].join(" ");

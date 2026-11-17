@@ -139,7 +139,7 @@ describe("runtime model names", () => {
     for (const alias of models.available) {
       expect(text).toContain(`| \`${alias}\` | ${Object.values(tables).map((t) => `\`${t[alias]}\``).join(" | ")} |`);
     }
-    expect(text).toContain("in the `marker` column for any other provider");
+    expect(text).toContain("Other providers use the `marker` column.");
     expect(text).toContain("`pi models: ");
   });
 });

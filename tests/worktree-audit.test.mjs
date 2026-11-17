@@ -321,6 +321,19 @@ test("a commit only the worktree's HEAD reflog reaches holds it, a rebased branc
   expect([row(rebased)[2], row(rebased)[3], row(rebased)[7]]).toEqual(["YES", "clean", "safe"]);
 });
 
+test("REMOTE follows external pushes and deletions even when the local tracking ref stays put", () => {
+  const fixture = createFixture();
+  const topic = addWorktree(fixture, "topic");
+  git("-C", topic, "push", "origin", "topic");
+  const second = join(fixture.root, "second");
+  git("clone", "--branch", "topic", fixture.remote, second);
+  commit(second, "from another clone");
+  git("-C", second, "push", "origin", "topic");
+  expect(rowFor(runAudit(fixture).rows, topic)[4]).toBe("behind1");
+  git("-C", second, "push", "origin", "--delete", "topic");
+  expect(rowFor(runAudit(fixture).rows, topic)[4]).toBe("no-remote");
+});
+
 test("the REMOTE column counts commits on each side of the pushed branch", () => {
   const fixture = createFixture();
   const behind = addWorktree(fixture, "behind");
@@ -365,6 +378,12 @@ test("a diff.ignoreSubmodules=all config does not hide submodule work from the a
     submodule(worktree, "update", "--init");
     return worktree;
   };
+  const ignored = checkout("sub-ignored");
+  const moduleGitDir = git("-C", join(ignored, "sub"), "rev-parse", "--absolute-git-dir");
+  writeFileSync(join(moduleGitDir, "info/exclude"), ".env\nnode_modules/\n");
+  writeFileSync(join(ignored, "sub/.env"), "only copy\n");
+  mkdirSync(join(ignored, "sub/node_modules"));
+  writeFileSync(join(ignored, "sub/node_modules/generated"), "rebuildable\n");
   const edited = checkout("sub-edited");
   writeFileSync(join(edited, "sub/lib.txt"), "edited\n");
   const added = checkout("sub-added");
@@ -374,6 +393,8 @@ test("a diff.ignoreSubmodules=all config does not hide submodule work from the a
   git("-C", fixture.repo, "config", "diff.ignoreSubmodules", "all");
 
   const { rows } = runAudit(fixture);
+  const held = rowFor(rows, ignored);
+  expect([held[3], held[7]]).toEqual(["ignored:1", "hold-ignored"]);
   for (const worktree of [edited, added, committed]) {
     expect(git("-C", worktree, "status", "--porcelain")).toBe("");
     const row = rowFor(rows, worktree);

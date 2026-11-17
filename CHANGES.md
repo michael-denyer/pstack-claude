@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.139 - safer worktree cleanup and resume, playbook checks, and GPT-6.2 defaults
+
+The worktree audit checks ignored files in initialized submodules and compares local branches with the tips advertised by origin. Pi records ownership in each new agent worktree's private Git directory so reusing its path cannot redirect a resumed agent or its cleanup.
+
+The project playbook checker accepts YAML comments and block lists of base names. It skips fenced examples and checks each quoted anchor against an individual bundled step.
+
+Codex defaults to GPT-6.2 Sol for general and worker roles and GPT-6.2 Astra for strongest judgment. Pi uses these defaults on its OpenAI providers when its model registry lists them. Older catalogs keep their supported model IDs, and a user's model sheet still takes precedence.
+
 ## 0.9.138 - worktree audit shows behind and diverged remotes
 
 The REMOTE column of `worktree-audit.mjs` counted only the commits a worktree had that its pushed branch lacked. A worktree whose pushed branch someone else had advanced printed `ahead0`, which reads as in sync, and a diverged one printed only its ahead count. The column now counts both sides and prints `aheadN`, `behindN`, or `aheadN,behindN`. The pushed, no-remote, and detached cases are unchanged, and no worktree changes bucket, because the bucket reads only whether the remote state is known. The 0.9.137 package already carried this change, and its entry left it out. @wattanartongtipsukon-create found and fixed this in [#453](https://github.com/michael-denyer/pstack-claude/pull/453).

@@ -229,7 +229,7 @@ export class AgentRunner {
     const def = types.get(type);
     if (!def) throw new Error(`Unknown subagent_type "${type}". Valid types: ${[...types.keys()].join(", ")}.`);
     const parentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
-    const model = fromAgentFile(def.file, params.model, () => resolveModel(params.model ?? def.model, this.settings, readSheet(this.settings.agentDir), parentModel));
+    const model = fromAgentFile(def.file, params.model, () => resolveModel(params.model ?? def.model, this.settings, readSheet(this.settings.agentDir), parentModel, ctx.modelRegistry));
     // Claude Code subagents without an effort run at their definition's effort, else the session's.
     const effort = params.effort ?? def.effort;
     const thinking = effort === undefined ? this.pi.getThinkingLevel() : fromAgentFile(def.file, params.effort, () => checkEffort(effort, this.settings));

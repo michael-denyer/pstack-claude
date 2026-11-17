@@ -92,6 +92,23 @@ describe("project playbooks", () => {
     expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
   });
 
+  test("YAML comments follow values and cannot supply the required condition", () => {
+    const playbook = (fields) => run({ "sample.md": "---\n" + fields + "\n---\n" });
+    expect(playbook("extends: [bug-fix, feature] # two bases\nwhen: 'Fix #42' # condition").code).toBe(0);
+    expect(playbook("extends: bug-fix # base\nwhen: # TODO").out).toContain('needs a "when:" line');
+    expect(playbook("extends: 'bug-fix # literal' # comment\nwhen: Fix it.").out).toContain("extends `bug-fix # literal`");
+    expect(playbook("extends:\n  - missing # base\nwhen: Fix it.").out).toContain("extends `missing`");
+  });
+
+  test("fenced changes are examples and only words in a bundled step can anchor changes", () => {
+    const front = "---\nextends: bug-fix\nwhen: Fix it.\n---\n";
+    const change = (anchor) => '- **After** "' + anchor + '": verify.\n';
+    const example = "    " + change("indented code example") + "\n~~~~markdown\n" + change("example only") + "~~~\n" + change("still an example") + "~~~~\n";
+    expect(run({ "sample.md": front + example + change("Binary-search the cause") }).code).toBe(0);
+    expect(run({ "sample.md": front + change("Focused-fix exception") }).code).toBe(1);
+    expect(run({ "sample.md": front + change("failing test first and the fix on top") }).code).toBe(0);
+  });
+
   test("a quoted flow list is one stem, as YAML reads it", () => {
     const result = run({ "ship.md": '---\nextends: "[shipping]"\nwhen: Use it to ship.\n---\n' });
     expect(result).toEqual({

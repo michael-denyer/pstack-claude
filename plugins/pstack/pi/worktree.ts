@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Static, Type } from "typebox";
 
-export const worktreeSchema = Type.Object({ repo: Type.String(), path: Type.String(), branch: Type.String(), base: Type.String() });
+export const worktreeSchema = Type.Object({ repo: Type.String(), path: Type.String(), branch: Type.String(), base: Type.String(), owner: Type.Optional(Type.String()) });
 export type Worktree = Static<typeof worktreeSchema>;
 
 // The error message ends up in an agent's final text, so it stays short. The
@@ -18,6 +19,7 @@ export function planWorktree(cwd: string, agentId: string): Worktree {
   const repo = git(cwd, ["rev-parse", "--show-toplevel"]);
   return {
     repo,
+    owner: randomUUID(),
     path: join(repo, ".claude", "worktrees", `agent-${agentId}`),
     branch: `worktree-agent-${agentId}`,
     base: git(repo, ["rev-parse", "HEAD"]),
@@ -26,7 +28,7 @@ export function planWorktree(cwd: string, agentId: string): Worktree {
 
 // An existing path can be a leftover directory, a replacement repository, or
 // a link to another checkout. None is permission to run an isolated writer there.
-function assertWorktree(wt: Worktree): void {
+function assertWorktree(wt: Worktree, created = false): void {
   const invalid = () => new Error(`not the expected linked worktree: ${wt.path.slice(0, 200)}`);
   if (!lstatSync(wt.path).isDirectory()) throw invalid();
   const root = realpathSync(wt.path);
@@ -42,16 +44,27 @@ function assertWorktree(wt: Worktree): void {
     }
   });
   if (!registered) throw invalid();
+
+  // The private Git directory stays with the registered worktree across moves and is deleted on removal.
+  const marker = join(git(wt.path, ["rev-parse", "--absolute-git-dir"]), "pstack-owner");
+  if (wt.owner) {
+    if (created) writeFileSync(marker, wt.owner, { flag: "wx", mode: 0o600 });
+    else if (!existsSync(marker) || readFileSync(marker, "utf8") !== wt.owner) throw invalid();
+  } else if (git(wt.path, ["branch", "--show-current"]) !== wt.branch) {
+    // Older session records have no owner marker. Only their recorded branch identifies a retained checkout.
+    throw invalid();
+  }
 }
 
 // Creates the worktree on first use and re-creates it for a resume after a
 // clean finish removed it. A retained path is checked before any child starts.
 export function ensureWorktree(wt: Worktree): void {
-  if (!existsSync(wt.path)) {
+  const created = !existsSync(wt.path);
+  if (created) {
     const branchExists = git(wt.repo, ["branch", "--list", wt.branch]) !== "";
     git(wt.repo, branchExists ? ["worktree", "add", wt.path, wt.branch] : ["worktree", "add", wt.path, "-b", wt.branch, wt.base]);
   }
-  assertWorktree(wt);
+  assertWorktree(wt, created);
 }
 
 // True when the agent left anything behind and the worktree stays. Ignored

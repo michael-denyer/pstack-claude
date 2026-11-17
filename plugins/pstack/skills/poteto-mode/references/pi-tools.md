@@ -49,7 +49,7 @@ poteto-mode's Subagents section applies on Pi through the `agent` tool:
 
 ## Model names
 
-Skills name models by the Claude aliases in their Models sections. On Pi, pass the alias as the `agent` tool's `model`. The pstack extension resolves it in the column of the provider the session's current model comes from, and in the `anthropic` column for any other provider:
+Skills name models by the Claude aliases in their Models sections. On Pi, pass the alias as the `agent` tool's `model`. The table lists the catalog-compatible defaults for the provider the session's current model comes from. Other providers use the `anthropic` column.
 
 | Alias | `anthropic` | `openai` | `openai-codex` |
 | --- | --- | --- | --- |
@@ -57,6 +57,8 @@ Skills name models by the Claude aliases in their Models sections. On Pi, pass t
 | `fable` | `anthropic/claude-fable-5-2` | `openai/gpt-6-astra` | `openai-codex/gpt-6-astra` |
 | `sonnet` | `anthropic/claude-sonnet-5-5` | `openai/gpt-6.1-sol` | `openai-codex/gpt-6.1-sol` |
 | `haiku` | `anthropic/claude-haiku-5-5` | `openai/gpt-6-luna` | `openai-codex/gpt-6-luna` |
+
+On the two OpenAI providers, Pi first looks for the Codex default (`gpt-6.2-sol` for `opus`), worker (`gpt-6.2-sol` for `sonnet`), or strongest model (`gpt-6.2-astra` for `fable`) in the session's model registry. When that model is absent, Pi uses the ID in the table.
 
 Pi warns that Anthropic bills Claude used through Pi per token, as extra usage, even on a Claude subscription. Pi shows that warning only in interactive mode, never for the `pi --mode rpc` children the `agent` tool runs.
 

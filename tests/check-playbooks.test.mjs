@@ -103,7 +103,7 @@ describe("project playbooks", () => {
   test("fenced changes are examples and only words in a bundled step can anchor changes", () => {
     const front = "---\nextends: bug-fix\nwhen: Fix it.\n---\n";
     const change = (anchor) => '- **After** "' + anchor + '": verify.\n';
-    const example = "~~~~markdown\n" + change("example only") + "~~~\n" + change("still an example") + "~~~~\n";
+    const example = "    " + change("indented code example") + "\n~~~~markdown\n" + change("example only") + "~~~\n" + change("still an example") + "~~~~\n";
     expect(run({ "sample.md": front + example + change("Binary-search the cause") }).code).toBe(0);
     expect(run({ "sample.md": front + change("Focused-fix exception") }).code).toBe(1);
     expect(run({ "sample.md": front + change("failing test first and the fix on top") }).code).toBe(0);

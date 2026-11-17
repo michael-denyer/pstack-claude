@@ -176,6 +176,19 @@ describe("a path that is not the agent's linked worktree", () => {
     expect(existsSync(wt.path)).toBe(true);
   });
 
+  test("a pre-marker session can resume its recorded branch and refuses a replacement branch", () => {
+    const { w } = setup();
+    const git = gitRepo(w.cwd);
+    const wt = planWorktree(w.cwd, "legacy");
+    delete wt.owner;
+    git("worktree", "add", "-b", wt.branch, wt.path);
+    ensureWorktree(wt);
+    git("worktree", "move", wt.path, join(dirname(w.cwd), "legacy-moved"));
+    git("worktree", "add", "-b", "replacement", wt.path);
+    rejected(() => ensureWorktree(wt));
+    rejected(() => settleWorktree(wt));
+  });
+
   test("an ordinary directory, which git resolves to the primary checkout, is rejected", () => {
     const { w } = setup();
     gitRepo(w.cwd);

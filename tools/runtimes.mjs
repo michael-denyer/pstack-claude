@@ -350,9 +350,12 @@ export function piModelNamesSection(models) {
     models.available.map((alias) => `| ${code(alias)} | ${columns.map((p) => code(tables[p][alias])).join(" | ")} |`).join("\n");
   return (
     "Skills name models by the Claude aliases in their Models sections. On Pi, pass the alias as the `agent` " +
-    "tool's `model`. The pstack extension resolves it in the column of the provider the session's current model " +
-    `comes from, and in the ${code(fallback)} column for any other provider:\n\n` +
+    "tool's `model`. The table lists the catalog-compatible defaults for the provider the session's current model " +
+    `comes from. Other providers use the ${code(fallback)} column.\n\n` +
     table +
+    `\n\nOn the two OpenAI providers, Pi first looks for the Codex default (${code(models.codex.default)} for ${code(models.tiers.default)}), ` +
+    `worker (${code(models.codex.worker)} for ${code(models.tiers.worker)}), or strongest model (${code(models.codex.strongest)} for ${code(models.tiers.strongest)}) ` +
+    "in the session's model registry. When that model is absent, Pi uses the ID in the table." +
     "\n\nPi warns that Anthropic bills Claude used through Pi per token, as extra usage, even on a Claude subscription. " +
     "Pi shows that warning only in interactive mode, never for the `pi --mode rpc` children the `agent` tool runs.\n\n" +
     "A `pi models: opus=<provider/id>, sonnet=<provider/id>` line in the Pi override sheet points each alias " +

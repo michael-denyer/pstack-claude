@@ -37,3 +37,8 @@ OMP uses its own model selection; without a pstack sheet, use the runtime's defa
 | Skill | On OMP |
 | --- | --- |
 | `why` | Use OMP tools and available sources. |
+| `automate-me` | Look for mode skills under `.omp/skills/`, `.agents/skills/`, and `~/.omp/agent/skills/` as well as the Claude Code paths. Write a new project mode skill under `.omp/skills/`, and a personal one under `~/.omp/agent/skills/`. |
+| `create-verification-skill` | The generated skill lands under `.claude/skills/verify/` on Claude Code; on OMP write it to `.omp/skills/verify/`, where OMP loads native project skills. The app-driving harness is platform-neutral. |
+| `maintain-verification-skill` | Look for the project-local skill under `.omp/skills/` first, then under `.claude/skills/` and `.agents/skills/`. |
+| `create-formal-verification-skill` | On OMP write the generated skill to `.omp/skills/<area>/`, named for the area it verifies. The verifier and its run command are platform-neutral. |
+| `maintain-formal-verification-skill` | Look for project skills, the formal verification skill among them, under `.omp/skills/` first, then under `.claude/skills/` and `.agents/skills/`. |

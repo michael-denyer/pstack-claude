@@ -103,6 +103,20 @@ describe("OMP marketplace plugin", () => {
   });
 });
 
+describe("omp-tools.md", () => {
+  test("every skill that writes or finds a project skill names OMP's native .omp/skills/ folder", () => {
+    const rows = readFileSync(join(plugin, "skills/poteto-mode/references/omp-tools.md"), "utf8").split("\n");
+    const missing = [
+      "automate-me",
+      "create-verification-skill",
+      "maintain-verification-skill",
+      "create-formal-verification-skill",
+      "maintain-formal-verification-skill",
+    ].filter((skill) => !rows.some((row) => row.startsWith(`| \`${skill}\` |`) && row.includes("`.omp/skills/")));
+    expect(missing).toEqual([]);
+  });
+});
+
 describe("OMP runtime registration", () => {
   const manifest = { name: "pstack", version: "1", omp: { extensions: ["./omp/index.mjs"] } };
   const marketplace = { plugins: [{ name: "pstack", source: "./plugins/pstack", version: "1" }] };

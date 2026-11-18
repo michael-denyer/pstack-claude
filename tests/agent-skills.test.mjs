@@ -427,7 +427,7 @@ describe("Codex model names", () => {
     expect(strongestLine).toContain("`strongest judgment`");
     expect(workerLine).toContain(`\`${raw.codex.worker}\``);
     expect(workerLine).toContain("`feature, refactoring`");
-    for (const role of ["bug-fix", "perf-issue", "hillclimb", "reflect tooling"]) {
+    for (const role of ["bug-fix", "perf-issue", "hillclimb", "judgment and prose"]) {
       expect(workerLine).not.toContain(`\`${role}\``);
       expect(strongestLine).not.toContain(`\`${role}\``);
     }

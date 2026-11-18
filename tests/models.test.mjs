@@ -115,14 +115,14 @@ describe("parseModels", () => {
   });
 
   test("a duplicate role label throws naming it", () => {
-    expect(parse((p) => p.roles.push({ ...role(p, "how explorer") }))).toThrow(
-      'models.json: role "how explorer" appears twice',
+    expect(parse((p) => p.roles.push({ ...role(p, "swarm workers") }))).toThrow(
+      'models.json: role "swarm workers" appears twice',
     );
   });
 
   test("a role whose skill directory does not exist throws naming both", () => {
-    expect(parse(() => {}, (skill) => skill !== "why")).toThrow(
-      'models.json: role "why investigators" names skill "why", which has no SKILL.md',
+    expect(parse(() => {}, (skill) => skill !== "swarm")).toThrow(
+      'models.json: role "swarm workers" names skill "swarm", which has no SKILL.md',
     );
   });
 
@@ -179,8 +179,8 @@ describe("parseModels", () => {
 });
 
 describe("role labels reach the prose", () => {
-  // The prose may hyphenate a label ("how-explorer" for the sheet's
-  // "how explorer") and names only the first segment of a comma-joined label.
+  // The prose may hyphenate a label ("swarm-workers" for the sheet's
+  // "swarm workers") and names only the first segment of a comma-joined label.
   const normalize = (text) => text.toLowerCase().replace(/[-\s]+/g, " ");
 
   function skillProse(skill) {

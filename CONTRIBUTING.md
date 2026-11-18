@@ -81,7 +81,7 @@ If you touched `skills/poteto-mode/scripts/`:
 cd plugins/pstack/skills/poteto-mode/scripts
 bun install --frozen-lockfile
 bun run typecheck
-bun test watch-pr check-plan.test.ts
+bun test watch-pr
 bunx prettier@3.6.2 --check .
 ```
 

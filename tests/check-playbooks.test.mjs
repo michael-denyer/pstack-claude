@@ -109,6 +109,29 @@ describe("project playbooks", () => {
     expect(run({ "sample.md": front + change("failing test first and the fix on top") }).code).toBe(0);
   });
 
+  test("a base without numbered steps anchors changes on one paragraph or list item, never a heading", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      const bundled = join(root, "bundled");
+      mkdirSync(bundled);
+      writeFileSync(
+        join(bundled, "prose.md"),
+        "### Prose\n\n**Worktree.** Work off main. Subagents\ninherit it.\n\n- `## Why`: the problem.\n- `## Scope`: always.\n\nAfter the sections, attach screenshots.\n",
+      );
+      writeFileSync(join(bundled, "steps.md"), "### Steps\n\nRead this first.\n\n1. Reproduce it.\n2. Fix it.\n");
+      const unanchored = (base, ...quotes) => {
+        const changes = quotes.map((quote) => `- **In** "${quote}": check it.\n`).join("");
+        writePlaybooks(root, { "sample.md": `---\nextends: ${base}\nwhen: Any change.\n---\n${changes}` });
+        return checkPlaybooks(root, bundled).map((problem) => problem.match(/"(.*)" is not in any playbook/)[1]);
+      };
+      expect(unanchored("prose", "Work off main.", "Subagents inherit it.", "`## Scope`: always.", "attach screenshots")).toEqual([]);
+      expect(unanchored("prose", "Prose", "inherit it. - `## Why`", "always. After")).toEqual(["Prose", "inherit it. - `## Why`", "always. After"]);
+      expect(unanchored("steps", "Reproduce it.", "Read this first.")).toEqual(["Read this first."]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("a quoted flow list is one stem, as YAML reads it", () => {
     const result = run({ "ship.md": '---\nextends: "[shipping]"\nwhen: Use it to ship.\n---\n' });
     expect(result).toEqual({

@@ -179,8 +179,8 @@ describe("parseModels", () => {
 });
 
 describe("role labels reach the prose", () => {
-  // The prose may hyphenate a label ("how-explorer" for the sheet's
-  // "how explorer") and names only the first segment of a comma-joined label.
+  // The prose may hyphenate a label ("swarm-workers" for the sheet's
+  // "swarm workers") and names only the first segment of a comma-joined label.
   const normalize = (text) => text.toLowerCase().replace(/[-\s]+/g, " ");
 
   function skillProse(skill) {

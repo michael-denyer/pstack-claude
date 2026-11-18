@@ -4,17 +4,17 @@ This file is the release changelog, with one `## <version> - <title>` entry per 
 
 ## 0.9.140 - sync to upstream 2f87c85 (v0.15.43): shorter skills, worker.md, one-file how, why, and reflect
 
-The upstream pin moves from `c742dd6` to `2f87c85`, upstream v0.15.43, 2 pstack commits (cursor/plugins#1236 and #1249). `cursor-team-kit` and `thermos` did not change upstream, so their pins stay.
+The upstream pin moves from `c742dd6` to `2f87c85`, upstream v0.15.43, 2 pstack commits (cursor/plugins#1236 and #1249). `cursor-team-kit` and `thermos` did not change upstream, so their pins stay. @bramvera ran this sync in [#467](https://github.com/michael-denyer/pstack-claude/pull/467).
 
 What changes for users:
 
 - `how`, `why`, and `reflect` are each one short file. `how` starts one read-only subagent and presents its answer. `why` answers from the commits and PR discussions behind the code. `reflect` reads the transcript itself, with no reviewer or synthesizer subagents, and still waits for approval before it edits a skill. Their reference prompts and per-source playbooks are gone.
 - `architect` is a short brief: trace every system the change touches, sketch two shapes, pick the one with one owner per piece of state, and run `arena` for a large or contested design. The five phases, runner prompt, red-flag list, and rationale template are gone.
-- poteto-mode no longer routes to `how`. Its trigger list is ten short lines, its playbook list is names only, and the Comments section is gone (`no-comments` still runs before review).
+- poteto-mode no longer routes to `how`. Its trigger list is 13 short lines, its playbook list is names only, and the Comments section is gone (`no-comments` still runs before review).
 - A new `poteto-mode/worker.md` carries the operator's rules to every started agent. The first line of each kickoff points at it by absolute path.
 - The Orchestrate playbook is deleted. Program-scale work routes to `figure-it-out`.
 - The Babysit, Opening a PR, and Multi-phase plan playbooks are cut to a few rules each. Multi-phase plan no longer runs `check-plan.mjs`, so the script, its tests, and its hook contract are deleted.
-- No role runs above xhigh. The `strongest judgment` model runs outside a panel only when the user names it for the task or two xhigh runs of the same brief on the task's own role model failed their check.
+- No role runs above xhigh unless the model sheet sets a higher level on the role's line or the `default effort` line. The `strongest judgment` model runs outside a panel only when the user names it for the task or two xhigh runs of the same brief on the task's own role model failed their check.
 - A second opinion, and the show-me-your-work reviewer, run on a model from another family.
 - Fourteen principle leaves, `unslop`, and `technical-writing` have shorter bodies with the same rules.
 - `statechart` reports a spec's SANY line and column on a parse error and draws arrows into a parent state through its border.
@@ -29,7 +29,7 @@ New substitution rules rewrite upstream's new Cursor slugs in poteto-mode, arena
 
 ## 0.9.139 - safer worktree cleanup and resume, playbook checks, and GPT-6.2 defaults
 
-The worktree audit checks ignored files in initialized submodules and compares local branches with the tips advertised by origin. Pi records ownership in each new agent worktree's private Git directory so reusing its path cannot redirect a resumed agent or its cleanup.
+The worktree audit checks ignored files in initialized submodules and compares local branches with the tips advertised by origin. @EthanYoQ found the submodule case and proposed a fix in [#459](https://github.com/michael-denyer/pstack-claude/pull/459). Pi records ownership in each new agent worktree's private Git directory so reusing its path cannot redirect a resumed agent or its cleanup.
 
 The project playbook checker accepts YAML comments and block lists of base names. It skips fenced examples and checks each quoted anchor against an individual bundled step.
 

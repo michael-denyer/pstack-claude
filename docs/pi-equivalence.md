@@ -75,4 +75,4 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | X02 | Effort levels and `@level` | Same five levels, passed as the `agent` tool's `effort`, which becomes `--thinking` | extension | `the effort parameter passes --thinking to any agent type, keeps a pstack agent's body as a 0600 system prompt file, and no effort runs at the parent's level` | VERIFIED |
 | X03 | `inherit-parent` / `auto` | The child runs on the parent's current model | extension | `alias, sheet override, inherit-parent, auto, pass-through, and no parent model` | n/a |
 | X04 | Compaction and `/clear` | Injection on every agent start keeps the routing instruction | extension | `injects the mandate and the full sheet on every agent start` | VERIFIED |
-| X05 | Session scratchpad | Pi has none; the skills only warn against keeping durable state there | difference | No skill names a scratchpad since the Orchestrate playbook was removed. | n/a |
+| X05 | Session scratchpad | Pi has none; the skills only warn against keeping durable state there | difference | No skill names a scratchpad. | n/a |

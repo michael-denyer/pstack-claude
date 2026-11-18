@@ -44,7 +44,7 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 - Do not guess the session's effort from the model, a config default, or a previous turn. If the helper cannot identify the active turn's effort, ask for an explicit role or `default effort` level before dispatching. Do not substitute an omitted `reasoning_effort` for the missing starting level. Automatic `session` resolution depends on the host exposing the current thread's runtime log; it is not available on every Codex host.
 - There is no `comment-sicko` subagent type either. The **no-comments** skill spawns it on Claude Code; on Codex dispatch a `spawn_agent` whose instructions tell it to read `poteto-mode/references/agents/comment-sicko.md` in full first.
 - There are no `thermo-nuclear-review-subagent` or `thermo-nuclear-code-quality-review-subagent` types. The **thermos** skill spawns both on Claude Code; on Codex dispatch two `spawn_agent` calls whose instructions tell each to read the `thermo-nuclear-review` or `thermo-nuclear-code-quality-review` skill in full first and review only the diff and file contents in its prompt.
-- Claude Code runs every subagent on this machine, so the **swarm** skill's workers and the fan-out playbooks (`orchestrate`, `autopilot-full`, `autopilot-stack`) isolate writers with worktrees. The same holds on Codex.
+- Claude Code runs every subagent on this machine, so the **swarm** skill's workers and the fan-out playbooks (`autopilot-full`, `autopilot-stack`) isolate writers with worktrees. The same holds on Codex.
 - Keep the rest of the policy unchanged. Pass file pointers not inlined context, give each worker its own worktree or branch when they write, review every subagent's diff yourself.
 
 ## Model names
@@ -92,14 +92,14 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | `maintain-formal-verification-skill` | Project skills, the formal verification skill among them, live under Codex's project-skill location. |
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
 | `automate-me` | `plugin-dev:skill-development` resolves through the skills table above. |
-| `architect` | The runner panel goes through the **arena** skill, so its `spawn_agent` fan-out and model substitution apply here too. |
+| `architect` | A large or contested design goes through the **arena** skill, so its `spawn_agent` fan-out and model substitution apply here too. |
 | `arena` | The parallel candidates and the cross-judge map to `spawn_agent`; substitute your configured Codex models for the runners and the cross-judge pool (see Model names above). |
-| `how` | The parallel explorers and the explainer map to `spawn_agent` fan-out; substitute your configured Codex models. |
-| `reflect` | The three reviewers and the synthesizer map to `spawn_agent`; substitute your configured Codex models. The transcript finder reads Claude Code's layout under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`, so pass the session digest step 1 allows instead. |
+| `how` | The one read-only subagent maps to `spawn_agent`. |
+| `reflect` | The transcript finder reads Claude Code's layout under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`, so work from the conversation in your context, as the skill allows when the finder finds nothing. |
 | `recall` | Search this workspace's Codex rollouts (see Tool actions). Do not list or read `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`. It holds Claude Code transcripts, not this session's history. In a rollout, chat messages are the `response_item` records whose `payload.type` is `message`, with the speaker in `payload.role`. Skip `developer` records, which are injected instructions. |
 | `show-me-your-work` | Check the log against this run's current Codex rollout, using `CODEX_THREAD_ID` and the state index as described in Tool actions. A filename suffix alone cannot select the current file after revert. If the current path is unavailable or ambiguous, report that the audit could not run instead of guessing a rollout. Do not read Claude Code's projects directory. |
 | `swarm` | Each worker is a `spawn_agent` call on your configured Codex model, and those calls already run concurrently; give each writing worker its own worktree or output directory (see Subagent policy above). |
-| `why` | The parallel investigators and the synthesizer map to `spawn_agent`; substitute your configured Codex models. List MCP servers from the tools Codex exposes to the session, not from `.mcp.json` or `claude mcp list`. |
+| `why` | List MCP servers from the tools Codex exposes to the session, not from `.mcp.json` or `claude mcp list`. |
 
 ## Vendored scripts
 

@@ -34,7 +34,7 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 - Reasoning effort maps to `task`'s `reasoning_effort`. Pass a role value's `@<level>` suffix, or else the sheet's `default effort` level, as `reasoning_effort`; `session` omits it.
 - `run_in_background: true` maps to `mode: "background"`. `mode: "sync"` blocks your turn; use it only when the next step needs the result.
 - A model a skill states for a role (its Models section, an `Agent` call's `model`, or the user's sheet line) is an explicit model instruction, so pass it as `task`'s `model`. A role with no configured model omits `model`. See Model names below for how a Claude default resolves.
-- Workers that write share this machine on the CLI, so the **swarm** skill's workers and the fan-out playbooks (`orchestrate`, `autopilot-full`, `autopilot-stack`) isolate writers with worktrees, as on Claude Code. In the Copilot app, `create_session` gives each writer its own worktree session instead; see App and CLI below.
+- Workers that write share this machine on the CLI, so the **swarm** skill's workers and the fan-out playbooks (`autopilot-full`, `autopilot-stack`) isolate writers with worktrees, as on Claude Code. In the Copilot app, `create_session` gives each writer its own worktree session instead; see App and CLI below.
 - Keep the rest of the policy unchanged. Pass file pointers not inlined context, give each worker its own worktree or branch when they write, review every subagent's diff yourself.
 
 ## Model names
@@ -77,9 +77,9 @@ The Copilot app loads the same plugin as the CLI and adds session-level tools. U
 
 | pstack need | Copilot app | Copilot CLI |
 |-------------|-------------|-------------|
-| Isolated writer (swarm worker, stack layer, orchestrate worker) | `create_session`, one worktree session per writer | `git worktree add` per writer, then `task` workers pointed at it |
+| Isolated writer (swarm worker, stack layer, autopilot owner) | `create_session`, one worktree session per writer | `git worktree add` per writer, then `task` workers pointed at it |
 | Recurring wake-up (`loop`, the `/loop` audit tick, babysit's cadence) | `save_session_automation` on this session | Re-run the step yourself each turn, or ask the user to re-invoke; state the cadence in the decision trail |
-| Coordinate several sessions or repos (`orchestrate`, `autopilot-full`) | The app's `orchestrate` skill plus `send_session_message` | `task` fan-out with worktrees; `/fleet` for parallel subagents |
+| Coordinate several sessions or repos (`autopilot-full`) | The app's `orchestrate` skill plus `send_session_message` | `task` fan-out with worktrees; `/fleet` for parallel subagents |
 | Stacked PRs (`autopilot-stack`, shipping a stack) | The app's `pr-stack` skill, one child session per layer | `gh` or `origin`, one worktree per layer |
 | Watch a PR to merge (`babysit`, `watch-pr`) | Agent merge on the session, or `babysit` with `save_session_automation` | `babysit` with the vendored `watch-pr` script and `gh` |
 | Drive a UI | The `browser` canvas, or your browser automation | Your browser automation, or a concrete manual check for the user |
@@ -92,7 +92,7 @@ Claude Code keeps one directory per project under `${CLAUDE_CONFIG_DIR:-$HOME/.c
 - `workspace.yaml` names the session's `cwd`. Scope every transcript search to the current workspace: keep only session directories whose `cwd` is the workspace path (or a worktree of it), then read their `events.jsonl`. Never read other projects' sessions.
 - When a skill says "this session's transcript", it is the newest matching session directory whose `events.jsonl` contains the opening prompt.
 
-In poteto-mode's playbooks, the Eval playbook reads candidate transcripts from Copilot session state, and `session-pickup` and `worktree-cleanup` search it scoped to the workspace. `orchestrate` and `multi-phase-plan` keep their store under `${COPILOT_HOME:-~/.copilot}/orchestrate/` instead of `~/.claude/orchestrate/`.
+In poteto-mode's playbooks, the Eval playbook reads candidate transcripts from Copilot session state, and `session-pickup` and `worktree-cleanup` search it scoped to the workspace. `autopilot-full` keeps its store under `${COPILOT_HOME:-~/.copilot}/orchestrate/` instead of `~/.claude/orchestrate/`.
 
 ## Driver and bundled skills pstack references
 
@@ -113,15 +113,15 @@ Affected skill entry points point here. Most skills need only the tables above. 
 |-------|-------------------|
 | `interrogate` | Each adversary is a `task` call: `subagent_type` becomes `agent_type`, and `model` comes from the sheet. Keep the panel's vendors distinct. |
 | `setup-pstack` | The skill's [Other runtimes](../../setup-pstack/references/runtimes.md) table names the Copilot sheet path and how it loads. Its [Copilot setup questions](../../setup-pstack/copilot.md) list models from the `task` tool's `model` enum and ask one `ask_user` question per tier and panel slot, grouped by vendor, with no recommended model; a first question lets a plan with one model, or anyone who wants no per-role choices, run every role on the session's model. The role rows are identical; the `session hook` line also controls the Copilot hook. |
-| `architect` | The runner panel goes through the **arena** skill: one `task` per runner, each with a model from the sheet's `architect runners` line. |
-| `how` | The explorers and the explainer are `task` calls with the sheet's `how` role models; critics use a read-only agent type (see Subagent policy). |
+| `architect` | A large or contested design goes through the **arena** skill: one `task` per runner, each with a model from the sheet's `arena runners` line. |
+| `how` | The one subagent is a `task` call with a read-only agent type (see Subagent policy). |
 | `arena` | Runners and the cross-judge pool come from the sheet's panel lines; pick the cross-judge from a different vendor than the candidate it grades. |
 | `no-comments` | Dispatch `task` with `agent_type: "pstack:comment-sicko"`. |
 | `thermos` | Dispatch two `task` calls with `mode: "background"`, `agent_type: "pstack:thermo-nuclear-review-subagent"` and `agent_type: "pstack:thermo-nuclear-code-quality-review-subagent"`, each with the same diff and file contents in its prompt. |
 | `swarm` | Workers are `task` calls with `mode: "background"`, each on its own worktree; in the app, `create_session` per worker. |
 | `teach` | Running `how` and `why` in parallel maps to `task` fan-out; image generation uses whatever image tool you have, or skip it and say so. |
 | `why` | Available MCP servers appear in your tool list; there is no `mcp__` prefix convention to scan for. |
-| `reflect` | Run `find-transcript.mjs <session-state directory> '<opening prompt fragment>' <workspace directory>` with the absolute session-state path under `${COPILOT_HOME:-~/.copilot}`. That directory is outside the workspace, so the call takes the normal permission flow. The workspace defaults to the current directory when omitted. The finder checks the session header's `cwd` against that workspace before reading Copilot's `user.message` records, so matching prompts in other projects are skipped. For a conversation in a related worktree, pass that worktree's directory explicitly. Reviewer references that name `.claude/skills/` and `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/` paths mean the Copilot skill locations below. |
+| `reflect` | Run `find-transcript.mjs <session-state directory> '<opening prompt fragment>' <workspace directory>` with the absolute session-state path under `${COPILOT_HOME:-~/.copilot}`. That directory is outside the workspace, so the call takes the normal permission flow. The workspace defaults to the current directory when omitted. The finder checks the session header's `cwd` against that workspace before reading Copilot's `user.message` records, so matching prompts in other projects are skipped. For a conversation in a related worktree, pass that worktree's directory explicitly. Skill paths under `.claude/skills/` and `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/` mean the Copilot skill locations below. |
 | `recall` | Search Copilot session state scoped to the current workspace (Transcripts above), not `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`. |
 | `show-me-your-work` | The end-of-run check reads this session's `events.jsonl` (Transcripts above). |
 | `automate-me` | Mode skills live in the Copilot skill locations below; transcripts come from Transcripts above; `plugin-dev:skill-development` resolves through the skills table. |

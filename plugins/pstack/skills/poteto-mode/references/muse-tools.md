@@ -35,7 +35,7 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 - `subagent_spawn` children already run alongside your turn, so `run_in_background: true` has no separate flag. Issue the dispatch and continue; the result arrives when the child finishes.
 - `readonly: true` (reviewers, explorers, critics) has no flag. Say in the objective that the child must not change files, and review its diff anyway.
 - A role value's `@<level>`, or the `default effort` line, passes as the dispatch's effort field: `effort` on a Workflow child. `subagent_spawn` has no effort field and keeps the session's effort, so name the level it needs in the objective when the job turns on it. `session` sets nothing.
-- `isolation: "worktree"` maps to `worktree_isolation` on `subagent_spawn`, or `isolation` on a Workflow child. Muse runs every subagent on this machine, so the **swarm** skill's workers and the fan-out playbooks (`orchestrate`, `autopilot-full`, `autopilot-stack`) isolate writers with worktrees, as on Claude Code.
+- `isolation: "worktree"` maps to `worktree_isolation` on `subagent_spawn`, or `isolation` on a Workflow child. Muse runs every subagent on this machine, so the **swarm** skill's workers and the fan-out playbooks (`autopilot-full`, `autopilot-stack`) isolate writers with worktrees, as on Claude Code.
 - A completion notice on Muse means the child finished; the Claude Code caveat about a `completed` agent that keeps running does not apply. Stop an agent you abandon with `subagent_cancel` and confirm it stopped before replacing it.
 - Keep the rest of the policy unchanged. Pass file pointers not inlined context, give each worker its own worktree or branch when they write, review every subagent's diff yourself.
 
@@ -86,12 +86,12 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | `maintain-formal-verification-skill` | Project skills, the formal verification skill among them, live under `.agents/skills/`. |
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
 | `automate-me` | The skill-authoring guidance resolves through the skills table above. The workspace's transcripts are its Muse sessions (see Tool actions), and the mode skill lands in the Muse user skills directory or `.agents/skills/`. |
-| `architect` | The runner panel goes through the **arena** skill, so its fan-out and model substitution apply here too. |
+| `architect` | A large or contested design goes through the **arena** skill, so its fan-out and model substitution apply here too. |
 | `arena` | The parallel candidates and the cross-judge are Workflow children or `subagent_spawn` calls on the configured Muse models (see Model names). |
-| `how` | The parallel explorers and the explainer map to `subagent_spawn` fan-out; substitute your configured Muse models. |
-| `reflect` | The three reviewers and the synthesizer map to `subagent_spawn` fan-out. The transcript finder reads Claude Code's layout, so pass the session digest step 1 allows instead. |
+| `how` | The one read-only subagent maps to `subagent_spawn`. |
+| `reflect` | The transcript finder reads Claude Code's layout, so work from the conversation in your context, as the skill allows when the finder finds nothing. |
 | `swarm` | Each worker is a `subagent_spawn` call or a Workflow child; give each writing worker worktree isolation or its own output directory (see Subagent policy). |
-| `why` | The parallel investigators and the synthesizer map to `subagent_spawn` fan-out; substitute your configured Muse models. List MCP servers from the tools Muse exposes to the session, not from Claude Code's MCP files. |
+| `why` | List MCP servers from the tools Muse exposes to the session, not from Claude Code's MCP files. |
 | `typescript-best-practices` | Its frontmatter `paths` scoping is Claude Code metadata on Muse; invoke it by name for TypeScript work. |
 | `recall` | Search this workspace's Muse sessions (see Tool actions), not Claude Code's projects directory. |
 | `show-me-your-work` | Check the log against this run's Muse session file (see Tool actions), not a Claude Code transcript. |

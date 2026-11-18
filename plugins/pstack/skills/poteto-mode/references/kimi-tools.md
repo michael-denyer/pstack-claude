@@ -37,4 +37,4 @@ Read `<KIMI_CODE_HOME>/pstack-models.md` before a skill that needs a role model 
 
 | Skill | On Kimi Code CLI |
 | --- | --- |
-| `why` | Run independent investigators with `Agent` where permitted and wait for their results. |
+| `why` | Answer from the commits and PR discussions you can read, and say what the record does not answer. |

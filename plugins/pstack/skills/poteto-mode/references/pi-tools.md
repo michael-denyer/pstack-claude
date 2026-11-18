@@ -103,12 +103,12 @@ No skill file carries a Pi line. poteto-mode's Platform Adaptation section point
 | `maintain-formal-verification-skill` | Project skills, the formal verification skill among them, live under `.pi/skills/` or `.agents/skills/`. |
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
 | `automate-me` | `plugin-dev:skill-development` resolves through the skills table above. The workspace's transcripts are its Pi sessions directory (see Tool actions). Pi does not discover `.claude/skills/`, so write the mode skill to `.pi/skills/<handle>-mode/SKILL.md` or `.agents/skills/<handle>-mode/SKILL.md` instead. |
-| `architect` | The runner panel goes through the **arena** skill, so its `agent` fan-out and model aliases apply here too. |
+| `architect` | A large or contested design goes through the **arena** skill, so its `agent` fan-out and model aliases apply here too. |
 | `arena` | The parallel candidates and the cross-judge are background `agent` calls on the configured aliases (see Model names). |
-| `how` | The parallel explorers and the explainer are `agent` calls, and `readonly` applies as written (see Subagent policy). |
-| `reflect` | The three reviewers and the synthesizer are background `agent` calls. The transcript finder reads Pi sessions too. Pass it this workspace's Pi sessions directory (see Tool actions) in place of Claude Code's projects directory. It follows the session's active branch to its opening prompt. Skill files load from the Pi package directory that `pi list` shows, not `${CLAUDE_CODE_PLUGIN_CACHE_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins}/`, so treat reads under that directory as plugin skill reads. |
+| `how` | The one read-only subagent is an `agent` call, and `readonly` applies as written (see Subagent policy). |
+| `reflect` | The transcript finder reads Pi sessions too. Pass it this workspace's Pi sessions directory (see Tool actions) in place of Claude Code's projects directory. It follows the session's active branch to its opening prompt. Skill files load from the Pi package directory that `pi list` shows, not `${CLAUDE_CODE_PLUGIN_CACHE_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins}/`, so treat reads under that directory as plugin skill reads. |
 | `swarm` | Each worker is a background `agent` call on the configured alias. Give each writing worker `isolation: "worktree"` or its own output directory (see Subagent policy above). |
-| `why` | The parallel investigators and the synthesizer are background `agent` calls. List MCP servers from the tools Pi exposes to the session or `pi mcp list`, not from `.mcp.json` or `claude mcp list`. Spawn the synthesizer only after every investigator's completion notice has arrived, because those notices carry the findings the synthesizer gets. A `send_message` to an investigator returns no findings, so wait for its notice. |
+| `why` | List MCP servers from the tools Pi exposes to the session or `pi mcp list`, not from `.mcp.json` or `claude mcp list`. |
 
 ## Vendored scripts
 

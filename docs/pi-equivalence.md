@@ -52,7 +52,7 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | F07 | Own transcript as evidence | Same reader; `worktree-audit.mjs` scans Pi session roots | script | `a Pi session in a second transcripts root marks the worktree it ran in as a recent chat` | n/a |
 | F02 | `.claude/skills/` project and user skills | `.pi/skills/` or `.agents/skills/` | mapping | pi-tools.md `create-verification-skill` note | n/a |
 | F03 | `${CLAUDE_CODE_PLUGIN_CACHE_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins}/` install path | Skill files load from the Pi package directory that `pi list` shows | mapping | pi-tools.md `reflect` note | n/a |
-| F04 | `~/.claude/orchestrate/<slug>/` store | A plain directory, used unchanged | native | orchestrate playbook | n/a |
+| F04 | `~/.claude/orchestrate/<slug>/` store | A plain directory, used unchanged | native | Autopilot-full playbook | n/a |
 | F05 | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/shell-snapshots/` cleanup advice | Cleanup advice only | n/a | worktree-cleanup playbook | n/a |
 | F06 | `.claude/worktrees` | The extension uses the same path | extension | `keeps a worktree with changes and reports its path and branch` | n/a |
 | S01 | Bundled `run` skill | Run the app through `bash` | mapping | pi-tools.md Driver and bundled skills | n/a |
@@ -75,4 +75,4 @@ The Live column records the end-to-end run on real Pi with `PSTACK_PI_LIVE=1` (`
 | X02 | Effort levels and `@level` | Same five levels, passed as the `agent` tool's `effort`, which becomes `--thinking` | extension | `the effort parameter passes --thinking to any agent type, keeps a pstack agent's body as a 0600 system prompt file, and no effort runs at the parent's level` | VERIFIED |
 | X03 | `inherit-parent` / `auto` | The child runs on the parent's current model | extension | `alias, sheet override, inherit-parent, auto, pass-through, and no parent model` | n/a |
 | X04 | Compaction and `/clear` | Injection on every agent start keeps the routing instruction | extension | `injects the mandate and the full sheet on every agent start` | VERIFIED |
-| X05 | Session scratchpad | Pi has none; the skills only warn against keeping durable state there | difference | The one reference (orchestrate) tells the agent not to use a scratchpad. | n/a |
+| X05 | Session scratchpad | Pi has none; the skills only warn against keeping durable state there | difference | No skill names a scratchpad since the Orchestrate playbook was removed. | n/a |

@@ -12,12 +12,6 @@
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
-    "plugins/pstack/skills/architect/references/rationale-template.md": {
-      "kind": "policy",
-      "why": "Adds an Implementation reconciliation section that records accepted deviations and their acceptance sources.",
-      "since": "0.9.34",
-      "upstream": "not-proposed"
-    },
     "plugins/pstack/skills/blast-radius/SKILL.md": {
       "kind": "policy",
       "why": "Extends the trigger to run before design when a brief asserts something about existing code.",
@@ -36,12 +30,6 @@
       "since": "0.9.29",
       "upstream": "not-proposed"
     },
-    "plugins/pstack/skills/how/references/explainer-prompt.md": {
-      "kind": "policy",
-      "why": "Tells a lone explainer on the simple path that no explorers ran and that it traces the code itself with Read, Grep, and Glob before explaining.",
-      "since": "0.9.130",
-      "upstream": "not-proposed"
-    },
     "plugins/pstack/skills/no-comments/SKILL.md": {
       "kind": "policy",
       "why": "Treats a HOLD that names its dependency, platform, vendor, or protocol rule and where to check it as settled for the run, restores as a HOLD any kill of such a comment without a refuting page or file, and limits a second rejected report's failure to that report's findings so the accepted work still lands. Sets comment-sicko's model from the no-comments reviewer line in pstack-models.md.",
@@ -56,7 +44,7 @@
     },
     "plugins/pstack/skills/poteto-mode/SKILL.md": {
       "kind": "policy",
-      "why": "Adds the Platform Adaptation section, whose runtime sentence the generator stamps from RUNTIMES, with its task-tool and todo.md fallback (per task slug when sessions share a checkout, and beside the desktop app's short update_plan list), the run-or-verify driver line, the deploy-platform and defect-severity triggers, the focused-fix exception to the how and architect triggers, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it points the Agent-call defaults at the Models section with full tool access and the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and describes Autopilot-full as stopping at merge-ready for the operator's click and Autopilot-stack as Autopilot-full for PRs that build on each other.",
+      "why": "Adds the Platform Adaptation section, whose runtime sentence the generator stamps from RUNTIMES, with its task-tool and todo.md fallback (per task slug when sessions share a checkout, and beside the desktop app's short update_plan list), keeps a skipped playbook step in the todolist as a skip line, the deploy-platform and defect-severity triggers, the focused-fix exception to the architect trigger, the port's principle summaries, the project playbooks paragraph, and the closed-review-gate rule that the Codex and Pi mappings point to, and it uses the namespaced pstack:poteto-agent name, requires stopping an abandoned agent before replacing it, renders every reply item as prose, layers technical-writing on top of unslop, and points the bot-review trigger at the triage rubric.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },
@@ -92,7 +80,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/multi-phase-plan.md": {
       "kind": "port-feature",
-      "why": "Plans read skills from the installed plugin, keep the store under ~/.claude/orchestrate, write the program objective into the store's notes.md, run the tick as a dynamic-mode /loop that re-reads that objective, run live lanes in worktrees through the driver skill the Non-negotiables resolve instead of on cloud VMs with control-ui or control-cli, name the configured swarm workers model instead of a placeholder, leave rebase and merge authority to the execution playbook, and pick Autopilot-stack only when a PR builds on another, because neither autopilot merges.",
+      "why": "Plans resolve the driver skill through the Non-negotiables and run each live box through it in its own worktree, instead of through Cursor's control-ui or control-cli.",
       "since": "0.9.19",
       "upstream": "not-proposed"
     },
@@ -130,18 +118,6 @@
       "kind": "policy",
       "why": "Exits with a clear message when run without bun and installs production dependencies only.",
       "since": "0.9.11",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/poteto-mode/scripts/check-plan.mjs": {
-      "kind": "port-feature",
-      "why": "Checks for the port's plan skeleton markers (the objective written into the program store's notes.md, installed-plugin reads, an hourly cadence, the configured swarm workers model), requires a box under each program task and under Close the program, excludes fenced examples from required section and review-gate text, opens and closes a code fence at any indentation so a fence inside a list item counts, and strips a leading byte-order mark before parsing.",
-      "since": "0.9.19",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/poteto-mode/scripts/check-plan.test.ts": {
-      "kind": "port-feature",
-      "why": "Gives upstream's valid-plan fixture the boxes under each program task and under Close the program, the notes.md, installed-plugin, and hourly lines, and the configured swarm workers lane line that the port's checker requires.",
-      "since": "0.9.83",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/scripts/package.json": {
@@ -236,7 +212,7 @@
     },
     "plugins/pstack/skills/reflect/SKILL.md": {
       "kind": "port-feature",
-      "why": "Finds the session transcript with the port's find-transcript.mjs under the Claude Code projects directory that claude-project-dir.mjs prints, keeps the parent's conclusions out of the reviewer prompts (a fallback digest records events without a verdict, and nothing goes beside a transcript path), and drops Cursor's readonly agent mode and inline model column.",
+      "why": "Finds the session transcript with the port's find-transcript.mjs under the Claude Code projects directory that claude-project-dir.mjs prints, so a reflect run can read turns compacted out of its context, and edits a skill copy under the Claude Code skills directories.",
       "since": "0.1.0",
       "upstream": "not-proposed"
     },
@@ -352,24 +328,6 @@
       "kind": "policy",
       "why": "Requires quoting the failure content, not the assertion line, as evidence that the new test fails for the intended reason.",
       "since": "0.9.21",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/why/references/epistemics.md": {
-      "kind": "policy",
-      "why": "Adds the Claims about human decisions section that five other files cite for keeping a ruling's original wording and scope.",
-      "since": "0.9.34",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/why/references/investigator-prompt.md": {
-      "kind": "policy",
-      "why": "Tells investigators to return a human ruling's attributable original wording per the epistemics section.",
-      "since": "0.9.34",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/why/references/synthesizer-prompt.md": {
-      "kind": "policy",
-      "why": "Adds a step that applies the human-rulings epistemics, and gives the Direct-claim example a URL the link validator resolves.",
-      "since": "0.9.17",
       "upstream": "not-proposed"
     }
   },

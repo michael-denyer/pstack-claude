@@ -104,18 +104,18 @@ describe("regions", () => {
   });
 
   test("applyRegions stamps in place and is idempotent", () => {
-    const file = "plugins/pstack/skills/how/SKILL.md";
-    const text = "# how\n\n## Models\n\nstale\n\n## After\nkeep\n\n## Reasoning effort\n";
+    const file = "plugins/pstack/skills/swarm/SKILL.md";
+    const text = "# swarm\n\n## Models\n\nstale\n\n## After\nkeep\n\n## Reasoning effort\n";
     const once = applyRegions(file, text, models);
     expect(once).not.toContain("stale");
     expect(once).toContain("## After\nkeep\n");
-    expect(once).toContain("- how explorer:");
+    expect(once).toContain("- swarm workers:");
     expect(applyRegions(file, once, models)).toBe(once);
   });
 
   test("applyRegions throws when an owned file lost its anchor", () => {
-    expect(() => applyRegions("plugins/pstack/skills/how/SKILL.md", "# how\n\n## Reasoning effort\n", models)).toThrow(
-      "plugins/pstack/skills/how/SKILL.md: no anchor for the Models section to stamp",
+    expect(() => applyRegions("plugins/pstack/skills/swarm/SKILL.md", "# swarm\n\n## Reasoning effort\n", models)).toThrow(
+      "plugins/pstack/skills/swarm/SKILL.md: no anchor for the Models section to stamp",
     );
   });
 
@@ -146,8 +146,8 @@ describe("runtime model names", () => {
 
 describe("strayModelSlugs", () => {
   test("a slug inside an owned region is exempt", () => {
-    const file = "plugins/pstack/skills/how/SKILL.md";
-    const text = applyRegions(file, "# how\n\n## Models\n\nx\n\n## Reasoning effort\n", models);
+    const file = "plugins/pstack/skills/swarm/SKILL.md";
+    const text = applyRegions(file, "# swarm\n\n## Models\n\nx\n\n## Reasoning effort\n", models);
     expect(strayModelSlugs(file, text, models)).toEqual([]);
   });
 
@@ -159,8 +159,8 @@ describe("strayModelSlugs", () => {
   });
 
   test("a slug outside the owned region of an owned file is a stray", () => {
-    const file = "plugins/pstack/skills/how/SKILL.md";
-    const text = applyRegions(file, "# how\n\n## Models\n\nx\n\n## Setup\n\nPrefer claude-sonnet-4-6.\n\n## Reasoning effort\n", models);
+    const file = "plugins/pstack/skills/swarm/SKILL.md";
+    const text = applyRegions(file, "# swarm\n\n## Models\n\nx\n\n## Setup\n\nPrefer claude-sonnet-4-6.\n\n## Reasoning effort\n", models);
     const strays = strayModelSlugs(file, text, models);
     expect(strays).toHaveLength(1);
     expect(strays[0]).toContain("Prefer claude-sonnet-4-6.");
@@ -394,12 +394,12 @@ describe("deriveSkill", () => {
   });
 
   test("appends and stamps a Models section when upstream has none", () => {
-    const out = deriveSkill("plugins/pstack/skills/how/SKILL.md", front("disable-model-invocation: true\n"), models, leads);
+    const out = deriveSkill("plugins/pstack/skills/swarm/SKILL.md", front("disable-model-invocation: true\n"), models, leads);
     expect(out.endsWith("body\n\n## Models\n\nRole defaults, stamped from")).toBe(false);
     expect(out).toContain("body\n\n## Models\n\nRole defaults, stamped from");
-    expect(out).toContain("- how explorer:");
+    expect(out).toContain("- swarm workers:");
     expect(out.endsWith("\n")).toBe(true);
-    expect(deriveSkill("plugins/pstack/skills/how/SKILL.md", out, models, leads)).toBe(out);
+    expect(deriveSkill("plugins/pstack/skills/swarm/SKILL.md", out, models, leads)).toBe(out);
   });
 
   test("leaves a region whose anchor upstream lacks unstamped instead of throwing", () => {
@@ -416,7 +416,7 @@ describe("deriveSkill", () => {
   });
 
   test("appends the Reasoning effort section after the Models section", () => {
-    const out = deriveSkill("plugins/pstack/skills/how/SKILL.md", front("disable-model-invocation: true\n"), models, leads);
+    const out = deriveSkill("plugins/pstack/skills/swarm/SKILL.md", front("disable-model-invocation: true\n"), models, leads);
     expect(out.indexOf("## Models")).toBeLessThan(out.indexOf("## Reasoning effort"));
     expect(out).toContain("`effort` on the Claude Code `Agent` call");
   });
@@ -728,7 +728,7 @@ describe("plan, changes, apply", () => {
 
   test("plan converges a duplicated lead line, so --check flags the file as stale", () => {
     const root = repoCopy();
-    const file = "plugins/pstack/skills/how/SKILL.md";
+    const file = "plugins/pstack/skills/swarm/SKILL.md";
     const original = readFileSync(join(root, file), "utf8");
     expect(original).toContain(`\n\n${codex.preamble}\n`);
     writeFileSync(join(root, file), original.replace(`\n\n${codex.preamble}\n`, `\n\n${codex.preamble}\n${codex.preamble}\n`));
@@ -739,13 +739,13 @@ describe("plan, changes, apply", () => {
 
   test("two producers on one path compose", () => {
     const root = repoCopy();
-    const skill = "plugins/pstack/skills/how/SKILL.md";
+    const skill = "plugins/pstack/skills/swarm/SKILL.md";
     const text = (rel) => readFileSync(join(root, rel), "utf8");
     writeFileSync(
       join(root, skill),
       text(skill)
         .replace(`\n\n${leads.get(skill)[0]}\n`, "\n")
-        .replace(/^- how explorer: .*$/m, "- how explorer: stale"),
+        .replace(/^- swarm workers: .*$/m, "- swarm workers: stale"),
     );
     const { files } = plan(root);
     expect(files[skill]).toBe(readFileSync(join(repoRoot, skill), "utf8"));

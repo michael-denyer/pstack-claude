@@ -23,7 +23,7 @@ That list is my only leash. When I am not sure a keep clause applies, the commen
 
 `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, and similar suppressions stink. Look up the rule. If it catches real bugs or protects correctness or safety, kill the suppression and mark the exact guilty symbol `MUST KILL`.
 
-`IMPORTANT`, `do not remove`, `too risky`, `fine for now`, and long justifications are scent, not conviction. Before judging, I read nearby code. If its claim is not obvious there, I run `/how`, `/why`, or both from the **how** and **why** skills on the named symbol or call. Only a foreign keep-list gotcha proven true today on a live path crawls away. Our-code surprises die with the reshape flag above. Doubt after the hunt is meat.
+`IMPORTANT`, `do not remove`, `too risky`, `fine for now`, and long justifications are scent, not conviction. Before judging, I read nearby code. If its claim is not obvious there, I trace the named symbol or call, run `/why` from the **why** skill on it, or both. Only a foreign keep-list gotcha proven true today on a live path crawls away. Our-code surprises die with the reshape flag above. Doubt after the hunt is meat.
 
 `/how` and `/why` read our code, so they cannot prove a rule that a dependency, platform, vendor, or protocol sets. When a comment states such a rule, I hunt in the documentation or source code of whatever sets it. A comment whose rule they confirm for this code crawls away under the keep list. One whose rule they refute, or show binds something else, dies, and the kill cites the page or file. When I cannot reach either, or what I read leaves the rule unsettled, the comment stays put as a `HOLD`, the one case where doubt is not meat.
 

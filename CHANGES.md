@@ -2,6 +2,31 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.140 - sync to upstream 2f87c85 (v0.15.43): shorter skills, worker.md, one-file how, why, and reflect
+
+The upstream pin moves from `c742dd6` to `2f87c85`, upstream v0.15.43, 2 pstack commits (cursor/plugins#1236 and #1249). `cursor-team-kit` and `thermos` did not change upstream, so their pins stay.
+
+What changes for users:
+
+- `how`, `why`, and `reflect` are each one short file. `how` starts one read-only subagent and presents its answer. `why` answers from the commits and PR discussions behind the code. `reflect` reads the transcript itself, with no reviewer or synthesizer subagents, and still waits for approval before it edits a skill. Their reference prompts and per-source playbooks are gone.
+- `architect` is a short brief: trace every system the change touches, sketch two shapes, pick the one with one owner per piece of state, and run `arena` for a large or contested design. The five phases, runner prompt, red-flag list, and rationale template are gone.
+- poteto-mode no longer routes to `how`. Its trigger list is ten short lines, its playbook list is names only, and the Comments section is gone (`no-comments` still runs before review).
+- A new `poteto-mode/worker.md` carries the operator's rules to every started agent. The first line of each kickoff points at it by absolute path.
+- The Orchestrate playbook is deleted. Program-scale work routes to `figure-it-out`.
+- The Babysit, Opening a PR, and Multi-phase plan playbooks are cut to a few rules each. Multi-phase plan no longer runs `check-plan.mjs`, so the script, its tests, and its hook contract are deleted.
+- No role runs above xhigh. The `strongest judgment` model runs outside a panel only when the user names it for the task or two xhigh runs of the same brief on the task's own role model failed their check.
+- A second opinion, and the show-me-your-work reviewer, run on a model from another family.
+- Fourteen principle leaves, `unslop`, and `technical-writing` have shorter bodies with the same rules.
+- `statechart` reports a spec's SANY line and column on a parse error and draws arrows into a parent state through its border.
+
+Retired roles. `models.json` drops `how explorer`, `how explainer`, `why investigators`, `why synthesizer`, `reflect tooling`, `reflect judgment, divergent, synthesizer`, and `architect runners`, because their skills no longer spawn those subagents. `setup-pstack` drops such lines from an existing sheet on its next run. The port keeps `strongest judgment`, `thermos reviewers`, and `no-comments reviewer`, and keeps its own role tiers in `models.json` rather than upstream's Opus-first slugs.
+
+Forks. Every fork in `tools/forks.json` survives, merged onto upstream's new text, except seven files upstream deleted that the port had edited: `architect/references/rationale-template.md`, `how/references/explainer-prompt.md`, `why/references/epistemics.md`, `why/references/investigator-prompt.md`, `why/references/synthesizer-prompt.md`, `poteto-mode/scripts/check-plan.mjs`, and `poteto-mode/scripts/check-plan.test.ts`. The port follows upstream and deletes them. The human-rulings rule that `epistemics.md` held now sits inline in `recall` and the Session pickup playbook. The architect deviation rule from `rationale-template.md` now sits in `architect/SKILL.md`. The two #231 reflect pins in `tests/skill-rules.test.mjs` are removed with the reviewer prompts they guarded. The #72 rule that keeps a skipped step as a `skip: <reason>` line stays, though upstream dropped it.
+
+`agents/poteto-agent.md` drops upstream's new `model:` pin, because the port passes model and effort on each `Agent` call from the role sheet. An `inherit-parent` role keeps the `pstack:poteto-agent` type and runs on the parent model.
+
+New substitution rules rewrite upstream's new Cursor slugs in poteto-mode, arena, and the eval playbook to point at the Models sections, rewrite arena's vendor rule and family prefixes to the port's family rule, rewrite the control-ui driver line and the cursor-team-kit `/deslop` line, and map Project workers and readonly agent mode to background workers and full tool access. 34 rules whose upstream text is gone were removed. The generator no longer stamps a driver line into the deleted Orchestrate playbook.
+
 ## 0.9.139 - safer worktree cleanup and resume, playbook checks, and GPT-6.2 defaults
 
 The worktree audit checks ignored files in initialized submodules and compares local branches with the tips advertised by origin. Pi records ownership in each new agent worktree's private Git directory so reusing its path cannot redirect a resumed agent or its cleanup.

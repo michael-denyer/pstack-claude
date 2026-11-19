@@ -755,9 +755,8 @@ export class GhGitHubReader implements T.GitHubReader {
 }
 
 // A fork workflow awaiting approval has a check suite but no check runs, so no
-// check read shows it. Each suite that has not finished cleanly becomes a check.
-// An app other than Actions, such as Claude, queues a suite on every push and
-// may never run it, so its queued suite with no runs does not count.
+// check read shows it. An app other than Actions, such as Claude, queues a suite
+// on every push and may never run it.
 export function unsettledSuiteChecks(pages: unknown, head: string): T.Check[] {
   const checks: T.Check[] = [];
   const slurped = list(pages, "check suite pages");

@@ -706,3 +706,91 @@ describe("a PR with no checks configured", () => {
       });
   });
 });
+
+describe("check suites that no check read shows", () => {
+  const gated = {
+    kind: "failed",
+    name: "GitHub Actions check suite",
+    reportedState: "ACTION_REQUIRED",
+    description:
+      "waits for maintainer approval to run; approve the workflows on the pull request",
+    link: "",
+    workflow: "",
+  } as const;
+  const noChecks = {
+    fastPath: { kind: "none-reported" },
+    rollupPages: [{ kind: "no-rollup" }],
+    commitRollups: [{ oid: "head", state: null }],
+  } as const;
+  const read = (options: Parameters<typeof fakeReader>[0]) =>
+    readSnapshot({
+      reader: fakeReader(options),
+      context: context(40),
+      pendingHistory: "include",
+      allowDraft: false,
+      confirmNoChecks: () => true,
+    });
+
+  it("blocks on approval-gated Actions beside another app's passing check", async () => {
+    const snapshot = await read({ unsettledSuites: [gated] });
+    expect(snapshot).toMatchObject({
+      kind: "open",
+      ci: { kind: "ci-failing", source: "gh-pr-checks", failed: [gated] },
+    });
+    expect(classifyPr(snapshot)).toMatchObject({
+      kind: "blocker",
+      blocker: { kind: "failing-checks" },
+    });
+  });
+
+  it("blocks on approval-gated Actions when no check is reported", async () => {
+    const snapshot = await read({ ...noChecks, unsettledSuites: [gated] });
+    expect(snapshot).toMatchObject({
+      kind: "open",
+      ci: { kind: "ci-failing", source: "check-suites", failed: [gated] },
+    });
+  });
+
+  it("waits on an Actions suite that has not started its runs", async () => {
+    const queued = {
+      ...gated,
+      kind: "pending",
+      reportedState: "QUEUED",
+      description: "has not finished",
+    } as const;
+    for (const options of [{}, noChecks])
+      expect(
+        await read({ ...options, unsettledSuites: [queued] })
+      ).toMatchObject({ ci: { kind: "ci-pending", pending: [queued] } });
+  });
+
+  it("keeps clean CI and no CI when the head has no unsettled suite", async () => {
+    expect(await read({ unsettledSuites: [] })).toMatchObject({
+      ci: { kind: "ci-clean" },
+    });
+    expect(await read({ ...noChecks, unsettledSuites: [] })).toMatchObject({
+      ci: { kind: "ci-none" },
+    });
+  });
+
+  it("reads the head's suites only when no check has failed or is pending", async () => {
+    const suiteReads = async (options: Parameters<typeof fakeReader>[0]) => {
+      const reader = fakeReader(options);
+      await readSnapshot({
+        reader,
+        context: context(40),
+        pendingHistory: "include",
+        allowDraft: false,
+      });
+      return reader.calls.filter((call) => call.startsWith("unsettledSuites"));
+    };
+    expect(await suiteReads({})).toEqual(["unsettledSuites:head:reported"]);
+    expect(await suiteReads(noChecks)).toEqual([
+      "unsettledSuites:head:no-checks",
+    ]);
+    for (const check of [pendingCheck(), failedCheck()])
+      expect(
+        await suiteReads({ fastPath: { kind: "checks", checks: [check] } })
+      ).toEqual([]);
+  });
+});

@@ -3,18 +3,17 @@ import { WatchDeadline } from "./deadline.ts";
 import {
   ChecksUnavailable,
   WatcherQueryError,
-  checkUnreportedSuites,
   discoverStack,
   orderStack,
   parseFastCheck,
   parsePullRequest,
   parseReviewThreadPage,
-  PR_CHECK_ROLLUP_QUERY,
   PR_FACTS_QUERY,
   resolveChecks,
   resolveContext,
   resolveReviewThreads,
   runJson,
+  unsettledSuiteChecks,
 } from "./github.ts";
 import { fakeReader } from "./fakes.test-helper.ts";
 import type { PrContext } from "./types.ts";
@@ -123,13 +122,13 @@ describe("checks fallback chain", () => {
   });
 });
 
-describe("check suites behind a null rollup", () => {
+describe("check suites no check read shows", () => {
   const head = "a66c327af02be3cd643c1f0a163ee00967fbc6c0";
   const suite = (fields: Record<string, unknown> = {}) => ({
     head_sha: head,
     status: "completed",
     conclusion: "action_required",
-    app: { slug: "github-actions" },
+    app: { slug: "github-actions", name: "GitHub Actions" },
     latest_check_runs_count: 0,
     ...fields,
   });
@@ -137,43 +136,61 @@ describe("check suites behind a null rollup", () => {
     { total_count: suites.length, check_suites: suites },
   ];
 
-  it("names the approval an Actions suite waits for instead of reading it as no CI", () => {
-    const read = () => checkUnreportedSuites(pages(suite()), head);
-    expect(read).toThrow(ChecksUnavailable);
-    expect(read).toThrow(/requires maintainer approval/);
+  it("reads an Actions suite waiting for approval as a failed check that names the approval", () => {
+    expect(unsettledSuiteChecks(pages(suite()), head, "no-checks")).toEqual([
+      {
+        kind: "failed",
+        name: "GitHub Actions check suite",
+        reportedState: "ACTION_REQUIRED",
+        description: expect.stringContaining("maintainer approval"),
+        link: "",
+        workflow: "",
+      },
+    ]);
   });
 
-  it("treats a failed or unfinished suite as CI that exists", () => {
-    const evidence = [
-      ...["failure", "cancelled", "timed_out", "startup_failure"].map(
-        (conclusion) => suite({ conclusion })
-      ),
-      ...["queued", "in_progress", "waiting", "requested"].map((status) =>
-        suite({ status, conclusion: null })
-      ),
-    ];
-    for (const value of evidence)
-      expect(() => checkUnreportedSuites(pages(value), head)).toThrow(
-        ChecksUnavailable
-      );
+  it("reads a failed suite as a failed check and an unfinished one as pending", () => {
+    for (const conclusion of [
+      "failure",
+      "cancelled",
+      "timed_out",
+      "startup_failure",
+      "stale",
+    ])
+      expect(
+        unsettledSuiteChecks(pages(suite({ conclusion })), head, "no-checks")
+      ).toMatchObject([
+        { kind: "failed", reportedState: conclusion.toUpperCase() },
+      ]);
+    for (const status of ["queued", "in_progress", "waiting", "requested"])
+      expect(
+        unsettledSuiteChecks(
+          pages(suite({ status, conclusion: null })),
+          head,
+          "no-checks"
+        )
+      ).toMatchObject([
+        { kind: "pending", reportedState: status.toUpperCase() },
+      ]);
   });
 
-  it("allows no suites or suites that finished cleanly", () => {
-    expect(() => checkUnreportedSuites(pages(), head)).not.toThrow();
+  it("reads no check from no suites or suites that finished cleanly", () => {
+    expect(unsettledSuiteChecks(pages(), head, "no-checks")).toEqual([]);
     for (const conclusion of ["success", "neutral", "skipped"])
-      expect(() =>
-        checkUnreportedSuites(pages(suite({ conclusion })), head)
-      ).not.toThrow();
+      expect(
+        unsettledSuiteChecks(pages(suite({ conclusion })), head, "no-checks")
+      ).toEqual([]);
   });
 
   it("ignores another app's queued suite with no runs, but not Actions'", () => {
     const idle = { status: "queued", conclusion: null };
-    expect(() =>
-      checkUnreportedSuites(
-        pages(suite({ ...idle, app: { slug: "claude" } })),
-        head
+    expect(
+      unsettledSuiteChecks(
+        pages(suite({ ...idle, app: { slug: "claude", name: "Claude" } })),
+        head,
+        "no-checks"
       )
-    ).not.toThrow();
+    ).toEqual([]);
     for (const fields of [
       { app: { slug: "github-actions" } },
       { app: null },
@@ -181,9 +198,40 @@ describe("check suites behind a null rollup", () => {
       { app: { slug: "claude" }, latest_check_runs_count: 1 },
       { app: { slug: "claude" }, latest_check_runs_count: undefined },
     ])
-      expect(() =>
-        checkUnreportedSuites(pages(suite({ ...idle, ...fields })), head)
-      ).toThrow(ChecksUnavailable);
+      expect(
+        unsettledSuiteChecks(
+          pages(suite({ ...idle, ...fields })),
+          head,
+          "no-checks"
+        )
+      ).toMatchObject([{ kind: "pending", name: "Unknown app check suite" }]);
+  });
+
+  it("beside reported checks, counts only a suite with no runs that waits for approval or for Actions to start", () => {
+    const reported = (fields: Record<string, unknown>) =>
+      unsettledSuiteChecks(pages(suite(fields)), head, "reported");
+    expect(reported({})).toMatchObject([
+      { kind: "failed", reportedState: "ACTION_REQUIRED" },
+    ]);
+    expect(reported({ status: "queued", conclusion: null })).toMatchObject([
+      { kind: "pending", reportedState: "QUEUED" },
+    ]);
+    for (const fields of [
+      { conclusion: "cancelled" },
+      { conclusion: "failure" },
+      { conclusion: "cancelled", latest_check_runs_count: 3 },
+      { status: "in_progress", conclusion: null, latest_check_runs_count: 2 },
+      {
+        status: "in_progress",
+        conclusion: null,
+        app: { slug: "wip", name: "WIP" },
+      },
+      {
+        app: { slug: "code-review-gate", name: "Gate App" },
+        latest_check_runs_count: 1,
+      },
+    ])
+      expect(reported(fields)).toEqual([]);
   });
 
   it("finds a gated suite on a later page", () => {
@@ -191,9 +239,9 @@ describe("check suites behind a null rollup", () => {
       ...pages(suite({ conclusion: "success" })),
       ...pages(suite()),
     ];
-    expect(() => checkUnreportedSuites(twoPages, head)).toThrow(
-      ChecksUnavailable
-    );
+    expect(unsettledSuiteChecks(twoPages, head, "no-checks")).toMatchObject([
+      { kind: "failed", reportedState: "ACTION_REQUIRED" },
+    ]);
   });
 
   it("fails closed on a response that cannot certify this head", () => {
@@ -204,14 +252,11 @@ describe("check suites behind a null rollup", () => {
         pages(suite({ head_sha: "b".repeat(40) })),
         /must match the queried head/,
       ],
+      [pages(suite({ conclusion: null })), /conclusion of a completed suite/],
     ] as const)
-      expect(() => checkUnreportedSuites(value, head)).toThrow(detail);
-  });
-
-  it("asks the rollup query for the head commit the suite lookup needs", () => {
-    expect(PR_CHECK_ROLLUP_QUERY).toMatch(
-      /commit\s*\{\s*oid\s+statusCheckRollup/
-    );
+      expect(() => unsettledSuiteChecks(value, head, "no-checks")).toThrow(
+        detail
+      );
   });
 });
 

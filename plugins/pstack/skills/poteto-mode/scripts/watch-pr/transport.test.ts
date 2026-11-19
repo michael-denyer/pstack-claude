@@ -42,7 +42,7 @@ if (args.some(a => a.includes('query PullRequestFacts'))) {
 } else if (args[0] === 'pr' && args[1] === 'checks') {
   if (scenario === 'no-ci-unauthorized') fail('HTTP 401: Bad credentials (https://api.github.com/graphql)');
   if (noCi) fail("no checks reported on the 'feature' branch");
-  value = [{ name: 'ci', state: 'SUCCESS', bucket: 'pass', description: '', link: '', workflow: '' }];
+  value = [scenario === 'pending' ? { name: 'ci', state: 'IN_PROGRESS', bucket: 'pending', description: '', link: '', workflow: '' } : { name: 'ci', state: 'SUCCESS', bucket: 'pass', description: '', link: '', workflow: '' }];
 } else if (args.some(a => a.includes('query PrCheckRollup'))) {
   if (scenario === 'no-ci-rollup-fails') fail('HTTP 502: Bad Gateway (https://api.github.com/graphql)');
   value = { data: { repository: { pullRequest: { commits: { nodes: [{ commit: { oid: 'head', statusCheckRollup: null } }] } } } } };
@@ -52,6 +52,17 @@ if (args.some(a => a.includes('query PullRequestFacts'))) {
   const suites = {
     'no-ci-owner-approval': [{ head_sha: 'head', status: 'completed', conclusion: 'action_required', app: { slug: 'github-actions' }, latest_check_runs_count: 0 }],
     'no-ci-idle-app': [{ head_sha: 'head', status: 'queued', conclusion: null, app: { slug: 'claude' }, latest_check_runs_count: 0 }],
+    'superseded-beside-reported': [
+      { head_sha: 'head', status: 'completed', conclusion: 'cancelled', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 3 },
+      { head_sha: 'head', status: 'completed', conclusion: 'cancelled', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 0 },
+      { head_sha: 'head', status: 'completed', conclusion: 'failure', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 1 },
+      { head_sha: 'head', status: 'completed', conclusion: 'success', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 3 },
+    ],
+    'gated-beside-reported': [
+      { head_sha: 'head', status: 'completed', conclusion: 'action_required', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 0 },
+      { head_sha: 'head', status: 'completed', conclusion: 'action_required', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 0 },
+      { head_sha: 'head', status: 'completed', conclusion: 'success', app: { slug: 'microsoft-github-policy-service', name: 'Microsoft GitHub Policy Service' }, latest_check_runs_count: 1 },
+    ],
   }[scenario] ?? [];
   value = [{ total_count: suites.length, check_suites: suites }];
 } else if (noCi && args.some(a => a.includes('query PrCommitStatuses'))) {
@@ -162,7 +173,7 @@ it("reports a first sighting of no checks on a status-only pass", () => {
   }
 });
 
-it("reads the head's check suites only when no check is reported", () => {
+it("reads the head's check suites only when no check has failed or is pending", () => {
   const readsSuites = (scenario: string) => {
     const result = run(scenario, ["--status-only", "--max-query-errors", "1"]);
     expect(result.status).toBe(0);
@@ -171,7 +182,8 @@ it("reads the head's check suites only when no check is reported", () => {
     );
   };
   expect(readsSuites("no-ci")).toBe(true);
-  expect(readsSuites("threads")).toBe(false);
+  expect(readsSuites("threads")).toBe(true);
+  expect(readsSuites("pending")).toBe(false);
 });
 
 // Confirming no checks takes 60 seconds of wall time, so a test on the real
@@ -213,18 +225,56 @@ it("fails closed when the check queries fail instead of reporting no checks", ()
   }
 });
 
-it("does not report approval-gated Actions as a repository without CI", () => {
-  const result = run("no-ci-owner-approval", [
-    "--status-only",
-    "--max-query-errors",
-    "1",
-  ]);
-  expect(result.status).toBe(7);
+it("blocks on approval-gated Actions instead of reporting a repository without CI", () => {
+  const result = run("no-ci-owner-approval", ["--max-query-errors", "1"]);
+  expect(result.status).toBe(4);
   expect(JSON.parse(result.stdout.trim())).toMatchObject({
     kind: "BLOCKER",
-    blocker: { kind: "status-query", failure: { kind: "checks-unavailable" } },
+    blocker: {
+      kind: "failing-checks",
+      ci: {
+        kind: "ci-failing",
+        source: "check-suites",
+        failed: [{ reportedState: "ACTION_REQUIRED" }],
+      },
+    },
   });
-  expect(result.stdout).toContain("requires maintainer approval");
+  expect(result.stdout).toContain("maintainer approval");
+});
+
+// Replays microsoft/TypeScript#64949 as read on 2026-11-19: another app reported
+// one passing check while two Actions suites waited for approval with no runs.
+it("blocks on approval-gated Actions beside another app's passing check", () => {
+  const result = run("gated-beside-reported", ["--max-query-errors", "1"]);
+  expect(result.status).toBe(4);
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({
+    kind: "BLOCKER",
+    blocker: {
+      kind: "failing-checks",
+      ci: {
+        kind: "ci-failing",
+        failed: [
+          {
+            name: "GitHub Actions check suite",
+            reportedState: "ACTION_REQUIRED",
+          },
+          {
+            name: "GitHub Actions check suite",
+            reportedState: "ACTION_REQUIRED",
+          },
+        ],
+      },
+    },
+  });
+});
+
+// Replays the shape of grafana/grafana#138293 as read on 2026-11-19: every
+// reported check passed, and a cancelled run that a later run replaced still
+// had its suite on the head.
+it("reports ready beside a cancelled or failed run that a later run replaced", () => {
+  const result = run("superseded-beside-reported", ["--max-query-errors", "1"]);
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({ kind: "READY" });
 });
 
 it("exits 7 with a JSON verdict when gh is not on PATH", () => {

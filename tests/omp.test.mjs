@@ -104,16 +104,22 @@ describe("OMP marketplace plugin", () => {
 });
 
 describe("omp-tools.md", () => {
-  test("every skill that writes or finds a project skill names OMP's native .omp/skills/ folder", () => {
-    const rows = readFileSync(join(plugin, "skills/poteto-mode/references/omp-tools.md"), "utf8").split("\n");
-    const missing = [
-      "automate-me",
-      "create-verification-skill",
-      "maintain-verification-skill",
-      "create-formal-verification-skill",
-      "maintain-formal-verification-skill",
-    ].filter((skill) => !rows.some((row) => row.startsWith(`| \`${skill}\` |`) && row.includes("`.omp/skills/")));
+  test("the verification and mode skills write to and look in OMP's native skill folders", () => {
+    const mapping = readFileSync(join(plugin, "skills/poteto-mode/references/omp-tools.md"), "utf8");
+    const rows = mapping.split("\n");
+    const want = {
+      "automate-me": ["to `.omp/skills/<handle>-mode/SKILL.md`", "`~/.omp/agent/skills/`"],
+      "create-verification-skill": ["write it to `.omp/skills/verify/`"],
+      "maintain-verification-skill": ["under `.omp/skills/` first"],
+      "create-formal-verification-skill": ["to `.omp/skills/<area>/`"],
+      "maintain-formal-verification-skill": ["under `.omp/skills/` first"],
+    };
+    const missing = Object.entries(want).flatMap(([skill, phrases]) => {
+      const row = rows.find((line) => line.startsWith(`| \`${skill}\` |`)) ?? "";
+      return phrases.filter((phrase) => !row.includes(phrase)).map((phrase) => `${skill}: ${phrase}`);
+    });
     expect(missing).toEqual([]);
+    expect(mapping).toContain("look under `.omp/skills/verify/` first");
   });
 });
 

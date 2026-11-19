@@ -1,6 +1,6 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkPlaybooks } from "../plugins/pstack/skills/poteto-mode/scripts/check-playbooks.mjs";
@@ -127,6 +127,25 @@ describe("project playbooks", () => {
       expect(unanchored("prose", "Work off main.", "Subagents inherit it.", "`## Scope`: always.", "attach screenshots")).toEqual([]);
       expect(unanchored("prose", "Prose", "inherit it. - `## Why`", "always. After")).toEqual(["Prose", "inherit it. - `## Why`", "always. After"]);
       expect(unanchored("steps", "Reproduce it.", "Read this first.")).toEqual(["Read this first."]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // An upstream sync that adds one numbered list to either playbook turns every other line unanchorable.
+  test("every prose line of the bundled playbooks without numbered steps anchors a change", () => {
+    const bundled = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/playbooks");
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      for (const stem of ["opening-a-pr", "babysit"]) {
+        const changes = readFileSync(join(bundled, `${stem}.md`), "utf8")
+          .split("\n")
+          .filter((line) => line.trim() && !line.startsWith("#") && !line.includes('"'))
+          .map((line) => line.replace(/^ *(?:[-*+]|\d+[.)]) +/, "").trim().split(/\s+/).slice(-4).join(" "))
+          .map((quote) => `- **In** "${quote}": check it.\n`);
+        writePlaybooks(root, { [`${stem}.md`]: `---\nextends: ${stem}\nwhen: Any change.\n---\n${changes.join("")}` });
+      }
+      expect(checkPlaybooks(root)).toEqual([]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

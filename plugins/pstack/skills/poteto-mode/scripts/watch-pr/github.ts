@@ -685,7 +685,17 @@ export class GhGitHubReader implements T.GitHubReader {
       "commit"
     );
     if (commit.statusCheckRollup === null) {
-      await this.checkUnreportedSuites(context, text(commit.oid, "commit.oid"));
+      const head = text(commit.oid, "commit.oid");
+      checkUnreportedSuites(
+        await this.runJson([
+          "gh",
+          "api",
+          "--paginate",
+          "--slurp",
+          `repos/${context.owner}/${context.repo}/commits/${head}/check-suites?per_page=100`,
+        ]),
+        head
+      );
       return { kind: "no-rollup" };
     }
     const contexts = record(
@@ -707,51 +717,6 @@ export class GhGitHubReader implements T.GitHubReader {
       checks,
       endCursor: page.hasNextPage && cursor ? cursor : null,
     };
-  }
-  // A fork workflow awaiting approval has a check suite but no check runs.
-  // A null rollup alone must not start the no-CI confirmation clock.
-  private async checkUnreportedSuites(
-    context: T.PrContext,
-    head: string
-  ): Promise<void> {
-    const pages = list(
-      await this.runJson([
-        "gh",
-        "api",
-        "--paginate",
-        "--slurp",
-        `repos/${context.owner}/${context.repo}/commits/${head}/check-suites?per_page=100`,
-      ]),
-      "check suite pages"
-    );
-    if (pages.length === 0) missing("check suite pages", pages);
-    for (const page of pages) {
-      for (const value of list(at(page, ["check_suites"]), "check_suites")) {
-        const suite = record(value, "check suite");
-        if (string(suite.head_sha, "check suite.head_sha") !== head)
-          missing(
-            "check suite.head_sha must match the queried head",
-            suite.head_sha
-          );
-        const status = string(suite.status, "check suite.status");
-        const conclusion = optionalString(
-          suite.conclusion,
-          "check suite.conclusion"
-        );
-        if (
-          status === "completed" &&
-          ["success", "neutral", "skipped"].includes(conclusion ?? "")
-        )
-          continue;
-        const reason =
-          conclusion === "action_required"
-            ? "requires maintainer approval or other action"
-            : `is ${conclusion ?? status}`;
-        throw new ChecksUnavailable(
-          `head ${head} has no check runs, but a check suite ${reason}; this is not a repository without CI`
-        );
-      }
-    }
   }
   async reviewThreadPage(
     context: T.PrContext,
@@ -787,6 +752,47 @@ export class GhGitHubReader implements T.GitHubReader {
   }
 }
 
+// A fork workflow awaiting approval has a check suite but no check runs, so a
+// null rollup alone must not start the no-CI confirmation clock. An app other
+// than Actions, such as Claude, queues a suite on every push and may never run it.
+export function checkUnreportedSuites(pages: unknown, head: string): void {
+  const slurped = list(pages, "check suite pages");
+  if (slurped.length === 0) missing("check suite pages", slurped);
+  for (const page of slurped) {
+    for (const value of list(at(page, ["check_suites"]), "check_suites")) {
+      const suite = record(value, "check suite");
+      if (string(suite.head_sha, "check suite.head_sha") !== head)
+        missing(
+          "check suite.head_sha must match the queried head",
+          suite.head_sha
+        );
+      const status = string(suite.status, "check suite.status");
+      const conclusion = optionalString(
+        suite.conclusion,
+        "check suite.conclusion"
+      );
+      if (
+        status === "completed" &&
+        ["success", "neutral", "skipped"].includes(conclusion ?? "")
+      )
+        continue;
+      const idleApp =
+        status === "queued" &&
+        suite.latest_check_runs_count === 0 &&
+        isRecord(suite.app) &&
+        typeof suite.app.slug === "string" &&
+        suite.app.slug !== "github-actions";
+      if (idleApp) continue;
+      const reason =
+        conclusion === "action_required"
+          ? "requires maintainer approval or other action"
+          : `is ${conclusion ?? status}`;
+      throw new ChecksUnavailable(
+        `head ${head} has no check runs, but a check suite ${reason}; this is not a repository without CI`
+      );
+    }
+  }
+}
 export async function resolveChecks(
   reader: T.GitHubReader,
   context: T.PrContext

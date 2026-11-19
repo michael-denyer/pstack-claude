@@ -3,11 +3,13 @@ import { WatchDeadline } from "./deadline.ts";
 import {
   ChecksUnavailable,
   WatcherQueryError,
+  checkUnreportedSuites,
   discoverStack,
   orderStack,
   parseFastCheck,
   parsePullRequest,
   parseReviewThreadPage,
+  PR_CHECK_ROLLUP_QUERY,
   PR_FACTS_QUERY,
   resolveChecks,
   resolveContext,
@@ -118,6 +120,98 @@ describe("checks fallback chain", () => {
       throw failure;
     };
     await expect(resolveChecks(reader, context)).rejects.toBe(failure);
+  });
+});
+
+describe("check suites behind a null rollup", () => {
+  const head = "a66c327af02be3cd643c1f0a163ee00967fbc6c0";
+  const suite = (fields: Record<string, unknown> = {}) => ({
+    head_sha: head,
+    status: "completed",
+    conclusion: "action_required",
+    app: { slug: "github-actions" },
+    latest_check_runs_count: 0,
+    ...fields,
+  });
+  const pages = (...suites: unknown[]) => [
+    { total_count: suites.length, check_suites: suites },
+  ];
+
+  it("names the approval an Actions suite waits for instead of reading it as no CI", () => {
+    const read = () => checkUnreportedSuites(pages(suite()), head);
+    expect(read).toThrow(ChecksUnavailable);
+    expect(read).toThrow(/requires maintainer approval/);
+  });
+
+  it("treats a failed or unfinished suite as CI that exists", () => {
+    const evidence = [
+      ...["failure", "cancelled", "timed_out", "startup_failure"].map(
+        (conclusion) => suite({ conclusion })
+      ),
+      ...["queued", "in_progress", "waiting", "requested"].map((status) =>
+        suite({ status, conclusion: null })
+      ),
+    ];
+    for (const value of evidence)
+      expect(() => checkUnreportedSuites(pages(value), head)).toThrow(
+        ChecksUnavailable
+      );
+  });
+
+  it("allows no suites or suites that finished cleanly", () => {
+    expect(() => checkUnreportedSuites(pages(), head)).not.toThrow();
+    for (const conclusion of ["success", "neutral", "skipped"])
+      expect(() =>
+        checkUnreportedSuites(pages(suite({ conclusion })), head)
+      ).not.toThrow();
+  });
+
+  it("ignores another app's queued suite with no runs, but not Actions'", () => {
+    const idle = { status: "queued", conclusion: null };
+    expect(() =>
+      checkUnreportedSuites(
+        pages(suite({ ...idle, app: { slug: "claude" } })),
+        head
+      )
+    ).not.toThrow();
+    for (const fields of [
+      { app: { slug: "github-actions" } },
+      { app: null },
+      { app: {} },
+      { app: { slug: "claude" }, latest_check_runs_count: 1 },
+      { app: { slug: "claude" }, latest_check_runs_count: undefined },
+    ])
+      expect(() =>
+        checkUnreportedSuites(pages(suite({ ...idle, ...fields })), head)
+      ).toThrow(ChecksUnavailable);
+  });
+
+  it("finds a gated suite on a later page", () => {
+    const twoPages = [
+      ...pages(suite({ conclusion: "success" })),
+      ...pages(suite()),
+    ];
+    expect(() => checkUnreportedSuites(twoPages, head)).toThrow(
+      ChecksUnavailable
+    );
+  });
+
+  it("fails closed on a response that cannot certify this head", () => {
+    for (const [value, detail] of [
+      [[], /check suite pages/],
+      [[{ total_count: 1 }], /check_suites/],
+      [
+        pages(suite({ head_sha: "b".repeat(40) })),
+        /must match the queried head/,
+      ],
+    ] as const)
+      expect(() => checkUnreportedSuites(value, head)).toThrow(detail);
+  });
+
+  it("asks the rollup query for the head commit the suite lookup needs", () => {
+    expect(PR_CHECK_ROLLUP_QUERY).toMatch(
+      /commit\s*\{\s*oid\s+statusCheckRollup/
+    );
   });
 });
 

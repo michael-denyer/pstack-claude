@@ -48,8 +48,10 @@ if (args.some(a => a.includes('query PullRequestFacts'))) {
   value = { data: { repository: { pullRequest: { commits: { nodes: [{ commit: { oid: 'head', statusCheckRollup: null } }] } } } } };
 } else if (args.some(a => a.endsWith('/check-suites?per_page=100'))) {
   if (scenario === 'no-ci-suites-fail') fail('HTTP 403: check suites unavailable');
-  const suites = scenario === 'no-ci-owner-approval'
-    ? [{ head_sha: 'head', status: 'completed', conclusion: 'action_required' }] : [];
+  const suites = {
+    'no-ci-owner-approval': [{ head_sha: 'head', status: 'completed', conclusion: 'action_required', app: { slug: 'github-actions' }, latest_check_runs_count: 0 }],
+    'no-ci-idle-app': [{ head_sha: 'head', status: 'queued', conclusion: null, app: { slug: 'claude' }, latest_check_runs_count: 0 }],
+  }[scenario] ?? [];
   value = [{ total_count: suites.length, check_suites: suites }];
 } else if (noCi && args.some(a => a.includes('query PrCommitStatuses'))) {
   value = { data: { repository: { pullRequest: { commits: { nodes: [{ commit: { oid: 'head', statusCheckRollup: null } }] } } } } };
@@ -148,13 +150,27 @@ const verdicts = (stdout: string): unknown[] =>
 // with no checks configured: `gh pr checks` exits 1 with "no checks reported"
 // and the head commit's statusCheckRollup is null.
 it("reports a first sighting of no checks on a status-only pass", () => {
-  const result = run("no-ci", ["--status-only", "--max-query-errors", "1"]);
-  expect(result.status).toBe(0);
-  expect(JSON.parse(result.stdout.trim())).toMatchObject({
-    kind: "STATUS",
-    terminal: true,
-    rows: [{ kind: "open", ci: { kind: "ci-unreported" } }],
-  });
+  for (const scenario of ["no-ci", "no-ci-idle-app"]) {
+    const result = run(scenario, ["--status-only", "--max-query-errors", "1"]);
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout.trim())).toMatchObject({
+      kind: "STATUS",
+      terminal: true,
+      rows: [{ kind: "open", ci: { kind: "ci-unreported" } }],
+    });
+  }
+});
+
+it("reads the head's check suites only when no check is reported", () => {
+  const readsSuites = (scenario: string) => {
+    const result = run(scenario, ["--status-only", "--max-query-errors", "1"]);
+    expect(result.status).toBe(0);
+    return result.calls.some((args) =>
+      args.some((arg) => arg.includes("/check-suites"))
+    );
+  };
+  expect(readsSuites("no-ci")).toBe(true);
+  expect(readsSuites("threads")).toBe(false);
 });
 
 // Confirming no checks takes 60 seconds of wall time, so a test on the real
@@ -196,6 +212,20 @@ it("fails closed when the check queries fail instead of reporting no checks", ()
   }
 });
 
+it("does not report approval-gated Actions as a repository without CI", () => {
+  const result = run("no-ci-owner-approval", [
+    "--status-only",
+    "--max-query-errors",
+    "1",
+  ]);
+  expect(result.status).toBe(7);
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({
+    kind: "BLOCKER",
+    blocker: { kind: "status-query", failure: { kind: "checks-unavailable" } },
+  });
+  expect(result.stdout).toContain("requires maintainer approval");
+});
+
 it("exits 7 with a JSON verdict when gh is not on PATH", () => {
   const result = run("missing-gh", [], "/nonexistent");
   expect(result.status).toBe(7);
@@ -217,18 +247,4 @@ it("cancels an in-flight command at the CLI deadline", () => {
   expect(JSON.parse(result.stdout.trim())).toMatchObject({ kind: "TIMEOUT" });
   const pid = Number(readFileSync(result.pidFile, "utf8"));
   expect(() => process.kill(pid, 0)).toThrow();
-});
-
-it("does not report approval-gated Actions as a repository without CI", () => {
-  const result = run("no-ci-owner-approval", [
-    "--status-only",
-    "--max-query-errors",
-    "1",
-  ]);
-  expect(result.status).toBe(7);
-  expect(JSON.parse(result.stdout.trim())).toMatchObject({
-    kind: "BLOCKER",
-    blocker: { kind: "status-query", failure: { kind: "checks-unavailable" } },
-  });
-  expect(result.stdout).toContain("requires maintainer approval");
 });

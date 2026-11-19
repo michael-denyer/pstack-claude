@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.143 - watch-pr blocks on approval-gated Actions beside other checks
+
+`watch-pr` no longer calls a fork PR ready while its Actions workflows wait for maintainer approval and another app, such as a CLA bot, has reported a passing check ([#470](https://github.com/michael-denyer/pstack-claude/issues/470)). GitHub gives a gated workflow a check suite with no runs, so no check read shows it, and the watcher read the other app's check alone as clean CI. On 2026-11-19, 28 of 110 open PR heads in nine large repositories whose reported checks had all passed had this shape.
+
+Before the watcher counts a head's CI as clean or absent, it now reads the head's check suites, and each suite that has not finished cleanly becomes a check named for its app. A suite waiting for approval is a failed check with state `ACTION_REQUIRED` that says to approve the workflows, so the watcher stops with exit 4, as it does for an `ACTION_REQUIRED` check run. A suite still running is a pending check, and the watcher waits on it. Another app's queued suite with no runs, such as the one the Claude GitHub app adds to every push, still does not count. The read is one paginated REST call for each PR on each poll, made only when no reported check has failed or is pending.
+
+The same reading replaces the 0.9.141 check on a head with no reported checks. That check reported a gated suite as a retried query failure, which ended in exit 7 after about 12 minutes of backoff and pointed at GitHub authentication. Such a head now stops at once with exit 4 and names the approval.
+
 ## 0.9.142 - playbook checks on bases without numbered steps, and OMP skill folders
 
 Since 0.9.139, `check-playbooks.mjs` matches each quoted anchor against one numbered step of the base playbook. `opening-a-pr.md` has no numbered steps, and since 0.9.140 neither has `babysit.md`, so the checker rejected every change anchored on them, even on text that matched word for word, and a repository that runs it before each push was blocked. When a base has no numbered steps, each paragraph and each list item now counts as a step. Headings, fenced code, and a quote that spans two blocks still fail, and a base with numbered steps is checked as before. poteto-mode's Project playbooks section now says what a step is in such a base. @apenab reported this in [#466](https://github.com/michael-denyer/pstack-claude/issues/466), and [#468](https://github.com/michael-denyer/pstack-claude/pull/468) fixes it.

@@ -24,7 +24,7 @@ export const PR_FACTS_QUERY = `query PullRequestFacts($owner: String!, $repo: St
   }
 }`;
 export const PR_CHECK_ROLLUP_QUERY =
-  "\nquery PrCheckRollup($owner: String!, $repo: String!, $pr: Int!, $after: String) {\n  repository(owner: $owner, name: $repo) {\n    pullRequest(number: $pr) {\n      commits(last: 1) {\n        nodes {\n          commit {\n            statusCheckRollup {\n              contexts(first: 100, after: $after) {\n                pageInfo {\n                  hasNextPage\n                  endCursor\n                }\n                nodes {\n                  __typename\n                  ... on CheckRun {\n                    name\n                    status\n                    conclusion\n                    detailsUrl\n                  }\n                  ... on StatusContext {\n                    context\n                    state\n                    targetUrl\n                  }\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}\n";
+  "\nquery PrCheckRollup($owner: String!, $repo: String!, $pr: Int!, $after: String) {\n  repository(owner: $owner, name: $repo) {\n    pullRequest(number: $pr) {\n      commits(last: 1) {\n        nodes {\n          commit {\n            oid\n            statusCheckRollup {\n              contexts(first: 100, after: $after) {\n                pageInfo {\n                  hasNextPage\n                  endCursor\n                }\n                nodes {\n                  __typename\n                  ... on CheckRun {\n                    name\n                    status\n                    conclusion\n                    detailsUrl\n                  }\n                  ... on StatusContext {\n                    context\n                    state\n                    targetUrl\n                  }\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}\n";
 
 interface CommandResult {
   readonly code: number;
@@ -684,7 +684,20 @@ export class GhGitHubReader implements T.GitHubReader {
       at(commits[commits.length - 1], ["commit"]),
       "commit"
     );
-    if (commit.statusCheckRollup === null) return { kind: "no-rollup" };
+    if (commit.statusCheckRollup === null) {
+      const head = text(commit.oid, "commit.oid");
+      checkUnreportedSuites(
+        await this.runJson([
+          "gh",
+          "api",
+          "--paginate",
+          "--slurp",
+          `repos/${context.owner}/${context.repo}/commits/${head}/check-suites?per_page=100`,
+        ]),
+        head
+      );
+      return { kind: "no-rollup" };
+    }
     const contexts = record(
       at(commit, ["statusCheckRollup", "contexts"]),
       "contexts"
@@ -739,6 +752,47 @@ export class GhGitHubReader implements T.GitHubReader {
   }
 }
 
+// A fork workflow awaiting approval has a check suite but no check runs, so a
+// null rollup alone must not start the no-CI confirmation clock. An app other
+// than Actions, such as Claude, queues a suite on every push and may never run it.
+export function checkUnreportedSuites(pages: unknown, head: string): void {
+  const slurped = list(pages, "check suite pages");
+  if (slurped.length === 0) missing("check suite pages", slurped);
+  for (const page of slurped) {
+    for (const value of list(at(page, ["check_suites"]), "check_suites")) {
+      const suite = record(value, "check suite");
+      if (string(suite.head_sha, "check suite.head_sha") !== head)
+        missing(
+          "check suite.head_sha must match the queried head",
+          suite.head_sha
+        );
+      const status = string(suite.status, "check suite.status");
+      const conclusion = optionalString(
+        suite.conclusion,
+        "check suite.conclusion"
+      );
+      if (
+        status === "completed" &&
+        ["success", "neutral", "skipped"].includes(conclusion ?? "")
+      )
+        continue;
+      const idleApp =
+        status === "queued" &&
+        suite.latest_check_runs_count === 0 &&
+        isRecord(suite.app) &&
+        typeof suite.app.slug === "string" &&
+        suite.app.slug !== "github-actions";
+      if (idleApp) continue;
+      const reason =
+        conclusion === "action_required"
+          ? "requires maintainer approval or other action"
+          : `is ${conclusion ?? status}`;
+      throw new ChecksUnavailable(
+        `head ${head} has no check runs, but a check suite ${reason}; this is not a repository without CI`
+      );
+    }
+  }
+}
 export async function resolveChecks(
   reader: T.GitHubReader,
   context: T.PrContext

@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.144 - check-playbooks treats setext and tab-separated headings as headings
+
+Since 0.9.142, `check-playbooks.mjs` counts each paragraph and list item of a base playbook without numbered steps as a step and ends a block at a heading, but it recognised only an ATX heading with a space after its `#` run. A setext heading (text over a `---` or `===` line) and an ATX heading with a tab after the `#` run read as paragraph text, so a change anchored on either passed. A setext underline now turns the paragraph above it into a heading, a tab after the `#` run counts as an ATX heading on both the numbered-step and the paragraph path, and a line of dashes under a list item still leaves the item an anchor, as CommonMark reads it. No bundled playbook has either heading form today, so no project playbook passed wrongly ([#476](https://github.com/michael-denyer/pstack-claude/issues/476)).
+
 ## 0.9.143 - watch-pr blocks on approval-gated Actions beside other checks
 
 `watch-pr` no longer calls a fork PR ready while its Actions workflows wait for maintainer approval and another app, such as a CLA bot, has reported a passing check ([#470](https://github.com/michael-denyer/pstack-claude/issues/470)). GitHub gives a gated workflow a check suite with no runs, so no check read shows it, and the watcher read the other app's check alone as clean CI. On 2026-11-19, 28 of 110 open PR heads in nine large repositories whose reported checks had all passed had this shape.

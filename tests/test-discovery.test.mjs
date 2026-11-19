@@ -18,6 +18,7 @@ function loadedFiles(...paths) {
   return Number(output.match(/across (\d+) files?/)?.[1]);
 }
 
+// Each load imports every test file; early in a cold CI job the pair took 5.7 s and 6.3 s.
 test("a bare bun test at the root loads the same files as bun test tests/", () => {
   expect(loadedFiles()).toBe(loadedFiles("tests/"));
-});
+}, 30_000);

@@ -48,6 +48,7 @@ if (args.some(a => a.includes('query PullRequestFacts'))) {
   value = { data: { repository: { pullRequest: { commits: { nodes: [{ commit: { oid: 'head', statusCheckRollup: null } }] } } } } };
 } else if (args.some(a => a.endsWith('/check-suites?per_page=100'))) {
   if (scenario === 'no-ci-suites-fail') fail('HTTP 403: check suites unavailable');
+  if (!args.includes('--paginate') || !args.includes('--slurp')) fail('fixture serves only paginated, slurped check suites');
   const suites = {
     'no-ci-owner-approval': [{ head_sha: 'head', status: 'completed', conclusion: 'action_required', app: { slug: 'github-actions' }, latest_check_runs_count: 0 }],
     'no-ci-idle-app': [{ head_sha: 'head', status: 'queued', conclusion: null, app: { slug: 'claude' }, latest_check_runs_count: 0 }],

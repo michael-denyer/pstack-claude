@@ -2,9 +2,9 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.141 - watch-pr waits on fork CI that needs approval
+## 0.9.141 - watch-pr no longer reads approval-gated fork CI as no CI
 
-`watch-pr` no longer reads a fork PR whose workflows wait for maintainer approval as a repository with no checks. GitHub shows no check runs and no rollup for such a head, so the watcher could wait out its 60 seconds and call the PR ready with CI never run. When the head has no rollup, the watcher now reads its check suites. A suite that has not finished cleanly is reported as a `checks-unavailable` query failure, and one waiting for approval says so. Another app's queued suite with no runs, such as the one the Claude GitHub app adds to every push, still counts as no CI. @EthanYoQ found and fixed this in [#460](https://github.com/michael-denyer/pstack-claude/pull/460).
+`watch-pr` no longer reads a fork PR whose workflows wait for maintainer approval as a repository with no checks. GitHub shows no check runs and no rollup for such a head, so the watcher could wait out its 60 seconds and call the PR ready with CI never run. When the head has no rollup, the watcher now reads its check suites. A suite that has not finished cleanly is reported as a `checks-unavailable` query failure, and one waiting for approval says so. Another app's queued suite with no runs, such as the one the Claude GitHub app adds to every push, still counts as no CI. The check covers a head with no reported checks only. When another app has reported a check, the watcher still reads that check alone and does not see Actions waiting beside it. @EthanYoQ found and fixed this in [#460](https://github.com/michael-denyer/pstack-claude/pull/460).
 
 ## 0.9.140 - sync to upstream 2f87c85 (v0.15.43): shorter skills, worker.md, one-file how, why, and reflect
 

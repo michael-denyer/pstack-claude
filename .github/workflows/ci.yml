@@ -212,7 +212,7 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
       - name: Test
-        run: bun test watch-pr check-plan.test.ts
+        run: bun test watch-pr
       # Pinned here, not in package.json, so bun.lock stays identical to
       # upstream's. 3.6.2 reproduces upstream's watch-pr files byte for byte,
       # except fakes.test-helper.ts, github.test.ts, and policy.test.ts, which

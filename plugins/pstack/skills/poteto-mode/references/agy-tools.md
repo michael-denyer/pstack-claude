@@ -40,11 +40,11 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 
 Skills name Claude Code model aliases in their Models sections. On Antigravity (`agy`), `invoke_subagent`'s `Model` parameter accepts `inherit` (default, uses the parent's model), `flash_lite`, `flash`, and `pro`.
 
-- The model sheet is `~/.gemini/config/pstack-models.md`. Before a skill that needs a role model (`architect`, `arena`, `how`, `interrogate`, `no-comments`, `poteto-mode`, `reflect`, `swarm`, `thermos`, `why`), read it. With no sheet, read `setup-pstack`'s `SKILL.md` and finish it first.
+- The model sheet is `~/.gemini/config/pstack-models.md`. Before a skill that needs a role model (`arena`, `interrogate`, `no-comments`, `poteto-mode`, `swarm`, `thermos`), read it. With no sheet, read `setup-pstack`'s `SKILL.md` and finish it first.
 - Pass the role's model as `Model` on `invoke_subagent`. For `inherit-parent` or `auto`, omit `Model`.
 - Roles that default to the worker model (`feature, refactoring`): the worker model the user chose.
 - Roles that default to the strongest model (`strongest judgment`): the strongest model the user chose.
-- Diverse-model panels (`arena`, `architect`, `interrogate`): the adversarial signal comes from model diversity. Use distinct available models and report when the panel shares a model family.
+- Diverse-model panels (`arena`, `interrogate`): the adversarial signal comes from model diversity. Use distinct available models and report when the panel shares a model family.
 
 `/setup-pstack` writes the sheet. Antigravity accepts `flash_lite`; the Copilot sheet checker rejects underscores in model IDs and does not apply to Antigravity.
 
@@ -73,16 +73,16 @@ Most skills need only the tables above. These need one more mapping:
 |-------|----------------|
 | `interrogate` | Each adversary is an `invoke_subagent` call with `Model` from the sheet. |
 | `setup-pstack` | The [Other runtimes](../../setup-pstack/references/runtimes.md) table gives the sheet path. Use the `Model` values listed in [Model names](#model-names). |
-| `architect` | The runner panel goes through the **arena** skill: one `invoke_subagent` call per runner, each with a `Model` from the sheet's `architect runners` line. |
-| `how` | The parallel explorers and the explainer map to `invoke_subagent` fan-out with the sheet's `how` role models. |
+| `architect` | A large or contested design goes through the **arena** skill: one `invoke_subagent` call per runner, each with a `Model` from the sheet's `arena runners` line. |
+| `how` | The one read-only subagent maps to `invoke_subagent`. |
 | `arena` | The parallel candidates and the cross-judge map to `invoke_subagent` calls with the sheet's panel lines. |
 | `no-comments` | Dispatch `comment-sicko` via `invoke_subagent` with `TypeName: "comment-sicko"`. |
 | `thermos` | Dispatch both review subagents via `invoke_subagent` with `TypeName: "thermo-nuclear-review-subagent"` and `"thermo-nuclear-code-quality-review-subagent"`, with the full diff and file excerpts in `Prompt`, since both types are read-only. |
 | `swarm` | Each worker is an `invoke_subagent` call; use `Workspace: "share"` or `git worktree add` for writing workers. |
 | `teach` | Running `how` and `why` in parallel maps to two `invoke_subagent` calls in one response; image generation uses `image-generator` via `invoke_subagent`. |
-| `why` | The parallel investigators and synthesizer map to `invoke_subagent` fan-out. |
+| `why` | List MCP servers from the tools Antigravity exposes to the session, not from Claude Code's MCP files. |
 | `recall` | Read Antigravity transcripts under `~/.gemini/antigravity-cli/brain/<conversation-id>/.system_generated/logs/transcript.jsonl` instead of `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`. |
-| `reflect` | Pass the current session's transcript path (`<appDataDir>/brain/<conversation-id>/.system_generated/logs/transcript.jsonl`) to the three review subagents. |
+| `reflect` | Pass the current session's transcript path (`<appDataDir>/brain/<conversation-id>/.system_generated/logs/transcript.jsonl`) to the transcript reading the skill does. |
 | `show-me-your-work` | Check the log against this session's transcript or context, not a Claude Code transcript. |
 | `automate-me` | Follow the `agy-customizations` skill alongside `unslop`, and write the mode skill under `.agents/skills/` or `~/.gemini/config/skills/`. |
 | `create-verification-skill` | Write the generated skill where Antigravity discovers project skills, `.agents/skills/verify/`, instead of `.claude/skills/verify/`. |

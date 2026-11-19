@@ -35,11 +35,11 @@ poteto-mode's Subagents section dispatches `subagent_type: "pstack:poteto-agent"
 
 Skills name Claude Code model aliases in their Models sections. Grok Build's available models depend on the user's configuration; do not pass a Claude alias as a Grok model.
 
-- The model sheet is `${GROK_HOME:-~/.grok}/pstack-models.md`. Before a skill that needs a role model (`architect`, `arena`, `how`, `interrogate`, `no-comments`, `poteto-mode`, `reflect`, `swarm`, `thermos`, `why`), read it. With no sheet, use the runtime default; run `setup-pstack` only when the user asks to configure roles.
+- The model sheet is `${GROK_HOME:-~/.grok}/pstack-models.md`. Before a skill that needs a role model (`arena`, `interrogate`, `no-comments`, `poteto-mode`, `swarm`, `thermos`), read it. With no sheet, use the runtime default; run `setup-pstack` only when the user asks to configure roles.
 - The `spawn_subagent` tool says to omit `model` unless the user explicitly requests one. It has no effort parameter; when it cannot apply a sheet choice, report that limitation instead of claiming model diversity.
 - Roles that default to the worker model (`feature, refactoring`): the worker model the user chose.
 - Roles that default to the strongest model (`strongest judgment`): the strongest model the user chose.
-- Diverse-model panels (`arena`, `architect`, `interrogate`) require distinct models. Report when the available dispatch cannot provide that diversity.
+- Diverse-model panels (`arena`, `interrogate`) require distinct models. Report when the available dispatch cannot provide that diversity.
 
 `/setup-pstack` writes the sheet. Choose only models the session exposes.
 
@@ -47,4 +47,4 @@ Skills name Claude Code model aliases in their Models sections. Grok Build's ava
 
 | Skill | On Grok Build |
 | --- | --- |
-| `why` | The parallel investigators and the synthesizer map to `spawn_subagent` fan-out. List MCP servers with `search_tool`, not from Claude Code's MCP files. |
+| `why` | List MCP servers with `search_tool`, not from Claude Code's MCP files. |

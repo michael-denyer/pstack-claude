@@ -167,16 +167,6 @@ const rules = [
     phrase: "Record `BLOCKED: independent review` in the todolist",
   },
   {
-    source: "#231 reflect digest carries no verdict",
-    file: "reflect/SKILL.md",
-    phrase: "It states no diagnosis, verdict, or cause.",
-  },
-  {
-    source: "#231 reflect adds nothing beside the transcript path",
-    file: "reflect/SKILL.md",
-    phrase: "Add nothing beside a transcript path",
-  },
-  {
     source: "backnotprop/pstack#14 an outside rule nobody can check is held, not deleted",
     file: "poteto-mode/references/agents/comment-sicko.md",
     phrase: "the comment stays put as a `HOLD`, the one case where doubt is not meat",

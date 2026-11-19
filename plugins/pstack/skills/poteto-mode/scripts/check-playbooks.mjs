@@ -73,7 +73,22 @@ function bundledSteps(body) {
     }
     afterBlank = !line.trim();
   }
-  return steps.map((step) => flat(step.lines.join(" ")));
+  return steps.length ? steps.map((step) => flat(step.lines.join(" "))) : proseBlocks(body);
+}
+
+// A playbook without numbered steps, such as opening-a-pr, writes each step as a paragraph or a list item.
+function proseBlocks(body) {
+  const blocks = [];
+  let current;
+  for (const line of proseLines(body)) {
+    const item = /^ *(?:[-*+]|\d+[.)]) +(.*)$/.exec(line);
+    if (!line.trim() || /^ {0,3}#{1,6}(?: |$)/.test(line)) current = undefined;
+    else if (item || !current) {
+      current = [item ? item[1] : line.trim()];
+      blocks.push(current);
+    } else current.push(line.trim());
+  }
+  return blocks.map((lines) => flat(lines.join(" ")));
 }
 
 export function checkPlaybooks(root, bundled = BUNDLED) {

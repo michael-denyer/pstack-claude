@@ -119,7 +119,7 @@ async function withUnsettledSuites(
   )
     return read;
   const suites = nonEmpty(
-    await reader.unsettledSuites(facts.context, facts.headRefOid)
+    await reader.unsettledSuites(facts.context, facts.headRefOid, read.kind)
   );
   if (suites === null) return read;
   return read.kind === "reported"

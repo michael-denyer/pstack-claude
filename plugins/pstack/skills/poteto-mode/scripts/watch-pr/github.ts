@@ -739,7 +739,8 @@ export class GhGitHubReader implements T.GitHubReader {
   }
   async unsettledSuites(
     context: T.PrContext,
-    head: string
+    head: string,
+    checksRead: T.CheckRead["kind"]
   ): Promise<readonly T.Check[]> {
     return unsettledSuiteChecks(
       await this.runJson([
@@ -749,15 +750,22 @@ export class GhGitHubReader implements T.GitHubReader {
         "--slurp",
         `repos/${context.owner}/${context.repo}/commits/${head}/check-suites?per_page=100`,
       ]),
-      head
+      head,
+      checksRead
     );
   }
 }
 
 // A fork workflow awaiting approval has a check suite but no check runs, so no
 // check read shows it. An app other than Actions, such as Claude, queues a suite
-// on every push and may never run it.
-export function unsettledSuiteChecks(pages: unknown, head: string): T.Check[] {
+// on every push and may never run it. Beside reported checks, the check read
+// shows each suite's runs and hides a run that a later run replaced, so only a
+// suite with no runs that waits for approval or for Actions to start counts.
+export function unsettledSuiteChecks(
+  pages: unknown,
+  head: string,
+  checksRead: T.CheckRead["kind"]
+): T.Check[] {
   const checks: T.Check[] = [];
   const slurped = list(pages, "check suite pages");
   if (slurped.length === 0) missing("check suite pages", slurped);
@@ -786,6 +794,11 @@ export function unsettledSuiteChecks(pages: unknown, head: string): T.Check[] {
         typeof app.slug === "string" &&
         app.slug !== "github-actions";
       if (idleApp) continue;
+      const unseen =
+        suite.latest_check_runs_count === 0 &&
+        (conclusion === "action_required" ||
+          (status !== "completed" && app.slug === "github-actions"));
+      if (checksRead === "reported" && !unseen) continue;
       const details = {
         name: `${typeof app.name === "string" ? app.name : "Unknown app"} check suite`,
         link: "",

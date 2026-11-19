@@ -52,6 +52,12 @@ if (args.some(a => a.includes('query PullRequestFacts'))) {
   const suites = {
     'no-ci-owner-approval': [{ head_sha: 'head', status: 'completed', conclusion: 'action_required', app: { slug: 'github-actions' }, latest_check_runs_count: 0 }],
     'no-ci-idle-app': [{ head_sha: 'head', status: 'queued', conclusion: null, app: { slug: 'claude' }, latest_check_runs_count: 0 }],
+    'superseded-beside-reported': [
+      { head_sha: 'head', status: 'completed', conclusion: 'cancelled', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 3 },
+      { head_sha: 'head', status: 'completed', conclusion: 'cancelled', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 0 },
+      { head_sha: 'head', status: 'completed', conclusion: 'failure', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 1 },
+      { head_sha: 'head', status: 'completed', conclusion: 'success', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 3 },
+    ],
     'gated-beside-reported': [
       { head_sha: 'head', status: 'completed', conclusion: 'action_required', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 0 },
       { head_sha: 'head', status: 'completed', conclusion: 'action_required', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 0 },
@@ -260,6 +266,15 @@ it("blocks on approval-gated Actions beside another app's passing check", () => 
       },
     },
   });
+});
+
+// Replays the shape of grafana/grafana#138293 as read on 2026-11-19: every
+// reported check passed, and a cancelled run that a later run replaced still
+// had its suite on the head.
+it("reports ready beside a cancelled or failed run that a later run replaced", () => {
+  const result = run("superseded-beside-reported", ["--max-query-errors", "1"]);
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({ kind: "READY" });
 });
 
 it("exits 7 with a JSON verdict when gh is not on PATH", () => {

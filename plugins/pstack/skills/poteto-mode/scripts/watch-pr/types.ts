@@ -464,7 +464,11 @@ export interface GitHubReader {
     after: string | null
   ): Promise<ReviewThreadPage>;
   commitRollups(context: PrContext): Promise<readonly CommitRollup[]>;
-  unsettledSuites(context: PrContext, head: string): Promise<readonly Check[]>;
+  unsettledSuites(
+    context: PrContext,
+    head: string,
+    checksRead: CheckRead["kind"]
+  ): Promise<readonly Check[]>;
 }
 export interface PollingOptions {
   readonly interval: number;

@@ -137,7 +137,7 @@ describe("check suites no check read shows", () => {
   ];
 
   it("reads an Actions suite waiting for approval as a failed check that names the approval", () => {
-    expect(unsettledSuiteChecks(pages(suite()), head)).toEqual([
+    expect(unsettledSuiteChecks(pages(suite()), head, "no-checks")).toEqual([
       {
         kind: "failed",
         name: "GitHub Actions check suite",
@@ -158,24 +158,28 @@ describe("check suites no check read shows", () => {
       "stale",
     ])
       expect(
-        unsettledSuiteChecks(pages(suite({ conclusion })), head)
+        unsettledSuiteChecks(pages(suite({ conclusion })), head, "no-checks")
       ).toMatchObject([
         { kind: "failed", reportedState: conclusion.toUpperCase() },
       ]);
     for (const status of ["queued", "in_progress", "waiting", "requested"])
       expect(
-        unsettledSuiteChecks(pages(suite({ status, conclusion: null })), head)
+        unsettledSuiteChecks(
+          pages(suite({ status, conclusion: null })),
+          head,
+          "no-checks"
+        )
       ).toMatchObject([
         { kind: "pending", reportedState: status.toUpperCase() },
       ]);
   });
 
   it("reads no check from no suites or suites that finished cleanly", () => {
-    expect(unsettledSuiteChecks(pages(), head)).toEqual([]);
+    expect(unsettledSuiteChecks(pages(), head, "no-checks")).toEqual([]);
     for (const conclusion of ["success", "neutral", "skipped"])
-      expect(unsettledSuiteChecks(pages(suite({ conclusion })), head)).toEqual(
-        []
-      );
+      expect(
+        unsettledSuiteChecks(pages(suite({ conclusion })), head, "no-checks")
+      ).toEqual([]);
   });
 
   it("ignores another app's queued suite with no runs, but not Actions'", () => {
@@ -183,7 +187,8 @@ describe("check suites no check read shows", () => {
     expect(
       unsettledSuiteChecks(
         pages(suite({ ...idle, app: { slug: "claude", name: "Claude" } })),
-        head
+        head,
+        "no-checks"
       )
     ).toEqual([]);
     for (const fields of [
@@ -194,8 +199,39 @@ describe("check suites no check read shows", () => {
       { app: { slug: "claude" }, latest_check_runs_count: undefined },
     ])
       expect(
-        unsettledSuiteChecks(pages(suite({ ...idle, ...fields })), head)
+        unsettledSuiteChecks(
+          pages(suite({ ...idle, ...fields })),
+          head,
+          "no-checks"
+        )
       ).toMatchObject([{ kind: "pending", name: "Unknown app check suite" }]);
+  });
+
+  it("beside reported checks, counts only a suite with no runs that waits for approval or for Actions to start", () => {
+    const reported = (fields: Record<string, unknown>) =>
+      unsettledSuiteChecks(pages(suite(fields)), head, "reported");
+    expect(reported({})).toMatchObject([
+      { kind: "failed", reportedState: "ACTION_REQUIRED" },
+    ]);
+    expect(reported({ status: "queued", conclusion: null })).toMatchObject([
+      { kind: "pending", reportedState: "QUEUED" },
+    ]);
+    for (const fields of [
+      { conclusion: "cancelled" },
+      { conclusion: "failure" },
+      { conclusion: "cancelled", latest_check_runs_count: 3 },
+      { status: "in_progress", conclusion: null, latest_check_runs_count: 2 },
+      {
+        status: "in_progress",
+        conclusion: null,
+        app: { slug: "wip", name: "WIP" },
+      },
+      {
+        app: { slug: "code-review-gate", name: "Gate App" },
+        latest_check_runs_count: 1,
+      },
+    ])
+      expect(reported(fields)).toEqual([]);
   });
 
   it("finds a gated suite on a later page", () => {
@@ -203,7 +239,7 @@ describe("check suites no check read shows", () => {
       ...pages(suite({ conclusion: "success" })),
       ...pages(suite()),
     ];
-    expect(unsettledSuiteChecks(twoPages, head)).toMatchObject([
+    expect(unsettledSuiteChecks(twoPages, head, "no-checks")).toMatchObject([
       { kind: "failed", reportedState: "ACTION_REQUIRED" },
     ]);
   });
@@ -218,7 +254,9 @@ describe("check suites no check read shows", () => {
       ],
       [pages(suite({ conclusion: null })), /conclusion of a completed suite/],
     ] as const)
-      expect(() => unsettledSuiteChecks(value, head)).toThrow(detail);
+      expect(() => unsettledSuiteChecks(value, head, "no-checks")).toThrow(
+        detail
+      );
   });
 });
 

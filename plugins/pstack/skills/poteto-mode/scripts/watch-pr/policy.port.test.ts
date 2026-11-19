@@ -764,7 +764,7 @@ describe("check suites that no check read shows", () => {
       ).toMatchObject({ ci: { kind: "ci-pending", pending: [queued] } });
   });
 
-  it("keeps clean CI and no CI when every suite finished cleanly or never runs", async () => {
+  it("keeps clean CI and no CI when the head has no unsettled suite", async () => {
     expect(await read({ unsettledSuites: [] })).toMatchObject({
       ci: { kind: "ci-clean" },
     });
@@ -784,8 +784,10 @@ describe("check suites that no check read shows", () => {
       });
       return reader.calls.filter((call) => call.startsWith("unsettledSuites"));
     };
-    expect(await suiteReads({})).toEqual(["unsettledSuites:head"]);
-    expect(await suiteReads(noChecks)).toEqual(["unsettledSuites:head"]);
+    expect(await suiteReads({})).toEqual(["unsettledSuites:head:reported"]);
+    expect(await suiteReads(noChecks)).toEqual([
+      "unsettledSuites:head:no-checks",
+    ]);
     for (const check of [pendingCheck(), failedCheck()])
       expect(
         await suiteReads({ fastPath: { kind: "checks", checks: [check] } })

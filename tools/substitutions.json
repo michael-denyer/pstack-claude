@@ -1,6 +1,145 @@
 {
   "substitutions": [
     {
+      "pattern": "`/deslop` from the `cursor-team-kit` plugin",
+      "replacement": "`/deslop`",
+      "rationale": "the port ships deslop as one of its own skills"
+    },
+    {
+      "pattern": "whether a Task subagent or a Project worker",
+      "replacement": "whether an `Agent` subagent or a background worker",
+      "rationale": "Claude Code's subagent tool is Agent, and it has no Cursor Project workers; a background subagent is the nearest kind of started agent"
+    },
+    {
+      "pattern": "Project workers included",
+      "replacement": "background workers included",
+      "rationale": "Claude Code has no Cursor Project workers"
+    },
+    {
+      "pattern": "agent mode (readonly strips MCP)",
+      "replacement": "full tool access (do not pick a subagent_type that strips MCP)",
+      "rationale": "Claude Code has no readonly agent mode; a restricted subagent_type is what strips MCP tools"
+    },
+    {
+      "pattern": "in agent mode because readonly strips MCP access",
+      "replacement": "with full tool access because a restricted agent type strips MCP access",
+      "rationale": "same mapping as the Agent-call defaults"
+    },
+    {
+      "regex": ", so omit `model` and spawn `generalPurpose`, because `poteto-agent` defaults to [A-Z][a-z]+ [0-9.]+\\.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": ", so omit `model` on the `Agent` call. `poteto-agent` sets no model of its own, so it then runs on the parent model.",
+      "rationale": "the port's poteto-agent carries no model pin, so an inherit-parent role keeps the poteto-agent type"
+    },
+    {
+      "regex": " If the rule has no `# defaults: [0-9]+` line, an older setup wrote it\\. Keep honoring its lines, and tell the user once per session to rerun `/setup-pstack`\\.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "",
+      "rationale": "the port's override sheet has no defaults marker; setup-pstack drops retired roles on its next run"
+    },
+    {
+      "pattern": "The `/setup-pstack` budget sets each role's starting level.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "The role's `@level`, or the sheet's `default effort` line, sets its starting level, and `session` starts from the session's level.",
+      "rationale": "the port's sheet sets effort per role and by default instead of Cursor's budget labels"
+    },
+    {
+      "regex": "\\*\\*Fable [0-9.]+ is an exception\\.\\*\\* It runs outside a panel only when the user named it for this task or two Opus [0-9.]+ xhigh runs of the same brief failed its check\\.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "**The `strongest judgment` model is an exception.** It runs outside a panel only when the user named it for this task or two xhigh runs of the same brief on the task's own role model failed their check.",
+      "rationale": "the port keeps Fable behind its strongest judgment role, so the exception names the role, not a Cursor model"
+    },
+    {
+      "pattern": "the same prompt on another vendor's model.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "the same prompt on a model from another family.",
+      "rationale": "the port's models are all Claude, so diversity comes from another model family, as arena defines families"
+    },
+    {
+      "pattern": "on another vendor's model than the one that did the work",
+      "files": "^skills/show-me-your-work/SKILL\\.md$",
+      "replacement": "on a model from another family than the one that did the work",
+      "rationale": "same family rule as poteto-mode's second opinion"
+    },
+    {
+      "pattern": "- `/deslop`, `control-cli`, and `control-ui` ship in the `cursor-team-kit` plugin.",
+      "files": "^skills/poteto-help/SKILL\\.md$",
+      "replacement": "- The Cursor driver skills have no port. The driver policy in poteto-mode's Non-negotiables names the Claude Code equivalents, the `run` skill and a project `verify` skill.",
+      "rationale": "the port ships deslop as a skill and has no control-cli or control-ui; the driver policy names Claude Code's equivalents"
+    },
+    {
+      "pattern": "- `/loop` and `/create-skill` are Cursor built-ins.",
+      "files": "^skills/poteto-help/SKILL\\.md$",
+      "replacement": "- `/loop` is a Claude Code bundled skill, and the **plugin-dev:skill-development** skill is Claude Code's skill-authoring guidance.",
+      "rationale": "Claude Code bundles loop, and its skill-authoring guidance is plugin-dev:skill-development"
+    },
+    {
+      "pattern": "an old slug is one that matches `grok-*`",
+      "files": "^skills/setup-pstack/SKILL\\.md$",
+      "replacement": "an old slug is a Grok model",
+      "rationale": "names upstream's retired Grok default without a Cursor slug pattern"
+    },
+    {
+      "regex": "\\nmodel: (?:claude|gpt|grok|gemini|composer)-[^\\n]+",
+      "files": "^agents/poteto-agent\\.md$",
+      "replacement": "",
+      "rationale": "upstream pins poteto-agent to a Cursor slug so an inherit-parent role must spawn generalPurpose; the port passes model and effort on each Agent call from the role sheet, so the agent file carries no model and an inherit-parent role runs on the parent model"
+    },
+    {
+      "pattern": "- Shipping UI / IDE / CLI → `control-ui` or `control-cli` from `cursor-team-kit`.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "- Shipping UI / IDE / CLI → the driver skill. `run` ships with Claude Code and the model can invoke it for CLIs, TUIs, servers, and browser or Electron apps. The bundled `verify` runs only when the user types `/verify`, so for UIs use the project `verify` skill at `.claude/skills/verify/` (generate it with `/create-verification-skill`) and fall back to `run` when the repo has none.",
+      "rationale": "the Cursor driver skills have no port; Claude Code's equivalents are the bundled run skill and a project verify skill"
+    },
+    {
+      "regex": "- Code, prose, and judgment: `(?:claude|gpt|grok|gemini|composer)-[^`]+`\\.\\n- Trivial mechanical edits: `(?:claude|gpt|grok|gemini|composer)-[^`]+`\\.\\n- Diverse review and design panels: one runner each on `(?:claude|gpt|grok|gemini|composer)-[^`]+`(?:(?:,| and|, and) `(?:claude|gpt|grok|gemini|composer)-[^`]+`)*\\.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "Role defaults for code, prose, judgment, trivial mechanical edits, and the diverse review and design panels are in [Models](#models).",
+      "rationale": "upstream lists Cursor slugs per kind of work; the port's defaults come from models.json and are stamped into the Models section"
+    },
+    {
+      "regex": "Verification always runs on the `swarm workers` model, `(?:claude|gpt|grok|gemini|composer)-[^`]+` by default\\.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "Verification always runs on the `swarm workers` model (default in the **swarm** skill's Models section).",
+      "rationale": "the swarm workers default comes from models.json, not a Cursor slug"
+    },
+    {
+      "regex": " A Gemini seat never runs above `gemini-[^`]+`, its top slug\\.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "",
+      "rationale": "the port's panels hold no Gemini seat, so the cap on Gemini's top slug has nothing to apply to"
+    },
+    {
+      "pattern": " Opus 5.5 always runs its `-fast` slug.",
+      "files": "^skills/poteto-mode/SKILL\\.md$",
+      "replacement": "",
+      "rationale": "Claude Code sets fast mode for the whole session, so a spawn has no fast slug to pick"
+    },
+    {
+      "regex": "runs on `(?:claude|gpt|grok|gemini|composer)-[^`]*-medium(?:-fast)?`",
+      "files": "^skills/poteto-mode/playbooks/eval\\.md$",
+      "replacement": "runs on the `swarm workers` model at medium effort",
+      "rationale": "upstream names a Cursor slug for an agent that only dispatches or packs results; the port names the role and the effort"
+    },
+    {
+      "regex": ", by default `(?:claude|gpt|grok|gemini|composer)-[^`]+`(?:(?:,| and|, and) `(?:claude|gpt|grok|gemini|composer)-[^`]+`)*\\.",
+      "files": "^skills/arena/SKILL\\.md$",
+      "replacement": ", or from [Models](#models) when the sheet has no such line.",
+      "rationale": "upstream gives Cursor slugs as the runner and judge defaults; the port's defaults are stamped from models.json"
+    },
+    {
+      "pattern": "The judge is never from the parent's vendor, and Fable counts as Claude for that check, so use the first entry from another vendor.",
+      "files": "^skills/arena/SKILL\\.md$",
+      "replacement": "The judge is never from the parent's family, as Phase A step 3 defines families, so use the first entry from another family.",
+      "rationale": "the port's panel holds only Claude models, so a vendor rule would always skip the judge; the port keeps upstream's earlier family rule"
+    },
+    {
+      "pattern": "say that the vendor check did not run",
+      "files": "^skills/arena/SKILL\\.md$",
+      "replacement": "say that the family check did not run",
+      "rationale": "same family rule as the judge sentence"
+    },
+    {
       "pattern": "`https://github.com/cursor/plugins/blob/main/pstack/` followed by its path",
       "replacement": "`https://github.com/michael-denyer/pstack-claude/blob/main/plugins/pstack/` followed by its path",
       "rationale": "the public copy of a port skill file lives in this repository under plugins/pstack"
@@ -90,11 +229,6 @@
       "rationale": "the port carries the thermos skills inside pstack, not as a separate plugin"
     },
     {
-      "pattern": "find this conversation's transcript in the `agent-transcripts/` directory the system prompt names.",
-      "replacement": "find this conversation's transcript in Claude Code's per-project transcripts directory at `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/`.",
-      "rationale": "Cursor's system prompt names its agent-transcripts directory; Claude Code's does not, so the port names the path"
-    },
-    {
       "pattern": "Spawn Comment Sicko, fix",
       "replacement": "Spawn the comment-sicko subagent, fix",
       "rationale": "the menu description names the plugin agent by its file name"
@@ -109,35 +243,6 @@
       "pattern": "No `eval`, `test`, `judge`, `experiment`, `rubric`, `score`, `compare`, `benchmark`, `candidate`, or `arena` in any directory",
       "replacement": "None of the words eval, test, judge, experiment, rubric, score, compare, benchmark, candidate, or arena in any directory",
       "rationale": "the Claude plugin directory validator reads a backticked eval as a shell execute pattern and holds the submission (0.9.46, #108)"
-    },
-    {
-      "pattern": "list the available MCPs from the Cursor environment. Use the available-tools map when present. Otherwise inspect the `mcps/` directory Cursor exposes for enabled MCP servers.",
-      "replacement": "list the available MCPs in the Claude Code environment. Use the tool list at the top of the system prompt (every MCP appears as a tool with prefix `mcp__<server>__<name>`). Otherwise read `.mcp.json` in the plugin/project, or run `claude mcp list`.",
-      "rationale": "where Claude Code exposes its MCP servers"
-    },
-    {
-      "regex": "default to one each on `(?:claude|gpt|grok|gemini|composer)-[^`]+`(?:(?:,| and|, and) `(?:claude|gpt|grok|gemini|composer)-[^`]+`)*\\.",
-      "files": "^skills/arena/SKILL\\.md$",
-      "replacement": "run one each on the defaults in [Models](#models).",
-      "rationale": "the runner defaults are stamped into the Models section"
-    },
-    {
-      "regex": "choose from `(?:claude|gpt|grok|gemini|composer)-[^`]+`(?:(?:,| and|, and) `(?:claude|gpt|grok|gemini|composer)-[^`]+`)*\\.",
-      "files": "^skills/arena/SKILL\\.md$",
-      "replacement": "choose from the runner defaults in [Models](#models).",
-      "rationale": "the cross-judge pool defaults to the stamped runners"
-    },
-    {
-      "regex": " With the default pool, a Claude parent gets `(?:claude|gpt|grok|gemini|composer)-[^`]+`\\. A parent from any other family gets `(?:claude|gpt|grok|gemini|composer)-[^`]+` first\\.",
-      "files": "^skills/arena/SKILL\\.md$",
-      "replacement": "",
-      "rationale": "the stamped defaults hold one Claude Code family per model name, so pool order already picks the first default from another family"
-    },
-    {
-      "regex": "use `(?:claude|gpt|grok|gemini|composer)-[^`]+`(?:(?:,| and|, and) `(?:claude|gpt|grok|gemini|composer)-[^`]+`)*\\.",
-      "files": "^skills/architect/SKILL\\.md$",
-      "replacement": "use the defaults in [Models](#models).",
-      "rationale": "the runner defaults are stamped into the Models section"
     },
     {
       "regex": "use `(?:claude|gpt|grok|gemini|composer)-[^`]+`\\.",
@@ -176,16 +281,6 @@
       "rationale": "Claude Code's own disk use, in place of Cursor's"
     },
     {
-      "pattern": "This playbook replaces Cursor's built-in babysit skill for these requests, so do not route there even though its description matches the same words.",
-      "replacement": "This playbook supersedes the bundled **babysit** skill for these requests, so do not route there even though its description matches the same words. `/babysit` stays the standalone entry point outside poteto-mode.",
-      "rationale": "the bundled babysit skill stays reachable by slash command; must precede the built-in babysit rule"
-    },
-    {
-      "pattern": "status comes from `scripts/watch-pr/watch-pr`.",
-      "replacement": "status comes from the watcher at `skills/poteto-mode/scripts/watch-pr/watch-pr` under the installed plugin.",
-      "rationale": "a skill-relative path does not resolve from the working directory"
-    },
-    {
       "pattern": "`environment: \"cloud\"`, `run_in_background: true`, and the step ",
       "replacement": "`run_in_background: true`, and the step ",
       "rationale": "the Agent tool has no environment parameter"
@@ -201,19 +296,9 @@
       "rationale": "the Agent tool has no base-branch parameter"
     },
     {
-      "pattern": "Bugbot or the agentic security review commented",
-      "replacement": "An automated PR-review bot or the agentic security review commented",
-      "rationale": "the port routes any automated PR-review bot, not only Cursor's Bugbot"
-    },
-    {
       "pattern": "(the `deslop` skill from the `cursor-team-kit` plugin (`/deslop`))",
       "replacement": "(the **deslop** skill, `/deslop`)",
       "rationale": "the port ships deslop itself; inside a parenthesis the port avoids nesting a second one; must precede the bare phrase"
-    },
-    {
-      "pattern": "the `deslop` skill from the `cursor-team-kit` plugin (`/deslop`)",
-      "replacement": "the **deslop** skill (`/deslop`)",
-      "rationale": "the port ships deslop itself"
     },
     {
       "pattern": "`/deslop` from `cursor-team-kit`",
@@ -246,11 +331,6 @@
       "rationale": "same tool, named bare before the word subagent; the port writes the tool name in backticks"
     },
     {
-      "pattern": "a Task error",
-      "replacement": "an `Agent` error",
-      "rationale": "same tool, named bare before the word error; the port writes the tool name in backticks"
-    },
-    {
       "pattern": "control skill",
       "replacement": "driver skill",
       "rationale": "driver selection lives in poteto-mode/SKILL.md Non-negotiables; preserve the older generator trigger in its local description"
@@ -262,39 +342,9 @@
       "rationale": "model defaults live in models.json and are stamped into Models sections, never hard-coded in prose; playbooks belong to poteto-mode"
     },
     {
-      "regex": "\\(default `(?:claude|gpt|grok|gemini|composer)-[^`]+`\\)",
-      "files": "/SKILL\\.md$",
-      "replacement": "(default in [Models](#models))",
-      "rationale": "same rule for a skill body, which carries its own Models section"
-    },
-    {
-      "regex": ", default `(?:claude|gpt|grok|gemini|composer)-[^`]+`",
-      "files": "/SKILL\\.md$",
-      "replacement": ", default in [Models](#models)",
-      "rationale": "a role bullet's default model is stamped into the skill's Models section, never hard-coded in prose"
-    },
-    {
-      "regex": "Defaults `(?:claude|gpt|grok|gemini|composer)-[^`]+` for code, `(?:claude|gpt|grok|gemini|composer)-[^`]+` for prose and judgment",
-      "files": "^skills/poteto-mode/SKILL\\.md$",
-      "replacement": "Role defaults in [Models](#models), with \"judgment and prose\" covering prose and judgment",
-      "rationale": "the delegate defaults are stamped into poteto-mode's Models section, so an upstream model bump on this line is not a change to the port"
-    },
-    {
-      "regex": "strongest judgment model \\(`(?:claude|gpt|grok|gemini|composer)-[^`]+`\\)",
-      "files": "^skills/poteto-mode/SKILL\\.md$",
-      "replacement": "strongest-judgment model (default in [Models](#models))",
-      "rationale": "same line, the strongest-judgment default"
-    },
-    {
       "pattern": "omit Task `model`",
       "replacement": "omit `model` on the `Agent` call",
       "rationale": "Claude Code's subagent tool is `Agent`, and the bare tool name is on the denylist"
-    },
-    {
-      "regex": " \\| `(?:claude|gpt|grok|gemini|composer)-[^`]+` \\| `references/",
-      "files": "^skills/reflect/SKILL\\.md$",
-      "replacement": " | default in [Models](#models) | `references/",
-      "rationale": "a reviewer row's default model is stamped into reflect's Models section, so an upstream model bump in the table is not a change to the port"
     },
     {
       "regex": "(?:claude|gpt|grok|gemini|composer)-[0-9a-z.]+(?:-[0-9a-z.]+)+(?<!\\.)",
@@ -303,29 +353,14 @@
       "rationale": "the port writes its own sheet from models.json and replaces Cursor's budget step, so every upstream slug in setup-pstack is scrubbed to the placeholder the port already uses; a conflict there can then be written and resolved, and a model bump alone is no conflict. Must follow the default-phrase rules above"
     },
     {
-      "pattern": "the `pstack-models.mdc` rule and a default.",
-      "replacement": "`pstack-models.md` and a default in [Models](#models).",
-      "rationale": "the override sheet and the stamped defaults a spawn falls back to; must precede the shorter `pstack-models.mdc` rule phrase"
-    },
-    {
-      "pattern": "the `pstack-models.mdc` rule",
-      "replacement": "`pstack-models.md`",
-      "rationale": "the override sheet is a file the user includes, not a Cursor rule"
-    },
-    {
       "pattern": "the rule or that line is missing",
       "replacement": "the sheet or that line is missing",
       "rationale": "the override sheet, not a Cursor rule"
     },
     {
-      "pattern": "the rule or the line is missing",
-      "replacement": "the sheet or the line is missing",
-      "rationale": "same sentence, the other wording upstream uses"
-    },
-    {
-      "regex": "Families go by prefix: `[a-z-]+-\\*`(?:(?:,| and|, and| with) `[a-z-]+-\\*`)*\\.",
+      "regex": "Families go by prefix, and the longest match wins: `[a-z-]+-\\*`(?:(?:,| and|, and) `[a-z-]+-\\*`)*, after dropping a leading `cursor-`\\. Any other slug's family is its text before the first hyphen\\.",
       "replacement": "Families go by model name, such as Opus, Fable, or Sonnet.",
-      "rationale": "Claude Code names models by family, not by slug prefix"
+      "rationale": "upstream's family test reads Cursor slug prefixes; Claude Code names models by alias, so a family is the model name"
     },
     {
       "pattern": "~/.cursor/skills/",
@@ -398,65 +433,9 @@
       "rationale": "Claude Code ships /loop as a bundled skill"
     },
     {
-      "pattern": "a Cursor restart",
-      "replacement": "a session restart",
-      "rationale": "the host application"
-    },
-    {
       "pattern": "Cursor's built-in babysit skill",
       "replacement": "the bundled **babysit** skill",
       "rationale": "Claude Code bundles its own babysit skill with the same trigger words"
-    },
-    {
-      "pattern": "bugbot comments",
-      "replacement": "review-bot comments",
-      "rationale": "the port routes any automated PR-review bot, not only Cursor's Bugbot"
-    },
-    {
-      "regex": " A refused `composer-\\*` entry runs on (?:`[^`]+`|Reviewer B's default)\\.",
-      "replacement": "",
-      "rationale": "Claude Code has no composer models, so the fallback for one has nothing to say"
-    },
-    {
-      "pattern": "reasoning level and fast or standard speed for the job",
-      "replacement": "reasoning level for the job",
-      "rationale": "Claude Code sets fast mode for the session, not per spawn, so a spawn picks only its effort"
-    },
-    {
-      "pattern": "pick the reasoning level and speed the job needs. The `/setup-pstack` budget sets each role's starting level, xhigh by default.",
-      "files": "^skills/poteto-mode/SKILL\\.md$",
-      "replacement": "pick the reasoning level the job needs, set as [Reasoning effort](#reasoning-effort) describes. The role's `@level`, or the sheet's `default effort` line, sets its starting level, and `session` starts from the session's level.",
-      "rationale": "the port's per-spawn effort lever is the override sheet's @level and the Agent call's effort parameter, not a slug suffix"
-    },
-    {
-      "pattern": "Use fast mode only when the job is urgent, meaning CI or trunk is red or a person is blocked on the result right now. Otherwise use standard speed, the same slug without `-fast`.",
-      "files": "^skills/poteto-mode/SKILL\\.md$",
-      "replacement": "Claude Code sets fast mode for the whole session, so a spawn changes only its effort.",
-      "rationale": "Claude Code has no per-spawn fast slug"
-    },
-    {
-      "regex": "stays on the `swarm workers` model and speed \\(`[^`]+` by default\\)",
-      "files": "^skills/poteto-mode/SKILL\\.md$",
-      "replacement": "stays on the `swarm workers` model and effort (default in the **swarm** skill's Models section)",
-      "rationale": "model defaults live in models.json and are stamped into Models sections, never hard-coded in prose"
-    },
-    {
-      "pattern": "Change only the effort level and whether the slug is fast, and keep the family the role names",
-      "files": "^skills/poteto-mode/SKILL\\.md$",
-      "replacement": "Change only the effort level, and keep the model the role names",
-      "rationale": "Claude Code has no per-spawn fast slug"
-    },
-    {
-      "pattern": "If the family has no slug at that level and speed, use its nearest slug.",
-      "files": "^skills/poteto-mode/SKILL\\.md$",
-      "replacement": "If the model does not take that level, use its nearest level.",
-      "rationale": "on Claude Code the effort is a level on the dispatch, not a slug"
-    },
-    {
-      "pattern": "rejects the adjusted slug, do not try another adjusted slug.",
-      "files": "^skills/poteto-mode/SKILL\\.md$",
-      "replacement": "rejects the adjusted level, do not try another level.",
-      "rationale": "on Claude Code the effort is a level on the dispatch, not a slug"
     },
     {
       "regex": " \\(?(?:with|through) (?:the matching|its) driver skill,? \\(?such as `control-(?:ui|cli)` or `control-(?:ui|cli)` from `cursor-team-kit`(?:, or a named driver where none exists)?\\)(?: or a named driver)?",
@@ -473,30 +452,6 @@
       "pattern": "One verifier per PR, each a Cursor cloud agent, runs",
       "replacement": "One verifier per PR, each a subagent in its own worktree, runs",
       "rationale": "Claude Code runs subagents locally; a worktree per writer gives the isolation a cloud VM gave"
-    },
-    {
-      "pattern": "Keep the program's state in the Project tracker (`notes.md`) and the Project store.",
-      "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
-      "replacement": "Keep the program's state in a store under `~/.claude/orchestrate/<slug>/`, outside the repo, with `notes.md` as its tracker.",
-      "rationale": "Claude Code has no Project tracker or Project store, so the port keeps the program's state in a directory that outlives the session"
-    },
-    {
-      "pattern": "Run workers on a new cloud VM (`environment: \"cloud\"`) unless the work needs this machine: a `control-ui` or `control-cli` runtime check (from `cursor-team-kit`), local transcripts, a simulator, or auth that exists only here.",
-      "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
-      "replacement": "Run workers as background subagents (`run_in_background: true`). Claude Code has no remote worker environment, so give each writer its own worktree or branch, and run runtime checks through the driver skill.",
-      "rationale": "Claude Code runs every subagent on this machine, so the cloud placement rule becomes a worktree rule"
-    },
-    {
-      "pattern": "a control-skill check",
-      "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
-      "replacement": "a driver-skill check",
-      "rationale": "driver selection lives in poteto-mode/SKILL.md Non-negotiables, and the port calls the skill the driver skill"
-    },
-    {
-      "pattern": "**Fork when new work needs a worker's built state,** such as its checkout, uncommitted changes, or a running process.",
-      "files": "^skills/poteto-mode/playbooks/orchestrate\\.md$",
-      "replacement": "**When new work needs a worker's built state,** such as its checkout or uncommitted changes, start a fresh worker in that worker's worktree. A Claude Code fork copies the coordinator, not the worker.",
-      "rationale": "Claude Code's fork subagent inherits the caller's context, so it cannot take over a worker's checkout; a fresh worker in that worktree can"
     },
     {
       "pattern": "re-reads this playbook from trunk",

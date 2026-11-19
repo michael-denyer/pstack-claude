@@ -7,12 +7,8 @@ watch-pr/policy.test.ts
 # forked-line count.
 watch-pr/types.compile.ts
 
-# The check covers TypeScript. Upstream's check-plan.mjs uses tabs, and the
-# port-only .mjs files follow no shared style.
+# The check covers TypeScript. The port-only .mjs files follow no shared style.
 *.mjs
-
-# Upstream's check-plan.test.ts uses tabs like the checker it drives.
-check-plan.test.ts
 
 # Upstream stopped formatting fakes.test-helper.ts with Prettier at 997ffc7;
 # keeping its wrapping keeps the fork small.

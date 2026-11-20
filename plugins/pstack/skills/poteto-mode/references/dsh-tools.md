@@ -46,6 +46,6 @@ DeepSeek Harness (DSH) uses this mapping regardless of its model provider. This 
 
 DSH selects providers, models, and reasoning efforts through its current deployment. Do not pass Claude Code model aliases to DSH or use the Pi/Copilot mapping merely because the parent model comes from that provider. Use `list_subagent_models` when exposed: first list providers, then models for a provider, then efforts for the exact provider/model pair. Without that tool, use the deployment's model settings or omit unsupported selectors. Pass `provider`, `model`, and `reasoning_effort` only when the live delegation schema accepts them; omit all selectors to use its documented defaults.
 
-Roles used by `architect`, `arena`, `how`, `interrogate`, `no-comments`, `poteto-mode`, `reflect`, `swarm`, `thermos`, `why` are prompt responsibilities, not DSH model IDs or built-in agent types. Diverse-model panels (`arena`, `architect`, `interrogate`) require distinct available model families; report when that is unavailable. Do not manufacture diversity by relabeling the same model.
+Roles used by `arena`, `interrogate`, `no-comments`, `poteto-mode`, `swarm`, `thermos` are prompt responsibilities, not DSH model IDs or built-in agent types. Diverse-model panels (`arena`, `interrogate`) require distinct available model families; report when that is unavailable. Do not manufacture diversity by relabeling the same model.
 
 This skills-only integration has no automatic per-role sheet reader. `setup-pstack` uses the native delegation defaults, as its Other runtimes table describes.

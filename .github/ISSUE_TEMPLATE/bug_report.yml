@@ -40,6 +40,7 @@ body:
         - OMP
         - Kimi Code CLI
         - Grok Build
+        - DeepSeek Harness
         - OpenCode 2
         - Another harness
         - More than one, or not specific to a runtime

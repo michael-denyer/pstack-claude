@@ -276,6 +276,12 @@
       "since": "0.9.128",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/statechart/scripts/kill.ts": {
+      "kind": "policy",
+      "why": "Starts taskkill with windowsHide, because the detached janitor that calls it on Windows has no console and taskkill would otherwise open a window of its own.",
+      "since": "0.9.145",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/statechart/scripts/passes/regions.ts": {
       "kind": "policy",
       "why": "Names the per-state key array `keyAt`, not `key`, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
@@ -284,13 +290,13 @@
     },
     "plugins/pstack/skills/statechart/scripts/run.ts": {
       "kind": "policy",
-      "why": "Kills the worker's process tree with taskkill on Windows, which has no /bin/sh and no process groups. Gives mise and java a named environment through childEnv, not the whole environment, because the plugin directory's scanner reads a whole environment given to a child beside a download URL as a credential forward (MCP_FORWARDS_CREDENTIAL_ENV).",
+      "why": "Gives mise and java a named environment through childEnv, not the whole environment, because the plugin directory's scanner reads a whole environment given to a child beside a download URL as a credential forward (MCP_FORWARDS_CREDENTIAL_ENV).",
       "since": "0.9.116",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/statechart/scripts/statechart.ts": {
       "kind": "policy",
-      "why": "Spawns janitor.ts on Windows in place of the /bin/sh janitor, points the worker's TEMP and TMP at its temp folder as TMPDIR already is, and hides the windows of the detached worker and janitor.",
+      "why": "Hides the windows of the detached worker and janitor.",
       "since": "0.9.116",
       "upstream": "not-proposed"
     },
@@ -316,12 +322,6 @@
       "kind": "policy",
       "why": "Spawns the command with the named child environment from run.ts plus TLA2TOOLS and JAVA, not the whole environment, because the plugin directory's scanner reads a whole environment given to a child as a credential forward (MCP_FORWARDS_CREDENTIAL_ENV).",
       "since": "0.9.128",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/statechart/scripts/test/messages.test.ts": {
-      "kind": "policy",
-      "why": "Adds a test that TLC's output with Windows line ends reads as it does with Unix ones.",
-      "since": "0.9.116",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/tdd/SKILL.md": {

@@ -113,7 +113,13 @@ describe("omp-tools.md", () => {
       "maintain-verification-skill": ["under `.omp/skills/` first"],
       "create-formal-verification-skill": ["to `.omp/skills/<area>/`"],
       "maintain-formal-verification-skill": ["under `.omp/skills/` first"],
-      reflect: ["`.omp/skills/<skill>/`", "`~/.omp/agent/skills/`", "`skills.enableClaudeUser`"],
+      reflect: [
+        "`.omp/skills/<skill>/`",
+        "`~/.omp/agent/skills/`",
+        "`~/.omp/profiles/$OMP_PROFILE/agent/skills/`",
+        "`skills.enableClaudeUser`",
+        "never edit the installed plugin",
+      ],
     };
     const missing = Object.entries(want).flatMap(([skill, phrases]) => {
       const row = rows.find((line) => line.startsWith(`| \`${skill}\` |`)) ?? "";

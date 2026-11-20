@@ -1,5 +1,6 @@
 import type {
   Check,
+  SuiteCheck,
   ChecksFastPath,
   CommitRollup,
   GitHubReader,
@@ -23,7 +24,7 @@ export interface FakeReaderOptions {
   readonly threads?: readonly ReviewThread[];
   readonly threadPages?: readonly ReviewThreadPage[];
   readonly commitRollups?: readonly CommitRollup[];
-  readonly unsettledSuites?: readonly Check[];
+  readonly unsettledSuites?: readonly SuiteCheck[];
   readonly openPullRequests?: readonly OpenPullRequest[];
   readonly defaultBranch?: string;
   readonly origin?: Repository | null;

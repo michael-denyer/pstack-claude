@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.144 - watch-pr verifies which check suites reported checks cover
+
+When a PR already has reported checks, `watch-pr` verifies the head and run count before deciding that a suite is covered. An invalid count now produces a query error. A suite with a positive count can be skipped even when GitHub returns a null status. The watcher reads suites as soon as the reported checks finish, alongside any outstanding review-thread pages.
+
+Each failed or pending row supplied by the check-suites API now carries `source: "check-suites"` in the verdict JSON. The top-level CI source still names the primary read. A zero-run GitHub Actions suite waiting for approval tells the reader to approve its workflows. Other providers requiring action point the reader to their check details.
+
+The suite lookup requires GitHub CLI 2.48 or later. A CLI that rejects `--slurp` now produces an immediate exit 7 with an upgrade instruction, saving 12 minutes of retries at the default settings.
+
 ## 0.9.143 - watch-pr blocks on approval-gated Actions beside other checks
 
 `watch-pr` no longer calls a fork PR ready while its Actions workflows wait for maintainer approval and another app, such as a CLA bot, has reported a passing check ([#470](https://github.com/michael-denyer/pstack-claude/issues/470)). GitHub gives a gated workflow a check suite with no runs, so no check read shows it, and the watcher read the other app's check alone as clean CI. On 2026-11-19, 28 of 110 open PR heads in nine large repositories whose reported checks had all passed had this shape.

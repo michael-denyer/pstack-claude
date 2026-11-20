@@ -100,7 +100,7 @@ const runtimes = {
   },
 };
 
-function runHook(runtime, sheet, command) {
+function runHook(runtime, sheet, command, extraEnv = {}) {
   const home = mkdtempSync(join(tmpdir(), "pstack-hook-"));
   const { sheetDir, env, cwd, hooks } = runtimes[runtime];
   command ??= runtimes[runtime].command ?? sessionStart[hooks].hooks[0].command;
@@ -112,7 +112,7 @@ function runHook(runtime, sheet, command) {
   try {
     const r = spawnSync("sh", ["-c", command], {
       cwd,
-      env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot, ...env(sheetRoot) },
+      env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot, ...env(sheetRoot), ...extraEnv },
       encoding: "utf8",
     });
     return { status: r.status, out: r.stdout, err: r.stderr };
@@ -177,6 +177,14 @@ describe("SessionStart hook", () => {
       for (const { name, sheet, off } of sheetCases) {
         test(`${off ? "injects nothing" : "injects the mandate"} when the sheet has ${name}`, () => {
           const r = runHook(runtime, sheet);
+          expect({ ...r, out: off && runtime !== "agy" ? r.out : wrap(r.out) }).toEqual({ status: 0, out: expected(off), err: "" });
+        });
+      }
+
+      // A cloud session starts with an empty home, so no user sheet survives it.
+      for (const [value, off] of [["off", true], ["on", false], ["OFF", false], ["", false]]) {
+        test(`${off ? "injects nothing" : "injects the mandate"} when PSTACK_SESSION_HOOK is ${JSON.stringify(value)} and no sheet exists`, () => {
+          const r = runHook(runtime, null, undefined, { PSTACK_SESSION_HOOK: value });
           expect({ ...r, out: off && runtime !== "agy" ? r.out : wrap(r.out) }).toEqual({ status: 0, out: expected(off), err: "" });
         });
       }

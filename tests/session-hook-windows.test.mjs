@@ -28,7 +28,7 @@ function windowsHookEnv(fixture, profile) {
   return env;
 }
 
-function runHook({ sheet, codexHome, homeSheet, context = mandate, host = "cmd" } = {}) {
+function runHook({ sheet, codexHome, homeSheet, context = mandate, host = "cmd", sessionHook } = {}) {
   const fixture = mkdtempSync(join(tmpdir(), "pstack windows hook "));
   try {
     const plugin = join(fixture, "plugin with spaces");
@@ -47,6 +47,7 @@ function runHook({ sheet, codexHome, homeSheet, context = mandate, host = "cmd" 
     const command = handler.commandWindows.replaceAll("${CLAUDE_PLUGIN_ROOT}", plugin);
     const env = { ...windowsHookEnv(fixture, profile), CLAUDE_PLUGIN_ROOT: plugin };
     if (codexHome !== undefined) env.CODEX_HOME = codexHome ? sheetRoot : "";
+    if (sessionHook !== undefined) env.PSTACK_SESSION_HOOK = sessionHook;
     const executable = host === "cmd" ? process.env.ComSpec ?? "cmd.exe" : "powershell.exe";
     const args = host === "cmd" ? ["/d", "/s", "/c", command] : ["-NoProfile", "-EncodedCommand", Buffer.from(command, "utf16le").toString("base64")];
     const result = spawnSync(executable, args, {
@@ -90,6 +91,12 @@ describe.skipIf(process.platform !== "win32" && !required)("Windows Codex Sessio
   for (const { name, sheet, off } of sheetCases) {
     test(`${off ? "injects nothing" : "injects the context"} when the sheet has ${name}`, () => {
       expect(runHook({ sheet })).toEqual({ status: 0, out: off ? "" : mandate, err: "" });
+    });
+  }
+
+  for (const [value, off] of [["off", true], ["on", false], ["OFF", false]]) {
+    test(`${off ? "injects nothing" : "injects the context"} when PSTACK_SESSION_HOOK is ${JSON.stringify(value)} and no sheet exists`, () => {
+      expect(runHook({ sessionHook: value })).toEqual({ status: 0, out: off ? "" : mandate, err: "" });
     });
   }
 

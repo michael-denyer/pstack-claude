@@ -208,6 +208,40 @@ describe("check suites no check read shows", () => {
       ).toMatchObject([{ kind: "pending", name: "Unknown app check suite" }]);
   });
 
+  it("counts an expected app's queued suite with no runs as pending in both reads, and lists the apps it did not count", () => {
+    const azure = suite({
+      status: "queued",
+      conclusion: null,
+      app: { slug: "azure-pipelines", name: "Azure Pipelines" },
+    });
+    for (const checksRead of ["no-checks", "reported"] as const) {
+      expect(
+        unsettledSuiteChecks(pages(azure), head, checksRead, [
+          "azure-pipelines",
+        ])
+      ).toEqual({
+        checks: [
+          {
+            kind: "pending",
+            source: "check-suites",
+            name: "Azure Pipelines check suite",
+            reportedState: "QUEUED",
+            description: "has not finished",
+            link: "",
+            workflow: "",
+          },
+        ],
+        queuedWithoutRuns: [],
+      });
+      expect(unsettledSuiteChecks(pages(azure), head, checksRead)).toEqual({
+        checks: [],
+        queuedWithoutRuns: [
+          { name: "Azure Pipelines", slug: "azure-pipelines" },
+        ],
+      });
+    }
+  });
+
   it("beside reported checks, counts only a suite with no runs that waits for approval or for Actions to start", () => {
     const reported = (fields: Record<string, unknown>) =>
       unsettledSuiteChecks(pages(suite(fields)), head, "reported");

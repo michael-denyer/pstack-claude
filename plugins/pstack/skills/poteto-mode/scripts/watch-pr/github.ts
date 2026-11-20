@@ -118,6 +118,18 @@ export async function runJson(
   return commandJson(await run(argv, deadline), argv.join(" "));
 }
 function commandJson(result: CommandResult, label: string): unknown {
+  if (
+    result.code !== 0 &&
+    firstLine(result.stderr).includes(
+      "GitHub GraphQL is not available from Claude Code sessions"
+    )
+  )
+    throw new WatcherQueryError({
+      kind: "graphql-refused",
+      retryable: false,
+      detail:
+        "This Claude Code session refuses GitHub GraphQL, which watch-pr reads the PR through.",
+    });
   if (result.code !== 0)
     throw new WatcherQueryError({
       kind: "command-exit",

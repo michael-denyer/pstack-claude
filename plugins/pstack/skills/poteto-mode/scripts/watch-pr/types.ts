@@ -252,7 +252,11 @@ export type MergeBlocker =
     };
 export type QueryFailure =
   | {
-      readonly kind: "deadline" | "spawn-failed" | "unsupported-gh";
+      readonly kind:
+        | "deadline"
+        | "spawn-failed"
+        | "unsupported-gh"
+        | "graphql-refused";
       readonly retryable: false;
       readonly detail: string;
     }

@@ -29,6 +29,10 @@ const sessionStart = Object.fromEntries(
   ]),
 );
 
+// Codex puts the plugin's path into the command string itself, so a hook can
+// run without CLAUDE_PLUGIN_ROOT in its environment.
+const expandRoot = (command, root) => command.replaceAll("${CLAUDE_PLUGIN_ROOT}", root);
+
 // CODEX_HOME and CLAUDE_CONFIG_DIR are only present when the user has
 // relocated that runtime's directory. PLUGIN_ROOT is a generic name any shell
 // profile may export, so it must not move a Claude Code session to Codex's sheet.
@@ -60,6 +64,22 @@ const runtimes = {
     hooks: "codex",
     sheetDir: "codex-home",
     env: (sheetRoot) => ({ CODEX_HOME: sheetRoot }),
+  },
+  // Codex may not export CLAUDE_PLUGIN_ROOT, and starts the hook in the
+  // session's directory, so the hook finds the plugin from its own path.
+  "codex without CLAUDE_PLUGIN_ROOT": {
+    hooks: "codex",
+    sheetDir: ".codex",
+    cwd: tmpdir(),
+    command: expandRoot(sessionStart.codex.hooks[0].command, pluginRoot),
+    env: () => ({ CLAUDE_PLUGIN_ROOT: undefined }),
+  },
+  "codex with CODEX_HOME without CLAUDE_PLUGIN_ROOT": {
+    hooks: "codex",
+    sheetDir: "codex-home",
+    cwd: tmpdir(),
+    command: expandRoot(sessionStart.codex.hooks[0].command, pluginRoot),
+    env: (sheetRoot) => ({ CLAUDE_PLUGIN_ROOT: undefined, CODEX_HOME: sheetRoot }),
   },
   // GitHub Copilot sets COPILOT_PLUGIN_ROOT alongside CLAUDE_PLUGIN_ROOT, and
   // COPILOT_HOME only when the user relocated ~/.copilot.
@@ -382,6 +402,76 @@ describe("Copilot SessionStart context", () => {
       rmSync(home, { recursive: true, force: true });
     }
   });
+});
+
+// Codex expands ${CLAUDE_PLUGIN_ROOT} inside the command string but may leave
+// the variable out of the hook's environment, so the hook reads its own
+// copy of the plugin, wherever Codex installed it.
+describe("Codex SessionStart without CLAUDE_PLUGIN_ROOT", () => {
+  // A plugin copy whose path has a space, beside a directory the session starts in.
+  function withCopy(name, body) {
+    const tmp = mkdtempSync(join(tmpdir(), "pstack-codex-"));
+    const copy = (dir) => {
+      const root = join(tmp, "plugin cache", dir);
+      for (const sub of ["hooks", "skills/setup-pstack/scripts"]) cpSync(join(pluginRoot, sub), join(root, sub), { recursive: true });
+      writeFileSync(join(root, "hooks/session-start-context.md"), `mandate from ${dir}\n`);
+      return root;
+    };
+    mkdirSync(join(tmp, "project dir"), { recursive: true });
+    try {
+      return body({ tmp, root: copy(name), copy, project: join(tmp, "project dir"), home: join(tmp, "home") });
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+  const run = (command, { home, cwd, env = {} }) => {
+    const r = spawnSync("sh", ["-c", command], { cwd, env: { PATH: process.env.PATH, HOME: home, ...env }, encoding: "utf8" });
+    return { status: r.status, out: r.stdout, err: r.stderr };
+  };
+  const shipped = sessionStart.codex.hooks[0].command;
+
+  test("runs the shipped command from an install path with spaces, started in another directory", () =>
+    withCopy("pstack 0.9", ({ root, project, home }) => {
+      expect(run(expandRoot(shipped, root), { home, cwd: project })).toEqual({ status: 0, out: "mandate from pstack 0.9\n", err: "" });
+    }));
+
+  test("reads the sheet through the plugin's own reader", () =>
+    withCopy("pstack 0.9", ({ root, project, home }) => {
+      mkdirSync(join(home, ".codex"), { recursive: true });
+      writeFileSync(join(home, ".codex", "pstack-models.md"), "session hook: on\n");
+      // A reader that turns the hook off proves the hook ran the copy's reader.
+      writeFileSync(join(root, "skills/setup-pstack/scripts/read-sheet.sh"), "#!/bin/sh\necho 'session hook: off'\n");
+      expect(run(expandRoot(shipped, root), { home, cwd: project })).toEqual({ status: 0, out: "", err: "" });
+    }));
+
+  test("an explicit CLAUDE_PLUGIN_ROOT still names the plugin", () =>
+    withCopy("pstack 0.9", ({ root, copy, project, home }) => {
+      const other = copy("other pstack");
+      const env = { CLAUDE_PLUGIN_ROOT: other };
+      expect(run(expandRoot(shipped, root), { home, cwd: project, env })).toEqual({ status: 0, out: "mandate from other pstack\n", err: "" });
+    }));
+
+  test("an empty CLAUDE_PLUGIN_ROOT counts as unset", () =>
+    withCopy("pstack 0.9", ({ root, project, home }) => {
+      const env = { CLAUDE_PLUGIN_ROOT: "" };
+      expect(run(expandRoot(shipped, root), { home, cwd: project, env })).toEqual({ status: 0, out: "mandate from pstack 0.9\n", err: "" });
+    }));
+
+  // `cd` prints its target when CDPATH supplies it, which would join the plugin root to its own copy.
+  test("finds the plugin from a relative script path, whatever CDPATH holds", () =>
+    withCopy("pstack 0.9", ({ tmp, project, home }) => {
+      const decoy = join(tmp, "decoy");
+      mkdirSync(join(decoy, "pstack 0.9", "hooks"), { recursive: true });
+      const cwd = join(tmp, "plugin cache");
+      for (const script of ["pstack 0.9/hooks/session-start.sh", "./pstack 0.9/hooks/session-start.sh"]) {
+        expect(run(`sh "${script}" codex`, { home, cwd, env: { CDPATH: decoy } })).toEqual({ status: 0, out: "mandate from pstack 0.9\n", err: "" });
+      }
+      expect(run(`cd '${join(cwd, "pstack 0.9", "hooks")}' && sh session-start.sh codex`, { home, cwd: project })).toEqual({
+        status: 0,
+        out: "mandate from pstack 0.9\n",
+        err: "",
+      });
+    }));
 });
 
 const museMandate = readFileSync(join(pluginRoot, "hooks/session-start-muse.md"), "utf8");

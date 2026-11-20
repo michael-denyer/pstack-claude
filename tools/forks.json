@@ -276,6 +276,12 @@
       "since": "0.9.128",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/statechart/scripts/kill.ts": {
+      "kind": "policy",
+      "why": "Starts taskkill with windowsHide, because the detached janitor that calls it on Windows has no console and taskkill would otherwise open a window of its own.",
+      "since": "0.9.145",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/statechart/scripts/passes/regions.ts": {
       "kind": "policy",
       "why": "Names the per-state key array `keyAt`, not `key`, because the plugin directory's scanner reads a `key` identifier beside a file read as a credential read (MCP_FORWARDS_CREDENTIAL_ENV).",
@@ -290,7 +296,7 @@
     },
     "plugins/pstack/skills/statechart/scripts/statechart.ts": {
       "kind": "policy",
-      "why": "Points the worker's TEMP and TMP at its temp folder as TMPDIR already is, and hides the windows of the detached worker and janitor.",
+      "why": "Hides the windows of the detached worker and janitor.",
       "since": "0.9.116",
       "upstream": "not-proposed"
     },

@@ -2,7 +2,7 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.145 - sync to upstream 0b46ec3 (v0.15.46): statechart on Windows reads TLC's line ends
+## 0.9.145 - sync to upstream 0b46ec3 (v0.15.46): statechart on Windows reads TLC's line ends, skills-only DeepSeek Harness support
 
 The upstream pin moves from `2f87c85` to `0b46ec3`, upstream v0.15.46, 3 pstack commits (cursor/plugins#1283, #1284 and #1292). `cursor-team-kit` and `thermos` did not change upstream, so their pins stay. The sync is from @CuriousDev21 ([#480](https://github.com/michael-denyer/pstack-claude/pull/480)).
 
@@ -10,12 +10,15 @@ What changes for users:
 
 - `/statechart` reads TLC's output with `\r\n` line ends as it reads `\n` output, in the run and DOT readers as well as the message reader the port already fixed in 0.9.116 (cursor/plugins#1292).
 - The janitor that kills the worker and removes its folders is now `janitor.ts` on every platform, with the group kill in the new `kill.ts`. The `/bin/sh` janitor is gone. On Windows the janitor no longer kills a process tree once the worker has exited, so a reused pid is spared.
+- On native Windows, `statechart/SKILL.md` gives the `node` command that runs `statechart.ts`, `java` and `mise` start without a console window, and TLC writes its output as UTF-8 (cursor/plugins#1292).
 
 What stays different:
 
 - #1283 and #1284 move upstream's Gemini panel seat to `gemini-4-neon-high`, then `gemini-4-neon-xhigh`. The port's panels come from `models.json` and hold no Gemini seat, so `arena`, `poteto-mode` and `setup-pstack` keep the port's text. The substitution rule that removes the Gemini seat sentence from `poteto-mode` now matches upstream's new wording.
 
-Fork changes: `janitor.ts` and `test/messages.test.ts` now match upstream and are no longer forks; the port's own Windows line-end test gives way to upstream's test of the same case. `run.ts` keeps `childEnv`, and `statechart.ts` keeps the worker's `TEMP` and `TMP` and the hidden worker and janitor windows; their fork reasons drop the Windows kill, which upstream now carries.
+Fork changes: `test/messages.test.ts` now matches upstream and is no longer a fork, and the port-only `janitor.ts` is now upstream's file. The port's own Windows line-end test gives way to upstream's test of the same case. Upstream now carries the Windows kill and the worker's `TEMP` and `TMP`, so `run.ts` keeps only `childEnv` and `statechart.ts` keeps only the hidden worker and janitor windows. `kill.ts` is a new fork. Its `taskkill` starts with `windowsHide`, as the port's kill did before, because the detached janitor that calls it on Windows has no console of its own.
+
+DeepSeek Harness (DSH) can run pstack as a skills-only install. The shared `~/.agents/skills/` install now covers DSH, and the generator writes [`dsh-tools.md`](plugins/pstack/skills/poteto-mode/references/dsh-tools.md), which maps Claude Code tool names, subagent policy and model roles to DSH. DSH gets no native bundle, SessionStart hook or role sheet, so `setup-pstack` uses its native delegation defaults. The bug report form lists DeepSeek Harness. From @kyn0v ([#429](https://github.com/michael-denyer/pstack-claude/pull/429)).
 
 ## 0.9.144 - watch-pr suite evidence, Codex hook without CLAUDE_PLUGIN_ROOT, setext playbook headings
 

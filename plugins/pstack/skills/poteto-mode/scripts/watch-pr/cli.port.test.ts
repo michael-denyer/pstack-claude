@@ -38,7 +38,9 @@ describe("--expect-app", () => {
   });
 
   it("names the uncounted apps and the flag in the pretty READY lines", async () => {
-    const reader: GitHubReader = fakeReader({ facts: { reviewDecision: null } });
+    const reader: GitHubReader = fakeReader({
+      facts: { reviewDecision: null },
+    });
     reader.unsettledSuites = async (_context, head, checksRead, expectedApps) =>
       unsettledSuiteChecks(
         [

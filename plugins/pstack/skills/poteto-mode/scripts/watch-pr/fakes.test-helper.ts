@@ -157,7 +157,7 @@ export function fakeReader(
     },
     async unsettledSuites(_requested, head, checksRead) {
       calls.push(`unsettledSuites:${head}:${checksRead}`);
-      return options.unsettledSuites ?? [];
+      return { checks: options.unsettledSuites ?? [], queuedWithoutRuns: [] };
     },
   };
 }

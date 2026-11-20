@@ -754,8 +754,9 @@ export class GhGitHubReader implements T.GitHubReader {
   async unsettledSuites(
     context: T.PrContext,
     head: string,
-    checksRead: T.CheckRead["kind"]
-  ): Promise<readonly T.SuiteCheck[]> {
+    checksRead: T.CheckRead["kind"],
+    expectedApps: readonly string[]
+  ): Promise<T.SuiteRead> {
     const result = await this.run([
       "gh",
       "api",
@@ -775,7 +776,8 @@ export class GhGitHubReader implements T.GitHubReader {
     return unsettledSuiteChecks(
       commandJson(result, "gh api check-suites"),
       head,
-      checksRead
+      checksRead,
+      expectedApps
     );
   }
 }
@@ -783,9 +785,11 @@ export class GhGitHubReader implements T.GitHubReader {
 export function unsettledSuiteChecks(
   pages: unknown,
   head: string,
-  checksRead: T.CheckRead["kind"]
-): T.SuiteCheck[] {
+  checksRead: T.CheckRead["kind"],
+  expectedApps: readonly string[] = []
+): T.SuiteRead {
   const checks: T.SuiteCheck[] = [];
+  const queuedWithoutRuns: T.SuiteApp[] = [];
   const slurped = list(pages, "check suite pages");
   if (slurped.length === 0) missing("check suite pages", slurped);
   for (const page of slurped) {
@@ -814,19 +818,22 @@ export function unsettledSuiteChecks(
             }
           : { status };
       const app = isRecord(suite.app) ? suite.app : {};
+      const suiteApp = {
+        name: typeof app.name === "string" ? app.name : "Unknown app",
+        slug: typeof app.slug === "string" ? app.slug : null,
+      };
       const check = classifySuite(
         state,
-        {
-          name: typeof app.name === "string" ? app.name : "Unknown app",
-          slug: typeof app.slug === "string" ? app.slug : null,
-        },
+        suiteApp,
         runs === 0,
-        checksRead
+        checksRead,
+        suiteApp.slug !== null && expectedApps.includes(suiteApp.slug)
       );
-      if (check !== null) checks.push(check);
+      if (check === "uncounted") queuedWithoutRuns.push(suiteApp);
+      else if (check !== null) checks.push(check);
     }
   }
-  return checks;
+  return { checks, queuedWithoutRuns };
 }
 export async function resolveChecks(
   reader: T.GitHubReader,

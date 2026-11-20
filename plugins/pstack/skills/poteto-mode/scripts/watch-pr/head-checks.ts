@@ -13,7 +13,7 @@ import {
 export async function resolveHeadChecks(
   reader: GitHubReader,
   facts: Pick<LandingRevision, "context" | "headRefOid">,
-  expectedApps: readonly string[]
+  expectedApps: readonly string[] = []
 ): Promise<CheckRead & { readonly queuedWithoutRuns: readonly SuiteApp[] }> {
   const read = await resolveChecks(reader, facts.context);
   if (

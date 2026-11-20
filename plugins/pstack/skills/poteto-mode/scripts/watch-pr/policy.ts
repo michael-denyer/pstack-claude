@@ -159,7 +159,7 @@ export async function readSnapshot(args: {
     return { kind: "closed", context: args.context, facts };
   const [threads, checks] = await Promise.all([
     resolveReviewThreads(args.reader, args.context),
-    resolveHeadChecks(args.reader, facts, args.expectedApps ?? []),
+    resolveHeadChecks(args.reader, facts, args.expectedApps),
   ]);
   const failed = nonEmpty(
     checks.checks.filter(

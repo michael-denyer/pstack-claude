@@ -1,8 +1,8 @@
+import { resolveHeadChecks } from "./head-checks.ts";
 import { landingRevision } from "./landing.ts";
 import {
   ChecksUnavailable,
   WatcherQueryError,
-  resolveChecks,
   resolveReviewThreads,
 } from "./github.ts";
 import { DeadlineExceeded, type WatchDeadline } from "./deadline.ts";
@@ -104,28 +104,6 @@ async function noChecksCi(
     ? { ...none, kind: "ci-none", github: merge.github }
     : { ...none, kind: "ci-unreported" };
 }
-// No check read shows a suite with no runs, such as a fork workflow waiting for
-// maintainer approval, so the head's suites are read before its CI counts as
-// clean or absent.
-async function withUnsettledSuites(
-  reader: T.GitHubReader,
-  facts: OpenFacts,
-  read: T.CheckRead
-): Promise<T.CheckRead> {
-  if (
-    read.checks.some(
-      (check) => check.kind === "failed" || check.kind === "pending"
-    )
-  )
-    return read;
-  const suites = nonEmpty(
-    await reader.unsettledSuites(facts.context, facts.headRefOid, read.kind)
-  );
-  if (suites === null) return read;
-  return read.kind === "reported"
-    ? { ...read, checks: [...read.checks, ...suites] }
-    : { kind: "reported", source: "check-suites", checks: suites };
-}
 const AUTOMATION_TOKENS = [
   "bugbot",
   "security review",
@@ -177,11 +155,10 @@ export async function readSnapshot(args: {
     return { kind: "merged", context: args.context, facts };
   if (facts.state === "CLOSED")
     return { kind: "closed", context: args.context, facts };
-  const [threads, read] = await Promise.all([
+  const [threads, checks] = await Promise.all([
     resolveReviewThreads(args.reader, args.context),
-    resolveChecks(args.reader, args.context),
+    resolveHeadChecks(args.reader, facts),
   ]);
-  const checks = await withUnsettledSuites(args.reader, facts, read);
   const failed = nonEmpty(
     checks.checks.filter(
       (check): check is T.FailedCheck => check.kind === "failed"

@@ -132,6 +132,41 @@ describe("project playbooks", () => {
     }
   });
 
+  test.each([
+    ["a setext heading over ---", "prose", "Prose heading\n-------------\n\nWork off main.\n"],
+    ["a setext heading over ===", "prose", "Prose\nheading\n===\n\nWork off main.\n"],
+    ["an ATX heading with a tab", "prose", "##\tProse heading\n\nWork off main.\n"],
+    ["an ATX heading with a tab after a numbered step", "steps", "1. Work off main.\n##\tProse heading\n"],
+  ])("a heading cannot anchor a change: %s", (_, stem, base) => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      const bundled = join(root, "bundled");
+      mkdirSync(bundled);
+      writeFileSync(join(bundled, `${stem}.md`), base);
+      const anchors = (quote) => {
+        writePlaybooks(root, { "sample.md": `---\nextends: ${stem}\nwhen: Any change.\n---\n- **In** "${quote}": check it.\n` });
+        return checkPlaybooks(root, bundled);
+      };
+      expect(anchors("Work off main.")).toEqual([]);
+      expect(anchors("Prose heading")).toEqual(['.agents/playbooks/sample.md: "Prose heading" is not in any playbook it extends']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a line of dashes under a list item leaves the item an anchor", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      const bundled = join(root, "bundled");
+      mkdirSync(bundled);
+      writeFileSync(join(bundled, "prose.md"), "- Work off main.\n---\n\nAttach screenshots.\n");
+      writePlaybooks(root, { "sample.md": '---\nextends: prose\nwhen: Any change.\n---\n- **In** "Work off main.": check it.\n' });
+      expect(checkPlaybooks(root, bundled)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   // An upstream sync that adds one numbered list to either playbook turns every other line unanchorable.
   test("every prose line of the bundled playbooks without numbered steps anchors a change", () => {
     const bundled = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/playbooks");

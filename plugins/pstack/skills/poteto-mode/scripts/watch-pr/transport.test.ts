@@ -47,6 +47,7 @@ if (args.some(a => a.includes('query PullRequestFacts'))) {
   if (scenario === 'no-ci-rollup-fails') fail('HTTP 502: Bad Gateway (https://api.github.com/graphql)');
   value = { data: { repository: { pullRequest: { commits: { nodes: [{ commit: { oid: 'head', statusCheckRollup: null } }] } } } } };
 } else if (args.some(a => a.endsWith('/check-suites?per_page=100'))) {
+  if (scenario === 'unsupported-gh') fail('unknown flag: --slurp');
   if (scenario === 'no-ci-suites-fail') fail('HTTP 403: check suites unavailable');
   if (!args.includes('--paginate') || !args.includes('--slurp')) fail('fixture serves only paginated, slurped check suites');
   const suites = {
@@ -255,10 +256,12 @@ it("blocks on approval-gated Actions beside another app's passing check", () => 
         kind: "ci-failing",
         failed: [
           {
+            source: "check-suites",
             name: "GitHub Actions check suite",
             reportedState: "ACTION_REQUIRED",
           },
           {
+            source: "check-suites",
             name: "GitHub Actions check suite",
             reportedState: "ACTION_REQUIRED",
           },
@@ -266,6 +269,27 @@ it("blocks on approval-gated Actions beside another app's passing check", () => 
       },
     },
   });
+});
+
+it("stops on the first suite read when gh lacks --slurp", () => {
+  const result = run("unsupported-gh", ["--timeout", "2"]);
+  expect(result.status).toBe(7);
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({
+    kind: "BLOCKER",
+    blocker: {
+      failures: 1,
+      failure: {
+        kind: "unsupported-gh",
+        retryable: false,
+        detail: expect.stringContaining("Upgrade GitHub CLI to 2.48"),
+      },
+    },
+  });
+  expect(result.calls.filter((args) => args.includes("--slurp"))).toHaveLength(
+    1
+  );
+  const pretty = run("unsupported-gh", ["--timeout", "2", "--pretty"]);
+  expect(pretty.stdout).toContain("action=upgrade GitHub CLI");
 });
 
 // Replays the shape of grafana/grafana#138293 as read on 2026-11-19: every

@@ -709,6 +709,7 @@ describe("a PR with no checks configured", () => {
 
 describe("check suites that no check read shows", () => {
   const gated = {
+    source: "check-suites",
     kind: "failed",
     name: "GitHub Actions check suite",
     reportedState: "ACTION_REQUIRED",
@@ -771,6 +772,30 @@ describe("check suites that no check read shows", () => {
     expect(await read({ ...noChecks, unsettledSuites: [] })).toMatchObject({
       ci: { kind: "ci-none" },
     });
+  });
+
+  it("reads suites while review threads are outstanding and rereads facts after both", async () => {
+    const reader = fakeReader();
+    const threads = Promise.withResolvers<void>();
+    reader.reviewThreadPage = async () => {
+      await threads.promise;
+      return { threads: [], endCursor: null };
+    };
+    const snapshot = readSnapshot({
+      reader,
+      context: context(40),
+      pendingHistory: "include",
+      allowDraft: false,
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const beforeRelease = [...reader.calls];
+    threads.resolve();
+    await snapshot;
+    expect(beforeRelease).toContain("unsettledSuites:head:reported");
+    expect(beforeRelease.filter((call) => call === "pullRequest")).toHaveLength(
+      1
+    );
+    expect(reader.calls.at(-1)).toBe("pullRequest");
   });
 
   it("reads the head's suites only when no check has failed or is pending", async () => {

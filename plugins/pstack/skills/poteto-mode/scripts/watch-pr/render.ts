@@ -145,7 +145,9 @@ function renderBlocker(blocker: T.MergeBlocker | StatusQueryBlocker): string {
         `detail=${blocker.failure.detail}`,
         blocker.failure.kind === "spawn-failed"
           ? "action=install the command that could not run, or put it on PATH, then rearm"
-          : "action=verify current PR context, GitHub authentication, and API availability, then rearm",
+          : blocker.failure.kind === "unsupported-gh"
+            ? "action=upgrade GitHub CLI, then rearm"
+            : "action=verify current PR context, GitHub authentication, and API availability, then rearm",
       ].join("\n");
     default: {
       const exhaustive: never = blocker;

@@ -2,6 +2,20 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.144 - watch-pr suite evidence, Codex hook without CLAUDE_PLUGIN_ROOT, setext playbook headings
+
+When a PR already has reported checks, `watch-pr` verifies the head and run count before deciding that a suite is covered. An invalid count now produces a query error. A suite with a positive count can be skipped even when GitHub returns a null status. The watcher reads suites as soon as the reported checks finish, alongside any outstanding review-thread pages ([#486](https://github.com/michael-denyer/pstack-claude/pull/486)).
+
+Each failed or pending row supplied by the check-suites API now carries `source: "check-suites"` in the verdict JSON. The top-level CI source still names the primary read. A zero-run GitHub Actions suite waiting for approval tells the reader to approve its workflows. Other providers requiring action point the reader to their check details.
+
+The suite lookup requires GitHub CLI 2.48 or later. A CLI that rejects `--slurp` now produces an immediate exit 7 with an upgrade instruction, saving 12 minutes of retries at the default settings.
+
+On Codex, the SessionStart hook finds the plugin from its own path when `CLAUDE_PLUGIN_ROOT` is not in its environment, as `session-start.ps1` already does on Windows. @thomas92tw reported in [#483](https://github.com/michael-denyer/pstack-claude/issues/483) that every Codex 0.170.0 session printed `SessionStart Failed`: Codex put the plugin path into the hook's command but left the variable unset, so `session-start.sh` stopped on it. The fix is from @flipcyde101 ([#485](https://github.com/michael-denyer/pstack-claude/pull/485)).
+
+`check-playbooks.mjs` reads a setext heading (text over a `---` or `===` line) and an ATX heading with a tab after its `#` run as headings, on the numbered-step path and on the paragraph path that 0.9.142 added. It read both as text before, so a change anchored on such a heading passed. A line of dashes under a list item still leaves the item an anchor, as CommonMark reads it. No bundled playbook has either heading form, so no project playbook passed wrongly. From @seonwooj0810 ([#478](https://github.com/michael-denyer/pstack-claude/pull/478)), for [#476](https://github.com/michael-denyer/pstack-claude/issues/476).
+
+The bug report form lists every supported runtime, and `tests/issue-template.test.mjs` fails when a `RUNTIMES` row is missing from it. From @abc123931 ([#482](https://github.com/michael-denyer/pstack-claude/pull/482)).
+
 ## 0.9.143 - watch-pr blocks on approval-gated Actions beside other checks
 
 `watch-pr` no longer calls a fork PR ready while its Actions workflows wait for maintainer approval and another app, such as a CLA bot, has reported a passing check ([#470](https://github.com/michael-denyer/pstack-claude/issues/470)). GitHub gives a gated workflow a check suite with no runs, so no check read shows it, and the watcher read the other app's check alone as clean CI. On 2026-11-19, 28 of 110 open PR heads in nine large repositories whose reported checks had all passed had this shape.

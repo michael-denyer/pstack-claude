@@ -80,6 +80,8 @@ export interface ReviewThread {
 interface CheckDetails {
   readonly name: string;
   readonly reportedState: string;
+  /** REST suites supplement the aggregate CI source. */
+  readonly source?: "check-suites";
   readonly description: string;
   readonly link: string;
   readonly workflow: string;
@@ -95,12 +97,15 @@ export type Check =
     });
 export type FailedCheck = Extract<Check, { readonly kind: "failed" }>;
 export type PendingCheck = Extract<Check, { readonly kind: "pending" }>;
+export type SuiteCheck = (FailedCheck | PendingCheck) & {
+  readonly source: "check-suites";
+};
 export interface ReportedChecks {
   readonly kind: "reported";
   readonly source: "gh-pr-checks" | "graphql-rollup" | "check-suites";
   readonly checks: NonEmpty<Check>;
 }
-/** `resolveChecks` owns what counts as `no-checks`. */
+/** `resolveHeadChecks` confirms a no-checks reading against the head's suites. */
 export type CheckRead =
   | ReportedChecks
   | {
@@ -247,7 +252,7 @@ export type MergeBlocker =
     };
 export type QueryFailure =
   | {
-      readonly kind: "deadline" | "spawn-failed";
+      readonly kind: "deadline" | "spawn-failed" | "unsupported-gh";
       readonly retryable: false;
       readonly detail: string;
     }
@@ -468,7 +473,7 @@ export interface GitHubReader {
     context: PrContext,
     head: string,
     checksRead: CheckRead["kind"]
-  ): Promise<readonly Check[]>;
+  ): Promise<readonly SuiteCheck[]>;
 }
 export interface PollingOptions {
   readonly interval: number;

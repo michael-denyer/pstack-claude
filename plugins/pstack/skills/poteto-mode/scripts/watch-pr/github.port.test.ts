@@ -140,6 +140,7 @@ describe("check suites no check read shows", () => {
     expect(unsettledSuiteChecks(pages(suite()), head, "no-checks")).toEqual([
       {
         kind: "failed",
+        source: "check-suites",
         name: "GitHub Actions check suite",
         reportedState: "ACTION_REQUIRED",
         description: expect.stringContaining("maintainer approval"),
@@ -241,6 +242,70 @@ describe("check suites no check read shows", () => {
     ];
     expect(unsettledSuiteChecks(twoPages, head, "no-checks")).toMatchObject([
       { kind: "failed", reportedState: "ACTION_REQUIRED" },
+    ]);
+  });
+
+  it("requires a valid run count to decide whether reported checks cover a suite", () => {
+    for (const count of [undefined, null, "0", -1, 0.5]) {
+      expect(() =>
+        unsettledSuiteChecks(
+          pages(suite({ latest_check_runs_count: count })),
+          head,
+          "reported"
+        )
+      ).toThrow(/latest_check_runs_count/);
+    }
+    const covered = suite({
+      latest_check_runs_count: 1,
+      status: null,
+      conclusion: null,
+    });
+    expect(unsettledSuiteChecks(pages(covered), head, "reported")).toEqual([]);
+    expect(() =>
+      unsettledSuiteChecks(pages(covered), head, "no-checks")
+    ).toThrow(/check suite.status/);
+    expect(() =>
+      unsettledSuiteChecks(
+        pages({ ...covered, head_sha: "other" }),
+        head,
+        "reported"
+      )
+    ).toThrow(/must match the queried head/);
+    expect(() =>
+      unsettledSuiteChecks(pages(suite({ conclusion: null })), head, "reported")
+    ).toThrow(/conclusion of a completed suite/);
+  });
+
+  it("tells the reader which provider requires action", () => {
+    for (const mode of ["reported", "no-checks"] as const) {
+      const checks = unsettledSuiteChecks(
+        pages(suite({ app: { slug: "external-ci", name: "External CI" } })),
+        head,
+        mode
+      );
+      expect(checks).toMatchObject([
+        {
+          source: "check-suites",
+          kind: "failed",
+          reportedState: "ACTION_REQUIRED",
+          description: expect.stringContaining(
+            "review the check details for External CI"
+          ),
+        },
+      ]);
+    }
+    expect(
+      unsettledSuiteChecks(
+        pages(suite({ latest_check_runs_count: 2 })),
+        head,
+        "no-checks"
+      )
+    ).toMatchObject([
+      {
+        description: expect.stringContaining(
+          "review the check details for GitHub Actions"
+        ),
+      },
     ]);
   });
 

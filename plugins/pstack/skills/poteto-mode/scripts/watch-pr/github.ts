@@ -1,3 +1,4 @@
+import { classifySuite } from "./check-suites.ts";
 import { baseRefTargetOid, text } from "./landing.ts";
 import { spawn } from "node:child_process";
 import { DeadlineExceeded, type WatchDeadline } from "./deadline.ts";
@@ -114,16 +115,17 @@ export async function runJson(
   argv: readonly [string, ...string[]],
   deadline: WatchDeadline
 ): Promise<unknown> {
-  const result = await run(argv, deadline);
+  return commandJson(await run(argv, deadline), argv.join(" "));
+}
+function commandJson(result: CommandResult, label: string): unknown {
   if (result.code !== 0)
     throw new WatcherQueryError({
       kind: "command-exit",
       retryable: true,
       code: result.code,
-      detail:
-        firstLine(result.stderr) || `${argv.join(" ")} exited ${result.code}`,
+      detail: firstLine(result.stderr) || `${label} exited ${result.code}`,
     });
-  return parseJson(result.stdout, argv.join(" "));
+  return parseJson(result.stdout, label);
 }
 function raw(value: unknown): string {
   try {
@@ -741,32 +743,37 @@ export class GhGitHubReader implements T.GitHubReader {
     context: T.PrContext,
     head: string,
     checksRead: T.CheckRead["kind"]
-  ): Promise<readonly T.Check[]> {
+  ): Promise<readonly T.SuiteCheck[]> {
+    const result = await this.run([
+      "gh",
+      "api",
+      "--paginate",
+      "--slurp",
+      `repos/${context.owner}/${context.repo}/commits/${head}/check-suites?per_page=100`,
+    ]);
+    if (
+      result.code !== 0 &&
+      firstLine(result.stderr) === "unknown flag: --slurp"
+    )
+      throw new WatcherQueryError({
+        kind: "unsupported-gh",
+        retryable: false,
+        detail: "gh api rejected --slurp. Upgrade GitHub CLI to 2.48 or later.",
+      });
     return unsettledSuiteChecks(
-      await this.runJson([
-        "gh",
-        "api",
-        "--paginate",
-        "--slurp",
-        `repos/${context.owner}/${context.repo}/commits/${head}/check-suites?per_page=100`,
-      ]),
+      commandJson(result, "gh api check-suites"),
       head,
       checksRead
     );
   }
 }
 
-// A fork workflow awaiting approval has a check suite but no check runs, so no
-// check read shows it. An app other than Actions, such as Claude, queues a suite
-// on every push and may never run it. Beside reported checks, the check read
-// shows each suite's runs and hides a run that a later run replaced, so only a
-// suite with no runs that waits for approval or for Actions to start counts.
 export function unsettledSuiteChecks(
   pages: unknown,
   head: string,
   checksRead: T.CheckRead["kind"]
-): T.Check[] {
-  const checks: T.Check[] = [];
+): T.SuiteCheck[] {
+  const checks: T.SuiteCheck[] = [];
   const slurped = list(pages, "check suite pages");
   if (slurped.length === 0) missing("check suite pages", slurped);
   for (const page of slurped) {
@@ -777,53 +784,34 @@ export function unsettledSuiteChecks(
           "check suite.head_sha must match the queried head",
           suite.head_sha
         );
-      const status = string(suite.status, "check suite.status");
-      const conclusion = optionalString(
-        suite.conclusion,
-        "check suite.conclusion"
-      );
-      if (
-        status === "completed" &&
-        ["success", "neutral", "skipped"].includes(conclusion ?? "")
-      )
-        continue;
-      const app = isRecord(suite.app) ? suite.app : {};
-      const idleApp =
-        status === "queued" &&
-        suite.latest_check_runs_count === 0 &&
-        typeof app.slug === "string" &&
-        app.slug !== "github-actions";
-      if (idleApp) continue;
-      const unseen =
-        suite.latest_check_runs_count === 0 &&
-        (conclusion === "action_required" ||
-          (status !== "completed" && app.slug === "github-actions"));
-      if (checksRead === "reported" && !unseen) continue;
-      const details = {
-        name: `${typeof app.name === "string" ? app.name : "Unknown app"} check suite`,
-        link: "",
-        workflow: "",
-      };
-      if (status !== "completed") {
-        checks.push({
-          ...details,
-          kind: "pending",
-          reportedState: status.toUpperCase(),
-          description: "has not finished",
-        });
-        continue;
+      const runs = suite.latest_check_runs_count;
+      if (checksRead === "reported") {
+        if (typeof runs !== "number" || !Number.isSafeInteger(runs) || runs < 0)
+          missing("check suite.latest_check_runs_count", runs);
+        // Reported checks already cover these runs, including superseded ones.
+        if (runs > 0) continue;
       }
-      if (conclusion === null)
-        missing("check suite.conclusion of a completed suite", conclusion);
-      checks.push({
-        ...details,
-        kind: "failed",
-        reportedState: conclusion.toUpperCase(),
-        description:
-          conclusion === "action_required"
-            ? "waits for maintainer approval to run; approve the workflows on the pull request"
-            : `concluded ${conclusion}`,
-      });
+      const status = text(suite.status, "check suite.status");
+      const state =
+        status === "completed"
+          ? {
+              conclusion: text(
+                suite.conclusion,
+                "check suite.conclusion of a completed suite"
+              ),
+            }
+          : { status };
+      const app = isRecord(suite.app) ? suite.app : {};
+      const check = classifySuite(
+        state,
+        {
+          name: typeof app.name === "string" ? app.name : "Unknown app",
+          slug: typeof app.slug === "string" ? app.slug : null,
+        },
+        runs === 0,
+        checksRead
+      );
+      if (check !== null) checks.push(check);
     }
   }
   return checks;

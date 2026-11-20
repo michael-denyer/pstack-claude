@@ -1,12 +1,13 @@
-// The Windows janitor for statechart.ts. Windows has no process groups and no /bin/sh, so when
-// the command's pipe closes this kills the worker's process tree and removes its folders.
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { finished } from "node:stream/promises";
+import { killGroup } from "./kill.ts";
 
 const [pid, ...dirs] = process.argv.slice(2);
 
-process.stdin.on("end", () => {
-  spawnSync("taskkill", ["/T", "/F", "/PID", pid], { stdio: "ignore", windowsHide: true });
-  for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true });
-});
-process.stdin.resume();
+let input = "";
+process.stdin.setEncoding("utf8").on("data", (chunk: string) => (input += chunk));
+await finished(process.stdin).catch(() => {});
+const running = !input.includes("exited");
+const groupOutlivesWorker = process.platform !== "win32";
+if (running || groupOutlivesWorker) await killGroup(Number(pid));
+for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true });

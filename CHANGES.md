@@ -2,6 +2,21 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## Unreleased - sync to upstream 0b46ec3 (v0.15.46): statechart on Windows reads TLC's line ends
+
+The upstream pin moves from `2f87c85` to `0b46ec3`, upstream v0.15.46, 3 pstack commits (cursor/plugins#1283, #1284 and #1292). `cursor-team-kit` and `thermos` did not change upstream, so their pins stay.
+
+What changes for users:
+
+- `/statechart` reads TLC's output with `\r\n` line ends as it reads `\n` output, in the run and DOT readers as well as the message reader the port already fixed in 0.9.116 (cursor/plugins#1292).
+- The janitor that kills the worker and removes its folders is now `janitor.ts` on every platform, with the group kill in the new `kill.ts`. The `/bin/sh` janitor is gone. On Windows the janitor no longer kills a process tree once the worker has exited, so a reused pid is spared.
+
+What stays different:
+
+- #1283 and #1284 move upstream's Gemini panel seat to `gemini-4-neon-high`, then `gemini-4-neon-xhigh`. The port's panels come from `models.json` and hold no Gemini seat, so `arena`, `poteto-mode` and `setup-pstack` keep the port's text. The substitution rule that removes the Gemini seat sentence from `poteto-mode` now matches upstream's new wording.
+
+Fork changes: `janitor.ts` and `test/messages.test.ts` now match upstream and are no longer forks; the port's own Windows line-end test gives way to upstream's test of the same case. `run.ts` keeps `childEnv`, and `statechart.ts` keeps the worker's `TEMP` and `TMP` and the hidden worker and janitor windows; their fork reasons drop the Windows kill, which upstream now carries.
+
 ## 0.9.143 - watch-pr blocks on approval-gated Actions beside other checks
 
 `watch-pr` no longer calls a fork PR ready while its Actions workflows wait for maintainer approval and another app, such as a CLA bot, has reported a passing check ([#470](https://github.com/michael-denyer/pstack-claude/issues/470)). GitHub gives a gated workflow a check suite with no runs, so no check read shows it, and the watcher read the other app's check alone as clean CI. On 2026-11-19, 28 of 110 open PR heads in nine large repositories whose reported checks had all passed had this shape.

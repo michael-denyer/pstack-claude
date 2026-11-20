@@ -104,10 +104,10 @@
       "rationale": "the swarm workers default comes from models.json, not a Cursor slug"
     },
     {
-      "regex": " A Gemini seat never runs above `gemini-[^`]+`, its top slug\\.",
+      "regex": " A Gemini seat runs at `gemini-[^`]+` unless its line names another level\\.",
       "files": "^skills/poteto-mode/SKILL\\.md$",
       "replacement": "",
-      "rationale": "the port's panels hold no Gemini seat, so the cap on Gemini's top slug has nothing to apply to"
+      "rationale": "the port's panels hold no Gemini seat, so the Gemini seat's level has nothing to apply to"
     },
     {
       "pattern": " Opus 5.5 always runs its `-fast` slug.",

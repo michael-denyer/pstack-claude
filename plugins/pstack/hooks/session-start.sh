@@ -35,7 +35,7 @@ case "$runtime" in
     # Codex expands ${CLAUDE_PLUGIN_ROOT} in the command string but may not
     # set it in the hook's environment, so fall back to this script's own
     # location. The root then serves the reader and the mandate below.
-    : "${CLAUDE_PLUGIN_ROOT:=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
+    : "${CLAUDE_PLUGIN_ROOT:=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)}"
     reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
   copilot)

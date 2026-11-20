@@ -1,8 +1,8 @@
+import { resolveHeadChecks } from "./head-checks.ts";
 import { landingRevision } from "./landing.ts";
 import {
   ChecksUnavailable,
   WatcherQueryError,
-  resolveChecks,
   resolveReviewThreads,
 } from "./github.ts";
 import { DeadlineExceeded, type WatchDeadline } from "./deadline.ts";
@@ -157,7 +157,7 @@ export async function readSnapshot(args: {
     return { kind: "closed", context: args.context, facts };
   const [threads, checks] = await Promise.all([
     resolveReviewThreads(args.reader, args.context),
-    resolveChecks(args.reader, args.context),
+    resolveHeadChecks(args.reader, facts),
   ]);
   const failed = nonEmpty(
     checks.checks.filter(

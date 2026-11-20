@@ -124,14 +124,11 @@ describe("applySubstitutions", () => {
     );
   });
 
-  test("a model default points at the Models section that owns the file, whatever the slug", () => {
+  test("a playbook model default points at poteto-mode's Models section, whatever the slug", () => {
     const line = (slug) => `your configured hillclimb model (default \`${slug}\`)`;
     for (const slug of ["grok-4.7-xhigh-fast", "claude-fable-5-1-thinking-max", "gpt-6-sol-max"]) {
       expect(applySubstitutions(line(slug), RULES.substitutions, "skills/poteto-mode/playbooks/hillclimb.md").text).toBe(
         "your configured hillclimb model (default in poteto-mode's Models section)",
-      );
-      expect(applySubstitutions(line(slug), RULES.substitutions, "skills/reflect/SKILL.md").text).toBe(
-        "your configured hillclimb model (default in [Models](#models))",
       );
     }
     expect(applySubstitutions("(default `true`)", RULES.substitutions, "skills/reflect/SKILL.md").text).toBe(
@@ -158,11 +155,6 @@ describe("applySubstitutions", () => {
   test.each([
     [
       "skills/how/SKILL.md",
-      "Each spawn below names a role line in the `pstack-models.mdc` rule and a default. Set `model` to that line's value, or to the default if the rule or the line is missing.",
-      "Each spawn below names a role line in `pstack-models.md` and a default in [Models](#models). Set `model` to that line's value, or to the default if the sheet or the line is missing.",
-    ],
-    [
-      "skills/how/SKILL.md",
       "If the Task tool rejects a slug, use the default and say so.",
       "If the `Agent` tool rejects a slug, use the default and say so.",
     ],
@@ -172,18 +164,8 @@ describe("applySubstitutions", () => {
       "Once all explorers have returned, spawn one `Agent` subagent to synthesize their findings into one explanation:",
     ],
     [
-      "skills/how/SKILL.md",
-      "- `model`: the `how explorer` line, default `grok-4.7-xhigh-fast`",
-      "- `model`: the `how explorer` line, default in [Models](#models)",
-    ],
-    [
-      "skills/architect/SKILL.md",
-      "Take the runners from the `architect runners` line in the `pstack-models.mdc` rule, in place of the `arena runners` line. If the rule or that line is missing, use",
-      "Take the runners from the `architect runners` line in `pstack-models.md`, in place of the `arena runners` line. If the sheet or that line is missing, use",
-    ],
-    [
       "skills/arena/SKILL.md",
-      "Families go by prefix: `claude-*`, `gpt-*`, and `grok-*`.",
+      "Families go by prefix, and the longest match wins: `claude-fable-*`, `claude-*`, and `gemini-*`, after dropping a leading `cursor-`. Any other slug's family is its text before the first hyphen.",
       "Families go by model name, such as Opus, Fable, or Sonnet.",
     ],
     [
@@ -232,14 +214,9 @@ describe("applySubstitutions", () => {
       "Pick the wake mechanism using Claude Code's `loop` skill (a built-in, not a pstack skill).",
     ],
     [
-      "skills/poteto-mode/SKILL.md",
-      "on an explicit pause, going offline, a Cursor restart, or imminent context compaction.",
-      "on an explicit pause, going offline, a session restart, or imminent context compaction.",
-    ],
-    [
       "skills/poteto-mode/playbooks/babysit.md",
-      'This playbook replaces Cursor\'s built-in babysit skill for these requests, for "address the bugbot comments".',
-      'This playbook replaces the bundled **babysit** skill for these requests, for "address the review-bot comments".',
+      "This playbook replaces Cursor's built-in babysit skill for these requests.",
+      "This playbook replaces the bundled **babysit** skill for these requests.",
     ],
     [
       "agents/poteto-agent.md",

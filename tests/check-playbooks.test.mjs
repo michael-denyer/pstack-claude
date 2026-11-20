@@ -1,6 +1,6 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkPlaybooks } from "../plugins/pstack/skills/poteto-mode/scripts/check-playbooks.mjs";
@@ -90,6 +90,100 @@ describe("project playbooks", () => {
   ])("frontmatter written as valid YAML passes: %s", (_, front) => {
     const result = run({ "bug-fix.md": `${front}${front.endsWith("---") ? "" : '- **In** "Binary-search the cause": compare with main.\n'}` });
     expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
+  });
+
+  test("YAML comments follow values and cannot supply the required condition", () => {
+    const playbook = (fields) => run({ "sample.md": "---\n" + fields + "\n---\n" });
+    expect(playbook("extends: [bug-fix, feature] # two bases\nwhen: 'Fix #42' # condition").code).toBe(0);
+    expect(playbook("extends: bug-fix # base\nwhen: # TODO").out).toContain('needs a "when:" line');
+    expect(playbook("extends: 'bug-fix # literal' # comment\nwhen: Fix it.").out).toContain("extends `bug-fix # literal`");
+    expect(playbook("extends:\n  - missing # base\nwhen: Fix it.").out).toContain("extends `missing`");
+  });
+
+  test("fenced changes are examples and only words in a bundled step can anchor changes", () => {
+    const front = "---\nextends: bug-fix\nwhen: Fix it.\n---\n";
+    const change = (anchor) => '- **After** "' + anchor + '": verify.\n';
+    const example = "    " + change("indented code example") + "\n~~~~markdown\n" + change("example only") + "~~~\n" + change("still an example") + "~~~~\n";
+    expect(run({ "sample.md": front + example + change("Binary-search the cause") }).code).toBe(0);
+    expect(run({ "sample.md": front + change("Focused-fix exception") }).code).toBe(1);
+    expect(run({ "sample.md": front + change("failing test first and the fix on top") }).code).toBe(0);
+  });
+
+  test("a base without numbered steps anchors changes on one paragraph or list item, never a heading", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      const bundled = join(root, "bundled");
+      mkdirSync(bundled);
+      writeFileSync(
+        join(bundled, "prose.md"),
+        "### Prose\n\n**Worktree.** Work off main. Subagents\ninherit it.\n\n- `## Why`: the problem.\n- `## Scope`: always.\n\nAfter the sections, attach screenshots.\n",
+      );
+      writeFileSync(join(bundled, "steps.md"), "### Steps\n\nRead this first.\n\n1. Reproduce it.\n2. Fix it.\n");
+      const unanchored = (base, ...quotes) => {
+        const changes = quotes.map((quote) => `- **In** "${quote}": check it.\n`).join("");
+        writePlaybooks(root, { "sample.md": `---\nextends: ${base}\nwhen: Any change.\n---\n${changes}` });
+        return checkPlaybooks(root, bundled).map((problem) => problem.match(/"(.*)" is not in any playbook/)[1]);
+      };
+      expect(unanchored("prose", "Work off main.", "Subagents inherit it.", "`## Scope`: always.", "attach screenshots")).toEqual([]);
+      expect(unanchored("prose", "Prose", "inherit it. - `## Why`", "always. After")).toEqual(["Prose", "inherit it. - `## Why`", "always. After"]);
+      expect(unanchored("steps", "Reproduce it.", "Read this first.")).toEqual(["Read this first."]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ["a setext heading over ---", "prose", "Prose heading\n-------------\n\nWork off main.\n"],
+    ["a setext heading over ===", "prose", "Prose\nheading\n===\n\nWork off main.\n"],
+    ["an ATX heading with a tab", "prose", "##\tProse heading\n\nWork off main.\n"],
+    ["an ATX heading with a tab after a numbered step", "steps", "1. Work off main.\n##\tProse heading\n"],
+  ])("a heading cannot anchor a change: %s", (_, stem, base) => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      const bundled = join(root, "bundled");
+      mkdirSync(bundled);
+      writeFileSync(join(bundled, `${stem}.md`), base);
+      const anchors = (quote) => {
+        writePlaybooks(root, { "sample.md": `---\nextends: ${stem}\nwhen: Any change.\n---\n- **In** "${quote}": check it.\n` });
+        return checkPlaybooks(root, bundled);
+      };
+      expect(anchors("Work off main.")).toEqual([]);
+      expect(anchors("Prose heading")).toEqual(['.agents/playbooks/sample.md: "Prose heading" is not in any playbook it extends']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a line of dashes under a list item leaves the item an anchor", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      const bundled = join(root, "bundled");
+      mkdirSync(bundled);
+      writeFileSync(join(bundled, "prose.md"), "- Work off main.\n---\n\nAttach screenshots.\n");
+      writePlaybooks(root, { "sample.md": '---\nextends: prose\nwhen: Any change.\n---\n- **In** "Work off main.": check it.\n' });
+      expect(checkPlaybooks(root, bundled)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // An upstream sync that adds one numbered list to either playbook turns every other line unanchorable.
+  test("every prose line of the bundled playbooks without numbered steps anchors a change", () => {
+    const bundled = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/playbooks");
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      for (const stem of ["opening-a-pr", "babysit"]) {
+        const changes = readFileSync(join(bundled, `${stem}.md`), "utf8")
+          .split("\n")
+          .filter((line) => line.trim() && !line.startsWith("#") && !line.includes('"'))
+          .map((line) => line.replace(/^ *(?:[-*+]|\d+[.)]) +/, "").trim().split(/\s+/).slice(-4).join(" "))
+          .map((quote) => `- **In** "${quote}": check it.\n`);
+        writePlaybooks(root, { [`${stem}.md`]: `---\nextends: ${stem}\nwhen: Any change.\n---\n${changes.join("")}` });
+      }
+      expect(checkPlaybooks(root)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test("a quoted flow list is one stem, as YAML reads it", () => {

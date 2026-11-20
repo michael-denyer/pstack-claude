@@ -26,7 +26,7 @@ The plugin injects its routing instruction before each main-agent turn and this 
 
 OMP's marketplace skill discovery does not apply pstack's `paths` frontmatter as a file-triggered invocation rule. Invoke `typescript-best-practices` explicitly for TypeScript work when applicable.
 
-Use the OMP session's available browser or project verification tools to drive applications. Project instructions take precedence over generic driver guidance.
+Use the OMP session's available browser or project verification tools to drive applications. Project instructions take precedence over generic driver guidance. Where poteto-mode names the project `verify` skill at `.claude/skills/verify/`, look under `.omp/skills/verify/` first, where `create-verification-skill` writes it on OMP, then under `.claude/skills/verify/` and `.agents/skills/verify/`.
 
 ## Model names
 
@@ -37,3 +37,8 @@ OMP uses its own model selection; without a pstack sheet, use the runtime's defa
 | Skill | On OMP |
 | --- | --- |
 | `why` | Use OMP tools and available sources. |
+| `automate-me` | Look for mode skills under `.omp/skills/`, `.agents/skills/`, and the active profile's agent directory (`~/.omp/agent/skills/` by default, `~/.omp/profiles/<name>/agent/skills/` under a named profile) as well as the Claude Code paths. Write a new project mode skill to `.omp/skills/<handle>-mode/SKILL.md`, and a personal one to `<handle>-mode/SKILL.md` in that agent directory's skills folder. OMP does not load a skill nested in a category directory, so keep the mode skill directly under the skills folder. |
+| `create-verification-skill` | The generated skill lands under `.claude/skills/verify/` on Claude Code; on OMP write it to `.omp/skills/verify/`, where OMP loads native project skills. The app-driving harness is platform-neutral. |
+| `maintain-verification-skill` | Look for the project-local skill under `.omp/skills/` first, then under `.claude/skills/` and `.agents/skills/`. |
+| `create-formal-verification-skill` | On OMP write the generated skill to `.omp/skills/<area>/`, named for the area it verifies, with a `description` in its frontmatter, because OMP skips a native skill without one. The verifier and its run command are platform-neutral. |
+| `maintain-formal-verification-skill` | Look for project skills, the formal verification skill among them, under `.omp/skills/` first, then under `.claude/skills/` and `.agents/skills/`. |

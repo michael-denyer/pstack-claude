@@ -1,3 +1,4 @@
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -111,7 +112,10 @@ export function readSheet(agentDir: string): Sheet | undefined {
 }
 
 // The parts of models.json the extension reads; the generator checks the rest.
+const singleModelTiers = Type.Object({ default: Type.String(), strongest: Type.String(), worker: Type.String() });
 const modelsConfig = Type.Object({
+  tiers: Type.Optional(singleModelTiers),
+  codex: Type.Optional(singleModelTiers),
   available: Type.Array(Type.String()),
   efforts: Type.Array(Type.String()),
   pi: Type.Object({ fallback: Type.String(), models: Type.Record(Type.String(), Type.Record(Type.String(), Type.String())) }),
@@ -139,6 +143,7 @@ export function resolveModel(
   settings: Settings,
   sheet: Sheet | undefined,
   parentModel: string | undefined,
+  registry: Pick<ExtensionContext["modelRegistry"], "find">,
 ): string | undefined {
   if (!requested || PARENT_MODEL_ALIASES.includes(requested)) return parentModel;
   if (requested.includes("/")) return requested;
@@ -150,8 +155,15 @@ export function resolveModel(
   // Family names follow the provider the session is signed in to, so a ChatGPT
   // subscription gets OpenAI models without any configuration.
   const provider = parentModel?.split("/")[0] ?? "";
+  const override = sheet?.piModels.get(requested);
+  if (override) return override;
+  if (provider === "openai" || provider === "openai-codex") {
+    const tier = (["default", "strongest", "worker"] as const).find((name) => models.tiers?.[name] === requested);
+    const preferred = tier && models.codex?.[tier];
+    if (preferred && registry.find(provider, preferred)) return `${provider}/${preferred}`;
+  }
   const table = models.pi.models[Object.hasOwn(models.pi.models, provider) ? provider : models.pi.fallback];
-  const id = sheet?.piModels.get(requested) ?? table[requested];
+  const id = table[requested];
   if (!id) {
     throw new InvalidValueError(`No Pi model mapped for "${requested}": add a "pi models: ${requested}=<provider>/<id>" line to the override sheet.`);
   }

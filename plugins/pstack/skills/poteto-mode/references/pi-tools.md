@@ -33,7 +33,7 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 poteto-mode's Subagents section applies on Pi through the `agent` tool:
 
 - `subagent_type` takes the same values. `pstack:poteto-agent`, `pstack:comment-sicko`, `pstack:thermo-nuclear-review-subagent`, and `pstack:thermo-nuclear-code-quality-review-subagent` resolve to the plugin's agent files. A `.md` file in `pstack-agents` in the Pi agent directory adds a type under its file name with no `pstack:` prefix, as a Claude Code user agent has no plugin prefix, and the body after the frontmatter is the child's system prompt. Its `tools:`, `disallowedTools:`, and `isolation:` fields are ignored, so pass `readonly: true` or `isolation: "worktree"` on the `agent` call instead. A hidden file, a file whose name has a colon, and one that cannot be read are skipped. The extension reads the frontmatter as YAML, and a repeated key keeps its last value, as in Claude Code. When the YAML does not parse, it retries as Claude Code 2.1.310 does, reading an unquoted top-level value that holds YAML syntax, such as `description: Use for a: b`, as text and turning leading tabs into spaces. It skips a user file whose frontmatter still does not parse. A user file never replaces a type, so `poteto-agent.md` there adds `poteto-agent` and leaves `pstack:poteto-agent` alone. The extension does not read Pi's `agents` folder, whose files other subagent extensions write with their own frontmatter. `general-purpose`, or no `subagent_type`, runs a child with no agent file. Claude Code's built-in types such as `Explore` and `Plan` do not exist on Pi, so use `general-purpose` and put the constraint in the prompt. An unknown type errors and lists the valid ones. The `agent` tool's `subagent_type` description lists each type the session starts with and what it is for, from each agent file's `description:`, the user's files included.
-- `readonly: true`, which the `how` panel sets, runs the child without the `edit` and `write` tools. It keeps `bash`, so a reviewer can still run `git diff`; say in the prompt that it must not change files.
+- `readonly: true`, which the `how` subagent sets, runs the child without the `edit` and `write` tools. It keeps `bash`, so a reviewer can still run `git diff`; say in the prompt that it must not change files.
 - Each child is its own `pi --mode rpc` process in your working directory, and the extension sends it the prompt on its stdin. It loads the packages and settings saved on disk, so it sees the pstack skills when pstack was installed with `pi install`. It does not inherit the parent's command-line flags, such as `-e`, `--api-key`, or a one-off `-a` project trust, so a pstack loaded only through `-e` gives children no extension.
 - A child can start its own agents, down to three layers below the main session, as on Claude Code. A child at the third layer runs without the `agent` tool.
 - `isolation: "worktree"` runs the child in its own git worktree under `.claude/worktrees/`. A worktree the agent left nothing in is removed when the agent finishes; a change, a gitignored file it wrote, or a commit on its branch or on any commit its HEAD visited keeps it.
@@ -49,7 +49,7 @@ poteto-mode's Subagents section applies on Pi through the `agent` tool:
 
 ## Model names
 
-Skills name models by the Claude aliases in their Models sections. On Pi, pass the alias as the `agent` tool's `model`. The pstack extension resolves it in the column of the provider the session's current model comes from, and in the `anthropic` column for any other provider:
+Skills name models by the Claude aliases in their Models sections. On Pi, pass the alias as the `agent` tool's `model`. The table lists the catalog-compatible defaults for the provider the session's current model comes from. Other providers use the `anthropic` column.
 
 | Alias | `anthropic` | `openai` | `openai-codex` |
 | --- | --- | --- | --- |
@@ -58,9 +58,11 @@ Skills name models by the Claude aliases in their Models sections. On Pi, pass t
 | `sonnet` | `anthropic/claude-sonnet-5-5` | `openai/gpt-6.1-sol` | `openai-codex/gpt-6.1-sol` |
 | `haiku` | `anthropic/claude-haiku-5-5` | `openai/gpt-6-luna` | `openai-codex/gpt-6-luna` |
 
+On the two OpenAI providers, Pi first looks for the Codex default (`gpt-6.2-sol` for `opus`), worker (`gpt-6.2-sol` for `sonnet`), or strongest model (`gpt-6.2-astra` for `fable`) in the session's model registry. When that model is absent, Pi uses the ID in the table.
+
 Pi warns that Anthropic bills Claude used through Pi per token, as extra usage, even on a Claude subscription. Pi shows that warning only in interactive mode, never for the `pi --mode rpc` children the `agent` tool runs.
 
-A `pi models: opus=<provider/id>, sonnet=<provider/id>` line in the Pi override sheet points each alias it names at another Pi model, whatever the session's provider. Add one when the session's provider has no column above and Pi has no credentials for `anthropic`, because each alias then resolves to an `anthropic/*` ID and the `agent` call fails with `No API key found for anthropic`. The `agent` tool also takes a full `provider/id`, passed through unchanged, and `inherit-parent`, `auto`, or no `model` runs the child on the parent's current model. Diverse-model panels (`arena`, `architect`, `interrogate`) stay diverse only while their aliases resolve to distinct models. If one model family is all you can reach, vary the reasoning effort and note in the verdict that diversity was reduced.
+A `pi models: opus=<provider/id>, sonnet=<provider/id>` line in the Pi override sheet points each alias it names at another Pi model, whatever the session's provider. Add one when the session's provider has no column above and Pi has no credentials for `anthropic`, because each alias then resolves to an `anthropic/*` ID and the `agent` call fails with `No API key found for anthropic`. The `agent` tool also takes a full `provider/id`, passed through unchanged, and `inherit-parent`, `auto`, or no `model` runs the child on the parent's current model. Diverse-model panels (`arena`, `interrogate`) stay diverse only while their aliases resolve to distinct models. If one model family is all you can reach, vary the reasoning effort and note in the verdict that diversity was reduced.
 
 `/setup-pstack` writes the configured model list. On Pi, keep the aliases and remap them with `pi models:`.
 
@@ -101,12 +103,12 @@ No skill file carries a Pi line. poteto-mode's Platform Adaptation section point
 | `maintain-formal-verification-skill` | Project skills, the formal verification skill among them, live under `.pi/skills/` or `.agents/skills/`. |
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
 | `automate-me` | `plugin-dev:skill-development` resolves through the skills table above. The workspace's transcripts are its Pi sessions directory (see Tool actions). Pi does not discover `.claude/skills/`, so write the mode skill to `.pi/skills/<handle>-mode/SKILL.md` or `.agents/skills/<handle>-mode/SKILL.md` instead. |
-| `architect` | The runner panel goes through the **arena** skill, so its `agent` fan-out and model aliases apply here too. |
+| `architect` | A large or contested design goes through the **arena** skill, so its `agent` fan-out and model aliases apply here too. |
 | `arena` | The parallel candidates and the cross-judge are background `agent` calls on the configured aliases (see Model names). |
-| `how` | The parallel explorers and the explainer are `agent` calls, and `readonly` applies as written (see Subagent policy). |
-| `reflect` | The three reviewers and the synthesizer are background `agent` calls. The transcript finder reads Pi sessions too. Pass it this workspace's Pi sessions directory (see Tool actions) in place of Claude Code's projects directory. It follows the session's active branch to its opening prompt. Skill files load from the Pi package directory that `pi list` shows, not `${CLAUDE_CODE_PLUGIN_CACHE_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins}/`, so treat reads under that directory as plugin skill reads. |
+| `how` | The one read-only subagent is an `agent` call, and `readonly` applies as written (see Subagent policy). |
+| `reflect` | The transcript finder reads Pi sessions too. Pass it this workspace's Pi sessions directory (see Tool actions) in place of Claude Code's projects directory. It follows the session's active branch to its opening prompt. Skill files load from the Pi package directory that `pi list` shows, not `${CLAUDE_CODE_PLUGIN_CACHE_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins}/`, so treat reads under that directory as plugin skill reads. |
 | `swarm` | Each worker is a background `agent` call on the configured alias. Give each writing worker `isolation: "worktree"` or its own output directory (see Subagent policy above). |
-| `why` | The parallel investigators and the synthesizer are background `agent` calls. List MCP servers from the tools Pi exposes to the session or `pi mcp list`, not from `.mcp.json` or `claude mcp list`. Spawn the synthesizer only after every investigator's completion notice has arrived, because those notices carry the findings the synthesizer gets. A `send_message` to an investigator returns no findings, so wait for its notice. |
+| `why` | List MCP servers from the tools Pi exposes to the session or `pi mcp list`, not from `.mcp.json` or `claude mcp list`. |
 
 ## Vendored scripts
 

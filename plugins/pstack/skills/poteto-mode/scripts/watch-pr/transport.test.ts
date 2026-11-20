@@ -37,7 +37,9 @@ if (scenario === 'slow') {
 const noCi = scenario.startsWith('no-ci');
 const fail = (stderr) => { console.error(stderr); process.exit(1); };
 let value;
-if (args.some(a => a.includes('query PullRequestFacts'))) {
+if (scenario === 'graphql-refused' && args[0] === 'api' && args[1] === 'graphql') {
+  fail('gh: GitHub GraphQL is not available from Claude Code sessions; use the REST API (gh api repos/{owner}/{repo}/...). (HTTP 403)');
+} else if (args.some(a => a.includes('query PullRequestFacts'))) {
   value = { data: { repository: { pullRequest: { headRefOid: 'head', baseRef: { target: { oid: 'base' } }, mergeable: 'MERGEABLE', mergeStateStatus: scenario === 'no-ci-blocked' ? 'BLOCKED' : 'CLEAN', reviewDecision: noCi ? null : 'APPROVED', headRefName: 'feature', baseRefName: 'main', state: 'OPEN', mergedAt: null, isDraft: false } } } };
 } else if (args[0] === 'pr' && args[1] === 'checks') {
   if (scenario === 'no-ci-unauthorized') fail('HTTP 401: Bad credentials (https://api.github.com/graphql)');
@@ -290,6 +292,25 @@ it("stops on the first suite read when gh lacks --slurp", () => {
   );
   const pretty = run("unsupported-gh", ["--timeout", "2", "--pretty"]);
   expect(pretty.stdout).toContain("action=upgrade GitHub CLI");
+});
+
+it("stops on the first read when the session refuses GitHub GraphQL", () => {
+  const result = run("graphql-refused", ["--timeout", "2"]);
+  expect(result.status).toBe(7);
+  expect(JSON.parse(result.stdout.trim())).toMatchObject({
+    kind: "BLOCKER",
+    blocker: {
+      failures: 1,
+      failure: {
+        kind: "graphql-refused",
+        retryable: false,
+        detail: expect.stringContaining("refuses GitHub GraphQL"),
+      },
+    },
+  });
+  expect(result.calls.filter((args) => args[1] === "graphql")).toHaveLength(1);
+  const pretty = run("graphql-refused", ["--timeout", "2", "--pretty"]);
+  expect(pretty.stdout).toContain("action=run watch-pr where gh can reach");
 });
 
 // Replays the shape of grafana/grafana#138293 as read on 2026-11-19: every

@@ -880,6 +880,27 @@ describe("apps named with --expect-app", () => {
     }
   });
 
+  it("waits on a named app's queued suite in a queued stack too", async () => {
+    const waits = async (expectedApps?: readonly string[]) => {
+      const emitted: ProgressVerdict[] = [];
+      await runQueued({
+        dependencies: dependencies(
+          headWith({}, azure),
+          ticking(),
+          emitted,
+          120
+        ),
+        contexts: [context(50)],
+        options: { ...options, expectedApps },
+      });
+      return kinds(emitted);
+    };
+    expect(await waits(["azure-pipelines"])).toContain(
+      "WAITING:pending-checks"
+    );
+    expect(await waits()).not.toContain("WAITING:pending-checks");
+  });
+
   it("names each app whose suite it did not count in the ready proof", async () => {
     const claude = queuedSuite("claude", "Claude");
     for (const [reported, ci] of [

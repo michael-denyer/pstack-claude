@@ -162,7 +162,7 @@ export function parseArgs(
     .option("--allow-draft", "do not treat a draft as a merge gate", false)
     .option(
       "--expect-app <slug>",
-      "a GitHub App that runs CI here; its queued check suite with no runs counts as pending (repeatable)",
+      "a GitHub App that runs CI here; a suite it has queued on the head with no runs counts as pending, and an app that never runs waits until --timeout, which is off by default (repeatable)",
       appSlugs
     )
     .option("--pretty", "render human text instead of JSON", false);

@@ -317,6 +317,9 @@ it("stops on the first read when the session refuses GitHub GraphQL", () => {
   expect(result.calls.filter((args) => args[1] === "graphql")).toHaveLength(1);
   const pretty = run("graphql-refused", ["--timeout", "2", "--pretty"]);
   expect(pretty.stdout).toContain("action=run watch-pr where gh can reach");
+  expect(pretty.stdout).toMatch(
+    /^detail=This Claude Code session refuses GitHub GraphQL.*use the REST API/m
+  );
 });
 
 it("still retries a GraphQL 403 that can clear, such as a secondary rate limit", () => {

@@ -39,6 +39,8 @@ const fail = (stderr) => { console.error(stderr); process.exit(1); };
 let value;
 if (scenario === 'graphql-refused' && args[0] === 'api' && args[1] === 'graphql') {
   fail('gh: GitHub GraphQL is not available from Claude Code sessions; use the REST API (gh api repos/{owner}/{repo}/...). (HTTP 403)');
+} else if (scenario === 'graphql-rate-limited' && args[0] === 'api' && args[1] === 'graphql') {
+  fail('gh: You have exceeded a secondary rate limit. Please wait a few minutes before you try again. (HTTP 403)');
 } else if (args.some(a => a.includes('query PullRequestFacts'))) {
   value = { data: { repository: { pullRequest: { headRefOid: 'head', baseRef: { target: { oid: 'base' } }, mergeable: 'MERGEABLE', mergeStateStatus: scenario === 'no-ci-blocked' ? 'BLOCKED' : 'CLEAN', reviewDecision: noCi ? null : 'APPROVED', headRefName: 'feature', baseRefName: 'main', state: 'OPEN', mergedAt: null, isDraft: false } } } };
 } else if (args[0] === 'pr' && args[1] === 'checks') {
@@ -308,9 +310,25 @@ it("stops on the first read when the session refuses GitHub GraphQL", () => {
       },
     },
   });
+  // gh's own line names the REST API an agent in the session can still use.
+  expect(JSON.parse(result.stdout.trim()).blocker.failure.detail).toContain(
+    "use the REST API (gh api repos/{owner}/{repo}/...)"
+  );
   expect(result.calls.filter((args) => args[1] === "graphql")).toHaveLength(1);
   const pretty = run("graphql-refused", ["--timeout", "2", "--pretty"]);
   expect(pretty.stdout).toContain("action=run watch-pr where gh can reach");
+  expect(pretty.stdout).toMatch(
+    /^detail=This Claude Code session refuses GitHub GraphQL.*use the REST API/m
+  );
+});
+
+it("still retries a GraphQL 403 that can clear, such as a secondary rate limit", () => {
+  const result = run("graphql-rate-limited", ["--timeout", "2"]);
+  expect(result.status).toBe(5);
+  expect(JSON.parse(result.stdout.trim().split("\n")[0])).toMatchObject({
+    kind: "RETRY",
+    failure: { kind: "command-exit", retryable: true },
+  });
 });
 
 // Replays the shape of grafana/grafana#138293 as read on 2026-11-19: every

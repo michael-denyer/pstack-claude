@@ -212,7 +212,7 @@
     },
     "plugins/pstack/skills/reflect/SKILL.md": {
       "kind": "port-feature",
-      "why": "Finds the session transcript with the port's find-transcript.mjs under the Claude Code projects directory that claude-project-dir.mjs prints, so a reflect run can read turns compacted out of its context, and edits a skill copy under the Claude Code skills directories.",
+      "why": "Finds the session transcript with the port's find-transcript.mjs under the Claude Code projects directory that claude-project-dir.mjs prints, so a reflect run can read turns compacted out of its context, and edits a skill copy under the Claude Code skills directories. Before approval it says that the copy of a pstack skill is a separate skill, which pstack's routing can keep bypassing.",
       "since": "0.1.0",
       "upstream": "not-proposed"
     },

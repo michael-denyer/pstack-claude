@@ -127,8 +127,7 @@ function commandJson(result: CommandResult, label: string): unknown {
     throw new WatcherQueryError({
       kind: "graphql-refused",
       retryable: false,
-      detail:
-        "This Claude Code session refuses GitHub GraphQL, which watch-pr and ship-pr read the PR through.",
+      detail: `This Claude Code session refuses GitHub GraphQL, which watch-pr and ship-pr read the PR through. ${firstLine(result.stderr)}`,
     });
   if (result.code !== 0)
     throw new WatcherQueryError({

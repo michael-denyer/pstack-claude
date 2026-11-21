@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -61,7 +61,19 @@ const EXTENSION = fileURLToPath(new URL("../../plugins/pstack/pi/index.ts", impo
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent");
 
 suite("HcChild on a live hc core", () => {
-  function launch(prompt, { args = [], env = {}, files = {}, withPstack = false } = {}) {
+  function pathWithout(root, names) {
+    return process.env.PATH.split(":")
+      .map((dir, i) => {
+        if (!names.some((name) => existsSync(join(dir, name)))) return dir;
+        const copy = join(root, `path-${i}`);
+        mkdirSync(copy);
+        for (const file of readdirSync(dir)) if (!names.includes(file)) symlinkSync(join(dir, file), join(copy, file));
+        return copy;
+      })
+      .join(":");
+  }
+
+  function launch(prompt, { args = [], env = {}, files = {}, withPstack = false, slowStart = false } = {}) {
     const root = mkdtempSync(join(tmpdir(), "pstack-hc-live-"));
     const cwd = join(root, "work");
     const identity = { sessionDir: join(root, "agents"), sessionId: randomUUID() };
@@ -72,13 +84,14 @@ suite("HcChild on a live hc core", () => {
       mkdirSync(dirname(join(cwd, rel)), { recursive: true });
       writeFileSync(join(cwd, rel), text);
     }
-    if (withPstack) {
+    if (withPstack || slowStart) {
       const agentDir = join(root, "agent");
       mkdirSync(agentDir);
       for (const file of ["models.json", "auth.json"]) if (existsSync(join(AGENT_DIR, file))) symlinkSync(join(AGENT_DIR, file), join(agentDir, file));
       env = { ...env, PI_CODING_AGENT_DIR: agentDir };
-      args = [...args, "--extension", EXTENSION];
     }
+    if (withPstack) args = [...args, "--extension", EXTENSION];
+    if (slowStart) env = { ...env, PATH: pathWithout(root, ["fd", "rg"]) };
     const name = `pstack-test-${identity.sessionId.slice(0, 8)}`;
     const envFile = join(identity.sessionDir, "child.env");
     const started = {};
@@ -125,6 +138,18 @@ suite("HcChild on a live hc core", () => {
       const exit = await child.exited;
       expect(exit.settled).toBe(true);
       expect(exit.finalText.toLowerCase()).toContain("dashed");
+    },
+    5 * MINUTE,
+  );
+
+  test(
+    "a prompt sent while pi is still starting, here downloading fd and rg, is submitted once its startup ends",
+    async () => {
+      const { child, cwd } = launch("Reply with the word started, and nothing else.", { slowStart: true });
+      const exit = await child.exited;
+      expect(exit.settled).toBe(true);
+      expect(exit.finalText.toLowerCase()).toContain("started");
+      expect(existsSync(join(dirname(cwd), "agent", "bin", "fd"))).toBe(true);
     },
     5 * MINUTE,
   );

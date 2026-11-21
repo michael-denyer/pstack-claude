@@ -1,5 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import { type Static, type TSchema, Type } from "typebox";
 import { Value } from "typebox/value";
@@ -9,6 +10,7 @@ import { alive, assistantText, type ChildExit, signalGroup, terminateGroup } fro
 const execHc = promisify(execFile);
 const SCREEN_LINES = "30";
 const CLOSE_POLL_MS = 200;
+const STARTUP_POLL_MS = 500;
 const NOT_THE_CHILD = new Set(["timeout", "message"]);
 const TERMINAL_VARS = new Set(["COLORTERM", "TERM", "TERM_PROGRAM", "PWD", "OLDPWD", "SHLVL", "_"]);
 const LOAD_ENV = '. "$1" && rm -- "$1" && shift && exec "$@"';
@@ -20,8 +22,12 @@ const waitResult = Type.Object({
 });
 type WaitResult = Static<typeof waitResult>;
 const runResult = Type.Object({ address: Type.String() });
-const getResult = Type.Object({ pid: Type.Union([Type.Number(), Type.Null()]) });
-const sendResult = Type.Object({ wait: Type.Optional(waitResult) });
+const getResult = Type.Object({
+  pid: Type.Union([Type.Number(), Type.Null()]),
+  status: Type.Union([Type.Object({ state: Type.String() }), Type.Null()]),
+  turn: Type.Number(),
+});
+const sendResult = Type.Object({ started: Type.Optional(Type.Boolean()), wait: Type.Optional(waitResult) });
 const transcriptReply = Type.Object({
   type: Type.Literal("message"),
   message: Type.Object({
@@ -115,8 +121,19 @@ export class HcChild {
   private async turn(prompt: string): Promise<WaitResult> {
     const ready = await this.wait();
     if (ready.status !== "idle" || this.ending) return ready;
-    const { wait } = await hc(sendResult, ["send", "--json", "--wait", "--", this.name, prompt]);
+    const { started, wait } = await hc(sendResult, ["send", "--json", "--wait", "--", this.name, prompt]);
+    if (started === false) return this.submitAfterStartup();
     return wait && !NOT_THE_CHILD.has(wait.reason) ? wait : this.wait();
+  }
+
+  // Pi reports idle before its startup ends, and an Enter before then leaves the prompt in its editor.
+  private async submitAfterStartup(): Promise<WaitResult> {
+    for (;;) {
+      await sleep(STARTUP_POLL_MS);
+      const { status, turn } = await hc(getResult, ["get", "--json", this.name]);
+      if (status?.state !== "idle" || turn > 0 || this.ending) return this.wait();
+      await execHc("hc", ["keys", "--", this.name, "enter"]);
+    }
   }
 
   private async wait(): Promise<WaitResult> {
@@ -131,7 +148,7 @@ export class HcChild {
     for (;;) {
       const state = await this.wait();
       if (state.reason === "exit") return state;
-      await new Promise((resolve) => setTimeout(resolve, CLOSE_POLL_MS));
+      await sleep(CLOSE_POLL_MS);
     }
   }
 

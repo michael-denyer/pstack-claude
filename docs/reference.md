@@ -176,7 +176,7 @@ Install dependencies for the workflows you use:
 
 | Dependency | When you need it |
 | --- | --- |
-| GitHub CLI, `gh` | PR monitoring and shipping. The bundled `watch-pr` requires GitHub CLI 2.48 or later to read all pages of check suites. Authenticate with `gh auth login`. The playbooks use Origin's CLI, `origin`, instead when it can resolve the repository. |
+| GitHub CLI, `gh` | PR monitoring and shipping. The bundled `watch-pr` requires GitHub CLI 2.48 or later to read all pages of check suites. `watch-pr` and `ship-pr` read pull requests through GitHub GraphQL, which a Claude Code cloud session refuses. There `watch-pr` stops with exit 7 on its first read, and an agent can read the PR over REST with `gh api repos/<owner>/<repo>/pulls/<number>`. Authenticate with `gh auth login`. The playbooks use Origin's CLI, `origin`, instead when it can resolve the repository. |
 | Bun | The bundled `watch-pr` scripts. Their bootstrap installs script dependencies on first run. |
 | `plugin-dev` | Claude Code skill-authoring guidance used by `automate-me`, `reflect`, and `poteto-mode`. |
 

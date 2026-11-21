@@ -12,6 +12,10 @@
 // and archived_sessions under $CODEX_HOME, and Pi's sessions and pstack subagent
 // sessions under $PI_CODING_AGENT_DIR (defaults: ~/.claude, ~/.codex, ~/.pi/agent).
 //
+// Compressed rollouts use native Zstd when it reads complete streams. Other
+// runtimes fall back to zstd on PATH. A decode failure makes the whole chat
+// scan unknown, so no worktree can be declared safe from that scan.
+//
 // Every probe yields a Fact, { known: true, value } or { known: false }. A hold
 // bucket needs only its own fact; `safe` needs every fact known.
 import { execFileSync } from "node:child_process";
@@ -20,6 +24,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
 
 import { candidates, rethrowUnlessRemoved } from "../../reflect/scripts/find-transcript.mjs";
 
@@ -199,11 +204,38 @@ function transcriptNeedles(spellings) {
   return [...new Set(forms)].map((form) => Buffer.from(JSON.stringify(form).slice(1, -1)));
 }
 
+// Bun 1.4.4 returns the partial output of a truncated frame without an error,
+// and nodejs/node#64592 reports the same for Node. The check also turns down a
+// decoder that stops after the first frame. It runs once, not once per transcript.
+function nativeZstdDecoder() {
+  const decode = zlib.zstdDecompressSync;
+  if (typeof decode !== "function") return undefined;
+  // A complete Zstd frame containing "a", independent of compressor availability.
+  const frame = Buffer.from("28b52ffd200109000061", "hex");
+  const joined = Buffer.concat([frame, frame]);
+  try {
+    if (decode(joined).toString() !== "aa") return undefined;
+  } catch {
+    return undefined;
+  }
+  for (const partial of [frame.subarray(0, -1), joined.subarray(0, -1)]) {
+    try {
+      decode(partial);
+      return undefined;
+    } catch { /* A complete-stream decoder must reject an unfinished frame. */ }
+  }
+  return decode;
+}
+
+const decodeZstd = nativeZstdDecoder() ?? ((input) => execFileSync("zstd", ["-d", "-c"], {
+  input, stdio: ["pipe", "pipe", "pipe"], maxBuffer: Infinity, timeout: 30_000,
+}));
+
 // `spellings` maps each worktree path to every spelling a session could use.
 export function lastChats(roots, spellings) {
   const needles = [...spellings].map(([path, forms]) => [path, transcriptNeedles(forms)]);
   const latest = new Map();
-  for (const { path: file } of roots.flatMap((root) => candidates(root, Infinity))) {
+  for (const { path: file } of roots.flatMap((root) => candidates(root, Infinity, { includeCompressed: true }))) {
     let text, mtime;
     try {
       text = readFileSync(file);
@@ -214,6 +246,15 @@ export function lastChats(roots, spellings) {
       rethrowUnlessRemoved(error);
       continue;
     }
+    if (file.endsWith(".jsonl.zst")) {
+      try {
+        text = decodeZstd(text);
+      } catch (error) {
+        // A missing fallback executable is not a transcript removed during enumeration.
+        const hint = error.code === "ENOENT" ? " Use a runtime with complete native Zstd support or install zstd." : "";
+        throw new Error(`cannot decode ${file}: ${String(error.stderr ?? "").trim() || error.message}${hint}`);
+      }
+    }
     for (const [path, forms] of needles) {
       if (mtime > (latest.get(path) ?? 0) && forms.some((needle) => mentions(text, needle))) latest.set(path, mtime);
     }
@@ -221,11 +262,13 @@ export function lastChats(roots, spellings) {
   return latest;
 }
 
-// The trunk is whatever the remote says it is; main only when it publishes no
-// usable HEAD.
-function trunkName(repo) {
-  const advertised = probe(() => git(repo, "ls-remote", "--symref", "origin", "HEAD"));
-  return (advertised.known && /^ref: refs\/heads\/(.+)\tHEAD$/m.exec(advertised.value)?.[1]) || "main";
+// Take one advertisement for all rows, including deletions that a cached ref misses.
+function advertisedBranches(repo) {
+  const refs = git(repo, "ls-remote", "--symref", "origin", "HEAD", "refs/heads/*");
+  const trunk = /^ref: refs\/heads\/(.+)\tHEAD$/m.exec(refs)?.[1] ?? "main";
+  const tips = new Map();
+  for (const match of refs.matchAll(/^([0-9a-f]+)\trefs\/heads\/(.+)$/gm)) tips.set(match[2], match[1]);
+  return { trunk, tips };
 }
 
 function isAncestor(repo, head, trunk) {
@@ -245,10 +288,14 @@ function dirtyState(path) {
     .split("\n").filter(Boolean);
   const untracked = lines.filter((line) => line.startsWith("??")).length;
   const ignoredLines = lines.filter((line) => line.startsWith("!!"));
-  const ignored = ignoredLines.filter((line) => {
-    const parts = line.slice(3).replace(/^"|"$/g, "").split("/");
-    return !parts.some((part) => DISPOSABLE.has(part));
-  }).length;
+  const keepIgnored = (name) => !name.split("/").some((part) => DISPOSABLE.has(part));
+  let ignored = ignoredLines.filter((line) => keepIgnored(line.slice(3).replace(/^"|"$/g, ""))).length;
+  // Superproject status omits ignored files in initialized submodules, even with --ignore-submodules=none.
+  if (statSync(join(path, ".gitmodules"), { throwIfNoEntry: false })) {
+    const nested = git(path, "submodule", "foreach", "--quiet", "--recursive",
+      "git ls-files --others --ignored --exclude-standard --directory --no-empty-directory -z");
+    ignored += nested.split("\0").filter((name) => name && keepIgnored(name)).length;
+  }
   return { wip: lines.length - untracked - ignoredLines.length, untracked, ignored };
 }
 
@@ -264,11 +311,17 @@ function reflogOnly(path, branchLogged) {
   }).trim());
 }
 
-function remoteState(path, branch, head) {
-  const sha = git(path, "for-each-ref", "--format=%(objectname)", `refs/remotes/origin/${branch}`);
+function remoteState(path, branch, head, tips) {
+  const sha = tips.get(branch);
   if (!sha) return "no-remote";
   if (sha === head) return "pushed";
-  return `ahead${git(path, "rev-list", "--count", `refs/remotes/origin/${branch}..HEAD`)}`;
+  // Only download history when this checkout lacks the advertised commit. Leave local tracking refs alone.
+  if (!probe(() => git(path, "cat-file", "-e", sha)).known) {
+    git(path, "fetch", "--no-tags", "--no-write-fetch-head", "--recurse-submodules=no", "--refmap=", "origin", `refs/heads/${branch}`);
+  }
+  // `--left-right` prints the remote-only count, then the HEAD-only count.
+  const [behind, ahead] = git(path, "rev-list", "--left-right", "--count", `${sha}...${head}`).split(/\s+/).map(Number);
+  return [ahead > 0 && `ahead${ahead}`, behind > 0 && `behind${behind}`].filter(Boolean).join(",");
 }
 
 export function duSize(output) {
@@ -305,7 +358,7 @@ function lockedLabel(locked) {
   return locked.replace(/\s+/g, " ").trim() || "locked";
 }
 
-function auditWorktree({ path, locked }, { repo, trunk, fetched, prs, chats, branchLogs, now }) {
+function auditWorktree({ path, locked }, { repo, trunk, fetched, advertised, prs, chats, branchLogs, now }) {
   const head = probe(() => git(path, "rev-parse", "HEAD"));
   const age = bind(head, () => probe(() => Math.trunc((now - Number(git(path, "log", "-1", "--format=%ct", "HEAD"))) / DAY)));
   const ancestry = bind(head, (sha) => probe(() => isAncestor(repo, sha, trunk)));
@@ -315,7 +368,11 @@ function auditWorktree({ path, locked }, { repo, trunk, fetched, prs, chats, bra
     const name = git(path, "rev-parse", "--abbrev-ref", "HEAD");
     return name === "HEAD" ? null : name;
   });
-  const remote = bind(branch, (name) => (name === null ? known("detached") : probe(() => remoteState(path, name, head.value))));
+  const remote = bind(branch, (name) => {
+    if (name === null) return known("detached");
+    if (!head.known || !advertised.known) return UNKNOWN;
+    return probe(() => remoteState(path, name, head.value, advertised.value.tips));
+  });
   const pr = bind(prs, (list) => bind(branch, (name) => {
     const matching = list.filter((entry) => name !== null && entry.headRefName === name);
     // A branch can target several bases; a newer closed PR does not end an older open one.
@@ -355,7 +412,8 @@ export function audit({
       return UNKNOWN;
     }
   };
-  const trunk = trunkName(repo);
+  const advertised = probe(() => advertisedBranches(repo));
+  const trunk = advertised.known ? advertised.value.trunk : "main";
   // An explicit refspec updates the ref even where a single-branch clone does not track it.
   const fetched = discover(
     () => git(repo, "fetch", "origin", `+refs/heads/${trunk}:refs/remotes/origin/${trunk}`),
@@ -397,7 +455,7 @@ export function audit({
     () => new Set(git(repo, "rev-list", "--walk-reflogs", "--branches").split("\n").filter(Boolean)),
     "could not read branch reflogs; no worktree can reach safe",
   );
-  const context = { repo, trunk, fetched, prs, chats, branchLogs, now };
+  const context = { repo, trunk, fetched, advertised, prs, chats, branchLogs, now };
   const rows = worktrees.map((worktree) =>
     worktree.prunable
       ? ["-", "?", "-", "-", "-", "-", "-", "prunable", "-", worktree.path]

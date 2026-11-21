@@ -80,6 +80,8 @@ export interface ReviewThread {
 interface CheckDetails {
   readonly name: string;
   readonly reportedState: string;
+  /** REST suites supplement the aggregate CI source. */
+  readonly source?: "check-suites";
   readonly description: string;
   readonly link: string;
   readonly workflow: string;
@@ -95,12 +97,24 @@ export type Check =
     });
 export type FailedCheck = Extract<Check, { readonly kind: "failed" }>;
 export type PendingCheck = Extract<Check, { readonly kind: "pending" }>;
+export type SuiteCheck = (FailedCheck | PendingCheck) & {
+  readonly source: "check-suites";
+};
+export interface SuiteApp {
+  readonly name: string;
+  readonly slug: string | null;
+}
+export interface SuiteRead {
+  readonly checks: readonly SuiteCheck[];
+  /** Apps other than Actions whose unfinished suite has no runs and was not counted. */
+  readonly queuedWithoutRuns: readonly SuiteApp[];
+}
 export interface ReportedChecks {
   readonly kind: "reported";
-  readonly source: "gh-pr-checks" | "graphql-rollup";
+  readonly source: "gh-pr-checks" | "graphql-rollup" | "check-suites";
   readonly checks: NonEmpty<Check>;
 }
-/** `resolveChecks` owns what counts as `no-checks`. */
+/** `resolveHeadChecks` confirms a no-checks reading against the head's suites. */
 export type CheckRead =
   | ReportedChecks
   | {
@@ -159,6 +173,7 @@ export type CiClean = CiBase & {
   readonly failed: readonly [];
   readonly pending: readonly [];
   readonly github: GitHubMergeAllowed;
+  readonly queuedWithoutRuns: readonly SuiteApp[];
 };
 export interface CiNone {
   readonly kind: "ci-none";
@@ -166,6 +181,7 @@ export interface CiNone {
   readonly pending: readonly [];
   readonly hadPreviousPassingCi: false;
   readonly github: GitHubMergeAllowed;
+  readonly queuedWithoutRuns: readonly SuiteApp[];
 }
 export interface CiUnreported {
   readonly kind: "ci-unreported";
@@ -247,7 +263,11 @@ export type MergeBlocker =
     };
 export type QueryFailure =
   | {
-      readonly kind: "deadline" | "spawn-failed";
+      readonly kind:
+        | "deadline"
+        | "spawn-failed"
+        | "unsupported-gh"
+        | "graphql-refused";
       readonly retryable: false;
       readonly detail: string;
     }
@@ -464,6 +484,12 @@ export interface GitHubReader {
     after: string | null
   ): Promise<ReviewThreadPage>;
   commitRollups(context: PrContext): Promise<readonly CommitRollup[]>;
+  unsettledSuites(
+    context: PrContext,
+    head: string,
+    checksRead: CheckRead["kind"],
+    expectedApps: readonly string[]
+  ): Promise<SuiteRead>;
 }
 export interface PollingOptions {
   readonly interval: number;
@@ -471,4 +497,6 @@ export interface PollingOptions {
   readonly timeout: number;
   readonly maxQueryErrors: number;
   readonly allowDraft: boolean;
+  /** App slugs from --expect-app, whose queued suite with no runs counts as pending. */
+  readonly expectedApps?: readonly string[];
 }

@@ -1,5 +1,6 @@
 import type {
   Check,
+  SuiteCheck,
   ChecksFastPath,
   CommitRollup,
   GitHubReader,
@@ -23,6 +24,7 @@ export interface FakeReaderOptions {
   readonly threads?: readonly ReviewThread[];
   readonly threadPages?: readonly ReviewThreadPage[];
   readonly commitRollups?: readonly CommitRollup[];
+  readonly unsettledSuites?: readonly SuiteCheck[];
   readonly openPullRequests?: readonly OpenPullRequest[];
   readonly defaultBranch?: string;
   readonly origin?: Repository | null;
@@ -152,6 +154,10 @@ export function fakeReader(
     async commitRollups() {
       calls.push("commitRollups");
       return options.commitRollups ?? [{ oid: "head", state: "SUCCESS" }];
+    },
+    async unsettledSuites(_requested, head, checksRead) {
+      calls.push(`unsettledSuites:${head}:${checksRead}`);
+      return { checks: options.unsettledSuites ?? [], queuedWithoutRuns: [] };
     },
   };
 }

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { MUSE_HOOKS } from "../tools/runtimes.mjs";
-import { roleCases, sheetCases, writeSheet } from "./session-hook-sheets.mjs";
+import { roleCases, sessionHookValues, sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
 const manifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8"));
@@ -28,7 +28,7 @@ function windowsHookEnv(fixture, profile) {
   return env;
 }
 
-function runHook({ sheet, codexHome, homeSheet, context = mandate, host = "cmd" } = {}) {
+function runHook({ sheet, codexHome, homeSheet, context = mandate, host = "cmd", sessionHook } = {}) {
   const fixture = mkdtempSync(join(tmpdir(), "pstack windows hook "));
   try {
     const plugin = join(fixture, "plugin with spaces");
@@ -47,6 +47,7 @@ function runHook({ sheet, codexHome, homeSheet, context = mandate, host = "cmd" 
     const command = handler.commandWindows.replaceAll("${CLAUDE_PLUGIN_ROOT}", plugin);
     const env = { ...windowsHookEnv(fixture, profile), CLAUDE_PLUGIN_ROOT: plugin };
     if (codexHome !== undefined) env.CODEX_HOME = codexHome ? sheetRoot : "";
+    if (sessionHook !== undefined) env.PSTACK_SESSION_HOOK = sessionHook;
     const executable = host === "cmd" ? process.env.ComSpec ?? "cmd.exe" : "powershell.exe";
     const args = host === "cmd" ? ["/d", "/s", "/c", command] : ["-NoProfile", "-EncodedCommand", Buffer.from(command, "utf16le").toString("base64")];
     const result = spawnSync(executable, args, {
@@ -93,6 +94,18 @@ describe.skipIf(process.platform !== "win32" && !required)("Windows Codex Sessio
     });
   }
 
+  for (const [label, value, off] of sessionHookValues) {
+    test(`${off ? "injects nothing" : "injects the context"} when PSTACK_SESSION_HOOK is ${label} and no sheet exists`, () => {
+      expect(runHook({ sessionHook: value })).toEqual({ status: 0, out: off ? "" : mandate, err: "" });
+    });
+  }
+
+  for (const [value, sheet] of [["off", "session hook: on\n"], ["on", "session hook: off\n"]]) {
+    test(`injects nothing when PSTACK_SESSION_HOOK is "${value}" and the sheet has "${sheet.trim()}"`, () => {
+      expect(runHook({ sheet, sessionHook: value })).toEqual({ status: 0, out: "", err: "" });
+    });
+  }
+
   test("writes UTF-8 context without an added newline", () => {
     const context = "Routing context: 中文 café 🚀";
     expect(runHook({ context })).toEqual({ status: 0, out: context, err: "" });
@@ -129,7 +142,7 @@ const museMandate = readFileSync(join(pluginRoot, "hooks/session-start-muse.md")
 // may give it CRLF, which muse-context.awk keeps.
 const museSheetNote = readFileSync(join(pluginRoot, "hooks/session-start-muse-sheet.md"), "utf8");
 
-function runMuseHook({ sheet, xdg, context = museMandate, pluginRootEnv, omitUserProfile } = {}) {
+function runMuseHook({ sheet, xdg, context = museMandate, pluginRootEnv, omitUserProfile, sessionHook } = {}) {
   const fixture = mkdtempSync(join(tmpdir(), "pstack windows muse hook "));
   try {
     const plugin = join(fixture, "plugin with spaces");
@@ -148,6 +161,7 @@ function runMuseHook({ sheet, xdg, context = museMandate, pluginRootEnv, omitUse
     const env = { ...windowsHookEnv(fixture, profile), MUSE_PLUGIN_ROOT: pluginRootEnv ?? plugin };
     if (xdg) env.XDG_CONFIG_HOME = xdgRoot;
     if (omitUserProfile) delete env.USERPROFILE;
+    if (sessionHook !== undefined) env.PSTACK_SESSION_HOOK = sessionHook;
     const [program, ...args] = museCommand;
     const result = spawnSync(program, args, { cwd: plugin, env, encoding: "utf8" });
     if (result.error) throw result.error;
@@ -161,6 +175,12 @@ describe.skipIf(process.platform !== "win32" && !required)("Windows Muse Session
   test("injects the Muse mandate without a sheet or sh", () => {
     expect(runMuseHook()).toEqual({ status: 0, out: museMandate, err: "" });
   });
+
+  for (const [label, value, off] of sessionHookValues) {
+    test(`${off ? "injects nothing" : "injects the mandate"} when PSTACK_SESSION_HOOK is ${label} and no sheet exists`, () => {
+      expect(runMuseHook({ sessionHook: value })).toEqual({ status: 0, out: off ? "" : museMandate, err: "" });
+    });
+  }
 
   for (const { name, sheet, off } of sheetCases) {
     test(`${off ? "injects nothing" : "injects the mandate"} when the sheet has ${name}`, () => {

@@ -57,6 +57,21 @@ describe("parseModels", () => {
     expect(role(resolved, "strongest judgment").models).toEqual([raw.tiers.strongest]);
   });
 
+  test("a null or non-object root fails naming models.json instead of a bare TypeError", () => {
+    expect(() => parseModels(null, anySkill)).toThrow("models.json: must be an object");
+    expect(() => parseModels(undefined, anySkill)).toThrow("models.json: must be an object");
+    expect(() => parseModels([], anySkill)).toThrow("models.json: must be an object");
+    expect(() => parseModels("x", anySkill)).toThrow("models.json: must be an object");
+  });
+
+  test("a null or non-object role fails naming the entry instead of a bare TypeError", () => {
+    expect(parse((p) => (p.roles = [null]))).toThrow("models.json: roles[0] must be an object");
+    expect(parse((p) => (p.roles = [undefined]))).toThrow("models.json: roles[0] must be an object");
+    expect(parse((p) => (p.roles = ["x"]))).toThrow("models.json: roles[0] must be an object");
+    expect(parse((p) => (p.roles = [[]]))).toThrow("models.json: roles[0] must be an object");
+    expect(parse((p) => p.roles.splice(1, 0, null))).toThrow("models.json: roles[1] must be an object");
+  });
+
   test("a missing top-level key throws naming it", () => {
     expect(parse((p) => delete p.efforts)).toThrow('models.json: "efforts" must be a list');
     expect(parse((p) => delete p.codex)).toThrow('models.json: "codex" must be an object');
@@ -100,14 +115,14 @@ describe("parseModels", () => {
   });
 
   test("a duplicate role label throws naming it", () => {
-    expect(parse((p) => p.roles.push({ ...role(p, "how explorer") }))).toThrow(
-      'models.json: role "how explorer" appears twice',
+    expect(parse((p) => p.roles.push({ ...role(p, "swarm workers") }))).toThrow(
+      'models.json: role "swarm workers" appears twice',
     );
   });
 
   test("a role whose skill directory does not exist throws naming both", () => {
-    expect(parse(() => {}, (skill) => skill !== "why")).toThrow(
-      'models.json: role "why investigators" names skill "why", which has no SKILL.md',
+    expect(parse(() => {}, (skill) => skill !== "swarm")).toThrow(
+      'models.json: role "swarm workers" names skill "swarm", which has no SKILL.md',
     );
   });
 
@@ -164,8 +179,8 @@ describe("parseModels", () => {
 });
 
 describe("role labels reach the prose", () => {
-  // The prose may hyphenate a label ("how-explorer" for the sheet's
-  // "how explorer") and names only the first segment of a comma-joined label.
+  // The prose may hyphenate a label ("swarm-workers" for the sheet's
+  // "swarm workers") and names only the first segment of a comma-joined label.
   const normalize = (text) => text.toLowerCase().replace(/[-\s]+/g, " ");
 
   function skillProse(skill) {

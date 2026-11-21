@@ -152,6 +152,43 @@ describe("a path that is not the agent's linked worktree", () => {
     writeFileSync(join(wt.path, "keep.txt"), "do not remove\n");
   };
 
+  test("moving the agent worktree and registering another at its path cannot redirect resume or cleanup", () => {
+    const { w } = setup();
+    const git = gitRepo(w.cwd);
+    const wt = planWorktree(w.cwd, "moved");
+    ensureWorktree(wt);
+    git("worktree", "move", wt.path, join(dirname(w.cwd), "moved"));
+    git("worktree", "add", "-b", "other", wt.path);
+    rejected(() => ensureWorktree(wt));
+    rejected(() => settleWorktree(wt));
+    expect(existsSync(wt.path)).toBe(true);
+  });
+
+  test("replacing the worktree on the same branch also loses its original identity", () => {
+    const { w } = setup();
+    const git = gitRepo(w.cwd);
+    const wt = planWorktree(w.cwd, "replaced");
+    ensureWorktree(wt);
+    git("worktree", "remove", wt.path);
+    git("worktree", "add", wt.path, wt.branch);
+    rejected(() => ensureWorktree(wt));
+    rejected(() => settleWorktree(wt));
+    expect(existsSync(wt.path)).toBe(true);
+  });
+
+  test("a pre-marker session can resume its recorded branch and refuses a replacement branch", () => {
+    const { w } = setup();
+    const git = gitRepo(w.cwd);
+    const wt = planWorktree(w.cwd, "legacy");
+    delete wt.owner;
+    git("worktree", "add", "-b", wt.branch, wt.path);
+    ensureWorktree(wt);
+    git("worktree", "move", wt.path, join(dirname(w.cwd), "legacy-moved"));
+    git("worktree", "add", "-b", "replacement", wt.path);
+    rejected(() => ensureWorktree(wt));
+    rejected(() => settleWorktree(wt));
+  });
+
   test("an ordinary directory, which git resolves to the primary checkout, is rejected", () => {
     const { w } = setup();
     gitRepo(w.cwd);

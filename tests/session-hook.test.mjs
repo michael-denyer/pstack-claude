@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { agentSkills } from "../tools/generate.mjs";
 import { MUSE_HOOKS, SESSION_START_STATUS } from "../tools/runtimes.mjs";
-import { roleCases, sheetCases, writeSheet } from "./session-hook-sheets.mjs";
+import { roleCases, sessionHookValues, sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
 const mandate = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
@@ -28,6 +28,10 @@ const sessionStart = Object.fromEntries(
     JSON.parse(readFileSync(join(pluginRoot, file), "utf8")).hooks.SessionStart[0],
   ]),
 );
+
+// Codex puts the plugin's path into the command string itself, so a hook can
+// run without CLAUDE_PLUGIN_ROOT in its environment.
+const expandRoot = (command, root) => command.replaceAll("${CLAUDE_PLUGIN_ROOT}", root);
 
 // CODEX_HOME and CLAUDE_CONFIG_DIR are only present when the user has
 // relocated that runtime's directory. PLUGIN_ROOT is a generic name any shell
@@ -61,6 +65,22 @@ const runtimes = {
     sheetDir: "codex-home",
     env: (sheetRoot) => ({ CODEX_HOME: sheetRoot }),
   },
+  // Codex may not export CLAUDE_PLUGIN_ROOT, and starts the hook in the
+  // session's directory, so the hook finds the plugin from its own path.
+  "codex without CLAUDE_PLUGIN_ROOT": {
+    hooks: "codex",
+    sheetDir: ".codex",
+    cwd: tmpdir(),
+    command: expandRoot(sessionStart.codex.hooks[0].command, pluginRoot),
+    env: () => ({ CLAUDE_PLUGIN_ROOT: undefined }),
+  },
+  "codex with CODEX_HOME without CLAUDE_PLUGIN_ROOT": {
+    hooks: "codex",
+    sheetDir: "codex-home",
+    cwd: tmpdir(),
+    command: expandRoot(sessionStart.codex.hooks[0].command, pluginRoot),
+    env: (sheetRoot) => ({ CLAUDE_PLUGIN_ROOT: undefined, CODEX_HOME: sheetRoot }),
+  },
   // GitHub Copilot sets COPILOT_PLUGIN_ROOT alongside CLAUDE_PLUGIN_ROOT, and
   // COPILOT_HOME only when the user relocated ~/.copilot.
   copilot: { hooks: "copilot", sheetDir: ".copilot", env: () => ({ COPILOT_PLUGIN_ROOT: pluginRoot }) },
@@ -80,7 +100,7 @@ const runtimes = {
   },
 };
 
-function runHook(runtime, sheet, command) {
+function runHook(runtime, sheet, command, extraEnv = {}) {
   const home = mkdtempSync(join(tmpdir(), "pstack-hook-"));
   const { sheetDir, env, cwd, hooks } = runtimes[runtime];
   command ??= runtimes[runtime].command ?? sessionStart[hooks].hooks[0].command;
@@ -92,7 +112,7 @@ function runHook(runtime, sheet, command) {
   try {
     const r = spawnSync("sh", ["-c", command], {
       cwd,
-      env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot, ...env(sheetRoot) },
+      env: { PATH: process.env.PATH, HOME: home, CLAUDE_PLUGIN_ROOT: pluginRoot, ...env(sheetRoot), ...extraEnv },
       encoding: "utf8",
     });
     return { status: r.status, out: r.stdout, err: r.stderr };
@@ -158,6 +178,21 @@ describe("SessionStart hook", () => {
         test(`${off ? "injects nothing" : "injects the mandate"} when the sheet has ${name}`, () => {
           const r = runHook(runtime, sheet);
           expect({ ...r, out: off && runtime !== "agy" ? r.out : wrap(r.out) }).toEqual({ status: 0, out: expected(off), err: "" });
+        });
+      }
+
+      // A cloud session starts with an empty home, so no user sheet survives it.
+      for (const [label, value, off] of sessionHookValues) {
+        test(`${off ? "injects nothing" : "injects the mandate"} when PSTACK_SESSION_HOOK is ${label} and no sheet exists`, () => {
+          const r = runHook(runtime, null, undefined, { PSTACK_SESSION_HOOK: value });
+          expect({ ...r, out: off && runtime !== "agy" ? r.out : wrap(r.out) }).toEqual({ status: 0, out: expected(off), err: "" });
+        });
+      }
+
+      for (const [value, sheet] of [["off", "session hook: on\n"], ["on", "session hook: off\n"]]) {
+        test(`injects nothing when PSTACK_SESSION_HOOK is "${value}" and the sheet has "${sheet.trim()}"`, () => {
+          const r = runHook(runtime, sheet, undefined, { PSTACK_SESSION_HOOK: value });
+          expect({ ...r, out: runtime !== "agy" ? r.out : wrap(r.out) }).toEqual({ status: 0, out: expected(true), err: "" });
         });
       }
     });
@@ -382,6 +417,76 @@ describe("Copilot SessionStart context", () => {
       rmSync(home, { recursive: true, force: true });
     }
   });
+});
+
+// Codex expands ${CLAUDE_PLUGIN_ROOT} inside the command string but may leave
+// the variable out of the hook's environment, so the hook reads its own
+// copy of the plugin, wherever Codex installed it.
+describe("Codex SessionStart without CLAUDE_PLUGIN_ROOT", () => {
+  // A plugin copy whose path has a space, beside a directory the session starts in.
+  function withCopy(name, body) {
+    const tmp = mkdtempSync(join(tmpdir(), "pstack-codex-"));
+    const copy = (dir) => {
+      const root = join(tmp, "plugin cache", dir);
+      for (const sub of ["hooks", "skills/setup-pstack/scripts"]) cpSync(join(pluginRoot, sub), join(root, sub), { recursive: true });
+      writeFileSync(join(root, "hooks/session-start-context.md"), `mandate from ${dir}\n`);
+      return root;
+    };
+    mkdirSync(join(tmp, "project dir"), { recursive: true });
+    try {
+      return body({ tmp, root: copy(name), copy, project: join(tmp, "project dir"), home: join(tmp, "home") });
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+  const run = (command, { home, cwd, env = {} }) => {
+    const r = spawnSync("sh", ["-c", command], { cwd, env: { PATH: process.env.PATH, HOME: home, ...env }, encoding: "utf8" });
+    return { status: r.status, out: r.stdout, err: r.stderr };
+  };
+  const shipped = sessionStart.codex.hooks[0].command;
+
+  test("runs the shipped command from an install path with spaces, started in another directory", () =>
+    withCopy("pstack 0.9", ({ root, project, home }) => {
+      expect(run(expandRoot(shipped, root), { home, cwd: project })).toEqual({ status: 0, out: "mandate from pstack 0.9\n", err: "" });
+    }));
+
+  test("reads the sheet through the plugin's own reader", () =>
+    withCopy("pstack 0.9", ({ root, project, home }) => {
+      mkdirSync(join(home, ".codex"), { recursive: true });
+      writeFileSync(join(home, ".codex", "pstack-models.md"), "session hook: on\n");
+      // A reader that turns the hook off proves the hook ran the copy's reader.
+      writeFileSync(join(root, "skills/setup-pstack/scripts/read-sheet.sh"), "#!/bin/sh\necho 'session hook: off'\n");
+      expect(run(expandRoot(shipped, root), { home, cwd: project })).toEqual({ status: 0, out: "", err: "" });
+    }));
+
+  test("an explicit CLAUDE_PLUGIN_ROOT still names the plugin", () =>
+    withCopy("pstack 0.9", ({ root, copy, project, home }) => {
+      const other = copy("other pstack");
+      const env = { CLAUDE_PLUGIN_ROOT: other };
+      expect(run(expandRoot(shipped, root), { home, cwd: project, env })).toEqual({ status: 0, out: "mandate from other pstack\n", err: "" });
+    }));
+
+  test("an empty CLAUDE_PLUGIN_ROOT counts as unset", () =>
+    withCopy("pstack 0.9", ({ root, project, home }) => {
+      const env = { CLAUDE_PLUGIN_ROOT: "" };
+      expect(run(expandRoot(shipped, root), { home, cwd: project, env })).toEqual({ status: 0, out: "mandate from pstack 0.9\n", err: "" });
+    }));
+
+  // `cd` prints its target when CDPATH supplies it, which would join the plugin root to its own copy.
+  test("finds the plugin from a relative script path, whatever CDPATH holds", () =>
+    withCopy("pstack 0.9", ({ tmp, project, home }) => {
+      const decoy = join(tmp, "decoy");
+      mkdirSync(join(decoy, "pstack 0.9", "hooks"), { recursive: true });
+      const cwd = join(tmp, "plugin cache");
+      for (const script of ["pstack 0.9/hooks/session-start.sh", "./pstack 0.9/hooks/session-start.sh"]) {
+        expect(run(`sh "${script}" codex`, { home, cwd, env: { CDPATH: decoy } })).toEqual({ status: 0, out: "mandate from pstack 0.9\n", err: "" });
+      }
+      expect(run(`cd '${join(cwd, "pstack 0.9", "hooks")}' && sh session-start.sh codex`, { home, cwd: project })).toEqual({
+        status: 0,
+        out: "mandate from pstack 0.9\n",
+        err: "",
+      });
+    }));
 });
 
 const museMandate = readFileSync(join(pluginRoot, "hooks/session-start-muse.md"), "utf8");

@@ -1,6 +1,6 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkPlaybooks } from "../plugins/pstack/skills/poteto-mode/scripts/check-playbooks.mjs";
@@ -9,14 +9,19 @@ setDefaultTimeout(30_000);
 
 const script = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/scripts/check-playbooks.mjs");
 
-function run(playbooks, { throughSymlink = false, cwd = ".", args = ["."] } = {}) {
+function writePlaybooks(dir, playbooks) {
+  mkdirSync(join(dir, ".agents/playbooks"), { recursive: true });
+  for (const [name, text] of Object.entries(playbooks)) writeFileSync(join(dir, ".agents/playbooks", name), text);
+}
+
+function run(playbooks, { throughSymlink = false, cwd = ".", args = ["."], home = null, rootIsHome = false } = {}) {
   // The script reports the resolved working directory; macOS tmpdir() sits behind the /var symlink.
   const root = realpathSync(mkdtempSync(join(tmpdir(), "pstack-check-playbooks-")));
+  // A throwaway home keeps the developer's own ~/.agents/playbooks out of every result.
+  const homeDir = rootIsHome ? root : realpathSync(mkdtempSync(join(tmpdir(), "pstack-check-playbooks-home-")));
   try {
-    if (playbooks) {
-      mkdirSync(join(root, ".agents/playbooks"), { recursive: true });
-      for (const [name, text] of Object.entries(playbooks)) writeFileSync(join(root, ".agents/playbooks", name), text);
-    }
+    if (playbooks) writePlaybooks(root, playbooks);
+    if (home) writePlaybooks(homeDir, home);
     const workingDirectory = join(root, cwd);
     mkdirSync(workingDirectory, { recursive: true });
     let entry = script;
@@ -24,10 +29,16 @@ function run(playbooks, { throughSymlink = false, cwd = ".", args = ["."] } = {}
       entry = join(root, "check-playbooks.mjs");
       symlinkSync(script, entry);
     }
-    const result = spawnSync("node", [entry, ...args.map((arg) => join(root, arg))], { encoding: "utf8", cwd: workingDirectory });
-    return { code: result.status, out: (result.stdout + result.stderr).replaceAll(root, "<root>") };
+    const result = spawnSync("node", [entry, ...args.map((arg) => join(root, arg))], {
+      encoding: "utf8",
+      cwd: workingDirectory,
+      env: { ...process.env, HOME: homeDir, USERPROFILE: homeDir },
+    });
+    const out = (result.stdout + result.stderr).replaceAll(root, "<root>");
+    return { code: result.status, out: out.replaceAll(homeDir, "<home>") };
   } finally {
     rmSync(root, { recursive: true, force: true });
+    rmSync(homeDir, { recursive: true, force: true });
   }
 }
 
@@ -71,6 +82,118 @@ describe("project playbooks", () => {
     expect(result.out).toContain(".agents/playbooks/bug-fix.md: a change has no straight-quoted step text to anchor on");
   });
 
+  test.each([
+    ["a quoted extends and when", '---\nextends: "bug-fix"\nwhen: \'Use it for any bug report.\'\n---\n'],
+    ["an extends flow list", "---\nextends: [bug-fix, 'feature']\nwhen: Use it for any bug report.\n---\n"],
+    ["blanks after a delimiter", "--- \nextends: bug-fix\nwhen: Use it for any bug report.\n---\t\n"],
+    ["a closing delimiter at the end of the file", "---\nextends: bug-fix\nwhen: Use it for any bug report.\n---"],
+  ])("frontmatter written as valid YAML passes: %s", (_, front) => {
+    const result = run({ "bug-fix.md": `${front}${front.endsWith("---") ? "" : '- **In** "Binary-search the cause": compare with main.\n'}` });
+    expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
+  });
+
+  test("YAML comments follow values and cannot supply the required condition", () => {
+    const playbook = (fields) => run({ "sample.md": "---\n" + fields + "\n---\n" });
+    expect(playbook("extends: [bug-fix, feature] # two bases\nwhen: 'Fix #42' # condition").code).toBe(0);
+    expect(playbook("extends: bug-fix # base\nwhen: # TODO").out).toContain('needs a "when:" line');
+    expect(playbook("extends: 'bug-fix # literal' # comment\nwhen: Fix it.").out).toContain("extends `bug-fix # literal`");
+    expect(playbook("extends:\n  - missing # base\nwhen: Fix it.").out).toContain("extends `missing`");
+  });
+
+  test("fenced changes are examples and only words in a bundled step can anchor changes", () => {
+    const front = "---\nextends: bug-fix\nwhen: Fix it.\n---\n";
+    const change = (anchor) => '- **After** "' + anchor + '": verify.\n';
+    const example = "    " + change("indented code example") + "\n~~~~markdown\n" + change("example only") + "~~~\n" + change("still an example") + "~~~~\n";
+    expect(run({ "sample.md": front + example + change("Binary-search the cause") }).code).toBe(0);
+    expect(run({ "sample.md": front + change("Focused-fix exception") }).code).toBe(1);
+    expect(run({ "sample.md": front + change("failing test first and the fix on top") }).code).toBe(0);
+  });
+
+  test("a base without numbered steps anchors changes on one paragraph or list item, never a heading", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      const bundled = join(root, "bundled");
+      mkdirSync(bundled);
+      writeFileSync(
+        join(bundled, "prose.md"),
+        "### Prose\n\n**Worktree.** Work off main. Subagents\ninherit it.\n\n- `## Why`: the problem.\n- `## Scope`: always.\n\nAfter the sections, attach screenshots.\n",
+      );
+      writeFileSync(join(bundled, "steps.md"), "### Steps\n\nRead this first.\n\n1. Reproduce it.\n2. Fix it.\n");
+      const unanchored = (base, ...quotes) => {
+        const changes = quotes.map((quote) => `- **In** "${quote}": check it.\n`).join("");
+        writePlaybooks(root, { "sample.md": `---\nextends: ${base}\nwhen: Any change.\n---\n${changes}` });
+        return checkPlaybooks(root, bundled).map((problem) => problem.match(/"(.*)" is not in any playbook/)[1]);
+      };
+      expect(unanchored("prose", "Work off main.", "Subagents inherit it.", "`## Scope`: always.", "attach screenshots")).toEqual([]);
+      expect(unanchored("prose", "Prose", "inherit it. - `## Why`", "always. After")).toEqual(["Prose", "inherit it. - `## Why`", "always. After"]);
+      expect(unanchored("steps", "Reproduce it.", "Read this first.")).toEqual(["Read this first."]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ["a setext heading over ---", "prose", "Prose heading\n-------------\n\nWork off main.\n"],
+    ["a setext heading over ===", "prose", "Prose\nheading\n===\n\nWork off main.\n"],
+    ["an ATX heading with a tab", "prose", "##\tProse heading\n\nWork off main.\n"],
+    ["an ATX heading with a tab after a numbered step", "steps", "1. Work off main.\n##\tProse heading\n"],
+  ])("a heading cannot anchor a change: %s", (_, stem, base) => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      const bundled = join(root, "bundled");
+      mkdirSync(bundled);
+      writeFileSync(join(bundled, `${stem}.md`), base);
+      const anchors = (quote) => {
+        writePlaybooks(root, { "sample.md": `---\nextends: ${stem}\nwhen: Any change.\n---\n- **In** "${quote}": check it.\n` });
+        return checkPlaybooks(root, bundled);
+      };
+      expect(anchors("Work off main.")).toEqual([]);
+      expect(anchors("Prose heading")).toEqual(['.agents/playbooks/sample.md: "Prose heading" is not in any playbook it extends']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a line of dashes under a list item leaves the item an anchor", () => {
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      const bundled = join(root, "bundled");
+      mkdirSync(bundled);
+      writeFileSync(join(bundled, "prose.md"), "- Work off main.\n---\n\nAttach screenshots.\n");
+      writePlaybooks(root, { "sample.md": '---\nextends: prose\nwhen: Any change.\n---\n- **In** "Work off main.": check it.\n' });
+      expect(checkPlaybooks(root, bundled)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // An upstream sync that adds one numbered list to either playbook turns every other line unanchorable.
+  test("every prose line of the bundled playbooks without numbered steps anchors a change", () => {
+    const bundled = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/playbooks");
+    const root = mkdtempSync(join(tmpdir(), "pstack-check-playbooks-"));
+    try {
+      for (const stem of ["opening-a-pr", "babysit"]) {
+        const changes = readFileSync(join(bundled, `${stem}.md`), "utf8")
+          .split("\n")
+          .filter((line) => line.trim() && !line.startsWith("#") && !line.includes('"'))
+          .map((line) => line.replace(/^ *(?:[-*+]|\d+[.)]) +/, "").trim().split(/\s+/).slice(-4).join(" "))
+          .map((quote) => `- **In** "${quote}": check it.\n`);
+        writePlaybooks(root, { [`${stem}.md`]: `---\nextends: ${stem}\nwhen: Any change.\n---\n${changes.join("")}` });
+      }
+      expect(checkPlaybooks(root)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a quoted flow list is one stem, as YAML reads it", () => {
+    const result = run({ "ship.md": '---\nextends: "[shipping]"\nwhen: Use it to ship.\n---\n' });
+    expect(result).toEqual({
+      code: 1,
+      out: ".agents/playbooks/ship.md: extends `[shipping]`, which this pstack has no playbook for\n",
+    });
+  });
+
   test("a playbook saved with CRLF line endings passes", () => {
     const result = run({
       "bug-fix.md": '---\r\nextends: bug-fix\r\nwhen: Use it for any bug report.\r\n---\r\n- **In** "Binary-search the cause": compare with main.\r\n',
@@ -96,7 +219,7 @@ describe("project playbooks", () => {
   test("a root with no .agents/playbooks directory passes and the check says so", () => {
     expect(run(null)).toEqual({
       code: 0,
-      out: "No project playbooks to check: <root>/.agents/playbooks does not exist.\n",
+      out: "No project playbooks to check: neither <root>/.agents/playbooks nor <home>/.agents/playbooks exists.\n",
     });
   });
 
@@ -104,7 +227,50 @@ describe("project playbooks", () => {
     const result = run({ "ship.md": "---\nextends: shipping-v2\nwhen: Use it to ship.\n---\n" }, { cwd: "src", args: [] });
     expect(result).toEqual({
       code: 0,
-      out: "No project playbooks to check: <root>/src/.agents/playbooks does not exist.\n",
+      out: "No project playbooks to check: neither <root>/src/.agents/playbooks nor <home>/.agents/playbooks exists.\n",
+    });
+  });
+
+  test("a playbook in the home folder is checked and named by its home path", () => {
+    const result = run(null, {
+      home: { "ship.md": '---\nextends: shipping\nwhen: Use it to ship.\n---\n- **After** "Ask the user to reproduce it": review the docs.\n' },
+    });
+    expect(result).toEqual({
+      code: 1,
+      out: '~/.agents/playbooks/ship.md: "Ask the user to reproduce it" is not in any playbook it extends\n',
+    });
+  });
+
+  test("a valid home playbook passes when the repository has none", () => {
+    const result = run(null, {
+      home: { "bug-fix.md": '---\nextends: bug-fix\nwhen: Use it for any bug report.\n---\n- **In** "Binary-search the cause": compare with main.\n' },
+    });
+    expect(result).toEqual({ code: 0, out: "Every project playbook matches this pstack's playbooks.\n" });
+  });
+
+  test("home playbooks are reported before the repository's own", () => {
+    const bad = "---\nextends: shipping-v2\nwhen: Use it to ship.\n---\n";
+    const result = run({ "ship.md": bad }, { home: { "ship.md": bad } });
+    expect(result).toEqual({
+      code: 1,
+      out:
+        "~/.agents/playbooks/ship.md: extends `shipping-v2`, which this pstack has no playbook for\n" +
+        ".agents/playbooks/ship.md: extends `shipping-v2`, which this pstack has no playbook for\n",
+    });
+  });
+
+  test("a repository at the home folder is checked once", () => {
+    const result = run({ "ship.md": "---\nextends: shipping-v2\nwhen: Use it to ship.\n---\n" }, { rootIsHome: true });
+    expect(result).toEqual({
+      code: 1,
+      out: ".agents/playbooks/ship.md: extends `shipping-v2`, which this pstack has no playbook for\n",
+    });
+  });
+
+  test("a repository at the home folder with no playbooks names one directory", () => {
+    expect(run(null, { rootIsHome: true })).toEqual({
+      code: 0,
+      out: "No project playbooks to check: <root>/.agents/playbooks does not exist.\n",
     });
   });
 

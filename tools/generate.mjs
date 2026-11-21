@@ -63,7 +63,7 @@ const repoRelative = (root, file) => relative(root, file).split(sep).join("/");
 const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
   `${PLUGIN}/.claude-plugin/plugin.json`,
-  ...RUNTIMES.map((runtime) => runtime.manifest),
+  ...RUNTIMES.filter((runtime) => runtime.manifest).map((runtime) => runtime.manifest),
 ];
 
 export const PORTABLE_ASSETS = [
@@ -319,7 +319,7 @@ export const tableRows = (header, rowPrefix) => (lines) => {
 };
 
 // The lines strictly between the line `open` and the next line `close`.
-export const between = (open, close) => (lines) => {
+const between = (open, close) => (lines) => {
   const start = lines.indexOf(open);
   if (start === -1) return null;
   const end = lines.indexOf(close, start + 1);
@@ -327,7 +327,7 @@ export const between = (open, close) => (lines) => {
 };
 
 // The one line that starts with `prefix`.
-export const lineStartingWith = (prefix) => (lines) => {
+const lineStartingWith = (prefix) => (lines) => {
   const at = lines.findIndex((l) => l.startsWith(prefix));
   return at === -1 ? null : [at, at + 1];
 };
@@ -429,7 +429,7 @@ export function regions(models) {
 
 const PREAMBLE_RUNTIMES = RUNTIMES.filter((runtime) => runtime.preamble);
 const DRIVER_LINE = "Resolve the driver skill through [poteto-mode's Non-negotiables](../SKILL.md#non-negotiables).";
-const DRIVER_PLAYBOOKS = ["autopilot-full", "multi-phase-plan", "orchestrate", "refactoring", "shipping"];
+const DRIVER_PLAYBOOKS = ["autopilot-full", "multi-phase-plan", "refactoring", "shipping"];
 const LEAD_LINES = [...PREAMBLE_RUNTIMES.map((runtime) => runtime.preamble), DRIVER_LINE];
 
 // The skills with a row in a runtime mapping's Per-skill notes table, in row order.
@@ -512,9 +512,14 @@ export function resolveModels(models) {
 const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
 const TIERS = ["default", "strongest", "worker", "panel"];
 
+export const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
 // Check models.json's shape and resolve its tiers, throwing with the offending
-// role, tier, or slug named. `skillExists(skill)` reports whether a role's
-// skill directory carries a SKILL.md.
+// role, tier, or slug named. Parse fails naming the document or entry when the
+// root or a roles entry is missing or not an object, so a typo cannot throw a
+// bare TypeError mid-load.
+// `skillExists(skill)` reports whether a role's skill directory carries a
+// SKILL.md.
 export function parseModels(raw, skillExists) {
   const fail = (message) => {
     throw new Error(`models.json: ${message}`);
@@ -526,7 +531,9 @@ export function parseModels(raw, skillExists) {
       seen.add(item);
     }
   };
-  const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  // A typo that makes the document null or a non-object must name models.json,
+  // not throw a bare TypeError when the first field is read.
+  if (!isObject(raw)) fail("must be an object");
   for (const key of ["available", "efforts", "roles"]) if (!Array.isArray(raw[key])) fail(`"${key}" must be a list`);
   for (const key of ["tiers", ...RUNTIMES.filter((runtime) => runtime.key).map((runtime) => runtime.key)]) {
     if (!isObject(raw[key])) fail(`"${key}" must be an object`);
@@ -546,7 +553,10 @@ export function parseModels(raw, skillExists) {
     tierLists.set(slugs.join(), tier);
   }
   const labels = new Set();
-  for (const role of raw.roles) {
+  for (const [i, role] of raw.roles.entries()) {
+    // A typo that makes a role entry null or a non-object must name the entry,
+    // not throw a bare TypeError when the first field is read.
+    if (!isObject(role)) fail(`roles[${i}] must be an object`);
     if (labels.has(role.role)) fail(`role "${role.role}" appears twice`);
     labels.add(role.role);
     if (!skillExists(role.skill)) fail(`role "${role.role}" names skill "${role.skill}", which has no SKILL.md`);
@@ -629,7 +639,7 @@ export function deriveSkill(file, text, models, leads) {
   return applyRegions(file, lines.join("\n"), models, { strict: false });
 }
 
-export function modelsSection(roles) {
+function modelsSection(roles) {
   const bullets = roles.map((r) => `- ${r.role}: ${codeList(r.models)}`).join("\n");
   return (
     "Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). " +
@@ -669,7 +679,7 @@ export function pluginAgentPaths(pluginRoot) {
 
 // Claude Code's loader tolerates frontmatter that strict YAML rejects, so an
 // agent file can load locally and still be unreadable to another parser.
-export function validateAgentFrontmatter(pluginRoot) {
+function validateAgentFrontmatter(pluginRoot) {
   const failures = pluginAgentPaths(pluginRoot).flatMap((path) => {
     try {
       const { data } = parseFrontmatter(readFileSync(join(pluginRoot, path), "utf8"));
@@ -683,7 +693,7 @@ export function validateAgentFrontmatter(pluginRoot) {
   if (failures.length) throw new Error(`agent frontmatter is not readable YAML:\n${failures.join("\n")}`);
 }
 
-export function setupModelsSection(models) {
+function setupModelsSection(models) {
   return (
     "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
     `- Available Claude models: ${codeList(models.available)}\n` +
@@ -696,7 +706,7 @@ export function setupModelsSection(models) {
 
 // The override sheet the setup skill writes for users. The preamble is fixed;
 // the role rows come from models.json.
-export function overrideSheetBlock(models) {
+function overrideSheetBlock(models) {
   const rows = models.roles.map((r) => `${r.role}: ${r.models.join(", ")}`).join("\n");
   return (
     "# pstack model configuration\n\n" +
@@ -708,7 +718,7 @@ export function overrideSheetBlock(models) {
     "the role's subagent then runs at that level, each entry of a panel list on its own. " +
     "`default effort` sets the level for a value without one; `session` uses the runtime's platform mapping to start from the parent session's effort. On Codex this requires active-turn metadata or an explicit effort choice. " +
     "`session hook: off` stops the supported runtime's pstack routing hook from injecting the poteto-mode mandate; " +
-    "any other value, or no line, leaves it on.\n\n" +
+    "any other value, or no line, leaves it on unless the environment sets `PSTACK_SESSION_HOOK=off`.\n\n" +
     rows +
     `\n\ndefault effort: ${models.defaultEffort}\nsession hook: on`
   );
@@ -958,7 +968,7 @@ export function problems(root, models) {
   const skillsDir = join(root, SKILLS);
   const read = (rel) => readFileSync(join(root, rel), "utf8");
   const pathExists = (rel) => existsSync(join(root, rel));
-  const packages = RUNTIMES.map((runtime) =>
+  const packages = RUNTIMES.filter((runtime) => runtime.manifest).map((runtime) =>
     attempt(() => {
       const text = read(runtime.manifest);
       let manifest;

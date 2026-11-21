@@ -53,6 +53,18 @@ export const sheetCases = [
 // `inherit-parent`, each with an optional known `@effort`. A usable default
 // effort follows, and roles print in models.json order. `roles` is what follows
 // the mandate and sheet note; an empty list means the mandate alone.
+// PSTACK_SESSION_HOOK values as [label, value, turns the hook off]. Only the
+// exact bytes `off` count, so a zero-width or soft-hyphen variant injects in
+// PowerShell as it does in sh.
+export const sessionHookValues = [
+  ['"off"', "off", true],
+  ['"on"', "on", false],
+  ['"OFF"', "OFF", false],
+  ["empty", "", false],
+  ['"off" with a trailing zero-width space', "off" + String.fromCharCode(0x200b), false],
+  ['"off" after a soft hyphen', String.fromCharCode(0xad) + "off", false],
+];
+
 export const roleCases = [
   { name: "a model ID", sheet: "bug-fix: muse-wonder-1.0\n", roles: ["bug-fix: muse-wonder-1.0"] },
   { name: "two model IDs", sheet: "bug-fix: a-1, b-2\n", roles: ["bug-fix: a-1, b-2"] },
@@ -66,7 +78,7 @@ export const roleCases = [
   { name: "a tab inside an entry", sheet: "bug-fix: a\tb\n", roles: [] },
   { name: "a space before the colon", sheet: "bug-fix :a-1\n", roles: ["bug-fix: a-1"] },
   { name: "a colon inside the value", sheet: "bug-fix: a:b\n", roles: [] },
-  { name: "roles whose names hold commas", sheet: "feature, refactoring: m-1\nreflect judgment, divergent, synthesizer: m-1, m-2 @high\n", roles: ["feature, refactoring: m-1", "reflect judgment, divergent, synthesizer: m-1, m-2 @high"] },
+  { name: "a role whose name holds a comma, beside a list", sheet: "feature, refactoring: m-1\narena cross-judge pool: m-1, m-2 @high\n", roles: ["feature, refactoring: m-1", "arena cross-judge pool: m-1, m-2 @high"] },
   { name: "a non-ASCII entry", sheet: "bug-fix: caf\u00e9\n", roles: [] },
   { name: "a no-break space before the entry", sheet: "bug-fix:\u00a0m-1\n", roles: [] },
   { name: "a later unusable line for the role", sheet: "bug-fix: good-1\nbug-fix: !!\n", roles: [] },

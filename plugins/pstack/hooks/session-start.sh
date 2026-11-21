@@ -32,6 +32,10 @@ case "$runtime" in
     ;;
   codex)
     sheet="${CODEX_HOME:-$HOME/.codex}/pstack-models.md"
+    # Codex expands ${CLAUDE_PLUGIN_ROOT} in the command string but may not
+    # set it in the hook's environment, so fall back to this script's own
+    # location. The root then serves the reader and the mandate below.
+    : "${CLAUDE_PLUGIN_ROOT:=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)}"
     reader="${CLAUDE_PLUGIN_ROOT}/skills/setup-pstack/scripts/read-sheet.sh"
     ;;
   copilot)
@@ -61,7 +65,9 @@ if [ -f "$sheet" ] && [ -r "$sheet" ] && normalized=$(sh "$reader" "$sheet"); th
 else
   normalized=
 fi
-if printf '%s\n' "$normalized" | grep -qx 'session hook: off'; then
+# PSTACK_SESSION_HOOK=off reaches sessions whose home starts empty, such as
+# Claude Code cloud sessions, where no user sheet survives.
+if [ "${PSTACK_SESSION_HOOK:-}" = off ] || printf '%s\n' "$normalized" | grep -qx 'session hook: off'; then
   [ "$runtime" != agy ] || printf '{}\n'
   exit 0
 fi

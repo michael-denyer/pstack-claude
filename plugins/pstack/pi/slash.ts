@@ -2,7 +2,7 @@ import type { SlashCommandInfo } from "@earendil-works/pi-coding-agent";
 import { readFileSync } from "node:fs";
 
 // Pi expands "/skill:name args" and "/template args" only inside sendUserMessage, and its package exports
-// none of the code that does it. This is that code from pi 1.4.0 (AgentSession._expandSkillCommand,
+// none of the code that does it. This is that code from pi 1.5.1 (AgentSession._expandSkillCommand,
 // dist/core/prompt-templates.js, and dist/utils/frontmatter.js), reading the files pi.getCommands() names,
 // for text the extension sends as a custom message. tests/pi/slash.test.mjs checks it against the installed pi.
 
@@ -13,18 +13,26 @@ export function stripFrontmatter(content: string): string {
   return endIndex === -1 ? normalized : normalized.slice(endIndex + 4).trim();
 }
 
-// Splits on whitespace outside quotes; a quote ends at the next quote of the same kind, and "" is an argument.
+// Splits on whitespace outside quotes. A quote opens only at the start of an argument, so an apostrophe inside a
+// word is text, and ends at the next quote of the same kind. Inside it, a backslash before that kind of quote
+// keeps the quote as text. A quote that never closes is text too, and "" is an argument.
 export function parseCommandArgs(argsString: string): string[] {
   const args: string[] = [];
   let current = "";
   let hasToken = false;
   let inQuote: string | null = null;
-  for (const char of argsString) {
+  let quoteStart = 0;
+  for (let i = 0; i < argsString.length; i++) {
+    const char = argsString.charAt(i);
     if (inQuote) {
-      if (char === inQuote) inQuote = null;
+      if (char === "\\" && argsString.charAt(i + 1) === inQuote) {
+        current += inQuote;
+        i++;
+      } else if (char === inQuote) inQuote = null;
       else current += char;
-    } else if (char === '"' || char === "'") {
+    } else if ((char === '"' || char === "'") && !hasToken) {
       inQuote = char;
+      quoteStart = i;
       hasToken = true;
     } else if (/\s/.test(char)) {
       if (hasToken) {
@@ -35,6 +43,12 @@ export function parseCommandArgs(argsString: string): string[] {
     } else {
       current += char;
       hasToken = true;
+    }
+    // The quote never closed: restart after it with the quote character as the argument's first character.
+    if (inQuote && i === argsString.length - 1) {
+      current = inQuote;
+      inQuote = null;
+      i = quoteStart;
     }
   }
   if (hasToken) args.push(current);

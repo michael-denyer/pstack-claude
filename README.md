@@ -11,7 +11,7 @@ For concurrency bugs and invariants that tests cannot reach, `/create-formal-ver
 
 ## Built for Claude Code
 
-This port translates upstream's Cursor skills for Claude Code before installation. [Upstream's Claude Code install](https://github.com/cursor/plugins/tree/c742dd6/harness/pstack/claude-code) asks agents to translate Cursor names at runtime, using extra tokens and relying on them to apply the mapping correctly. This port also adds a SessionStart hook that routes tasks to `poteto-mode`.
+This port translates upstream's Cursor skills for Claude Code before installation. [Upstream's Claude Code install](https://github.com/cursor/plugins/tree/0b46ec3/harness/pstack/claude-code) asks agents to translate Cursor names at runtime, using extra tokens and relying on them to apply the mapping correctly. This port also adds a SessionStart hook that routes tasks to `poteto-mode`.
 
 ## Install
 
@@ -47,7 +47,7 @@ Invoke a skill by typing `$` and its name, such as `$poteto-mode` or `$babysit`,
 <details>
 <summary><strong>Pi</strong></summary>
 
-Run in your terminal:
+Run in your terminal, with Pi 1.5.1 or later:
 
 ```shell
 pi install git:github.com/michael-denyer/pstack-claude
@@ -183,11 +183,19 @@ This installs the native Antigravity plugin bundle (`skills`, `agents`, and `Ses
 
 </details>
 
+<a id="deepseek-harness"></a>
+<details>
+<summary><strong>DeepSeek Harness (skills-only)</strong></summary>
+
+Use the [shared skills installation](#other-harnesses) below to link each pstack skill directory into `~/.agents/skills/`, which DSH discovers by default. Ask for `poteto-mode` by name and use the [DSH mapping](plugins/pstack/skills/poteto-mode/references/dsh-tools.md), regardless of the model provider. This skills-only installation adds no native DSH bundle, Pi extension, routing hook, or role sheet.
+
+</details>
+
 <a id="other-harnesses"></a>
 <details>
 <summary><strong>Other harnesses</strong></summary>
 
-Gemini CLI, Prime Agent, and skills-only Codex installs read skills from `~/.agents/skills/`. Run in your terminal:
+Gemini CLI, Prime Agent, DeepSeek Harness skills-only installs, and skills-only Codex installs read skills from `~/.agents/skills/`. Run in your terminal:
 
 ```shell
 git clone https://github.com/michael-denyer/pstack-claude

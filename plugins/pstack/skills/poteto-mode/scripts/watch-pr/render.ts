@@ -145,13 +145,24 @@ function renderBlocker(blocker: T.MergeBlocker | StatusQueryBlocker): string {
         `detail=${blocker.failure.detail}`,
         blocker.failure.kind === "spawn-failed"
           ? "action=install the command that could not run, or put it on PATH, then rearm"
-          : "action=verify current PR context, GitHub authentication, and API availability, then rearm",
+          : blocker.failure.kind === "unsupported-gh"
+            ? "action=upgrade GitHub CLI, then rearm"
+            : blocker.failure.kind === "graphql-refused"
+              ? "action=run watch-pr where gh can reach GitHub GraphQL, such as a local session"
+              : "action=verify current PR context, GitHub authentication, and API availability, then rearm",
       ].join("\n");
     default: {
       const exhaustive: never = blocker;
       return exhaustive;
     }
   }
+}
+function queuedWithoutRunsLines(ci: T.CiClean | T.CiNone): string {
+  if (ci.queuedWithoutRuns.length === 0) return "";
+  const apps = ci.queuedWithoutRuns
+    .map((app) => (app.slug === null ? app.name : `${app.name} (${app.slug})`))
+    .join(", ");
+  return `\nqueuedWithoutRuns=${apps}\nnote=these apps queued a check suite and started no runs, so they were not counted; if one runs CI for this repository, rerun with --expect-app <slug>`;
 }
 export function renderPretty(verdict: T.WatcherVerdict): string {
   switch (verdict.kind) {
@@ -176,7 +187,7 @@ export function renderPretty(verdict: T.WatcherVerdict): string {
     case "READY": {
       const detail =
         verdict.scope.kind === "single" && verdict.scope.pr.kind === "ready-pr"
-          ? `\nmergeStateStatus=${verdict.scope.pr.proof.ci.github.mergeStateStatus}\nreviewDecision=${verdict.scope.pr.proof.gate.reviewDecision}\nisDraft=${verdict.scope.pr.proof.gate.draft === "draft-allowed"}${verdict.scope.pr.proof.gate.draft === "draft-allowed" ? "\nnote=draft allowed (--allow-draft); leave draft \u2014 do not mark ready" : ""}${verdict.scope.pr.proof.ci.kind === "ci-none" ? "\nchecks=none reported on the head commit" : ""}`
+          ? `\nmergeStateStatus=${verdict.scope.pr.proof.ci.github.mergeStateStatus}\nreviewDecision=${verdict.scope.pr.proof.gate.reviewDecision}\nisDraft=${verdict.scope.pr.proof.gate.draft === "draft-allowed"}${verdict.scope.pr.proof.gate.draft === "draft-allowed" ? "\nnote=draft allowed (--allow-draft); leave draft \u2014 do not mark ready" : ""}${verdict.scope.pr.proof.ci.kind === "ci-none" ? "\nchecks=none reported on the head commit" : ""}${queuedWithoutRunsLines(verdict.scope.pr.proof.ci)}`
           : "";
       return `READY: no merge conflicts, no unresolved review threads, no failing or pending checks${detail}\n`;
     }

@@ -9,6 +9,7 @@ import {
   selectTierMajorStackDecision,
 } from "./policy.ts";
 import { fakeReader, failedCheck, pendingCheck } from "./fakes.test-helper.ts";
+import { unsettledSuiteChecks } from "./github.ts";
 import type {
   GitHubReader,
   NonEmpty,
@@ -704,5 +705,241 @@ describe("a PR with no checks configured", () => {
       await expect(read(overrides)).rejects.toMatchObject({
         failure: { kind: "checks-unavailable", retryable: true },
       });
+  });
+});
+
+describe("check suites that no check read shows", () => {
+  const gated = {
+    source: "check-suites",
+    kind: "failed",
+    name: "GitHub Actions check suite",
+    reportedState: "ACTION_REQUIRED",
+    description:
+      "waits for maintainer approval to run; approve the workflows on the pull request",
+    link: "",
+    workflow: "",
+  } as const;
+  const noChecks = {
+    fastPath: { kind: "none-reported" },
+    rollupPages: [{ kind: "no-rollup" }],
+    commitRollups: [{ oid: "head", state: null }],
+  } as const;
+  const read = (options: Parameters<typeof fakeReader>[0]) =>
+    readSnapshot({
+      reader: fakeReader(options),
+      context: context(40),
+      pendingHistory: "include",
+      allowDraft: false,
+      confirmNoChecks: () => true,
+    });
+
+  it("blocks on approval-gated Actions beside another app's passing check", async () => {
+    const snapshot = await read({ unsettledSuites: [gated] });
+    expect(snapshot).toMatchObject({
+      kind: "open",
+      ci: { kind: "ci-failing", source: "gh-pr-checks", failed: [gated] },
+    });
+    expect(classifyPr(snapshot)).toMatchObject({
+      kind: "blocker",
+      blocker: { kind: "failing-checks" },
+    });
+  });
+
+  it("blocks on approval-gated Actions when no check is reported", async () => {
+    const snapshot = await read({ ...noChecks, unsettledSuites: [gated] });
+    expect(snapshot).toMatchObject({
+      kind: "open",
+      ci: { kind: "ci-failing", source: "check-suites", failed: [gated] },
+    });
+  });
+
+  it("waits on an Actions suite that has not started its runs", async () => {
+    const queued = {
+      ...gated,
+      kind: "pending",
+      reportedState: "QUEUED",
+      description: "has not finished",
+    } as const;
+    for (const options of [{}, noChecks])
+      expect(
+        await read({ ...options, unsettledSuites: [queued] })
+      ).toMatchObject({ ci: { kind: "ci-pending", pending: [queued] } });
+  });
+
+  it("keeps clean CI and no CI when the head has no unsettled suite", async () => {
+    expect(await read({ unsettledSuites: [] })).toMatchObject({
+      ci: { kind: "ci-clean" },
+    });
+    expect(await read({ ...noChecks, unsettledSuites: [] })).toMatchObject({
+      ci: { kind: "ci-none" },
+    });
+  });
+
+  it("reads suites while review threads are outstanding and rereads facts after both", async () => {
+    const reader = fakeReader();
+    const threads = Promise.withResolvers<void>();
+    reader.reviewThreadPage = async () => {
+      await threads.promise;
+      return { threads: [], endCursor: null };
+    };
+    const snapshot = readSnapshot({
+      reader,
+      context: context(40),
+      pendingHistory: "include",
+      allowDraft: false,
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const beforeRelease = [...reader.calls];
+    threads.resolve();
+    await snapshot;
+    expect(beforeRelease).toContain("unsettledSuites:head:reported");
+    expect(beforeRelease.filter((call) => call === "pullRequest")).toHaveLength(
+      1
+    );
+    expect(reader.calls.at(-1)).toBe("pullRequest");
+  });
+
+  it("reads the head's suites only when no check has failed or is pending", async () => {
+    const suiteReads = async (options: Parameters<typeof fakeReader>[0]) => {
+      const reader = fakeReader(options);
+      await readSnapshot({
+        reader,
+        context: context(40),
+        pendingHistory: "include",
+        allowDraft: false,
+      });
+      return reader.calls.filter((call) => call.startsWith("unsettledSuites"));
+    };
+    expect(await suiteReads({})).toEqual(["unsettledSuites:head:reported"]);
+    expect(await suiteReads(noChecks)).toEqual([
+      "unsettledSuites:head:no-checks",
+    ]);
+    for (const check of [pendingCheck(), failedCheck()])
+      expect(
+        await suiteReads({ fastPath: { kind: "checks", checks: [check] } })
+      ).toEqual([]);
+  });
+});
+
+describe("apps named with --expect-app", () => {
+  const queuedSuite = (slug: string, name: string) => ({
+    head_sha: "head",
+    status: "queued",
+    conclusion: null,
+    app: { slug, name },
+    latest_check_runs_count: 0,
+  });
+  const azure = queuedSuite("azure-pipelines", "Azure Pipelines");
+  const noChecks = {
+    fastPath: { kind: "none-reported" },
+    rollupPages: [{ kind: "no-rollup" }],
+    commitRollups: [{ oid: "head", state: null }],
+  } as const;
+  // The suite read goes through the real parser, so the slugs travel from
+  // the polling options to the classification.
+  const headWith = (
+    reported: Parameters<typeof fakeReader>[0],
+    ...suites: unknown[]
+  ): GitHubReader => {
+    const reader = fakeReader({ ...reported, facts: { reviewDecision: null } });
+    reader.unsettledSuites = async (_context, head, checksRead, expectedApps) =>
+      unsettledSuiteChecks(
+        [{ total_count: suites.length, check_suites: suites }],
+        head,
+        checksRead,
+        expectedApps
+      );
+    return reader;
+  };
+  const watch = async (
+    reader: GitHubReader,
+    expectedApps?: readonly string[]
+  ) => {
+    const emitted: ProgressVerdict[] = [];
+    const verdict = await runSimple({
+      dependencies: dependencies(reader, ticking(), emitted, 120),
+      contexts: [context(50)],
+      mode: "single",
+      statusOnly: false,
+      options: { ...options, expectedApps },
+    });
+    return { verdict, emitted: kinds(emitted) };
+  };
+
+  it("waits on a named app's queued suite with no runs, with or without another app's check", async () => {
+    for (const reported of [{}, noChecks]) {
+      const { verdict, emitted } = await watch(headWith(reported, azure), [
+        "azure-pipelines",
+      ]);
+      expect(new Set(emitted)).toEqual(new Set(["WAITING:pending-checks"]));
+      expect(verdict).toMatchObject({
+        kind: "TIMEOUT",
+        exitCode: 5,
+        reason: { kind: "pending-checks" },
+      });
+    }
+  });
+
+  it("waits on a named app's queued suite in a queued stack too", async () => {
+    const waits = async (expectedApps?: readonly string[]) => {
+      const emitted: ProgressVerdict[] = [];
+      await runQueued({
+        dependencies: dependencies(
+          headWith({}, azure),
+          ticking(),
+          emitted,
+          120
+        ),
+        contexts: [context(50)],
+        options: { ...options, expectedApps },
+      });
+      return kinds(emitted);
+    };
+    expect(await waits(["azure-pipelines"])).toContain(
+      "WAITING:pending-checks"
+    );
+    expect(await waits()).not.toContain("WAITING:pending-checks");
+  });
+
+  it("names each app whose suite it did not count in the ready proof", async () => {
+    const claude = queuedSuite("claude", "Claude");
+    for (const [reported, ci] of [
+      [{}, "ci-clean"],
+      [noChecks, "ci-none"],
+    ] as const) {
+      expect(
+        (await watch(headWith(reported, azure, claude))).verdict
+      ).toMatchObject({
+        kind: "READY",
+        scope: {
+          pr: {
+            proof: {
+              ci: {
+                kind: ci,
+                queuedWithoutRuns: [
+                  { name: "Azure Pipelines", slug: "azure-pipelines" },
+                  { name: "Claude", slug: "claude" },
+                ],
+              },
+            },
+          },
+        },
+      });
+      expect(
+        (await watch(headWith(reported, claude), ["azure-pipelines"])).verdict
+      ).toMatchObject({
+        kind: "READY",
+        scope: {
+          pr: {
+            proof: {
+              ci: {
+                kind: ci,
+                queuedWithoutRuns: [{ name: "Claude", slug: "claude" }],
+              },
+            },
+          },
+        },
+      });
+    }
   });
 });

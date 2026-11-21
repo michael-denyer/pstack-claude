@@ -5,7 +5,6 @@ BEGIN {
   CONTRACT["skills/reflect/scripts/find-transcript.mjs"] = "transcript"
   CONTRACT["skills/setup-pstack/scripts/check-sheet.sh"] = "optional-path"
   CONTRACT["skills/poteto-mode/scripts/check-playbooks.mjs"] = "optional-path"
-  CONTRACT["skills/poteto-mode/scripts/check-plan.mjs"] = "one-path"
   CONTRACT["skills/poteto-mode/scripts/worktree-audit.mjs"] = "paths"
   CONTRACT["skills/poteto-mode/scripts/resume.mjs"] = "resume"
 }
@@ -25,7 +24,6 @@ function script_contract(script, runner, T, first, n,    kind, count, i) {
       && (count == 2 || safe_path(T[first + 2]))
   }
   if (kind == "resume") return resume_contract(T, first, n)
-  if (kind == "one-path" && count != 1) return 0
   if (kind == "optional-path" && count > 1) return 0
   for (i = first; i <= n; i++) if (!safe_path(T[i])) return 0
   return 1

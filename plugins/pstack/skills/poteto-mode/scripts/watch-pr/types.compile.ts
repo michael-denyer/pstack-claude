@@ -36,6 +36,7 @@ const cleanCi = {
     mergeStateStatus: "CLEAN",
     headRollupState: "SUCCESS",
   },
+  queuedWithoutRuns: [],
 } satisfies CiClean;
 const readyPr = {
   kind: "ready-pr",

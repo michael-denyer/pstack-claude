@@ -13,6 +13,7 @@ import {
   resolveContext,
   resolveReviewThreads,
   runJson,
+  unsettledSuiteChecks,
 } from "./github.ts";
 import { fakeReader } from "./fakes.test-helper.ts";
 import type { PrContext } from "./types.ts";
@@ -118,6 +119,227 @@ describe("checks fallback chain", () => {
       throw failure;
     };
     await expect(resolveChecks(reader, context)).rejects.toBe(failure);
+  });
+});
+
+describe("check suites no check read shows", () => {
+  const head = "a66c327af02be3cd643c1f0a163ee00967fbc6c0";
+  const suite = (fields: Record<string, unknown> = {}) => ({
+    head_sha: head,
+    status: "completed",
+    conclusion: "action_required",
+    app: { slug: "github-actions", name: "GitHub Actions" },
+    latest_check_runs_count: 0,
+    ...fields,
+  });
+  const pages = (...suites: unknown[]) => [
+    { total_count: suites.length, check_suites: suites },
+  ];
+  const checksOf = (...args: Parameters<typeof unsettledSuiteChecks>) =>
+    unsettledSuiteChecks(...args).checks;
+
+  it("reads an Actions suite waiting for approval as a failed check that names the approval", () => {
+    expect(checksOf(pages(suite()), head, "no-checks")).toEqual([
+      {
+        kind: "failed",
+        source: "check-suites",
+        name: "GitHub Actions check suite",
+        reportedState: "ACTION_REQUIRED",
+        description: expect.stringContaining("maintainer approval"),
+        link: "",
+        workflow: "",
+      },
+    ]);
+  });
+
+  it("reads a failed suite as a failed check and an unfinished one as pending", () => {
+    for (const conclusion of [
+      "failure",
+      "cancelled",
+      "timed_out",
+      "startup_failure",
+      "stale",
+    ])
+      expect(
+        checksOf(pages(suite({ conclusion })), head, "no-checks")
+      ).toMatchObject([
+        { kind: "failed", reportedState: conclusion.toUpperCase() },
+      ]);
+    for (const status of ["queued", "in_progress", "waiting", "requested"])
+      expect(
+        checksOf(pages(suite({ status, conclusion: null })), head, "no-checks")
+      ).toMatchObject([
+        { kind: "pending", reportedState: status.toUpperCase() },
+      ]);
+  });
+
+  it("reads no check from no suites or suites that finished cleanly", () => {
+    expect(checksOf(pages(), head, "no-checks")).toEqual([]);
+    for (const conclusion of ["success", "neutral", "skipped"])
+      expect(checksOf(pages(suite({ conclusion })), head, "no-checks")).toEqual(
+        []
+      );
+  });
+
+  it("ignores another app's queued suite with no runs, but not Actions'", () => {
+    const idle = { status: "queued", conclusion: null };
+    expect(
+      checksOf(
+        pages(suite({ ...idle, app: { slug: "claude", name: "Claude" } })),
+        head,
+        "no-checks"
+      )
+    ).toEqual([]);
+    for (const fields of [
+      { app: { slug: "github-actions" } },
+      { app: null },
+      { app: {} },
+      { app: { slug: "claude" }, latest_check_runs_count: 1 },
+      { app: { slug: "claude" }, latest_check_runs_count: undefined },
+    ])
+      expect(
+        checksOf(pages(suite({ ...idle, ...fields })), head, "no-checks")
+      ).toMatchObject([{ kind: "pending", name: "Unknown app check suite" }]);
+  });
+
+  it("counts an expected app's queued suite with no runs as pending in both reads, and lists the apps it did not count", () => {
+    const azure = suite({
+      status: "queued",
+      conclusion: null,
+      app: { slug: "azure-pipelines", name: "Azure Pipelines" },
+    });
+    for (const checksRead of ["no-checks", "reported"] as const) {
+      expect(
+        unsettledSuiteChecks(pages(azure), head, checksRead, [
+          "azure-pipelines",
+        ])
+      ).toEqual({
+        checks: [
+          {
+            kind: "pending",
+            source: "check-suites",
+            name: "Azure Pipelines check suite",
+            reportedState: "QUEUED",
+            description: "has not finished",
+            link: "",
+            workflow: "",
+          },
+        ],
+        queuedWithoutRuns: [],
+      });
+      expect(unsettledSuiteChecks(pages(azure), head, checksRead)).toEqual({
+        checks: [],
+        queuedWithoutRuns: [
+          { name: "Azure Pipelines", slug: "azure-pipelines" },
+        ],
+      });
+    }
+  });
+
+  it("beside reported checks, counts only a suite with no runs that waits for approval or for Actions to start", () => {
+    const reported = (fields: Record<string, unknown>) =>
+      checksOf(pages(suite(fields)), head, "reported");
+    expect(reported({})).toMatchObject([
+      { kind: "failed", reportedState: "ACTION_REQUIRED" },
+    ]);
+    expect(reported({ status: "queued", conclusion: null })).toMatchObject([
+      { kind: "pending", reportedState: "QUEUED" },
+    ]);
+    for (const fields of [
+      { conclusion: "cancelled" },
+      { conclusion: "failure" },
+      { conclusion: "cancelled", latest_check_runs_count: 3 },
+      { status: "in_progress", conclusion: null, latest_check_runs_count: 2 },
+      {
+        status: "in_progress",
+        conclusion: null,
+        app: { slug: "wip", name: "WIP" },
+      },
+      {
+        app: { slug: "code-review-gate", name: "Gate App" },
+        latest_check_runs_count: 1,
+      },
+    ])
+      expect(reported(fields)).toEqual([]);
+  });
+
+  it("finds a gated suite on a later page", () => {
+    const twoPages = [
+      ...pages(suite({ conclusion: "success" })),
+      ...pages(suite()),
+    ];
+    expect(checksOf(twoPages, head, "no-checks")).toMatchObject([
+      { kind: "failed", reportedState: "ACTION_REQUIRED" },
+    ]);
+  });
+
+  it("requires a valid run count to decide whether reported checks cover a suite", () => {
+    for (const count of [undefined, null, "0", -1, 0.5]) {
+      expect(() =>
+        checksOf(
+          pages(suite({ latest_check_runs_count: count })),
+          head,
+          "reported"
+        )
+      ).toThrow(/latest_check_runs_count/);
+    }
+    const covered = suite({
+      latest_check_runs_count: 1,
+      status: null,
+      conclusion: null,
+    });
+    expect(checksOf(pages(covered), head, "reported")).toEqual([]);
+    expect(() => checksOf(pages(covered), head, "no-checks")).toThrow(
+      /check suite.status/
+    );
+    expect(() =>
+      checksOf(pages({ ...covered, head_sha: "other" }), head, "reported")
+    ).toThrow(/must match the queried head/);
+    expect(() =>
+      checksOf(pages(suite({ conclusion: null })), head, "reported")
+    ).toThrow(/conclusion of a completed suite/);
+  });
+
+  it("tells the reader which provider requires action", () => {
+    for (const mode of ["reported", "no-checks"] as const) {
+      const checks = checksOf(
+        pages(suite({ app: { slug: "external-ci", name: "External CI" } })),
+        head,
+        mode
+      );
+      expect(checks).toMatchObject([
+        {
+          source: "check-suites",
+          kind: "failed",
+          reportedState: "ACTION_REQUIRED",
+          description: expect.stringContaining(
+            "review the check details for External CI"
+          ),
+        },
+      ]);
+    }
+    expect(
+      checksOf(pages(suite({ latest_check_runs_count: 2 })), head, "no-checks")
+    ).toMatchObject([
+      {
+        description: expect.stringContaining(
+          "review the check details for GitHub Actions"
+        ),
+      },
+    ]);
+  });
+
+  it("fails closed on a response that cannot certify this head", () => {
+    for (const [value, detail] of [
+      [[], /check suite pages/],
+      [[{ total_count: 1 }], /check_suites/],
+      [
+        pages(suite({ head_sha: "b".repeat(40) })),
+        /must match the queried head/,
+      ],
+      [pages(suite({ conclusion: null })), /conclusion of a completed suite/],
+    ] as const)
+      expect(() => checksOf(value, head, "no-checks")).toThrow(detail);
   });
 });
 

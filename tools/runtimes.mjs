@@ -14,7 +14,9 @@ import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 // none: its one pointer is in poteto-mode's Platform
 // Adaptation section. `manifest` is the file the generator stamps VERSION
 // into, `validate` checks the runtime's packaging against the tree once that
-// manifest parses, and `hooks` lists the hooks files the manifest names,
+// manifest parses. Skills-only rows omit `manifest` and `validate`; they still
+// participate in mapping generation and shared skill validation.
+// `hooks` lists the hooks files a native manifest names,
 // relative to the plugin root. GitHub Copilot stamps preambles but has no
 // models.json block, since it ships no default models.
 // Muse declares its hooks inline in its native manifest, so it has no hooks
@@ -110,6 +112,13 @@ export const RUNTIMES = [
     modelNames: grokModelNamesSection,
     manifest: `${PLUGIN}/.grok-plugin/plugin.json`,
     validate: ({ manifest, pathExists, agentSkills }) => validateGrokPlugin(manifest, { pathExists, agentSkills }),
+  },
+  {
+    name: "DeepSeek Harness",
+    mapping: "dsh-tools.md",
+    modelNames: dshModelNamesSection,
+    // Skills-only: the filesystem provider reads the shared tree; no native
+    // plugin manifest or host package dependencies are needed.
   },
   {
     name: "OpenCode 2",
@@ -350,9 +359,12 @@ export function piModelNamesSection(models) {
     models.available.map((alias) => `| ${code(alias)} | ${columns.map((p) => code(tables[p][alias])).join(" | ")} |`).join("\n");
   return (
     "Skills name models by the Claude aliases in their Models sections. On Pi, pass the alias as the `agent` " +
-    "tool's `model`. The pstack extension resolves it in the column of the provider the session's current model " +
-    `comes from, and in the ${code(fallback)} column for any other provider:\n\n` +
+    "tool's `model`. The table lists the catalog-compatible defaults for the provider the session's current model " +
+    `comes from. Other providers use the ${code(fallback)} column.\n\n` +
     table +
+    `\n\nOn the two OpenAI providers, Pi first looks for the Codex default (${code(models.codex.default)} for ${code(models.tiers.default)}), ` +
+    `worker (${code(models.codex.worker)} for ${code(models.tiers.worker)}), or strongest model (${code(models.codex.strongest)} for ${code(models.tiers.strongest)}) ` +
+    "in the session's model registry. When that model is absent, Pi uses the ID in the table." +
     "\n\nPi warns that Anthropic bills Claude used through Pi per token, as extra usage, even on a Claude subscription. " +
     "Pi shows that warning only in interactive mode, never for the `pi --mode rpc` children the `agent` tool runs.\n\n" +
     "A `pi models: opus=<provider/id>, sonnet=<provider/id>` line in the Pi override sheet points each alias " +
@@ -570,6 +582,21 @@ export function ompModelNamesSection() {
     "OMP's own `modelRoles` and `task.agentModelOverrides` through its configuration interface, preserving unrelated " +
     "settings. Use only models listed by the active installation; do not copy Claude model aliases into OMP. " +
     "If the available agent roster cannot select distinct models for a requested panel, report that limitation."
+  );
+}
+
+export function dshModelNamesSection(models) {
+  return (
+    "DSH selects providers, models, and reasoning efforts through its current deployment. " +
+    "Do not pass Claude Code model aliases to DSH or use the Pi/Copilot mapping merely because the parent model comes from that provider. " +
+    "Use `list_subagent_models` when exposed: first list providers, then models for a provider, then efforts for the exact provider/model pair. " +
+    "Without that tool, use the deployment's model settings or omit unsupported selectors. Pass `provider`, `model`, and " +
+    "`reasoning_effort` only when the live delegation schema accepts them; omit all selectors to use its documented defaults.\n\n" +
+    `Roles used by ${roleSkills(models).map(code).join(", ")} are prompt responsibilities, not DSH model IDs or built-in agent types. ` +
+    `Diverse-model panels (${panelSkills(models)}) require distinct available model families; report when that is unavailable. ` +
+    "Do not manufacture diversity by relabeling the same model.\n\n" +
+    "This skills-only integration has no automatic per-role sheet reader. `setup-pstack` uses the " +
+    "native delegation defaults, as its Other runtimes table describes."
   );
 }
 

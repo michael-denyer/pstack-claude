@@ -1,6 +1,6 @@
 {
   "name": "pstack",
-  "version": "0.9.145",
+  "version": "0.9.146",
   "private": true,
   "omp": {
     "extensions": ["./omp/index.mjs"]

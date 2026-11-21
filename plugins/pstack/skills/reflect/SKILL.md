@@ -30,4 +30,4 @@ It prints the first path whose opening typed prompt carries the fragment. Do not
 Present Accepted (problem, proposal, skill), Rejected (reason) and Backlog, and wait for approval before editing any skill.
 
 
-Never edit a skill under `plugins/cache/`. Before approval, show its destination, `.claude/skills/<skill>/` or `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/<skill>/`. After approval, copy the skill folder there and edit the copy. Never open a PR or push.
+Never edit a skill under `plugins/cache/`. Before approval, show its destination, `.claude/skills/<skill>/` or `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/<skill>/`. For a pstack skill, also say that the copy becomes a separate skill named `<skill>`, beside the plugin's own copy (`pstack:<skill>` on Claude Code). pstack's routing can keep invoking the plugin's copy, so the edit is certain to apply only when the copy is invoked by its own name. After approval, copy the skill folder there and edit the copy. Never open a PR or push.

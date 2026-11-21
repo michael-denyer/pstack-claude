@@ -65,7 +65,9 @@ if [ -f "$sheet" ] && [ -r "$sheet" ] && normalized=$(sh "$reader" "$sheet"); th
 else
   normalized=
 fi
-if printf '%s\n' "$normalized" | grep -qx 'session hook: off'; then
+# PSTACK_SESSION_HOOK=off reaches sessions whose home starts empty, such as
+# Claude Code cloud sessions, where no user sheet survives.
+if [ "${PSTACK_SESSION_HOOK:-}" = off ] || printf '%s\n' "$normalized" | grep -qx 'session hook: off'; then
   [ "$runtime" != agy ] || printf '{}\n'
   exit 0
 fi

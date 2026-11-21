@@ -53,6 +53,18 @@ export const sheetCases = [
 // `inherit-parent`, each with an optional known `@effort`. A usable default
 // effort follows, and roles print in models.json order. `roles` is what follows
 // the mandate and sheet note; an empty list means the mandate alone.
+// PSTACK_SESSION_HOOK values as [label, value, turns the hook off]. Only the
+// exact bytes `off` count, so a zero-width or soft-hyphen variant injects in
+// PowerShell as it does in sh.
+export const sessionHookValues = [
+  ['"off"', "off", true],
+  ['"on"', "on", false],
+  ['"OFF"', "OFF", false],
+  ["empty", "", false],
+  ['"off" with a trailing zero-width space', "off" + String.fromCharCode(0x200b), false],
+  ['"off" after a soft hyphen', String.fromCharCode(0xad) + "off", false],
+];
+
 export const roleCases = [
   { name: "a model ID", sheet: "bug-fix: muse-wonder-1.0\n", roles: ["bug-fix: muse-wonder-1.0"] },
   { name: "two model IDs", sheet: "bug-fix: a-1, b-2\n", roles: ["bug-fix: a-1, b-2"] },

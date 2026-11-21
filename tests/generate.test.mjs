@@ -123,6 +123,16 @@ describe("regions", () => {
     const text = "# other\n\n## Models\n\nprose\n";
     expect(applyRegions("plugins/pstack/skills/other/SKILL.md", text, models)).toBe(text);
   });
+
+  test("setup-pstack override sheet scopes PSTACK_SESSION_HOOK=off to the runtimes that honor it", () => {
+    const file = "plugins/pstack/skills/setup-pstack/SKILL.md";
+    const stamped = applyRegions(file, readFileSync(join(repoRoot, file), "utf8"), models);
+    const sheet = spanned(fenceUnder("Write the override sheet", "markdown"), lines(stamped))?.join("\n") ?? "";
+    expect(sheet).not.toContain("leaves it on unless the environment sets `PSTACK_SESSION_HOOK=off`");
+    expect(sheet).toContain("`session hook: off` stops the supported runtime's pstack routing hook from injecting the poteto-mode mandate; any other value, or no line, leaves it on.");
+    expect(sheet).toContain("Setting `PSTACK_SESSION_HOOK=off` in the environment also keeps the hook off on Claude Code, and on Codex, GitHub Copilot, Muse, and Antigravity when the runtime passes the variable to its hooks;");
+    expect(sheet).toContain("MiniMax Code passes its hooks a fixed set of variables, and the OMP, OpenCode, and Pi plugins read only the sheet.");
+  });
 });
 
 describe("runtime model names", () => {

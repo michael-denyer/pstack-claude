@@ -1,14 +1,17 @@
 import { execFile, spawn } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { promisify } from "node:util";
 import { type Static, type TSchema, Type } from "typebox";
 import { Value } from "typebox/value";
 
-import { assistantText, type ChildExit } from "./child.ts";
+import { alive, assistantText, type ChildExit, signalGroup, terminateGroup } from "./child.ts";
 
 const execHc = promisify(execFile);
 const SCREEN_LINES = "30";
+const CLOSE_POLL_MS = 200;
 const NOT_THE_CHILD = new Set(["timeout", "message"]);
+const TERMINAL_VARS = new Set(["COLORTERM", "TERM", "TERM_PROGRAM", "PWD", "OLDPWD", "SHLVL", "_"]);
+const LOAD_ENV = '. "$1" && rm -- "$1" && shift && exec "$@"';
 
 const waitResult = Type.Object({
   reason: Type.String(),
@@ -17,6 +20,7 @@ const waitResult = Type.Object({
 });
 type WaitResult = Static<typeof waitResult>;
 const runResult = Type.Object({ address: Type.String() });
+const getResult = Type.Object({ pid: Type.Union([Type.Number(), Type.Null()]) });
 const sendResult = Type.Object({ wait: Type.Optional(waitResult) });
 const transcriptReply = Type.Object({
   type: Type.Literal("message"),
@@ -28,10 +32,20 @@ const transcriptReply = Type.Object({
   }),
 });
 
+export interface HcOptions {
+  cwd: string;
+  env: Record<string, string | undefined>;
+  envFile: string;
+  graceMs: number;
+  transcript: () => string | undefined;
+  onStart: (pid: number) => void;
+}
+
 export class HcChild {
   readonly pid = undefined;
   readonly activity = undefined;
   readonly exited: Promise<ChildExit>;
+  private terminalPid?: number;
   private settled = false;
   private ending = false;
 
@@ -39,54 +53,69 @@ export class HcChild {
     private readonly name: string,
     command: string,
     args: string[],
-    opts: { cwd: string; env: Record<string, string | undefined>; transcript: () => string | undefined },
+    opts: HcOptions,
     prompt: string,
   ) {
-    const env = Object.entries(opts.env).flatMap(([key, value]) => (value === undefined ? [] : [`${key}=${value}`]));
-    const run = ["run", "--json", "--bg", "--no-notify", "--name", name, "--cwd", opts.cwd, "env", ...env, command, ...args];
-    this.exited = this.drive(run, opts.transcript, prompt);
+    writeFileSync(opts.envFile, envScript({ ...process.env, ...opts.env }), { mode: 0o600 });
+    const run = ["run", "--json", "--bg", "--no-notify", "--name", name, "--cwd", opts.cwd, "--", "sh", "-c", LOAD_ENV, "pstack-env", opts.envFile, command, ...args];
+    this.exited = this.drive(run, opts, prompt);
   }
 
   async steer(message: string): Promise<{ response: { success: boolean } | undefined; taken: boolean }> {
     if (this.settled) return { response: undefined, taken: false };
     try {
-      await execHc("hc", ["send", "--json", "--if", "working", this.name, message]);
+      await execHc("hc", ["send", "--json", "--if", "working", "--", this.name, message]);
     } catch {
       return { response: undefined, taken: false };
     }
     return { response: { success: true }, taken: !this.settled };
   }
 
-  end(): void {
+  end(graceMs: number): void {
     this.ending = true;
-    void quiet(["kill", this.name]);
+    this.stop(graceMs);
   }
 
-  signal(): void {
-    spawn("hc", ["kill", this.name], { detached: true, stdio: "ignore" }).unref();
+  signal(signal: NodeJS.Signals): void {
+    if (this.terminalPid === undefined) spawn("hc", ["kill", this.name], { detached: true, stdio: "ignore" }).unref();
+    else signalGroup(this.terminalPid, signal);
   }
 
-  private async drive(run: string[], transcript: () => string | undefined, prompt: string): Promise<ChildExit> {
-    const from = sizeOf(transcript());
+  private async drive(run: string[], opts: HcOptions, prompt: string): Promise<ChildExit> {
+    const from = sizeOf(opts.transcript());
     try {
       await hc(runResult, run);
+      const { pid } = await hc(getResult, ["get", "--json", this.name]);
+      if (pid !== null) {
+        this.terminalPid = pid;
+        opts.onStart(pid);
+      }
       const last = await this.turn(prompt);
       this.settled = last.status === "done";
       const stderr = this.settled || this.ending ? "" : await this.screen();
-      const exit = last.reason === "exit" ? last : await this.close();
-      return { exitCode: exit.exit_code, settled: this.settled, ...replyIn(transcript(), from), stderr };
+      const exit = last.reason === "exit" ? last : await this.close(opts.graceMs);
+      return { exitCode: exit.exit_code, settled: this.settled, ...replyIn(opts.transcript(), from), stderr };
     } catch (e) {
-      await this.close().catch(() => undefined);
-      return { exitCode: null, settled: false, finalText: replyIn(transcript(), from).finalText, errorMessage: hcError(e), stderr: "" };
+      await this.close(opts.graceMs).catch(() => undefined);
+      return { exitCode: null, settled: false, finalText: replyIn(opts.transcript(), from).finalText, errorMessage: hcError(e), stderr: "" };
     } finally {
       await quiet(["rm", this.name]);
+      try {
+        unlinkSync(opts.envFile);
+      } catch {}
     }
+  }
+
+  private stop(graceMs: number): void {
+    const pid = this.terminalPid;
+    if (pid === undefined) void quiet(["kill", this.name]);
+    else void terminateGroup(pid, () => alive(pid), graceMs);
   }
 
   private async turn(prompt: string): Promise<WaitResult> {
     const ready = await this.wait();
     if (ready.status !== "idle" || this.ending) return ready;
-    const { wait } = await hc(sendResult, ["send", "--json", "--wait", this.name, prompt]);
+    const { wait } = await hc(sendResult, ["send", "--json", "--wait", "--", this.name, prompt]);
     return wait && !NOT_THE_CHILD.has(wait.reason) ? wait : this.wait();
   }
 
@@ -97,9 +126,13 @@ export class HcChild {
     }
   }
 
-  private async close(): Promise<WaitResult> {
-    await quiet(["kill", this.name]);
-    return this.wait();
+  private async close(graceMs: number): Promise<WaitResult> {
+    this.stop(graceMs);
+    for (;;) {
+      const state = await this.wait();
+      if (state.reason === "exit") return state;
+      await new Promise((resolve) => setTimeout(resolve, CLOSE_POLL_MS));
+    }
   }
 
   private screen(): Promise<string> {
@@ -108,6 +141,13 @@ export class HcChild {
       () => "",
     );
   }
+}
+
+export function envScript(env: NodeJS.ProcessEnv): string {
+  return Object.entries(env)
+    .filter(([name, value]) => value !== undefined && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !name.startsWith("HC_") && !TERMINAL_VARS.has(name))
+    .map(([name, value]) => `export ${name}='${(value ?? "").replaceAll("'", "'\\''")}'\n`)
+    .join("");
 }
 
 export function replyIn(file: string | undefined, from: number): Pick<ChildExit, "finalText" | "errorMessage"> {

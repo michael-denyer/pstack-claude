@@ -54,6 +54,7 @@ const runningSchema = Type.Object({
   pidStart: Type.Optional(Type.String()),
   // The pi process that launched it. Only that process may reap it.
   parentPid: Type.Number(),
+  host: Type.Optional(Type.Literal("hc")),
 });
 const endedSchema = Type.Object({
   agent: identitySchema,
@@ -185,7 +186,8 @@ function fateOf(record: RunningRecord): Fate {
   if (info && pidStart !== undefined && info.start !== pidStart) return "gone";
   // With no word from the system, two live pids keep the record: calling a
   // live agent stopped would let a message start a second process on its session.
-  const launcherHasIt = info ? info.parentPid === parentPid : alive(parentPid);
+  // An hc terminal's program is a child of herdr-core, not of the pi that launched it.
+  const launcherHasIt = info && record.host !== "hc" ? info.parentPid === parentPid : alive(parentPid);
   if (parentPid !== process.pid && launcherHasIt) return "kept";
   return info && info.start === pidStart ? "orphan" : "unknown";
 }
@@ -218,6 +220,7 @@ export class AgentRunner {
   // parent's stdout, which the reader ignores.
   private ui?: ExtensionContext["ui"];
   private ownSessionId?: string;
+  private projectTrusted = false;
 
   constructor(
     private readonly pi: ExtensionAPI,
@@ -290,16 +293,31 @@ export class AgentRunner {
     const flags = childArgs(identity, this.settings.depth);
     const env = { [PARENT_SESSION_ENV]: this.ownSessionId };
     if (readSheet(this.settings.agentDir)?.hcHost && process.env.HC_TERMINAL_ID) {
-      const transcript = () => sessionFile(identity);
-      return new HcChild(identity.id, command, [...base, ...flags], { cwd: identity.cwd, env: { ...env, PI_CODING_AGENT_DIR: this.settings.agentDir }, transcript }, prompt);
+      // An interactive pi asks whether to trust the project before it reports any status; the parent already decided.
+      return new HcChild(identity.id, command, [...base, ...flags, this.projectTrusted ? "--approve" : "--no-approve"], {
+        cwd: identity.cwd,
+        env: { ...env, PI_CODING_AGENT_DIR: this.settings.agentDir },
+        envFile: join(identity.sessionDir, `${identity.id}.env`),
+        graceMs: this.settings.killGraceMs,
+        transcript: () => sessionFile(identity),
+        onStart: (pid) => this.track(identity.id, { host: "hc", pid, pidStart: inspect(pid)?.start }),
+      }, prompt);
     }
     return new PiChild(command, [...base, "--mode", "rpc", ...flags], { cwd: identity.cwd, env, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() }, prompt);
+  }
+
+  private track(id: string, handle: Pick<RunningRecord, "host" | "pid" | "pidStart">): void {
+    const state = this.agents.get(id);
+    if (state?.kind !== "local") return;
+    Object.assign(state.record, handle);
+    this.persist(state.record);
   }
 
   // From session_start too: a reloaded session can resume an agent with
   // send_message before any agent call.
   attachSession(ctx: ExtensionContext): void {
     this.ownSessionId = ctx.sessionManager.getSessionId();
+    this.projectTrusted = ctx.isProjectTrusted?.() ?? false;
     if (ctx.hasUI && this.settings.depth === 0) this.ui = ctx.ui;
   }
 

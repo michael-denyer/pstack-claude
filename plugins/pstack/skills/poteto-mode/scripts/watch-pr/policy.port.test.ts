@@ -9,6 +9,7 @@ import {
   selectTierMajorStackDecision,
 } from "./policy.ts";
 import { fakeReader, failedCheck, pendingCheck } from "./fakes.test-helper.ts";
+import { unsettledSuiteChecks } from "./github.ts";
 import type {
   GitHubReader,
   NonEmpty,
@@ -817,5 +818,128 @@ describe("check suites that no check read shows", () => {
       expect(
         await suiteReads({ fastPath: { kind: "checks", checks: [check] } })
       ).toEqual([]);
+  });
+});
+
+describe("apps named with --expect-app", () => {
+  const queuedSuite = (slug: string, name: string) => ({
+    head_sha: "head",
+    status: "queued",
+    conclusion: null,
+    app: { slug, name },
+    latest_check_runs_count: 0,
+  });
+  const azure = queuedSuite("azure-pipelines", "Azure Pipelines");
+  const noChecks = {
+    fastPath: { kind: "none-reported" },
+    rollupPages: [{ kind: "no-rollup" }],
+    commitRollups: [{ oid: "head", state: null }],
+  } as const;
+  // The suite read goes through the real parser, so the slugs travel from
+  // the polling options to the classification.
+  const headWith = (
+    reported: Parameters<typeof fakeReader>[0],
+    ...suites: unknown[]
+  ): GitHubReader => {
+    const reader = fakeReader({ ...reported, facts: { reviewDecision: null } });
+    reader.unsettledSuites = async (_context, head, checksRead, expectedApps) =>
+      unsettledSuiteChecks(
+        [{ total_count: suites.length, check_suites: suites }],
+        head,
+        checksRead,
+        expectedApps
+      );
+    return reader;
+  };
+  const watch = async (
+    reader: GitHubReader,
+    expectedApps?: readonly string[]
+  ) => {
+    const emitted: ProgressVerdict[] = [];
+    const verdict = await runSimple({
+      dependencies: dependencies(reader, ticking(), emitted, 120),
+      contexts: [context(50)],
+      mode: "single",
+      statusOnly: false,
+      options: { ...options, expectedApps },
+    });
+    return { verdict, emitted: kinds(emitted) };
+  };
+
+  it("waits on a named app's queued suite with no runs, with or without another app's check", async () => {
+    for (const reported of [{}, noChecks]) {
+      const { verdict, emitted } = await watch(headWith(reported, azure), [
+        "azure-pipelines",
+      ]);
+      expect(new Set(emitted)).toEqual(new Set(["WAITING:pending-checks"]));
+      expect(verdict).toMatchObject({
+        kind: "TIMEOUT",
+        exitCode: 5,
+        reason: { kind: "pending-checks" },
+      });
+    }
+  });
+
+  it("waits on a named app's queued suite in a queued stack too", async () => {
+    const waits = async (expectedApps?: readonly string[]) => {
+      const emitted: ProgressVerdict[] = [];
+      await runQueued({
+        dependencies: dependencies(
+          headWith({}, azure),
+          ticking(),
+          emitted,
+          120
+        ),
+        contexts: [context(50)],
+        options: { ...options, expectedApps },
+      });
+      return kinds(emitted);
+    };
+    expect(await waits(["azure-pipelines"])).toContain(
+      "WAITING:pending-checks"
+    );
+    expect(await waits()).not.toContain("WAITING:pending-checks");
+  });
+
+  it("names each app whose suite it did not count in the ready proof", async () => {
+    const claude = queuedSuite("claude", "Claude");
+    for (const [reported, ci] of [
+      [{}, "ci-clean"],
+      [noChecks, "ci-none"],
+    ] as const) {
+      expect(
+        (await watch(headWith(reported, azure, claude))).verdict
+      ).toMatchObject({
+        kind: "READY",
+        scope: {
+          pr: {
+            proof: {
+              ci: {
+                kind: ci,
+                queuedWithoutRuns: [
+                  { name: "Azure Pipelines", slug: "azure-pipelines" },
+                  { name: "Claude", slug: "claude" },
+                ],
+              },
+            },
+          },
+        },
+      });
+      expect(
+        (await watch(headWith(reported, claude), ["azure-pipelines"])).verdict
+      ).toMatchObject({
+        kind: "READY",
+        scope: {
+          pr: {
+            proof: {
+              ci: {
+                kind: ci,
+                queuedWithoutRuns: [{ name: "Claude", slug: "claude" }],
+              },
+            },
+          },
+        },
+      });
+    }
   });
 });

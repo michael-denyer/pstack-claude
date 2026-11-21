@@ -135,9 +135,11 @@ describe("check suites no check read shows", () => {
   const pages = (...suites: unknown[]) => [
     { total_count: suites.length, check_suites: suites },
   ];
+  const checksOf = (...args: Parameters<typeof unsettledSuiteChecks>) =>
+    unsettledSuiteChecks(...args).checks;
 
   it("reads an Actions suite waiting for approval as a failed check that names the approval", () => {
-    expect(unsettledSuiteChecks(pages(suite()), head, "no-checks")).toEqual([
+    expect(checksOf(pages(suite()), head, "no-checks")).toEqual([
       {
         kind: "failed",
         source: "check-suites",
@@ -159,34 +161,30 @@ describe("check suites no check read shows", () => {
       "stale",
     ])
       expect(
-        unsettledSuiteChecks(pages(suite({ conclusion })), head, "no-checks")
+        checksOf(pages(suite({ conclusion })), head, "no-checks")
       ).toMatchObject([
         { kind: "failed", reportedState: conclusion.toUpperCase() },
       ]);
     for (const status of ["queued", "in_progress", "waiting", "requested"])
       expect(
-        unsettledSuiteChecks(
-          pages(suite({ status, conclusion: null })),
-          head,
-          "no-checks"
-        )
+        checksOf(pages(suite({ status, conclusion: null })), head, "no-checks")
       ).toMatchObject([
         { kind: "pending", reportedState: status.toUpperCase() },
       ]);
   });
 
   it("reads no check from no suites or suites that finished cleanly", () => {
-    expect(unsettledSuiteChecks(pages(), head, "no-checks")).toEqual([]);
+    expect(checksOf(pages(), head, "no-checks")).toEqual([]);
     for (const conclusion of ["success", "neutral", "skipped"])
-      expect(
-        unsettledSuiteChecks(pages(suite({ conclusion })), head, "no-checks")
-      ).toEqual([]);
+      expect(checksOf(pages(suite({ conclusion })), head, "no-checks")).toEqual(
+        []
+      );
   });
 
   it("ignores another app's queued suite with no runs, but not Actions'", () => {
     const idle = { status: "queued", conclusion: null };
     expect(
-      unsettledSuiteChecks(
+      checksOf(
         pages(suite({ ...idle, app: { slug: "claude", name: "Claude" } })),
         head,
         "no-checks"
@@ -200,17 +198,47 @@ describe("check suites no check read shows", () => {
       { app: { slug: "claude" }, latest_check_runs_count: undefined },
     ])
       expect(
-        unsettledSuiteChecks(
-          pages(suite({ ...idle, ...fields })),
-          head,
-          "no-checks"
-        )
+        checksOf(pages(suite({ ...idle, ...fields })), head, "no-checks")
       ).toMatchObject([{ kind: "pending", name: "Unknown app check suite" }]);
+  });
+
+  it("counts an expected app's queued suite with no runs as pending in both reads, and lists the apps it did not count", () => {
+    const azure = suite({
+      status: "queued",
+      conclusion: null,
+      app: { slug: "azure-pipelines", name: "Azure Pipelines" },
+    });
+    for (const checksRead of ["no-checks", "reported"] as const) {
+      expect(
+        unsettledSuiteChecks(pages(azure), head, checksRead, [
+          "azure-pipelines",
+        ])
+      ).toEqual({
+        checks: [
+          {
+            kind: "pending",
+            source: "check-suites",
+            name: "Azure Pipelines check suite",
+            reportedState: "QUEUED",
+            description: "has not finished",
+            link: "",
+            workflow: "",
+          },
+        ],
+        queuedWithoutRuns: [],
+      });
+      expect(unsettledSuiteChecks(pages(azure), head, checksRead)).toEqual({
+        checks: [],
+        queuedWithoutRuns: [
+          { name: "Azure Pipelines", slug: "azure-pipelines" },
+        ],
+      });
+    }
   });
 
   it("beside reported checks, counts only a suite with no runs that waits for approval or for Actions to start", () => {
     const reported = (fields: Record<string, unknown>) =>
-      unsettledSuiteChecks(pages(suite(fields)), head, "reported");
+      checksOf(pages(suite(fields)), head, "reported");
     expect(reported({})).toMatchObject([
       { kind: "failed", reportedState: "ACTION_REQUIRED" },
     ]);
@@ -240,7 +268,7 @@ describe("check suites no check read shows", () => {
       ...pages(suite({ conclusion: "success" })),
       ...pages(suite()),
     ];
-    expect(unsettledSuiteChecks(twoPages, head, "no-checks")).toMatchObject([
+    expect(checksOf(twoPages, head, "no-checks")).toMatchObject([
       { kind: "failed", reportedState: "ACTION_REQUIRED" },
     ]);
   });
@@ -248,7 +276,7 @@ describe("check suites no check read shows", () => {
   it("requires a valid run count to decide whether reported checks cover a suite", () => {
     for (const count of [undefined, null, "0", -1, 0.5]) {
       expect(() =>
-        unsettledSuiteChecks(
+        checksOf(
           pages(suite({ latest_check_runs_count: count })),
           head,
           "reported"
@@ -260,25 +288,21 @@ describe("check suites no check read shows", () => {
       status: null,
       conclusion: null,
     });
-    expect(unsettledSuiteChecks(pages(covered), head, "reported")).toEqual([]);
+    expect(checksOf(pages(covered), head, "reported")).toEqual([]);
+    expect(() => checksOf(pages(covered), head, "no-checks")).toThrow(
+      /check suite.status/
+    );
     expect(() =>
-      unsettledSuiteChecks(pages(covered), head, "no-checks")
-    ).toThrow(/check suite.status/);
-    expect(() =>
-      unsettledSuiteChecks(
-        pages({ ...covered, head_sha: "other" }),
-        head,
-        "reported"
-      )
+      checksOf(pages({ ...covered, head_sha: "other" }), head, "reported")
     ).toThrow(/must match the queried head/);
     expect(() =>
-      unsettledSuiteChecks(pages(suite({ conclusion: null })), head, "reported")
+      checksOf(pages(suite({ conclusion: null })), head, "reported")
     ).toThrow(/conclusion of a completed suite/);
   });
 
   it("tells the reader which provider requires action", () => {
     for (const mode of ["reported", "no-checks"] as const) {
-      const checks = unsettledSuiteChecks(
+      const checks = checksOf(
         pages(suite({ app: { slug: "external-ci", name: "External CI" } })),
         head,
         mode
@@ -295,11 +319,7 @@ describe("check suites no check read shows", () => {
       ]);
     }
     expect(
-      unsettledSuiteChecks(
-        pages(suite({ latest_check_runs_count: 2 })),
-        head,
-        "no-checks"
-      )
+      checksOf(pages(suite({ latest_check_runs_count: 2 })), head, "no-checks")
     ).toMatchObject([
       {
         description: expect.stringContaining(
@@ -319,9 +339,7 @@ describe("check suites no check read shows", () => {
       ],
       [pages(suite({ conclusion: null })), /conclusion of a completed suite/],
     ] as const)
-      expect(() => unsettledSuiteChecks(value, head, "no-checks")).toThrow(
-        detail
-      );
+      expect(() => checksOf(value, head, "no-checks")).toThrow(detail);
   });
 });
 

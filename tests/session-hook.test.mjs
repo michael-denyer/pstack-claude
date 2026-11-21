@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { agentSkills } from "../tools/generate.mjs";
 import { MUSE_HOOKS, SESSION_START_STATUS } from "../tools/runtimes.mjs";
-import { roleCases, sheetCases, writeSheet } from "./session-hook-sheets.mjs";
+import { roleCases, sessionHookValues, sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 
 const pluginRoot = fileURLToPath(new URL("../plugins/pstack/", import.meta.url));
 const mandate = readFileSync(join(pluginRoot, "hooks/session-start-context.md"), "utf8");
@@ -182,10 +182,17 @@ describe("SessionStart hook", () => {
       }
 
       // A cloud session starts with an empty home, so no user sheet survives it.
-      for (const [value, off] of [["off", true], ["on", false], ["OFF", false], ["", false]]) {
-        test(`${off ? "injects nothing" : "injects the mandate"} when PSTACK_SESSION_HOOK is ${JSON.stringify(value)} and no sheet exists`, () => {
+      for (const [label, value, off] of sessionHookValues) {
+        test(`${off ? "injects nothing" : "injects the mandate"} when PSTACK_SESSION_HOOK is ${label} and no sheet exists`, () => {
           const r = runHook(runtime, null, undefined, { PSTACK_SESSION_HOOK: value });
           expect({ ...r, out: off && runtime !== "agy" ? r.out : wrap(r.out) }).toEqual({ status: 0, out: expected(off), err: "" });
+        });
+      }
+
+      for (const [value, sheet] of [["off", "session hook: on\n"], ["on", "session hook: off\n"]]) {
+        test(`injects nothing when PSTACK_SESSION_HOOK is "${value}" and the sheet has "${sheet.trim()}"`, () => {
+          const r = runHook(runtime, sheet, undefined, { PSTACK_SESSION_HOOK: value });
+          expect({ ...r, out: runtime !== "agy" ? r.out : wrap(r.out) }).toEqual({ status: 0, out: expected(true), err: "" });
         });
       }
     });

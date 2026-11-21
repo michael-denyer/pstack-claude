@@ -25,5 +25,5 @@ Read `head.sha`, `draft`, `mergeable`, and `mergeable_state` from the first comm
 ## Limits
 
 - These reads are single snapshots. Nothing here replaces the watcher's rereads, its merge gates, or its check for a head that moved between reads. Reread the PR's head after the other reads, and start again when it changed.
-- `ship-pr` reads and writes through GraphQL, so Shipping and the merge-safety operations cannot run in a cloud session.
+- `ship-pr` reads the PR through GraphQL, so Shipping and the merge-safety operations cannot run in a cloud session.
 - A repository the session has not attached answers every REST read with HTTP 403.

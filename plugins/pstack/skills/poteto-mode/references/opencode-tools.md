@@ -17,6 +17,7 @@ OpenCode 2 loads the native pstack plugin, which registers each skill as `pstack
 | --- | --- |
 | `setup-pstack` | Use the configured models listed by OpenCode and the model names guidance below. |
 | `why` | Use connected sources where available and report missing evidence instead of assuming it. |
+| `reflect` | The transcript finder reads Claude Code's folder, so it finds nothing here. From the session's directory, run `opencode session list --format json`, which lists that project's sessions newest first, and pick this conversation by its `title`; another open session can be newer. Run `opencode session export <id> > <file>` and read the file. The export holds every message, compacted turns included. Redirect it to a file, because a pipe can cut it short. Add `--sanitize` to redact sensitive transcript and file data. If the export fails, work from the conversation in your context and say the transcript was not found. |
 
 ## Model names
 

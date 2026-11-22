@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { parseSuiteRead } from "./check-suites.ts";
 import { WatchDeadline } from "./deadline.ts";
 import {
   ChecksUnavailable,
@@ -18,6 +19,7 @@ import {
 import { fakeReader } from "./fakes.test-helper.ts";
 import type { PrContext } from "./types.ts";
 import { parsePrNumber } from "./types.ts";
+import { resolveWorkflowRunChecks } from "./workflow-runs.ts";
 
 const context = {
   owner: "owner",
@@ -340,6 +342,474 @@ describe("check suites no check read shows", () => {
       [pages(suite({ conclusion: null })), /conclusion of a completed suite/],
     ] as const)
       expect(() => checksOf(value, head, "no-checks")).toThrow(detail);
+  });
+});
+
+describe("workflow runs identify current startup failures", () => {
+  const head = "a66c327af02be3cd643c1f0a163ee00967fbc6c0";
+  const run = (fields: Record<string, unknown> = {}) => ({
+    id: 10,
+    workflow_id: 20,
+    check_suite_id: 30,
+    event: "pull_request",
+    head_sha: head,
+    status: "completed",
+    conclusion: "startup_failure",
+    created_at: "2026-11-19T10:00:00Z",
+    name: "CI",
+    html_url: "https://github.com/owner/repo/actions/runs/10",
+    ...fields,
+  });
+  const pages = (...runs: unknown[]) => [
+    { total_count: runs.length, workflow_runs: runs },
+  ];
+  const suitePages = (
+    count = 0,
+    successors: Record<string, unknown>[] = []
+  ) => [
+    {
+      total_count: 1 + successors.length,
+      check_suites: [
+        {
+          id: 30,
+          head_sha: head,
+          status: "completed",
+          conclusion: "startup_failure",
+          app: { slug: "github-actions" },
+          latest_check_runs_count: count,
+        },
+        ...successors,
+      ],
+    },
+  ];
+  const resolve = (
+    workflowPages: unknown,
+    suites: unknown,
+    checksRead: "reported" | "no-checks" = "reported"
+  ) =>
+    resolveWorkflowRunChecks(
+      workflowPages,
+      parseSuiteRead(suites, head, checksRead),
+      head
+    ).checks;
+
+  it("blocks on a current startup failure beside reported checks", () => {
+    expect(resolve(pages(run()), suitePages())).toMatchObject([
+      {
+        source: "check-suites",
+        kind: "failed",
+        name: "CI workflow",
+        reportedState: "STARTUP_FAILURE",
+        link: "https://github.com/owner/repo/actions/runs/10",
+      },
+    ]);
+  });
+
+  it("suppresses only a later success of the same workflow and event", () => {
+    const older = run();
+    const newerSuccess = run({
+      id: 11,
+      conclusion: "success",
+      created_at: "2026-11-19T10:01:00Z",
+    });
+    for (const ordered of [
+      [older, newerSuccess],
+      [newerSuccess, older],
+    ])
+      expect(resolve(pages(...ordered), suitePages())).toEqual([]);
+    const otherEvent = run({
+      id: 11,
+      event: "push",
+      conclusion: "success",
+      created_at: "2026-11-19T10:01:00Z",
+    });
+    for (const ordered of [
+      [older, otherEvent],
+      [otherEvent, older],
+    ])
+      expect(resolve(pages(...ordered), suitePages())).toMatchObject([
+        { reportedState: "STARTUP_FAILURE" },
+      ]);
+  });
+
+  it("preserves a current pending run", () => {
+    expect(
+      resolve(
+        pages(run({ status: "in_progress", conclusion: null })),
+        suitePages()
+      )
+    ).toMatchObject([{ kind: "pending", reportedState: "IN_PROGRESS" }]);
+  });
+
+  it("fails closed when workflow identity or status is absent", () => {
+    expect(() =>
+      resolve(pages(run({ workflow_id: undefined })), suitePages())
+    ).toThrow(/workflow run.workflow_id/);
+  });
+
+  it("does not duplicate a workflow whose suite already has reported runs", () => {
+    expect(
+      resolve(pages(run({ conclusion: "success" })), suitePages(1))
+    ).toEqual([]);
+  });
+
+  it("fails closed when the zero-run evidence is incomplete", () => {
+    for (const checksRead of ["reported", "no-checks"] as const)
+      expect(() =>
+        resolve(pages(run()), suitePages(Number.NaN), checksRead)
+      ).toThrow(/check suite.latest_check_runs_count/);
+  });
+
+  it("fails closed when a failed zero-run suite has no matching workflow row", () => {
+    for (const workflowPages of [
+      pages(),
+      pages({ ...run(), check_suite_id: 999, conclusion: "success" }),
+    ])
+      expect(() => resolve(workflowPages, suitePages())).toThrow(
+        /workflow runs for failed check suite/
+      );
+  });
+
+  it("uses display title and path when the workflow name is null", () => {
+    expect(
+      resolve(
+        pages(
+          run({
+            name: null,
+            display_title: "Display title",
+            conclusion: "STARTUP_FAILURE",
+          })
+        ),
+        suitePages()
+      )
+    ).toMatchObject([{ name: "Display title workflow" }]);
+    expect(
+      resolve(
+        pages(
+          run({
+            name: null,
+            display_title: null,
+            path: ".github/workflows/ci.yml",
+          })
+        ),
+        suitePages()
+      )
+    ).toMatchObject([{ name: ".github/workflows/ci.yml workflow" }]);
+  });
+
+  it("normalizes REST case and ignores unrelated runs and suites", () => {
+    expect(
+      resolve(
+        pages(
+          run({
+            status: "COMPLETED",
+            conclusion: "STARTUP_FAILURE",
+          }),
+          run({
+            id: 99,
+            workflow_id: 99,
+            check_suite_id: 999,
+            status: "completed",
+            conclusion: "success",
+          })
+        ),
+        [
+          {
+            total_count: 2,
+            check_suites: [
+              {
+                id: 30,
+                head_sha: head,
+                status: "COMPLETED",
+                conclusion: "STARTUP_FAILURE",
+                app: { slug: "GITHUB-ACTIONS" },
+                latest_check_runs_count: 0,
+              },
+              {
+                head_sha: head,
+                status: "completed",
+                conclusion: "failure",
+                app: { slug: "third-party" },
+                latest_check_runs_count: 0,
+              },
+            ],
+          },
+        ]
+      )
+    ).toMatchObject([{ reportedState: "STARTUP_FAILURE" }]);
+  });
+
+  it("fails closed on an unknown completed conclusion in an identified workflow", () => {
+    expect(() =>
+      resolve(pages(run({ conclusion: "new_future_state" })), suitePages())
+    ).toThrow(/workflow run.conclusion/);
+  });
+
+  it("counts only startup_failure as a failure, leaving cancelled and other conclusions alone", () => {
+    for (const conclusion of [
+      "action_required",
+      "neutral",
+      "skipped",
+      "cancelled",
+      "failure",
+      "timed_out",
+      "stale",
+    ])
+      expect(resolve(pages(run({ conclusion })), suitePages())).toEqual([]);
+  });
+
+  // Replays grafana/grafana#138385 at 038471dc2a94b1d373bddf1995b9d06249728d49:
+  // a cancel-in-progress workflow left a zero-run cancelled suite in the same
+  // second as the passing run.
+  it("ignores grafana-style zero-run cancelled suites beside a same-second green run", () => {
+    const grafanaHead = "038471dc2a94b1d373bddf1995b9d06249728d49";
+    const grafanaSuites = [
+      {
+        total_count: 3,
+        check_suites: [
+          {
+            id: 101,
+            head_sha: grafanaHead,
+            status: "completed",
+            conclusion: "cancelled",
+            app: { slug: "github-actions", name: "GitHub Actions" },
+            latest_check_runs_count: 1,
+          },
+          {
+            id: 102,
+            head_sha: grafanaHead,
+            status: "completed",
+            conclusion: "success",
+            app: { slug: "github-actions", name: "GitHub Actions" },
+            latest_check_runs_count: 1,
+          },
+          {
+            id: 103,
+            head_sha: grafanaHead,
+            status: "completed",
+            conclusion: "cancelled",
+            app: { slug: "github-actions", name: "GitHub Actions" },
+            latest_check_runs_count: 0,
+          },
+        ],
+      },
+    ];
+    const parsed = parseSuiteRead(grafanaSuites, grafanaHead, "reported");
+    expect(parsed.startupFailureSuites).toEqual([]);
+    expect(parsed.entries).toEqual([]);
+
+    // Even when workflow runs are queried for another workflow's startup_failure,
+    // the cancelled zero-run workflow does not produce a false failure.
+    const grafanaRuns = [
+      {
+        id: 44577615023,
+        workflow_id: 500,
+        check_suite_id: 103,
+        event: "pull_request",
+        head_sha: grafanaHead,
+        status: "completed",
+        conclusion: "cancelled",
+        created_at: "2026-11-19T17:28:50Z",
+        name: "Unified Storage Compatibility",
+        html_url: "https://github.com/grafana/grafana/actions/runs/44577615023",
+      },
+      {
+        id: 44577614969,
+        workflow_id: 500,
+        check_suite_id: 102,
+        event: "pull_request",
+        head_sha: grafanaHead,
+        status: "completed",
+        conclusion: "success",
+        created_at: "2026-11-19T17:28:50Z",
+        name: "Unified Storage Compatibility",
+        html_url: "https://github.com/grafana/grafana/actions/runs/44577614969",
+      },
+      {
+        id: 44577612080,
+        workflow_id: 500,
+        check_suite_id: 101,
+        event: "pull_request",
+        head_sha: grafanaHead,
+        status: "completed",
+        conclusion: "cancelled",
+        created_at: "2026-11-19T17:28:49Z",
+        name: "Unified Storage Compatibility",
+        html_url: "https://github.com/grafana/grafana/actions/runs/44577612080",
+      },
+    ];
+    expect(
+      resolveWorkflowRunChecks(pages(...grafanaRuns), parsed, grafanaHead)
+        .checks
+    ).toEqual([]);
+  });
+
+  it("keeps a zero-run failure when a later same-identity run is neutral, skipped, or cancelled regardless of input order", () => {
+    for (const conclusion of ["neutral", "skipped", "cancelled"]) {
+      const older = run();
+      const newer = run({
+        id: 11,
+        check_suite_id: 31,
+        conclusion,
+        created_at: "2026-11-19T10:01:00Z",
+      });
+      const suites = suitePages(0, [
+        {
+          id: 31,
+          head_sha: head,
+          status: "completed",
+          conclusion,
+          app: { slug: "github-actions" },
+          latest_check_runs_count: 0,
+        },
+      ]);
+      // Test both oldest-first and the GitHub API's newest-first ordering.
+      for (const ordered of [
+        [older, newer],
+        [newer, older],
+      ])
+        expect(resolve(pages(...ordered), suites)).toMatchObject([
+          { kind: "failed", reportedState: "STARTUP_FAILURE" },
+        ]);
+    }
+  });
+
+  it("reports a newer pending run and clears a newer success even when the successor suite count is nonzero", () => {
+    const older = run();
+    const newerPending = run({
+      id: 11,
+      check_suite_id: 31,
+      status: "in_progress",
+      conclusion: null,
+      created_at: "2026-11-19T10:01:00Z",
+    });
+    const pendingSuites = suitePages(0, [
+      {
+        id: 31,
+        head_sha: head,
+        status: "in_progress",
+        conclusion: null,
+        app: { slug: "github-actions" },
+        latest_check_runs_count: 2,
+      },
+    ]);
+    for (const ordered of [
+      [older, newerPending],
+      [newerPending, older],
+    ])
+      expect(resolve(pages(...ordered), pendingSuites)).toMatchObject([
+        { kind: "pending", reportedState: "IN_PROGRESS" },
+      ]);
+
+    const newerSuccess = run({
+      id: 12,
+      check_suite_id: 32,
+      conclusion: "success",
+      created_at: "2026-11-19T10:01:00Z",
+    });
+    const successSuites = suitePages(0, [
+      {
+        id: 32,
+        head_sha: head,
+        status: "completed",
+        conclusion: "success",
+        app: { slug: "github-actions" },
+        latest_check_runs_count: 2,
+      },
+    ]);
+    for (const ordered of [
+      [older, newerSuccess],
+      [newerSuccess, older],
+    ])
+      expect(resolve(pages(...ordered), successSuites)).toEqual([]);
+  });
+
+  it("lets a newer pending rerun supersede an older failure regardless of input order", () => {
+    const older = run();
+    const newer = run({
+      id: 11,
+      check_suite_id: 31,
+      status: "in_progress",
+      conclusion: null,
+      created_at: "2026-11-19T10:01:00Z",
+    });
+    const suites = [
+      {
+        total_count: 2,
+        check_suites: [
+          {
+            id: 30,
+            head_sha: head,
+            status: "completed",
+            conclusion: "startup_failure",
+            app: { slug: "github-actions" },
+            latest_check_runs_count: 0,
+          },
+          {
+            id: 31,
+            head_sha: head,
+            status: "in_progress",
+            conclusion: null,
+            app: { slug: "github-actions" },
+            latest_check_runs_count: 0,
+          },
+        ],
+      },
+    ];
+    for (const ordered of [
+      [older, newer],
+      [newer, older],
+    ])
+      expect(resolve(pages(...ordered), suites)).toMatchObject([
+        { kind: "pending", reportedState: "IN_PROGRESS" },
+      ]);
+  });
+
+  it("correlates pending and approval successors with non-completed suites", () => {
+    expect(
+      resolve(
+        pages(
+          run({
+            id: 12,
+            workflow_id: 22,
+            check_suite_id: 32,
+            status: "in_progress",
+            conclusion: null,
+            created_at: "2026-11-19T10:02:00Z",
+          }),
+          run({
+            id: 11,
+            workflow_id: 20,
+            check_suite_id: 31,
+            status: "in_progress",
+            conclusion: null,
+            created_at: "2026-11-19T10:01:00Z",
+          }),
+          run()
+        ),
+        suitePages(0, [
+          {
+            id: 31,
+            head_sha: head,
+            status: "in_progress",
+            conclusion: null,
+            app: { slug: "github-actions" },
+            latest_check_runs_count: 0,
+          },
+          {
+            id: 32,
+            head_sha: head,
+            status: "action_required",
+            conclusion: "success",
+            app: { slug: "github-actions" },
+            latest_check_runs_count: 0,
+          },
+        ])
+      )
+    ).toMatchObject([
+      { kind: "pending", reportedState: "IN_PROGRESS" },
+      { kind: "pending", reportedState: "IN_PROGRESS" },
+    ]);
   });
 });
 

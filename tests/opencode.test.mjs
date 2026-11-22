@@ -143,3 +143,16 @@ describe("OpenCode model names", () => {
   });
   test("matches the generated mapping section", () => expect(mapping).toContain(section));
 });
+
+describe("opencode-tools.md", () => {
+  test("reflect reads the session through OpenCode's export instead of Claude Code's transcript folder", () => {
+    const row = mapping.split("\n").find((line) => line.startsWith("| `reflect` |")) ?? "";
+    const missing = [
+      "`opencode session list --format json`",
+      "`opencode session export <id> > <file>`",
+      "`--sanitize`",
+      "say the transcript was not found",
+    ].filter((phrase) => !row.includes(phrase));
+    expect(missing).toEqual([]);
+  });
+});

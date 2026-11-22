@@ -6,7 +6,7 @@
 // The aliases resolve through the shipped models.json table of
 // PSTACK_PI_LIVE_PROVIDER (default openai), or through the `pi models:`
 // line in PSTACK_PI_LIVE_MODELS when it is set. The parent runs on the sonnet
-// alias. The panel test expects each agent on the model the extension's own
+// alias's table model. The panel test expects each agent on the model the extension's own
 // resolver picks, which on openai can be the codex tier model instead.
 // PSTACK_PI_LIVE_KEEP=1 keeps the throwaway directory for inspection.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";

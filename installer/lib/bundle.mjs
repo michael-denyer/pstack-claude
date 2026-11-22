@@ -28,8 +28,15 @@ export function stagePlugin(source, dest) {
   const fresh = `${dest}.new-${process.pid}`;
   const old = `${dest}.old-${process.pid}`;
   rmSync(fresh, { recursive: true, force: true });
-  cpSync(source, fresh, { recursive: true, filter: withoutNodeModules(source) });
-  if (existsSync(dest)) renameSync(dest, old);
-  renameSync(fresh, dest);
+  try {
+    cpSync(source, fresh, { recursive: true, filter: withoutNodeModules(source) });
+    if (existsSync(dest)) renameSync(dest, old);
+    renameSync(fresh, dest);
+  } catch (error) {
+    if (!existsSync(dest) && existsSync(old)) renameSync(old, dest);
+    throw error;
+  } finally {
+    rmSync(fresh, { recursive: true, force: true });
+  }
   rmSync(old, { recursive: true, force: true });
 }

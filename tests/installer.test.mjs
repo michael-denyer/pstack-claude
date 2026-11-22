@@ -254,6 +254,23 @@ describe("open-pstack CLI", () => {
     expect(s.calls()).toEqual([]);
   });
 
+  run("an empty --only= exits 2", () => {
+    const s = sandbox();
+    const r = s.open("--only=");
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("--only needs a comma list of ids");
+    expect(s.calls()).toEqual([]);
+  });
+
+  run("a staging failure exits 1 and leaves no partial copy", () => {
+    const s = sandbox();
+    writeFileSync(join(s.xdg, "open-pstack"), "a file where the data dir should be");
+    const r = s.open("--only", "skills");
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("Could not stage the plugin");
+    expect(existsSync(join(s.home, ".agents"))).toBe(false);
+  });
+
   run("an unknown harness id exits 2", () => {
     const r = sandbox().open("--only", "nope");
     expect(r.code).toBe(2);

@@ -46,7 +46,10 @@ function parseArgs(argv) {
       const value = argv[++i];
       if (!value) throw new UsageError("--only needs a comma list of ids");
       opts.only = idList(value);
-    } else if (arg.startsWith("--only=")) opts.only = idList(arg.slice(7));
+    } else if (arg.startsWith("--only=")) {
+      opts.only = idList(arg.slice(7));
+      if (opts.only.length === 0) throw new UsageError("--only needs a comma list of ids");
+    }
     else if (arg === "--yes" || arg === "-y") opts.yes = true;
     else if (arg === "--dry-run") opts.dryRun = true;
     else if (arg === "--list") opts.list = true;
@@ -100,11 +103,15 @@ function installHarness(harness, ctx, detected) {
   return { status: "ok" };
 }
 
-// The variables the installer reads; nothing else is looked at or passed on.
-const READ_VARS = ["PATH", "Path", "PATHEXT", "XDG_DATA_HOME", "MINIMAX_DATA_DIR"];
+// The only variables the installer reads; nothing else is looked at or passed on.
+function readEnv() {
+  const { PATH, Path, PATHEXT, XDG_DATA_HOME, MINIMAX_DATA_DIR } = process.env;
+  const env = { PATH, Path, PATHEXT, XDG_DATA_HOME, MINIMAX_DATA_DIR };
+  return Object.fromEntries(Object.entries(env).filter(([, value]) => value !== undefined));
+}
 
 export async function main(argv) {
-  const env = Object.fromEntries(READ_VARS.filter((k) => k in process.env).map((k) => [k, process.env[k]]));
+  const env = readEnv();
   const platform = process.platform;
   let opts;
   try {
@@ -182,7 +189,12 @@ export async function main(argv) {
 
   if (needsBundle) {
     console.log(`\nStaging the bundled plugin at ${ctx.pluginDir}`);
-    stagePlugin(source, ctx.pluginDir);
+    try {
+      stagePlugin(source, ctx.pluginDir);
+    } catch (error) {
+      console.error(`Could not stage the plugin at ${ctx.pluginDir}: ${error.message}`);
+      return 1;
+    }
   }
 
   const results = [];

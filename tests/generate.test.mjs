@@ -133,6 +133,14 @@ describe("regions", () => {
     expect(sheet).toContain("Setting `PSTACK_SESSION_HOOK=off` in the environment also keeps the hook off on Claude Code, and on Codex, GitHub Copilot, Muse, and Antigravity when the runtime passes the variable to its hooks;");
     expect(sheet).toContain("MiniMax Code passes its hooks a fixed set of variables, and the OMP, OpenCode, and Pi plugins read only the sheet.");
   });
+
+  test("setup-pstack step 8 scopes the PSTACK_SESSION_HOOK report to the runtimes that honor it", () => {
+    const text = readFileSync(join(repoRoot, "plugins/pstack/skills/setup-pstack/SKILL.md"), "utf8");
+    const step8 = text.slice(text.indexOf("### 8. Confirm"), text.indexOf("### 9."));
+    expect(step8).not.toContain("When `PSTACK_SESSION_HOOK` is `off` in the environment, say");
+    expect(step8).toContain("on Claude Code, or on Codex, GitHub Copilot, Muse, or Antigravity when the runtime passes the variable to its hooks, say that it keeps the hook off over the sheet.");
+    expect(step8).toContain("MiniMax Code, OMP, OpenCode, and Pi do not read the variable, so do not report it there.");
+  });
 });
 
 describe("runtime model names", () => {

@@ -83,7 +83,7 @@ On Claude Code, if `<config>/CLAUDE.md` does not already include `<config>/pstac
 
 ### 8. Confirm
 
-Tell the user where the override was written, how its model rows load, and whether the plugin hook is on. When `PSTACK_SESSION_HOOK` is `off` in the environment, say that it keeps the hook off over the sheet. Re-running this skill updates the override sheet.
+Tell the user where the override was written, how its model rows load, and whether the plugin hook is on. When `PSTACK_SESSION_HOOK` is `off` in the environment on Claude Code, or on Codex, GitHub Copilot, Muse, or Antigravity when the runtime passes the variable to its hooks, say that it keeps the hook off over the sheet. MiniMax Code, OMP, OpenCode, and Pi do not read the variable, so do not report it there. Re-running this skill updates the override sheet.
 
 ### 9. Offer a verification skill (optional)
 

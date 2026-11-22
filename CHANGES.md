@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.148 - watch-pr reports Actions startup failures
+
+`watch-pr` read a head as clean when every reported check passed, even if an Actions workflow on that head failed before it created a run. Such a workflow ends in `startup_failure` with a check suite that has no runs, so no check read showed it. `watch-pr` now reads the head's workflow runs when it finds such a suite, and reports the latest run for each workflow and event as failing CI. A later pending, successful, or `startup_failure` run for the same workflow replaces an earlier one. A cancelled run still does not count as a failure. From @flipcyde101 ([#484](https://github.com/michael-denyer/pstack-claude/pull/484), for [#474](https://github.com/michael-denyer/pstack-claude/issues/474)).
+
 ## 0.9.147 - Pi agents in herdr-core terminals, reflect on Pi, Codex and OpenCode, REST reads in cloud sessions
 
 With a `pi agent host: hc` line in the sheet, and a Pi session running inside [herdr-core](https://github.com/herdrdev/herdr-core), the Pi `agent` tool runs each child as an interactive `pi` in its own `hc` terminal instead of a hidden `pi --mode rpc` process. The user can watch a running agent and type into it. The child gets the parent's environment through a 0600 file instead of argv. `stop_agent` sends SIGTERM to the terminal's process group, then SIGKILL after `killGraceMs`. A restored session finds the terminal by its recorded pid. Without the line, or outside herdr-core, the RPC path is unchanged. On Linux, a prompt over 128 KiB fails, because `hc send` takes the text as an argument. From @xinlihhh ([#447](https://github.com/michael-denyer/pstack-claude/pull/447)).

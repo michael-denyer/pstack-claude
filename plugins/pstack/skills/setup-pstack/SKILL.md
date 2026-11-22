@@ -45,7 +45,7 @@ Then ask for the default reasoning effort, the `default effort` line. It is `ses
 
 ### 4. Choose whether the session hook routes tasks
 
-On Claude Code, the plugin's `SessionStart` hook injects the poteto-mode mandate on startup, resume, clear, and compact. Ask whether to keep the hook. The default is on. The answer is the `session hook` line in the current runtime's sheet: `on` or `off`. With no sheet or no line, the hook injects. The line is inert on other runtimes without a pstack routing hook. An environment that sets `PSTACK_SESSION_HOOK=off` keeps the hook off whatever the sheet says. A Claude Code cloud session (`CLAUDE_CODE_REMOTE=true`) starts with an empty home, so a user sheet written there does not reach the next session. To keep the hook off there, tell the user to set `PSTACK_SESSION_HOOK=off` in the cloud environment's settings or to commit a project sheet.
+On Claude Code, the plugin's `SessionStart` hook injects the poteto-mode mandate on startup, resume, clear, and compact. Ask whether to keep the hook. The default is on. The answer is the `session hook` line in the current runtime's sheet: `on` or `off`. With no sheet or no line, the hook injects. The line is inert on other runtimes without a pstack routing hook. On Claude Code, and on Codex, GitHub Copilot, Muse, and Antigravity when the runtime passes the variable to its hooks, an environment that sets `PSTACK_SESSION_HOOK=off` keeps the hook off whatever the sheet says. A Claude Code cloud session (`CLAUDE_CODE_REMOTE=true`) starts with an empty home, so a user sheet written there does not reach the next session. To keep the hook off there, tell the user to set `PSTACK_SESSION_HOOK=off` in the cloud environment's settings or to commit a project sheet.
 
 ### 5. Validate
 
@@ -58,7 +58,7 @@ Write the current runtime's sheet with the shape below. Overwrite the whole file
 ```markdown
 # pstack model configuration
 
-Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out. A model may carry a reasoning effort, as in `opus @xhigh` (levels: low, medium, high, xhigh, max); the role's subagent then runs at that level, each entry of a panel list on its own. `default effort` sets the level for a value without one; `session` uses the runtime's platform mapping to start from the parent session's effort. On Codex this requires active-turn metadata or an explicit effort choice. `session hook: off` stops the supported runtime's pstack routing hook from injecting the poteto-mode mandate; any other value, or no line, leaves it on unless the environment sets `PSTACK_SESSION_HOOK=off`.
+Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out. A model may carry a reasoning effort, as in `opus @xhigh` (levels: low, medium, high, xhigh, max); the role's subagent then runs at that level, each entry of a panel list on its own. `default effort` sets the level for a value without one; `session` uses the runtime's platform mapping to start from the parent session's effort. On Codex this requires active-turn metadata or an explicit effort choice. `session hook: off` stops the supported runtime's pstack routing hook from injecting the poteto-mode mandate; any other value, or no line, leaves it on. Setting `PSTACK_SESSION_HOOK=off` in the environment also keeps the hook off on Claude Code, and on Codex, GitHub Copilot, Muse, and Antigravity when the runtime passes the variable to its hooks; MiniMax Code passes its hooks a fixed set of variables, and the OMP, OpenCode, and Pi plugins read only the sheet.
 
 feature, refactoring: sonnet
 bug-fix: opus
@@ -83,7 +83,7 @@ On Claude Code, if `<config>/CLAUDE.md` does not already include `<config>/pstac
 
 ### 8. Confirm
 
-Tell the user where the override was written, how its model rows load, and whether the plugin hook is on. When `PSTACK_SESSION_HOOK` is `off` in the environment, say that it keeps the hook off over the sheet. Re-running this skill updates the override sheet.
+Tell the user where the override was written, how its model rows load, and whether the plugin hook is on. When `PSTACK_SESSION_HOOK` is `off` in the environment on Claude Code, or on Codex, GitHub Copilot, Muse, or Antigravity when the runtime passes the variable to its hooks, say that it keeps the hook off over the sheet. MiniMax Code passes its hooks a fixed set of variables, and the OMP, OpenCode, and Pi plugins read only the sheet, so do not report it there. Re-running this skill updates the override sheet.
 
 ### 9. Offer a verification skill (optional)
 

@@ -5,7 +5,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { lineSplitter } from "../../plugins/pstack/pi/child.ts";
-import { parseSheet } from "../../plugins/pstack/pi/config.ts";
+import { parseSheet, resolveModel } from "../../plugins/pstack/pi/config.ts";
 import { readEntries, sleep } from "./harness.mjs";
 
 export const MINUTE = 60_000;
@@ -20,6 +20,22 @@ export function liveModels(root, head = "") {
   const shipped = JSON.parse(readFileSync(join(root, "models.json"), "utf8")).pi.models[provider];
   if (!shipped) throw new Error(`models.json has no pi table for "${provider}"`);
   return { sheet, models: new Map([...Object.entries(shipped), ...parseSheet(sheet).piModels]) };
+}
+
+// The model the extension gives an agent for each alias, by its own
+// resolveModel. On an OpenAI session that can be the models.json codex tier
+// model rather than the pi table's, when pi lists it. pi has no
+// machine-readable model list, so this reads its table and fails if the
+// parent's model is not in it.
+export function agentModels(root, sheet, parentModel, env, aliases) {
+  const run = spawnSync("pi", ["--list-models"], { env, encoding: "utf8" });
+  if (run.status !== 0) throw new Error(`pi --list-models failed: ${run.stderr}`);
+  const listed = new Set(run.stdout.split("\n").map((line) => line.trim().split(/\s+/).slice(0, 2).join("/")));
+  if (!listed.has(parentModel)) throw new Error(`pi --list-models does not list ${parentModel}:\n${run.stdout}`);
+  const catalog = { find: (provider, id) => (listed.has(`${provider}/${id}`) ? { provider, id } : undefined) };
+  const settings = { modelsFile: join(root, "models.json") };
+  const parsed = parseSheet(sheet);
+  return new Map(aliases.map((alias) => [alias, resolveModel(alias, settings, parsed, parentModel, catalog)]));
 }
 
 export const textOf = (m) =>

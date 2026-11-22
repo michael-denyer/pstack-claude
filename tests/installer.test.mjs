@@ -282,6 +282,15 @@ describe("open-pstack CLI", () => {
     );
   });
 
+  // Homebrew builds from the GitHub tag tarball, which keeps git's file mode;
+  // npm sets the bit itself, so only this catches a 644 bin.
+  test("the bin is committed executable", () => {
+    const r = spawnSync("git", ["-C", repoRoot, "ls-files", "-s", "installer/bin/open-pstack.mjs"], {
+      encoding: "utf8",
+    });
+    expect(r.stdout.split(" ")[0]).toBe("100755");
+  });
+
   run("--version prints the repo version", () => {
     const version = readFileSync(join(repoRoot, "VERSION"), "utf8").trim();
     expect(sandbox().open("--version").out.trim()).toBe(version);

@@ -176,8 +176,8 @@ export function resolveWorkflowRunChecks(
       link: run.link,
       workflow: run.name,
     };
+    if (canSupersede(run)) ownCorrelatedSuites(ownedSuiteIds, runs, run);
     if (run.status !== "completed") {
-      ownCorrelatedSuites(ownedSuiteIds, runs, run);
       checks.push({
         ...details,
         kind: "pending",
@@ -186,10 +186,7 @@ export function resolveWorkflowRunChecks(
       });
       continue;
     }
-    if (run.conclusion === "success")
-      ownCorrelatedSuites(ownedSuiteIds, runs, run);
     if (run.conclusion !== STARTUP_FAILURE) continue;
-    ownCorrelatedSuites(ownedSuiteIds, runs, run);
     checks.push({
       ...details,
       kind: "failed",

@@ -156,10 +156,7 @@ export function parseSuiteRead(
               "check suite.conclusion of a completed suite"
             ).toLowerCase()
           : null;
-      const state =
-        status === "completed" && conclusion !== null
-          ? { conclusion }
-          : { status };
+      const state = conclusion !== null ? { conclusion } : { status };
       if (isActions) {
         if (suiteId !== null && runs !== null)
           actionsSuites.set(suiteId, {
@@ -195,7 +192,10 @@ export function unsettledSuiteChecks(
   checksRead: CheckRead["kind"],
   expectedApps: readonly string[] = []
 ): SuiteRead {
-  const parsed = parseSuiteRead(pages, head, checksRead, expectedApps);
+  return suiteReadOf(parseSuiteRead(pages, head, checksRead, expectedApps));
+}
+
+export function suiteReadOf(parsed: ParsedSuiteRead): SuiteRead {
   return {
     checks: parsed.entries.map((entry) => entry.check),
     queuedWithoutRuns: parsed.queuedWithoutRuns,

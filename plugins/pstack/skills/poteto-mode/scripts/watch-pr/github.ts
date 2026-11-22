@@ -1,4 +1,8 @@
-import { parseSuiteRead, unsettledSuiteChecks } from "./check-suites.ts";
+import {
+  parseSuiteRead,
+  suiteReadOf,
+  unsettledSuiteChecks,
+} from "./check-suites.ts";
 import { baseRefTargetOid, text } from "./landing.ts";
 import {
   mergeWorkflowRunChecks,
@@ -776,11 +780,7 @@ export class GhGitHubReader implements T.GitHubReader {
       checksRead,
       expectedApps
     );
-    if (parsed.startupFailureSuites.length === 0)
-      return {
-        checks: parsed.entries.map((entry) => entry.check),
-        queuedWithoutRuns: parsed.queuedWithoutRuns,
-      };
+    if (parsed.startupFailureSuites.length === 0) return suiteReadOf(parsed);
     const workflowPages = await this.runJson([
       "gh",
       "api",

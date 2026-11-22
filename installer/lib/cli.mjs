@@ -25,10 +25,10 @@ Harness ids: ${HARNESSES.map((h) => h.id).join(", ")}
 Run in a terminal for an interactive picker, or pass --only or --yes.
 `;
 
-const version = () =>
-  JSON.parse(
-    readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "package.json"), "utf8"),
-  ).version;
+function version() {
+  const packageJson = join(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
+  return JSON.parse(readFileSync(packageJson, "utf8")).version;
+}
 
 class UsageError extends Error {}
 
@@ -113,13 +113,22 @@ export async function main(argv) {
     console.error(`${error.message}\n\n${USAGE}`);
     return 2;
   }
-  if (opts.help) return console.log(USAGE), 0;
-  if (opts.version) return console.log(version()), 0;
+  if (opts.help) {
+    console.log(USAGE);
+    return 0;
+  }
+  if (opts.version) {
+    console.log(version());
+    return 0;
+  }
 
   const ctx = { home: homedir(), env, platform, pluginDir: null };
   ctx.pluginDir = stableDir(ctx);
   const detected = new Set(HARNESSES.filter((h) => detect(h, ctx)).map((h) => h.id));
-  if (opts.list) return printList(detected), 0;
+  if (opts.list) {
+    printList(detected);
+    return 0;
+  }
 
   const interactive = !opts.only && !opts.yes;
   if (interactive && !(process.stdin.isTTY && process.stdout.isTTY)) {
@@ -138,8 +147,9 @@ export async function main(argv) {
     }
   } catch (error) {
     rl?.close();
-    if (error instanceof UsageError) return console.error(`${error.message}\n\n${USAGE}`), 2;
-    throw error;
+    if (!(error instanceof UsageError)) throw error;
+    console.error(`${error.message}\n\n${USAGE}`);
+    return 2;
   }
 
   if (selected.length === 0) {
@@ -157,11 +167,17 @@ export async function main(argv) {
     for (const step of h.steps(ctx)) console.log(`  ${describeStep(step)}`);
   }
 
-  if (opts.dryRun) return rl?.close(), 0;
+  if (opts.dryRun) {
+    rl?.close();
+    return 0;
+  }
   if (rl) {
     const go = (await rl.question("\nProceed? [Y/n] ")).trim().toLowerCase();
     rl.close();
-    if (go !== "" && go !== "y" && go !== "yes") return console.log("Cancelled."), 0;
+    if (go !== "" && go !== "y" && go !== "yes") {
+      console.log("Cancelled.");
+      return 0;
+    }
   }
 
   if (needsBundle) {

@@ -1,18 +1,20 @@
 // prepack: copy the plugin and its licenses into installer/ so the tarball
 // carries them. Also runs from a checkout; the copies are gitignored.
 import { cpSync, mkdirSync, rmSync } from "node:fs";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { withoutNodeModules } from "../lib/bundle.mjs";
 
 const installer = join(dirname(fileURLToPath(import.meta.url)), "..");
 const repo = join(installer, "..");
+const pluginSource = join(repo, "plugins", "pstack");
 
 rmSync(join(installer, "plugin"), { recursive: true, force: true });
 mkdirSync(join(installer, "plugin"), { recursive: true });
-cpSync(join(repo, "plugins", "pstack"), join(installer, "plugin"), {
+cpSync(pluginSource, join(installer, "plugin"), {
   recursive: true,
-  filter: (src) =>
-    !relative(join(repo, "plugins", "pstack"), src).split(sep).includes("node_modules"),
+  filter: withoutNodeModules(pluginSource),
 });
 for (const name of [
   "LICENSE",

@@ -26,10 +26,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # the main-ancestry check below needs origin/main's history
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "24"
+          # Trusted publishing needs npm 11.5.1 or later; Node 24.22.3 bundles npm 11.19.1.
+          node-version: "24.22.3"
           package-manager-cache: false
+      - name: Check the tag points at a commit on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "$GITHUB_SHA is not on main; publish only tags of merged releases" >&2
+            exit 1
+          fi
       - name: Check the tag, VERSION, and installer version agree
         env:
           TAG: ${{ github.ref_name }}
@@ -63,10 +71,6 @@ jobs:
             cat npm-view.err >&2
             exit 1
           fi
-      # Trusted publishing needs npm 11.5.1 or later.
-      - name: Install npm 11.5.1
-        if: steps.published.outputs.exists == 'false'
-        run: npm install --global npm@11.5.1
       - name: Publish with provenance
         if: steps.published.outputs.exists == 'false'
         working-directory: installer

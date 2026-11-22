@@ -11,6 +11,14 @@
 *.code-workspace
 .claude/settings.local.json
 
+# staged by installer/scripts/stage.mjs on prepack
+installer/plugin/
+installer/LICENSE
+installer/LICENSE-cursor-team-kit
+installer/LICENSE-thermos
+installer/NOTICE.md
+installer/NOTICE-skills.md
+
 # bun deps for the vendored poteto-mode scripts (bootstrap.ts installs them on first run)
 plugins/pstack/skills/poteto-mode/scripts/node_modules/
 

@@ -1,0 +1,247 @@
+// open-pstack installs pstack into the harnesses on PATH using each
+// README recipe. The registry is pinned to the README so neither side can
+// drift, and the CLI runs end to end against stub harness binaries in a
+// throwaway HOME.
+import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { delimiter, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { HARNESSES } from "../installer/lib/harnesses.mjs";
+
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const cli = join(repoRoot, "installer/bin/open-pstack.mjs");
+const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
+const PLUGIN_DIR = "<pluginDir>";
+
+// README -> argv lists -----------------------------------------------------
+
+function tokenize(line) {
+  const out = [];
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  for (let m; (m = re.exec(line)); ) out.push(m[1] ?? m[2] ?? m[3]);
+  return out;
+}
+
+const isPluginPath = (t) => t === "./plugins/pstack" || t === "$PWD/plugins/pstack";
+
+// Fenced commands under each harness's <details> in the README Install section.
+function readmeCommands() {
+  const install = readme.slice(readme.indexOf("\n## Install"), readme.indexOf("\n### Configure"));
+  const sections = {};
+  for (const block of install.split("<details>").slice(1)) {
+    const name = block.match(/<summary><strong>(.*?)<\/strong>/)[1];
+    const lines = [];
+    for (const fence of block.matchAll(/```(?:shell|text|bash)\n([\s\S]*?)```/g)) {
+      lines.push(...fence[1].split("\n").filter(Boolean));
+    }
+    sections[name] = lines;
+  }
+  return sections;
+}
+
+const sections = readmeCommands();
+
+const ctx = { home: "/home/u", env: {}, platform: "linux", pluginDir: PLUGIN_DIR };
+
+describe("registry matches the README recipes", () => {
+  const withBin = HARNESSES.filter((h) => h.bin && h.id !== "minimax" && h.id !== "kimi");
+  for (const harness of withBin) {
+    test(`${harness.id} runs the README commands`, () => {
+      // Claude Code's README uses the in-session /plugin form of the same commands.
+      const readmeArgv = sections[harness.name]
+        .map((line) => tokenize(line.replace(/^\/plugin /, "claude plugin ")))
+        .filter(([bin, , sub]) => bin === harness.bin && !["check", "update"].includes(sub))
+        .map((argv) => argv.map((t) => (isPluginPath(t) ? PLUGIN_DIR : t)));
+      const registryArgv = harness
+        .steps(ctx)
+        .filter((s) => s.kind === "run")
+        .map((s) => s.argv);
+      expect(registryArgv.length).toBeGreaterThan(0);
+      expect(registryArgv).toEqual(readmeArgv);
+    });
+  }
+
+  test("kimi prints the README in-session commands", () => {
+    const kimi = HARNESSES.find((h) => h.id === "kimi");
+    const [step] = kimi.steps(ctx);
+    expect(step.kind).toBe("manual");
+    const slash = sections["Kimi Code CLI"].filter((l) => l.startsWith("/"));
+    expect(slash.length).toBe(2);
+    expect(step.lines.filter((l) => l.startsWith("/"))).toEqual(slash);
+  });
+
+  test("minimax copies the plugin where the README does", () => {
+    const minimax = HARNESSES.find((h) => h.id === "minimax");
+    const copy = readme.match(/cp -R plugins\/pstack "\$\{MINIMAX_DATA_DIR:-\$HOME\/\.minimax\}\/plugins\/pstack"/);
+    expect(copy).not.toBeNull();
+    const [step] = minimax.steps({ ...ctx, env: {} });
+    expect(step).toEqual({ kind: "copy", from: PLUGIN_DIR, to: "/home/u/.minimax/plugins/pstack" });
+    const [moved] = minimax.steps({ ...ctx, env: { MINIMAX_DATA_DIR: "/data" } });
+    expect(moved.to).toBe("/data/plugins/pstack");
+  });
+
+  test("skills links each skill dir into ~/.agents/skills", () => {
+    expect(readme).toContain("mkdir -p ~/.agents/skills");
+    const skills = HARNESSES.find((h) => h.id === "skills");
+    expect(skills.bin).toBeNull();
+    expect(skills.steps({ ...ctx, pluginDir: "/p" })).toEqual([
+      { kind: "link-skills", from: "/p/skills", to: "/home/u/.agents/skills" },
+    ]);
+  });
+
+  test("every harness with a binary has a README section", () => {
+    for (const h of HARNESSES.filter((h) => h.bin)) expect(sections[h.name]).toBeDefined();
+  });
+});
+
+// CLI end to end -----------------------------------------------------------
+
+const onWindows = process.platform === "win32";
+const run = onWindows ? test.skip : test;
+
+function nodePath() {
+  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+    if (existsSync(join(dir, "node"))) return join(dir, "node");
+  }
+  throw new Error("node not on PATH");
+}
+
+function sandbox(exitCodes = {}) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "open-pstack-")));
+  const home = join(root, "home");
+  const xdg = join(root, "xdg");
+  const minimax = join(root, "minimax");
+  const bin = join(root, "bin");
+  const log = join(root, "calls.log");
+  for (const dir of [home, xdg, bin]) mkdirSync(dir);
+  writeFileSync(log, "");
+  for (const name of ["claude", "codex", "pi", "copilot", "muse", "omp", "kimi", "grok", "mcode", "opencode", "agy"]) {
+    writeFileSync(
+      join(bin, name),
+      `#!/bin/sh\nprintf '%s\\n' "${name} $*" >> "${log}"\nexit ${exitCodes[name] ?? 0}\n`,
+      { mode: 0o755 },
+    );
+  }
+  const env = {
+    PATH: [bin, dirname(nodePath())].join(delimiter),
+    HOME: home,
+    XDG_DATA_HOME: xdg,
+    MINIMAX_DATA_DIR: minimax,
+  };
+  const open = (...args) => {
+    const r = spawnSync(nodePath(), [cli, ...args], { env, encoding: "utf8", input: "" });
+    return { code: r.status, out: r.stdout, err: r.stderr };
+  };
+  const calls = () => readFileSync(log, "utf8").split("\n").filter(Boolean);
+  return { root, home, xdg, minimax, open, calls, staged: join(xdg, "open-pstack", "pstack") };
+}
+
+describe("open-pstack CLI", () => {
+  run("--yes installs into every detected harness", () => {
+    const s = sandbox();
+    const r = s.open("--yes");
+    expect(r.code).toBe(0);
+    const repo = "michael-denyer/pstack-claude";
+    expect(s.calls()).toEqual([
+      `claude plugin marketplace add ${repo}`,
+      "claude plugin install pstack@pstack-claude",
+      `codex plugin marketplace add ${repo}`,
+      "codex plugin add pstack@pstack-claude",
+      `pi install git:github.com/${repo}`,
+      `copilot plugin marketplace add ${repo}`,
+      "copilot plugin install pstack@pstack-claude",
+      `muse plugins install ${s.staged}`,
+      "muse plugins approve pstack",
+      `omp plugin marketplace add ${repo}`,
+      "omp plugin install --scope user pstack@pstack-claude",
+      `grok plugin install ${s.staged} --trust`,
+      "grok plugin enable pstack",
+      `opencode plugin add github:${repo}#main`,
+      `agy plugin install ${s.staged}`,
+    ]);
+    expect(r.out).toContain("kimi");
+    expect(existsSync(join(s.staged, ".claude-plugin", "plugin.json"))).toBe(true);
+    expect(existsSync(join(s.minimax, "plugins", "pstack", ".claude-plugin", "plugin.json"))).toBe(true);
+    const skills = readdirSync(join(s.staged, "skills"));
+    expect(skills).toContain("poteto-mode");
+    for (const skill of skills) {
+      expect(realpathSync(join(s.home, ".agents", "skills", skill))).toBe(
+        realpathSync(join(s.staged, "skills", skill)),
+      );
+    }
+  });
+
+  run("a rerun converges to the same state", () => {
+    const s = sandbox();
+    s.open("--yes");
+    const before = readdirSync(join(s.home, ".agents", "skills")).sort();
+    const r = s.open("--yes");
+    expect(r.code).toBe(0);
+    expect(r.err).toBe("");
+    expect(readdirSync(join(s.home, ".agents", "skills")).sort()).toEqual(before);
+    expect(readdirSync(join(s.xdg, "open-pstack"))).toEqual(["pstack"]);
+    expect(existsSync(join(s.staged, "skills", "poteto-mode", "SKILL.md"))).toBe(true);
+    expect(r.out).toMatch(/minimax\s+skipped/);
+    expect(r.out).toMatch(/skills\s+skipped/);
+  });
+
+  run("one failing harness does not stop the others and sets exit 1", () => {
+    const s = sandbox({ claude: 3 });
+    const r = s.open("--yes");
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/claude\s+failed \(exit 3\)/);
+    expect(s.calls()).not.toContain("claude plugin install pstack@pstack-claude");
+    expect(s.calls()).toContain("pi install git:github.com/michael-denyer/pstack-claude");
+    expect(existsSync(join(s.home, ".agents", "skills", "poteto-mode"))).toBe(true);
+  });
+
+  run("--only installs just the named harnesses", () => {
+    const s = sandbox();
+    const r = s.open("--only", "pi");
+    expect(r.code).toBe(0);
+    expect(s.calls()).toEqual(["pi install git:github.com/michael-denyer/pstack-claude"]);
+    expect(existsSync(s.staged)).toBe(false);
+  });
+
+  run("--dry-run prints the steps and writes nothing", () => {
+    const s = sandbox();
+    const r = s.open("--yes", "--dry-run");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("claude plugin install pstack@pstack-claude");
+    expect(r.out).toContain(`muse plugins install ${s.staged}`);
+    expect(s.calls()).toEqual([]);
+    expect(readdirSync(s.home)).toEqual([]);
+    expect(readdirSync(s.xdg)).toEqual([]);
+    expect(existsSync(s.minimax)).toBe(false);
+  });
+
+  run("no terminal and no flags exits 2 with usage", () => {
+    const s = sandbox();
+    const r = s.open();
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("Usage: open-pstack");
+    expect(s.calls()).toEqual([]);
+  });
+
+  run("an unknown harness id exits 2", () => {
+    const r = sandbox().open("--only", "nope");
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("unknown harness id: nope");
+  });
+
+  run("--version prints the repo version", () => {
+    const version = readFileSync(join(repoRoot, "VERSION"), "utf8").trim();
+    expect(sandbox().open("--version").out.trim()).toBe(version);
+  });
+});

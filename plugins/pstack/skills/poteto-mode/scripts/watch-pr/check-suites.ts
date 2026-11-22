@@ -1,4 +1,4 @@
-import { WatcherQueryError } from "./github.ts";
+import { isRecord, missing } from "./query-error.ts";
 import { text } from "./landing.ts";
 import type { CheckRead, SuiteApp, SuiteCheck, SuiteRead } from "./types.ts";
 
@@ -25,30 +25,6 @@ export interface ParsedSuiteRead {
   readonly queuedWithoutRuns: readonly SuiteApp[];
   readonly actionsSuites: ReadonlyMap<number, ActionsSuiteEvidence>;
   readonly startupFailureSuites: readonly StartupFailureSuite[];
-}
-
-function raw(value: unknown): string {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
-function missing(path: string, value?: unknown): never {
-  throw new WatcherQueryError({
-    kind: "missing-field",
-    retryable: true,
-    detail:
-      value === undefined
-        ? `missing ${path}`
-        : `invalid ${path}: ${raw(value)}`,
-    ...(value === undefined ? {} : { rawValue: raw(value) }),
-  });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function positiveInteger(value: unknown): number | null {

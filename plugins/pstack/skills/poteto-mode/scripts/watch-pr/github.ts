@@ -6,6 +6,7 @@ import {
 } from "./workflow-runs.ts";
 import { spawn } from "node:child_process";
 import { DeadlineExceeded, type WatchDeadline } from "./deadline.ts";
+import { WatcherQueryError } from "./query-error.ts";
 import type * as T from "./types.ts";
 import { nonEmpty, parsePrNumber } from "./types.ts";
 export const REVIEW_THREADS_QUERY =
@@ -36,14 +37,7 @@ interface CommandResult {
   readonly stdout: string;
   readonly stderr: string;
 }
-export class WatcherQueryError extends Error {
-  readonly failure: T.QueryFailure;
-  constructor(failure: T.QueryFailure) {
-    super(failure.detail);
-    this.name = "WatcherQueryError";
-    this.failure = failure;
-  }
-}
+export { WatcherQueryError };
 export class ChecksUnavailable extends WatcherQueryError {
   constructor(detail: string) {
     super({ kind: "checks-unavailable", retryable: true, detail });

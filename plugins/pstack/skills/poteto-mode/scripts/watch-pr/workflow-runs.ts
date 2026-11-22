@@ -1,5 +1,5 @@
 import type { ParsedSuiteRead } from "./check-suites.ts";
-import { WatcherQueryError } from "./github.ts";
+import { isRecord, missing } from "./query-error.ts";
 import type { SuiteCheck, SuiteRead } from "./types.ts";
 
 interface WorkflowRun {
@@ -32,30 +32,6 @@ const KNOWN_COMPLETED_CONCLUSIONS = new Set([
   "cancelled",
   "stale",
 ]);
-
-function raw(value: unknown): string {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
-function missing(path: string, value?: unknown): never {
-  throw new WatcherQueryError({
-    kind: "missing-field",
-    retryable: true,
-    detail:
-      value === undefined
-        ? `missing ${path}`
-        : `invalid ${path}: ${raw(value)}`,
-    ...(value === undefined ? {} : { rawValue: raw(value) }),
-  });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function positiveInteger(value: unknown, path: string): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0)

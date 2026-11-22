@@ -1,4 +1,4 @@
-import { WatcherQueryError } from "./github.ts";
+import { WatcherQueryError } from "./query-error.ts";
 import { parsePrNumber, type PrContext } from "./types.ts";
 
 export interface LandingRevision {

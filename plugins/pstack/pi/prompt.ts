@@ -28,8 +28,8 @@ const PARALLEL_CALLS =
 // the mandate: SessionStart does not run for subagents.
 export function registerPromptSections(pi: ExtensionAPI, settings: Settings): void {
   const mandateFile = join(settings.pluginRoot, "hooks", "session-start-context.md");
-  pi.on("before_agent_start", (event) => {
-    const sheet = readSheet(settings.agentDir);
+  pi.on("before_agent_start", (event, ctx) => {
+    const sheet = readSheet(settings.agentDir, ctx.cwd);
     const sections = event.systemPromptOptions.sections;
     sections[PARALLEL_SECTION] = PARALLEL_CALLS;
     sections[TOOLS_SECTION] = piToolsNote(settings.pluginRoot);

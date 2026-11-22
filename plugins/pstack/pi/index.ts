@@ -13,7 +13,8 @@ export function install(pi: ExtensionAPI, settings: Settings): void {
   const runner = new AgentRunner(pi, settings);
   const scheduler = new Scheduler();
   const oneShot = registerOneShot(pi, settings, runner);
-  const sheet = readSheet(settings.agentDir);
+  // The extension loads in the project directory, so process.cwd() is the project a committed sheet applies to.
+  const sheet = readSheet(settings.agentDir, process.cwd());
   if (!sheet?.agentToolsOff) registerAgentTools(pi, runner, settings);
   if (!sheet?.askToolOff) registerAsk(pi, oneShot);
   registerSchedule(pi, scheduler, oneShot);

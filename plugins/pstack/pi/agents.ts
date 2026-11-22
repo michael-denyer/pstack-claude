@@ -8,7 +8,8 @@ import { Value } from "typebox/value";
 
 import { noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
-import { type Activity, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
+import { type Activity, type AgentChild, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
+import { HcChild } from "./hc-child.ts";
 import { loadAgentTypes } from "./agent-files.ts";
 import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
@@ -53,6 +54,7 @@ const runningSchema = Type.Object({
   pidStart: Type.Optional(Type.String()),
   // The pi process that launched it. Only that process may reap it.
   parentPid: Type.Number(),
+  host: Type.Optional(Type.Literal("hc")),
 });
 const endedSchema = Type.Object({
   agent: identitySchema,
@@ -73,7 +75,7 @@ export type EndedRecord = Static<typeof endedSchema>;
 export type AgentRecord = Static<typeof recordSchema>;
 
 interface Run {
-  child: PiChild;
+  child: AgentChild;
   background: boolean;
   // Set once the run is told to end: the exit code no longer decides the
   // status. teardown means the session is going away, so no notice follows.
@@ -135,7 +137,7 @@ function settle(worktree: Worktree): { kept: boolean; note: string } {
 }
 
 function childArgs(identity: AgentIdentity, depth: number): string[] {
-  const args = ["--mode", "rpc", "--session-id", identity.sessionId, "--session-dir", identity.sessionDir];
+  const args = ["--session-id", identity.sessionId, "--session-dir", identity.sessionDir];
   if (identity.model) args.push("--model", identity.model);
   if (identity.thinking) args.push("--thinking", identity.thinking);
   if (identity.systemPromptFile) args.push("--append-system-prompt", identity.systemPromptFile);
@@ -184,7 +186,8 @@ function fateOf(record: RunningRecord): Fate {
   if (info && pidStart !== undefined && info.start !== pidStart) return "gone";
   // With no word from the system, two live pids keep the record: calling a
   // live agent stopped would let a message start a second process on its session.
-  const launcherHasIt = info ? info.parentPid === parentPid : alive(parentPid);
+  // An hc terminal's program is a child of herdr-core, not of the pi that launched it.
+  const launcherHasIt = info && record.host !== "hc" ? info.parentPid === parentPid : alive(parentPid);
   if (parentPid !== process.pid && launcherHasIt) return "kept";
   return info && info.start === pidStart ? "orphan" : "unknown";
 }
@@ -217,6 +220,7 @@ export class AgentRunner {
   // parent's stdout, which the reader ignores.
   private ui?: ExtensionContext["ui"];
   private ownSessionId?: string;
+  private projectTrusted = false;
 
   constructor(
     private readonly pi: ExtensionAPI,
@@ -273,13 +277,7 @@ export class AgentRunner {
       }
       throw e;
     }
-    const { command, args } = this.settings.pi;
-    const child = new PiChild(
-      command,
-      [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills"), ...childArgs(identity, this.settings.depth)],
-      { cwd: identity.cwd, env: { [PARENT_SESSION_ENV]: this.ownSessionId }, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() },
-      prompt,
-    );
+    const child = this.spawnChild(identity, prompt);
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
     const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
@@ -289,10 +287,37 @@ export class AgentRunner {
     return record;
   }
 
+  private spawnChild(identity: AgentIdentity, prompt: string): AgentChild {
+    const { command, args } = this.settings.pi;
+    const base = [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills")];
+    const flags = childArgs(identity, this.settings.depth);
+    const env = { [PARENT_SESSION_ENV]: this.ownSessionId };
+    if (readSheet(this.settings.agentDir)?.hcHost && process.env.HC_TERMINAL_ID) {
+      // An interactive pi asks whether to trust the project before it reports any status; the parent already decided.
+      return new HcChild(identity.id, command, [...base, ...flags, this.projectTrusted ? "--approve" : "--no-approve"], {
+        cwd: identity.cwd,
+        env: { ...env, PI_CODING_AGENT_DIR: this.settings.agentDir },
+        envFile: join(identity.sessionDir, `${identity.id}.env`),
+        graceMs: this.settings.killGraceMs,
+        transcript: () => sessionFile(identity),
+        onStart: (pid) => this.track(identity.id, { host: "hc", pid, pidStart: inspect(pid)?.start }),
+      }, prompt);
+    }
+    return new PiChild(command, [...base, "--mode", "rpc", ...flags], { cwd: identity.cwd, env, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() }, prompt);
+  }
+
+  private track(id: string, handle: Pick<RunningRecord, "host" | "pid" | "pidStart">): void {
+    const state = this.agents.get(id);
+    if (state?.kind !== "local") return;
+    Object.assign(state.record, handle);
+    this.persist(state.record);
+  }
+
   // From session_start too: a reloaded session can resume an agent with
   // send_message before any agent call.
   attachSession(ctx: ExtensionContext): void {
     this.ownSessionId = ctx.sessionManager.getSessionId();
+    this.projectTrusted = ctx.isProjectTrusted?.() ?? false;
     if (ctx.hasUI && this.settings.depth === 0) this.ui = ctx.ui;
   }
 
@@ -409,7 +434,6 @@ export class AgentRunner {
     if (state.kind === "ended") return state.record;
     const { run } = state;
     if (run.ending !== "teardown") run.ending = ending;
-    void run.child.command({ type: "abort" });
     run.child.end(this.settings.killGraceMs);
     return run.done;
   }

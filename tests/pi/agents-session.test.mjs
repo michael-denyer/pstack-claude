@@ -251,6 +251,26 @@ describe("registry", () => {
     expect(alive(reusedParent.pid)).toBe(true);
   });
 
+  test("a restored hc agent is left to its live launching pi, and once that pi is gone its terminal's program is ended", async () => {
+    const { w, pi, ctx } = setup({ script: { default: [{ sleep: 30000 }] } });
+    await pi.call("agent", { description: "terminal", prompt: "x", run_in_background: true }, ctx);
+    await w.until("invocation");
+    const program = w.invocations()[0].pid;
+    const launcher = w.spawn("sleep", ["30"], { detached: true });
+    const gone = w.spawn("sleep", ["0.1"]);
+    await exitOf(gone);
+    const asHc = (parentPid) => pi.entries.map((e) => agentEntry(recordWith(e.data, { host: "hc", parentPid })));
+
+    const kept = await restore(w, asHc(launcher.pid));
+    await sleep(2 * w.settings.killGraceMs);
+    expect(alive(program)).toBe(true);
+    expect((await listAgents(kept, ctx))[0].status).toBe("running");
+
+    const resumed = await restore(w, asHc(gone.pid));
+    await waitFor(() => !alive(program));
+    expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
+  });
+
   test("send_message and stop_agent refuse an agent another live pi process is running, naming that process", async () => {
     const { w, ctx, host: liveParent, entries } = await otherPi();
     const id = entries[0].data.agent.id;

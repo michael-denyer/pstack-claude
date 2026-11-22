@@ -126,6 +126,8 @@ Plugin auto-update installs **by version number**, not by tracking `main`. A ski
 
 So: any PR that changes skill behavior either bumps the version itself or is followed by a release PR that does. The bump is three steps: edit the root `VERSION` file, add a `CHANGES.md` entry under a `## <version>` heading describing what changed and why, and run `bun tools/generate.mjs` to stamp the manifests. Forgetting any of the three fails CI. Run the full invariant script (including the behavioral leg) before merging.
 
+The `open-pstack` installer in `installer/` is versioned with the rest: the generator stamps `installer/package.json` from `VERSION`. Pushing the `vX.Y.Z` tag runs `.github/workflows/release-npm.yml`, which checks that the tag, `VERSION`, and the installer version agree, then publishes `open-pstack` to npm with provenance through trusted publishing. It skips a version npm already has. Before the first publish, add this repository and workflow file as the package's trusted publisher on npmjs.com. Run `npm pack --dry-run` in `installer/` to preview the tarball, which `prepack` fills with the plugin and licenses.
+
 ## Commit and PR style
 
 - Explain what changed and why. The diff already shows how.

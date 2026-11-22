@@ -22,5 +22,7 @@ export function which(bin, { env, platform }) {
   return null;
 }
 
-// A harness with no bin (the shared skills dir) is always available.
-export const detect = (harness, ctx) => (harness.bin === null ? true : which(harness.bin, ctx) !== null);
+// The shared skills dir has no bin to find, and Codex and OpenCode also read
+// it, so it is never chosen by default: a native install plus the links would
+// load every skill twice. Pick it by id or number.
+export const detect = (harness, ctx) => harness.bin !== null && which(harness.bin, ctx) !== null;

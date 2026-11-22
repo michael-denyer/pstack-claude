@@ -34,7 +34,7 @@ With Homebrew:
 brew install michael-denyer/tap/open-pstack
 ```
 
-`open-pstack` finds the agent harnesses on your `PATH` and shows a picker. Press Enter to install into the ones it found, or choose others by number or id. It then runs each harness's recipe from the sections below. `--only claude,pi` names harnesses directly, `--yes` skips the prompt, `--dry-run` prints every step without running or writing anything, and `--list` shows what it detected. Harnesses that need a local copy of the plugin, such as Muse, Grok, MiniMax Code, and the shared skills directory, get one staged under `~/.local/share/open-pstack`. The per-harness recipes below still work on their own, and they cover updating.
+`open-pstack` finds the agent harnesses on your `PATH` and shows a picker. Press Enter to install into the ones it found, or choose others by number or id. The shared `~/.agents/skills` directory is never chosen by default, because Codex and OpenCode read it too and would load each skill twice; pick it for Gemini CLI, Prime Agent, or DeepSeek Harness. It then runs each harness's recipe from the sections below. `--only claude,pi` names harnesses directly, `--yes` skips the prompt, `--dry-run` prints every step without running or writing anything, and `--list` shows what it detected. Harnesses that need a local copy of the plugin, such as Muse, Grok, MiniMax Code, and the shared skills directory, get one staged under `~/.local/share/open-pstack`. The per-harness recipes below still work on their own, and they cover updating.
 
 <details>
 <summary><strong>Claude Code</strong></summary>

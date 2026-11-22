@@ -57,7 +57,7 @@ jobs:
             else
               echo "exists=false" >> "$GITHUB_OUTPUT"
             fi
-          elif grep -q E404 npm-view.err; then
+          elif grep E404 npm-view.err; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
           else
             cat npm-view.err >&2

@@ -185,6 +185,13 @@ describe("open-pstack CLI", () => {
     expect(r.out).toContain("kimi");
     expect(existsSync(join(s.staged, ".claude-plugin", "plugin.json"))).toBe(true);
     expect(existsSync(join(s.minimax, "plugins", "pstack", ".claude-plugin", "plugin.json"))).toBe(true);
+    expect(existsSync(join(s.home, ".agents"))).toBe(false);
+  });
+
+  run("--only skills links every skill into ~/.agents/skills", () => {
+    const s = sandbox();
+    const r = s.open("--only", "skills");
+    expect(r.code).toBe(0);
     const skills = readdirSync(join(s.staged, "skills"));
     expect(skills).toContain("poteto-mode");
     for (const skill of skills) {
@@ -196,9 +203,10 @@ describe("open-pstack CLI", () => {
 
   run("a rerun converges to the same state", () => {
     const s = sandbox();
-    s.open("--yes");
+    const everything = ["--only", "claude,muse,minimax,skills"];
+    s.open(...everything);
     const before = readdirSync(join(s.home, ".agents", "skills")).sort();
-    const r = s.open("--yes");
+    const r = s.open(...everything);
     expect(r.code).toBe(0);
     expect(r.err).toBe("");
     expect(readdirSync(join(s.home, ".agents", "skills")).sort()).toEqual(before);
@@ -215,7 +223,7 @@ describe("open-pstack CLI", () => {
     expect(r.out).toMatch(/claude\s+failed \(exit 3\)/);
     expect(s.calls()).not.toContain("claude plugin install pstack@pstack-claude");
     expect(s.calls()).toContain("pi install git:github.com/michael-denyer/pstack-claude");
-    expect(existsSync(join(s.home, ".agents", "skills", "poteto-mode"))).toBe(true);
+    expect(existsSync(join(s.minimax, "plugins", "pstack", ".claude-plugin", "plugin.json"))).toBe(true);
   });
 
   run("--only installs just the named harnesses", () => {

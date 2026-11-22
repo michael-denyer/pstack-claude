@@ -1,0 +1,77 @@
+name: Release npm
+
+# Pushing a vX.Y.Z tag publishes open-pstack, the npm installer in installer/.
+# Publishing uses npm trusted publishing over OIDC, so the workflow holds no
+# token. The package's trusted publisher entry on npmjs.com names this file.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-npm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish open-pstack
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing and provenance sign with the job's OIDC token
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the main-ancestry check below needs origin/main's history
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # Trusted publishing needs npm 11.5.1 or later; Node 24.22.3 bundles npm 11.19.1.
+          node-version: "24.22.3"
+          package-manager-cache: false
+      - name: Check the tag points at a commit on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "$GITHUB_SHA is not on main; publish only tags of merged releases" >&2
+            exit 1
+          fi
+      - name: Check the tag, VERSION, and installer version agree
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="$(cat VERSION)"
+          package="$(node -p "require('./installer/package.json').version")"
+          if [ "$TAG" != "v$version" ] || [ "$package" != "$version" ]; then
+            echo "tag $TAG, VERSION $version, installer/package.json $package must all match" >&2
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_OUTPUT"
+        id: version
+      - name: Look for this version on npm
+        id: published
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          # A missing version or package exits 1 with E404. Anything else that
+          # fails (network, registry outage) stops the release rather than
+          # guessing.
+          if found="$(npm view "open-pstack@$VERSION" version 2>npm-view.err)"; then
+            if [ -n "$found" ]; then
+              echo "open-pstack@$VERSION is already on npm, nothing to publish"
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+            fi
+          elif grep E404 npm-view.err; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            cat npm-view.err >&2
+            exit 1
+          fi
+      - name: Publish with provenance
+        if: steps.published.outputs.exists == 'false'
+        working-directory: installer
+        run: npm publish --provenance --access public

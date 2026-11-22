@@ -93,15 +93,25 @@ Skills-only installs and other runtimes do not include these integrations. Reque
 
 ### Shared skills installation
 
-Use this path for Prime Agent, Gemini CLI, DeepSeek Harness, or a skills-only Codex installation. Run the script under [Other harnesses](../README.md#other-harnesses) in the README, which clones the repository and links its skills into `~/.agents/skills/`.
+Use this path for Prime Agent, Gemini CLI, DeepSeek Harness, or a skills-only Codex installation. Run `npx open-pstack --only skills`, which links each skill into `~/.agents/skills/` from the copy [open-pstack](#install-with-open-pstack) stages. Or run the script under [Other harnesses](../README.md#other-harnesses) in the README, which clones the repository and links its skills from the clone.
 
-Keep all skill directories, including the principle references. Leave the clone at this path while the links are installed.
+Keep all skill directories, including the principle references. Leave the clone or the staged copy in place while the links are installed.
 
 ### Manage linked skills
 
 If a destination already exists, inspect it before replacing it. The installation skips existing files, directories, and links.
 
-To update, run `git pull` in the clone that the links point to, then run the install loop again. A pull updates skills that are already linked but does not link new skill directories. To uninstall a linked skill, remove its link at `~/.agents/skills/<name>`. This removes it from every runtime using that directory.
+To update links made by `open-pstack`, upgrade it and run `open-pstack --only skills` again. To update links into a clone, run `git pull` in the clone, then run the install loop again. A pull updates skills that are already linked but does not link new skill directories. To uninstall a linked skill, remove its link at `~/.agents/skills/<name>`. This removes it from every runtime using that directory.
+
+### Install with open-pstack
+
+`open-pstack` is published to npm and to the `michael-denyer/tap` Homebrew tap. It runs the README recipe of each harness you pick; see [Install](../README.md#install) for its options. It has no dependencies.
+
+Harnesses that install from a local path get the plugin copy that ships with `open-pstack`, staged at `~/.local/share/open-pstack/pstack`, or at `open-pstack/pstack` under `XDG_DATA_HOME` when that is set. The npm cache and Homebrew's versioned directories change on every upgrade, so a fixed path keeps the shared skills links and harness registrations valid. Each run copies the plugin beside the staged copy and then swaps it in, so a rerun ends in the same state and a failed copy leaves the previous one in place. A run skips skills that already have a link and a MiniMax Code plugin directory that already exists.
+
+The staged copy matches the installer's version, so upgrade the installer before rerunning it. Rerunning `claude plugin install` reports pstack as already installed and leaves its version unchanged. Update plugins that a harness installed through that harness's own update command.
+
+To uninstall, remove pstack from each harness with its own command. Remove the links in `~/.agents/skills` that point into the staged copy, then delete `~/.local/share/open-pstack`. Finally run `npm uninstall -g open-pstack` or `brew uninstall open-pstack`.
 
 ### Install with the skills CLI
 

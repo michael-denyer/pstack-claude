@@ -1,0 +1,32 @@
+{
+  "name": "open-pstack",
+  "version": "0.9.148",
+  "description": "Install pstack into the agent harnesses on this machine: Claude Code, Codex, Pi, Copilot, Muse, OMP, Kimi, Grok, MiniMax, OpenCode, Antigravity, and the shared skills directory.",
+  "type": "module",
+  "bin": {
+    "open-pstack": "bin/open-pstack.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "plugin",
+    "LICENSE",
+    "LICENSE-cursor-team-kit",
+    "LICENSE-thermos",
+    "NOTICE.md",
+    "NOTICE-skills.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/michael-denyer/pstack-claude#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/michael-denyer/pstack-claude.git",
+    "directory": "installer"
+  },
+  "scripts": {
+    "prepack": "node scripts/stage.mjs"
+  }
+}

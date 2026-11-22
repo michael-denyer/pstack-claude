@@ -1,5 +1,6 @@
 // The settings the extension derives from its flags, environment, and model sheet.
 import { expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -71,6 +72,57 @@ test.skipIf(!chmodDeniesReads)("a sheet in a directory that cannot be searched r
     expect(readSheet(dir)).toMatchObject({ hookOff: true });
   } finally {
     chmodSync(dir, 0o700);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// A directory with an agent sheet and, where the test makes one, a git
+// repository with a committed sheet. The agent sheet loses to the committed
+// one whenever the working directory can name the repository root.
+function sheetDirs() {
+  const dir = mkdtempSync(join(tmpdir(), "pstack-project-sheet-"));
+  const agent = join(dir, "agent");
+  mkdirSync(agent, { recursive: true });
+  writeFileSync(join(agent, "pstack-models.md"), "pi models: opus=agent/model\n");
+  const repo = join(dir, "repo");
+  mkdirSync(join(repo, ".claude"), { recursive: true });
+  writeFileSync(join(repo, ".claude", "pstack-models.md"), "pi models: opus=project/model\n");
+  return { dir, agent, repo };
+}
+
+test("a sheet committed at the git root replaces the agent sheet, from a subdirectory", () => {
+  const { dir, agent, repo } = sheetDirs();
+  try {
+    expect(spawnSync("git", ["init", "-q", repo]).status).toBe(0);
+    const deep = join(repo, "sub", "deep");
+    mkdirSync(deep, { recursive: true });
+    expect(readSheet(agent, deep)?.piModels.get("opus")).toBe("project/model");
+    expect(readSheet(agent, repo)?.piModels.get("opus")).toBe("project/model");
+    // Without a working directory the agent sheet stands, as before.
+    expect(readSheet(agent)?.piModels.get("opus")).toBe("agent/model");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a working directory that is not a repository checks itself, then the agent sheet", () => {
+  const { dir, agent, repo } = sheetDirs();
+  try {
+    // No git init: the directory itself is the root, as in the session hook.
+    expect(readSheet(agent, repo)?.piModels.get("opus")).toBe("project/model");
+    rmSync(join(repo, ".claude", "pstack-models.md"));
+    expect(readSheet(agent, repo)?.piModels.get("opus")).toBe("agent/model");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a committed sheet in UTF-16 LE reads like a user's sheet", () => {
+  const { dir, agent, repo } = sheetDirs();
+  try {
+    writeFileSync(join(repo, ".claude", "pstack-models.md"), Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("pi models: opus=wide/model\n", "utf16le")]));
+    expect(readSheet(agent, repo)?.piModels.get("opus")).toBe("wide/model");
+  } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });

@@ -5,6 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -17,6 +18,7 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { which } from "../installer/lib/detect.mjs";
 import { HARNESSES } from "../installer/lib/harnesses.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -108,7 +110,17 @@ describe("registry matches the README recipes", () => {
 // CLI end to end -----------------------------------------------------------
 
 const onWindows = process.platform === "win32";
-const run = onWindows ? test.skip : test;
+const run = onWindows ? test.skip : (name, fn) => test(name, fn, 30000);
+
+describe("detection", () => {
+  test("on win32 a .cmd shim wins over the extensionless sh shim", () => {
+    const dir = mkdtempSync(join(tmpdir(), "open-pstack-which-"));
+    writeFileSync(join(dir, "claude"), "#!/bin/sh\n");
+    writeFileSync(join(dir, "claude.cmd"), "@echo off\n");
+    const env = { PATH: dir, PATHEXT: ".exe;.cmd" };
+    expect(which("claude", { env, platform: "win32" })).toBe(join(dir, "claude.cmd"));
+  });
+});
 
 function nodePath() {
   for (const dir of (process.env.PATH ?? "").split(delimiter)) {
@@ -238,6 +250,28 @@ describe("open-pstack CLI", () => {
     const r = sandbox().open("--only", "nope");
     expect(r.code).toBe(2);
     expect(r.err).toContain("unknown harness id: nope");
+  });
+
+  run("stages the plugin when installed under node_modules", () => {
+    const s = sandbox();
+    const pkg = join(s.root, "node_modules", "open-pstack");
+    mkdirSync(pkg, { recursive: true });
+    for (const name of ["bin", "lib", "package.json"]) {
+      cpSync(join(repoRoot, "installer", name), join(pkg, name), { recursive: true });
+    }
+    cpSync(join(repoRoot, "plugins/pstack"), join(pkg, "plugin"), {
+      recursive: true,
+      filter: (src) => !src.split("/").includes("node_modules"),
+    });
+    const r = spawnSync(nodePath(), [join(pkg, "bin/open-pstack.mjs"), "--only", "skills"], {
+      env: { PATH: dirname(nodePath()), HOME: s.home, XDG_DATA_HOME: s.xdg },
+      encoding: "utf8",
+    });
+    expect(r.status).toBe(0);
+    expect(existsSync(join(s.staged, "skills", "poteto-mode", "SKILL.md"))).toBe(true);
+    expect(realpathSync(join(s.home, ".agents", "skills", "poteto-mode"))).toBe(
+      realpathSync(join(s.staged, "skills", "poteto-mode")),
+    );
   });
 
   run("--version prints the repo version", () => {

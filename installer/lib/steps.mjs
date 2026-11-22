@@ -58,7 +58,7 @@ const EXECUTORS = {
       return { ok: true, skipped: true, detail: `${step.to} already present, see README update steps` };
     }
     mkdirSync(dirname(step.to), { recursive: true });
-    cpSync(step.from, step.to, { recursive: true, filter: withoutNodeModules });
+    cpSync(step.from, step.to, { recursive: true, filter: withoutNodeModules(step.from) });
     return { ok: true };
   },
   "link-skills": (step, ctx) => {

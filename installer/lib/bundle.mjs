@@ -1,5 +1,5 @@
 import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
-import { dirname, join, sep } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const installerRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -16,7 +16,10 @@ export function bundledPluginSource() {
 export const stableDir = ({ home, env }) =>
   join(env.XDG_DATA_HOME || join(home, ".local", "share"), "open-pstack", "pstack");
 
-export const withoutNodeModules = (src) => !src.split(sep).includes("node_modules");
+// Filter for cpSync from `root`: judge the path below root, because root itself
+// sits under node_modules when the installer runs from an npm install.
+export const withoutNodeModules = (root) => (src) =>
+  !relative(root, src).split(sep).includes("node_modules");
 
 // Copy to a sibling, then swap, so a rerun converges and a crash leaves the
 // previous copy whole.
@@ -25,7 +28,7 @@ export function stagePlugin(source, dest) {
   const fresh = `${dest}.new-${process.pid}`;
   const old = `${dest}.old-${process.pid}`;
   rmSync(fresh, { recursive: true, force: true });
-  cpSync(source, fresh, { recursive: true, filter: withoutNodeModules });
+  cpSync(source, fresh, { recursive: true, filter: withoutNodeModules(source) });
   if (existsSync(dest)) renameSync(dest, old);
   renameSync(fresh, dest);
   rmSync(old, { recursive: true, force: true });

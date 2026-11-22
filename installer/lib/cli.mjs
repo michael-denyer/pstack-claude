@@ -100,7 +100,12 @@ function installHarness(harness, ctx, detected) {
   return { status: "ok" };
 }
 
-export async function main(argv, { env = process.env, platform = process.platform } = {}) {
+// The variables the installer reads; nothing else is looked at or passed on.
+const READ_VARS = ["PATH", "Path", "PATHEXT", "XDG_DATA_HOME", "MINIMAX_DATA_DIR"];
+
+export async function main(argv) {
+  const env = Object.fromEntries(READ_VARS.filter((k) => k in process.env).map((k) => [k, process.env[k]]));
+  const platform = process.platform;
   let opts;
   try {
     opts = parseArgs(argv);

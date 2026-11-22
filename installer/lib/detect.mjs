@@ -7,7 +7,7 @@ export function which(bin, { env, platform }) {
   const dirs = (env.PATH ?? env.Path ?? "").split(delimiter).filter(Boolean);
   const exts =
     platform === "win32"
-      ? ["", ...(env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean)]
+      ? (env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean)
       : [""];
   for (const dir of dirs) {
     for (const ext of exts) {

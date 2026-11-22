@@ -62,7 +62,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/babysit.md": {
       "kind": "policy",
-      "why": "Requires confirming that the first status read reports the requested PR or stack, and naming the merge frontier, before acting on it, and reports the watcher's behind-base gate to the branch owner instead of resolving it, as it does a conflict.",
+      "why": "Requires confirming that the first status read reports the requested PR or stack, and naming the merge frontier, before acting on it, and reports the watcher's behind-base gate to the branch owner instead of resolving it, as it does a conflict. Points a watcher that exits with `graphql-refused`, as in a Claude Code cloud session, at the REST reads in `cloud-session-pr-reads.md`.",
       "since": "0.9.39",
       "upstream": "not-proposed"
     },

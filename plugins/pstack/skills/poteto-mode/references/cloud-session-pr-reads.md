@@ -23,7 +23,7 @@ Each command was run in a cloud session with `gh` 2.89.0, most recently on 2026-
 | Review comments                     | `gh api --paginate --slurp "repos/<owner>/<repo>/pulls/<pr>/comments?per_page=100"`              |
 | Review threads and their resolution | `gh api "repos/<owner>/<repo>/pulls/<pr>/ccr/review_threads"`                                    |
 
-A `--paginate --slurp` read prints one JSON array holding every page, so take the rows from each page: `.[].check_runs[]`, `.[].statuses[]`, `.[].check_suites[]`, `.[].workflow_runs[]`, `.[].jobs[]`, or `.[][]` for reviews and review comments. Every page of the commit statuses read repeats the combined `state`, so read it from `.[0].state`. `gh` refuses `--jq` with `--slurp`, so pipe the output to `jq`. Without `--paginate`, a list read returns only its first page.
+A `--paginate --slurp` read prints one JSON array holding every page, so take the rows from each page: `.[].check_runs[]`, `.[].statuses[]`, `.[].check_suites[]`, `.[].workflow_runs[]`, `.[].jobs[]`, or `.[][]` for reviews and review comments. Every page of the commit statuses read repeats the combined `state` across all statuses, `success`, `failure`, or `pending`, so read it from `.[0].state`. A commit with no statuses (`.[0].total_count` is 0) still reports `pending`, so judge it by its check runs alone. `gh` refuses `--jq` with `--slurp`, so pipe the output to `jq`. Without `--paginate`, a list read returns only its first page.
 
 Read `head.sha`, `draft`, `mergeable`, and `mergeable_state` from the first command. `mergeable` is `null` until GitHub computes it, so read again before you trust it.
 

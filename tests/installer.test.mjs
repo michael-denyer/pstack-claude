@@ -163,13 +163,14 @@ function writeStubs(root, bin, log, exitCodes) {
 
 // The data dir name holds a space, &, ^, and a %NAME% pair naming a variable
 // the CLI passes on (SystemRoot, on Windows), so a staged path reaches a .cmd
-// shim unchanged only if each argument is escaped for cmd.exe.
+// shim unchanged only if each argument is escaped for cmd.exe. The stubs sit in
+// a directory with a space and &, as a home like C:\Users\Jane Doe can put them.
 function sandbox(exitCodes = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "open-pstack-")));
   const home = join(root, "home");
   const xdg = join(root, "x d&g^%SystemRoot%");
   const minimax = join(root, "minimax");
-  const bin = join(root, "bin");
+  const bin = join(root, "b in&");
   const log = join(root, "calls.log");
   for (const dir of [home, xdg, bin]) mkdirSync(dir);
   writeFileSync(log, "");

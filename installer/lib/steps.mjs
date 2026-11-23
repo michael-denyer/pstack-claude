@@ -24,15 +24,23 @@ export function describeStep(step) {
   }
 }
 
-// cmd.exe needs one quoted command line for a .cmd or .bat shim.
-const winQuote = (arg) => `"${arg.replace(/"/g, '""')}"`;
+// A .cmd or .bat shim runs through cmd.exe, which parses its arguments twice:
+// once on the cmd /c line and again when the shim expands %* (https://qntm.org/cmd).
+// Each argument is quoted for the program's own parser, then each cmd.exe
+// metacharacter gets a caret once per parse. Double quotes alone would still
+// let cmd.exe expand %NAME%; with a caret before each %, the name it would look
+// up ends in a caret and matches no variable.
+const CMD_META = /([()\][%!^"`<>&|;, *?])/g;
+const cmdEscape = (text) => text.replace(CMD_META, "^$1");
+const programQuote = (arg) => `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, "$1$1")}"`;
+const shimArg = (arg) => cmdEscape(cmdEscape(programQuote(arg)));
 
 function spawnArgv(argv, ctx) {
   const [bin, ...args] = argv;
   const file = which(bin, ctx) ?? bin;
   const result =
     ctx.platform === "win32" && /\.(cmd|bat)$/i.test(file)
-      ? spawnSync([file, ...args].map(winQuote).join(" "), { stdio: "inherit", shell: true })
+      ? spawnSync([cmdEscape(file), ...args.map(shimArg)].join(" "), { stdio: "inherit", shell: true })
       : spawnSync(file, args, { stdio: "inherit" });
   if (result.error) return { ok: false, detail: result.error.message };
   return result.status === 0

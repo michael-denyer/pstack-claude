@@ -2,6 +2,10 @@ import type { QueryFailure } from "./types.ts";
 
 // Port-owned modules import the query error from here rather than from
 // github.ts, which imports them; github.ts re-exports it for its callers.
+// The line gh prints when a Claude Code cloud session's GitHub proxy refuses GraphQL.
+export const GRAPHQL_REFUSAL =
+  "GitHub GraphQL is not available from Claude Code sessions";
+
 export class WatcherQueryError extends Error {
   readonly failure: QueryFailure;
   constructor(failure: QueryFailure) {

@@ -10,7 +10,7 @@ import {
 } from "./workflow-runs.ts";
 import { spawn } from "node:child_process";
 import { DeadlineExceeded, type WatchDeadline } from "./deadline.ts";
-import { WatcherQueryError } from "./query-error.ts";
+import { GRAPHQL_REFUSAL, WatcherQueryError } from "./query-error.ts";
 import type * as T from "./types.ts";
 import { nonEmpty, parsePrNumber } from "./types.ts";
 export const REVIEW_THREADS_QUERY =
@@ -50,7 +50,7 @@ export class ChecksUnavailable extends WatcherQueryError {
 }
 const firstLine = (value: string): string =>
   value.trim().split(/\r?\n/, 1)[0]?.slice(0, 240) ?? "";
-function run(
+export function run(
   argv: readonly [string, ...string[]],
   deadline: WatchDeadline
 ): Promise<CommandResult> {
@@ -120,16 +120,15 @@ export async function runJson(
   return commandJson(await run(argv, deadline), argv.join(" "));
 }
 function commandJson(result: CommandResult, label: string): unknown {
-  if (
-    result.code !== 0 &&
-    firstLine(result.stderr).includes(
-      "GitHub GraphQL is not available from Claude Code sessions"
-    )
-  )
+  // Newer gh prints a hint block on stderr before its error, so check every line.
+  const refusal = result.stderr
+    .split(/\r?\n/)
+    .find((line) => line.includes(GRAPHQL_REFUSAL));
+  if (result.code !== 0 && refusal !== undefined)
     throw new WatcherQueryError({
       kind: "graphql-refused",
       retryable: false,
-      detail: `This Claude Code session refuses GitHub GraphQL, which watch-pr and ship-pr read the PR through. ${firstLine(result.stderr)}`,
+      detail: `This Claude Code session refuses GitHub GraphQL, which watch-pr and ship-pr read the PR through. ${refusal.trim().slice(0, 240)}`,
     });
   if (result.code !== 0)
     throw new WatcherQueryError({

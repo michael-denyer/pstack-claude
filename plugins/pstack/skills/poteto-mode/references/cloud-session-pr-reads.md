@@ -1,6 +1,6 @@
 # Reading a PR from a Claude Code cloud session
 
-A Claude Code cloud session's GitHub proxy refuses GraphQL with HTTP 403. `watch-pr` then exits 7 with a `graphql-refused` failure, `ship-pr inspect` reports `unavailable`, and `gh pr view`, `gh pr list`, `gh pr checks`, and `gh pr merge` fail with the same refusal. The proxy still serves REST for the repositories attached to the session. Use the reads below there, and nowhere else. Where GraphQL works, the watcher stays the source of PR status.
+A Claude Code cloud session's GitHub proxy refuses GraphQL with HTTP 403. `ship-pr inspect` then reports `unavailable`, and `gh pr view`, `gh pr list`, `gh pr checks`, and `gh pr merge` fail with the same refusal. `watch-pr` switches to the REST reads below at the first refusal and stays the source of PR status. The proxy serves REST for the repositories attached to the session. Use the reads below there for what the watcher does not report, and nowhere else.
 
 ## REST reads
 

@@ -2,9 +2,13 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.152 - OpenCode registers pstack's agents, Pi reads the agent host from the project sheet
+
 On Pi, a `pi agent host: hc` line in a sheet committed with the project now applies, for worktree agents too. The extension read that line only from the agent directory's sheet, while the prompt sheet and model routing already read the committed one. A project's committed sheet now replaces the agent directory's sheet for this line as well, so in a project whose sheet has no `pi agent host: hc` line, agents run as RPC children even when the agent directory's sheet sets it. The extension also asks git for a directory's root once per process instead of on every agent start and every subagent spawn (12.6 ms each on macOS). [`docs/pi-equivalence.md`](docs/pi-equivalence.md) row H07 says that `pi agent tools: off` and `pi ask tool: off` are read at install, from the directory Pi started in, because Pi registers tools before any session directory is known ([#512](https://github.com/michael-denyer/pstack-claude/issues/512)).
 
 The OpenCode 2 plugin now registers the four bundled agents as subagents under their Claude Code names, such as `pstack:poteto-agent`, so a skill's `subagent_type` names an OpenCode agent as written, without entries in `opencode.json`. OpenCode's agent editor has no `add`, but on 2.3.2 its `update` creates an agent that does not exist yet, which is how OpenCode's own config loader adds agents. OpenCode applies `opencode.json` after plugins, so fields a user sets there for the same ID override the bundled ones. The agents deny the `question` tool, as OpenCode's own `general` subagent does. `opencode debug agents` on 2.3.2 lists all four; a dispatch to one has not been run against a model ([#507](https://github.com/michael-denyer/pstack-claude/issues/507)).
+
+`open-pstack`'s end-to-end tests now run on Windows in CI, with `.cmd` harness shims launched through `cmd.exe` and the skill links made as junctions. A staged path with a space, `&`, and `^` reaches the shim as one argument ([#523](https://github.com/michael-denyer/pstack-claude/pull/523), for [#509](https://github.com/michael-denyer/pstack-claude/issues/509)). Quoting does not stop `cmd.exe` from expanding a defined `%NAME%` pair in that path ([#526](https://github.com/michael-denyer/pstack-claude/issues/526)).
 
 ## 0.9.151 - fix-ci and Shipping read PRs over REST in a Claude Code cloud session
 

@@ -1,10 +1,10 @@
 # Reading a PR from a Claude Code cloud session
 
-A Claude Code cloud session's GitHub proxy refuses GraphQL with HTTP 403. `watch-pr` then exits 7 with a `graphql-refused` failure, and `gh pr view`, `gh pr list`, and `gh pr checks` fail with the same refusal. The proxy still serves REST for the repositories attached to the session. Use the reads below there, and nowhere else. Where GraphQL works, the watcher stays the source of PR status.
+A Claude Code cloud session's GitHub proxy refuses GraphQL with HTTP 403. `watch-pr` then exits 7 with a `graphql-refused` failure, `ship-pr inspect` reports `unavailable`, and `gh pr view`, `gh pr list`, `gh pr checks`, and `gh pr merge` fail with the same refusal. The proxy still serves REST for the repositories attached to the session. Use the reads below there, and nowhere else. Where GraphQL works, the watcher stays the source of PR status.
 
 ## REST reads
 
-Each command was run in a cloud session on 2026-11-21 with `gh` 2.89.0.
+Each command was run in a cloud session with `gh` 2.89.0, most recently on 2026-11-23.
 
 | Fact                                | Command                                                                                         |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -14,16 +14,23 @@ Each command was run in a cloud session on 2026-11-21 with `gh` 2.89.0.
 | Commit statuses on the head         | `gh api "repos/<owner>/<repo>/commits/<head-sha>/status"`                                       |
 | Check suites on the head            | `gh api --paginate --slurp "repos/<owner>/<repo>/commits/<head-sha>/check-suites?per_page=100"` |
 | Actions runs on the head            | `gh api "repos/<owner>/<repo>/actions/runs?head_sha=<head-sha>"`                                |
+| Jobs and steps of an Actions run    | `gh api "repos/<owner>/<repo>/actions/runs/<run-id>/jobs"`                                      |
+| Log of one Actions job              | `gh api "repos/<owner>/<repo>/actions/jobs/<job-id>/logs"`                                      |
+| Summary of an Actions run           | `gh run view <run-id>`                                                                          |
+| Log of an Actions run               | `gh run view <run-id> --log`                                                                    |
+| Recent Actions runs                 | `gh run list`                                                                                   |
 | Reviews                             | `gh api "repos/<owner>/<repo>/pulls/<pr>/reviews"`                                              |
 | Review comments                     | `gh api "repos/<owner>/<repo>/pulls/<pr>/comments"`                                             |
 | Review threads and their resolution | `gh api "repos/<owner>/<repo>/pulls/<pr>/ccr/review_threads"`                                   |
 
 Read `head.sha`, `draft`, `mergeable`, and `mergeable_state` from the first command. `mergeable` is `null` until GitHub computes it, so read again before you trust it.
 
+`gh pr checks` lists both check runs and commit statuses, so read both. A check run is pending until its `status` is `completed`. Its `conclusion` then gives the result: `success` passes; `failure`, `timed_out`, and `action_required` fail; `cancelled`, `skipped`, and `neutral` neither pass nor fail. A commit status carries its result in `state`: `success`, `failure` or `error`, or `pending`. For an Actions check, `details_url` ends in `actions/runs/<run-id>/job/<job-id>`. GitHub answers a log read with HTTP 410 once the log has expired.
+
 `ccr/review_threads` is a route of the cloud session's proxy, not of GitHub's REST API. It returns one object for each thread, with `resolved`, `outdated`, `path`, `line`, and `comment_ids`. Match `comment_ids` to the review comments to read a thread's text.
 
 ## Limits
 
 - These reads are single snapshots. Nothing here replaces the watcher's rereads, its merge gates, or its check for a head that moved between reads. Reread the PR's head after the other reads, and start again when it changed.
-- `ship-pr` reads the PR through GraphQL, so Shipping and the merge-safety operations cannot run in a cloud session.
+- Shipping and the merge-safety operations cannot run in a cloud session, because `ship-pr` and `gh pr merge` need GraphQL.
 - A repository the session has not attached answers every REST read with HTTP 403.

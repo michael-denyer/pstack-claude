@@ -104,7 +104,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/shipping.md": {
       "kind": "policy",
-      "why": "Lands one PR at a time under the user's landing authority, cancelling pending merges before any chain change, merging only under a service-enforced head condition, arming auto-merge or a queue only behind repository rules that enforce the verdict, and confirming each landing in the destination's history before advancing, with verifiers that drive the real surface through the driver skill in their own worktrees, a matching patch-id that keeps a review only after its applicability to the new base is checked, and the watcher owning blocker classification, with a branch behind its base routed to the topology owner.",
+      "why": "Lands one PR at a time under the user's landing authority, cancelling pending merges before any chain change, merging only under a service-enforced head condition, arming auto-merge or a queue only behind repository rules that enforce the verdict, and confirming each landing in the destination's history before advancing, with verifiers that drive the real surface through the driver skill in their own worktrees, a matching patch-id that keeps a review only after its applicability to the new base is checked, and the watcher owning blocker classification, with a branch behind its base routed to the topology owner. Stops at merge-ready when GitHub refuses GraphQL, as in a Claude Code cloud session, and points at the REST reads in `cloud-session-pr-reads.md`.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
@@ -336,6 +336,12 @@
       "kind": "policy",
       "why": "Scopes the diff to the PR's base branch, else the branch it was cut from, else the default branch, with uncommitted changes, and reruns the verifying checks after editing, reverting any edit whose check fails.",
       "since": "0.9.130",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/fix-ci/SKILL.md": {
+      "kind": "port-feature",
+      "why": "When `gh pr checks` fails with a GraphQL refusal, as in a Claude Code cloud session, points at the REST reads in `cloud-session-pr-reads.md` and makes the head's check runs and commit statuses the source of truth there.",
+      "since": "0.9.151",
       "upstream": "not-proposed"
     }
   },

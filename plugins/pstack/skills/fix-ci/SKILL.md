@@ -21,7 +21,7 @@ Branch or PR CI is failing and needs a fast, iterative path to green checks.
 - Fix one actionable failure at a time.
 - Prefer minimal, low-risk changes before broader refactors.
 - Keep `gh pr checks` as the source of truth for overall PR CI state.
-- In a Claude Code cloud session, `gh pr checks` fails because the session refuses GitHub GraphQL. Read the check runs on the PR's head with the REST commands in `../poteto-mode/references/cloud-session-pr-reads.md`, and treat them as the source of truth there.
+- When `gh pr checks` fails with a GraphQL refusal, as in a Claude Code cloud session, read the check runs and commit statuses on the PR's head with the REST commands in [Reading a PR from a Claude Code cloud session](../poteto-mode/references/cloud-session-pr-reads.md), and treat the two together as the source of truth there.
 
 ## Output
 

@@ -4,24 +4,26 @@ A Claude Code cloud session's GitHub proxy refuses GraphQL with HTTP 403. `watch
 
 ## REST reads
 
-Each command was run in a cloud session with `gh` 2.89.0, most recently on 2026-11-23.
+Each command was run in a cloud session with `gh` 2.89.0, most recently on 2026-11-23. The paginated check-runs, Actions runs, jobs, reviews, and review comments reads were run outside one, with the flags the check-suites read uses there.
 
-| Fact                                | Command                                                                                         |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------- |
-| State, draft, mergeability, head    | `gh api "repos/<owner>/<repo>/pulls/<pr>"`                                                      |
-| Open PR for a branch                | `gh api "repos/<owner>/<repo>/pulls?head=<owner>:<branch>&state=open"`                          |
-| Check runs on the head              | `gh api "repos/<owner>/<repo>/commits/<head-sha>/check-runs"`                                   |
-| Commit statuses on the head         | `gh api "repos/<owner>/<repo>/commits/<head-sha>/status"`                                       |
-| Check suites on the head            | `gh api --paginate --slurp "repos/<owner>/<repo>/commits/<head-sha>/check-suites?per_page=100"` |
-| Actions runs on the head            | `gh api "repos/<owner>/<repo>/actions/runs?head_sha=<head-sha>"`                                |
-| Jobs and steps of an Actions run    | `gh api "repos/<owner>/<repo>/actions/runs/<run-id>/jobs"`                                      |
-| Log of one Actions job              | `gh api "repos/<owner>/<repo>/actions/jobs/<job-id>/logs"`                                      |
-| Summary of an Actions run           | `gh run view <run-id>`                                                                          |
-| Log of an Actions run               | `gh run view <run-id> --log`                                                                    |
-| Recent Actions runs                 | `gh run list`                                                                                   |
-| Reviews                             | `gh api "repos/<owner>/<repo>/pulls/<pr>/reviews"`                                              |
-| Review comments                     | `gh api "repos/<owner>/<repo>/pulls/<pr>/comments"`                                             |
-| Review threads and their resolution | `gh api "repos/<owner>/<repo>/pulls/<pr>/ccr/review_threads"`                                   |
+| Fact                                | Command                                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ |
+| State, draft, mergeability, head    | `gh api "repos/<owner>/<repo>/pulls/<pr>"`                                                       |
+| Open PR for a branch                | `gh api "repos/<owner>/<repo>/pulls?head=<owner>:<branch>&state=open"`                           |
+| Check runs on the head              | `gh api --paginate --slurp "repos/<owner>/<repo>/commits/<head-sha>/check-runs?per_page=100"`    |
+| Commit statuses on the head         | `gh api "repos/<owner>/<repo>/commits/<head-sha>/status"`                                        |
+| Check suites on the head            | `gh api --paginate --slurp "repos/<owner>/<repo>/commits/<head-sha>/check-suites?per_page=100"`  |
+| Actions runs on the head            | `gh api --paginate --slurp "repos/<owner>/<repo>/actions/runs?head_sha=<head-sha>&per_page=100"` |
+| Jobs and steps of an Actions run    | `gh api --paginate --slurp "repos/<owner>/<repo>/actions/runs/<run-id>/jobs?per_page=100"`       |
+| Log of one Actions job              | `gh api "repos/<owner>/<repo>/actions/jobs/<job-id>/logs"`                                       |
+| Summary of an Actions run           | `gh run view <run-id>`                                                                           |
+| Log of an Actions run               | `gh run view <run-id> --log`                                                                     |
+| Recent Actions runs                 | `gh run list`                                                                                    |
+| Reviews                             | `gh api --paginate --slurp "repos/<owner>/<repo>/pulls/<pr>/reviews?per_page=100"`               |
+| Review comments                     | `gh api --paginate --slurp "repos/<owner>/<repo>/pulls/<pr>/comments?per_page=100"`              |
+| Review threads and their resolution | `gh api "repos/<owner>/<repo>/pulls/<pr>/ccr/review_threads"`                                    |
+
+A `--paginate --slurp` read prints one JSON array holding every page, so take the rows from each page: `.[].check_runs[]`, `.[].check_suites[]`, `.[].workflow_runs[]`, `.[].jobs[]`, or `.[][]` for reviews and review comments. `gh` refuses `--jq` with `--slurp`, so pipe the output to `jq`. Without `--paginate`, a list read returns only its first page.
 
 Read `head.sha`, `draft`, `mergeable`, and `mergeable_state` from the first command. `mergeable` is `null` until GitHub computes it, so read again before you trust it.
 

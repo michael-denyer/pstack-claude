@@ -28,7 +28,7 @@ The remaining triggers live only here:
 - Shipping UI / IDE / CLI → the driver skill. `run` ships with Claude Code and the model can invoke it for CLIs, TUIs, servers, and browser or Electron apps. The bundled `verify` runs only when the user types `/verify`, so for UIs use the project `verify` skill at `.claude/skills/verify/` (generate it with `/create-verification-skill`) and fall back to `run` when the repo has none.
 - A number you measured → **benchmark-checklist**.
 - PR status → the **Babysit** playbook, not the bundled **babysit** skill. Landing a green stack → the **Shipping** playbook.
-- Bot review comments → judge each on its merits, per `references/bugbot-triage.md`.
+- Bot review comments → judge each on its merits, per [`bugbot-triage.md`](references/bugbot-triage.md).
 - Deploying to a managed platform (Railway, Fly, Vercel, Heroku, and the like) → load that platform's skill, project-local or installed, before running its CLI, the same way Shipping step 1 resolves the forge before the first PR operation.
 - A defect found mid-task → severity decides its artifact, not where it turned up. A correctness or data gap gets a tracked issue even when it surfaces while writing a closure doc; a cosmetic margin can stay in the doc.
 - Long or unattended work → **show-me-your-work**.

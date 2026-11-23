@@ -141,6 +141,8 @@ function userEnv(home, extra) {
 
 // Each stub records its argv as one JSON line and exits with its code. On
 // Windows it is a .cmd shim, as npm installs, so the CLI launches it through cmd.exe.
+// npm's shims forward %*; muse's stub reads "%~1" "%~2" "%~3" instead, as a
+// launcher that names its arguments does, and gets the staged path that way.
 function writeStubs(root, bin, log, exitCodes) {
   const logger = join(root, "log-call.mjs");
   writeFileSync(
@@ -154,7 +156,8 @@ function writeStubs(root, bin, log, exitCodes) {
   for (const name of ["claude", "codex", "pi", "copilot", "muse", "omp", "kimi", "grok", "mcode", "opencode", "agy"]) {
     const code = exitCodes[name] ?? 0;
     if (onWindows) {
-      writeFileSync(join(bin, `${name}.cmd`), `@"${node}" "${logger}" ${code} ${name} %*\r\n@exit /b %ERRORLEVEL%\r\n`);
+      const forward = name === "muse" ? `"%~1" "%~2" "%~3"` : "%*";
+      writeFileSync(join(bin, `${name}.cmd`), `@"${node}" "${logger}" ${code} ${name} ${forward}\r\n@exit /b %ERRORLEVEL%\r\n`);
     } else {
       writeFileSync(join(bin, name), `#!/bin/sh\nexec "${node}" "${logger}" ${code} ${name} "$@"\n`, { mode: 0o755 });
     }

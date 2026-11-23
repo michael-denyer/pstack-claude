@@ -4,7 +4,7 @@ A Claude Code cloud session's GitHub proxy refuses GraphQL with HTTP 403. `watch
 
 ## REST reads
 
-Each command was run in a cloud session with `gh` 2.89.0, most recently on 2026-11-23. The paginated check-runs, Actions runs, jobs, reviews, and review comments reads were run outside one, with the flags the check-suites read uses there.
+Each command was run in a cloud session with `gh` 2.89.0, most recently on 2026-11-23, except the paginated check-runs, Actions runs, jobs, reviews, and review comments reads, which were run outside one. No read there has yet needed a second page. GitHub's next-page links use `repositories/<id>/` paths, not `repos/<owner>/<repo>/`, and whether the proxy serves them is untested. So when a paginated read reports `total_count`, check that it returned that many rows.
 
 | Fact                                | Command                                                                                          |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------ |

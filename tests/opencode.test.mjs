@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import plugin from "../plugins/pstack/opencode/index.js";
@@ -9,20 +9,54 @@ import { openCodeModelNamesSection, roleSkills, RUNTIMES, validateOpenCodePackag
 import { mappingCoverage } from "./mapping-coverage.mjs";
 import { sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 
-async function setup(skills = new Map()) {
+// OpenCode 2.3.2's agent editor: update creates a missing agent as primary, with
+// allow-all permissions, then applies the change. opencode.json applies after
+// plugins, so the editor a plugin sees holds only built-in and earlier plugins' agents.
+function agentEditor(agents) {
+  return {
+    get: (id) => agents.get(id),
+    update: (id, change) => {
+      const agent = agents.get(id) ?? { id, name: id, mode: "primary", hidden: false, permissions: [{ action: "*", resource: "*", effect: "allow" }] };
+      change(agent);
+      agents.set(id, agent);
+    },
+  };
+}
+
+async function setup(skills = new Map(), agents = new Map()) {
   let context;
   await plugin.setup({
     skill: {
       transform: async (apply) => apply({ get: (id) => skills.get(id), add: (skill) => skills.set(skill.id, skill) }),
       list: async () => ({ data: [...skills.values()] }),
     },
+    agent: { transform: async (apply) => apply(agentEditor(agents)) },
     session: {
       hook: async (_name, callback) => { context = callback; },
       get: async ({ sessionID }) => sessionID === "child" ? { parentID: "root" } : {},
     },
   });
-  return { skills, context };
+  return { skills, agents, context };
 }
+
+test("registers each bundled agent as a subagent under its Claude Code name", async () => {
+  const { agents } = await setup();
+  const agentFiles = readdirSync(new URL("../plugins/pstack/agents/", import.meta.url)).filter((name) => name.endsWith(".md"));
+  expect([...agents.keys()].sort()).toEqual(agentFiles.map((name) => `pstack:${name.slice(0, -3)}`).sort());
+  const agent = agents.get("pstack:poteto-agent");
+  expect(agent.mode).toBe("subagent");
+  expect(agent.description).toContain("Delegate subagent");
+  expect(agent.system).toContain("# Poteto subagent");
+  expect(agent.system).not.toMatch(/^---/);
+  expect(agent.permissions.at(-1)).toEqual({ action: "question", resource: "*", effect: "deny" });
+});
+
+test("keeps an agent another plugin registered under a bundled agent's ID", async () => {
+  const mine = { id: "pstack:poteto-agent", mode: "primary", system: "mine" };
+  const { agents } = await setup(new Map(), new Map([[mine.id, mine]]));
+  expect(agents.get("pstack:poteto-agent")).toEqual({ id: "pstack:poteto-agent", mode: "primary", system: "mine" });
+  expect(agents.get("pstack:comment-sicko").mode).toBe("subagent");
+});
 
 test("Git package exposes its OpenCode server", async () => {
   expect((await import("pstack/server")).default).toBe(plugin);

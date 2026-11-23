@@ -1,15 +1,33 @@
+# Dependabot keeps the pinned workflow actions current. Updates are grouped and
+# weekly to limit noise. Minor and patch updates merge automatically once every
+# required check passes; majors wait for review (see the Dependabot settings on
+# the repository, not a workflow: this fork keeps upstream's CI unchanged).
+#
+# cooldown holds each update after release. Without it Dependabot opens a pull
+# request the moment a version ships, which is exactly the window a compromised
+# release is still unreported.
 version: 2
+
 updates:
-  # Pinned action SHAs go stale silently; this is what keeps them current.
-  #
-  # cooldown holds each update for 7 days after release. Without it Dependabot
-  # opens a PR the moment a version ships, which is exactly the window a
-  # compromised release is still unreported.
   - package-ecosystem: github-actions
-    directory: /
+    directory: "/"
     schedule:
       interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
     cooldown:
-      default-days: 7
+      default-days: 14
+      semver-patch-days: 3
+      semver-minor-days: 7
+      semver-major-days: 14
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      github-actions-major:
+        patterns: ["*"]
+        update-types: ["major"]
+    labels: ["dependencies"]
     commit-message:
-      prefix: ci
+      prefix: "chore(actions)"

@@ -1,0 +1,10 @@
+# Tools pinned for every simpsonm09 repository. Keep the versions identical
+# across the account so recipes behave the same everywhere. `prettier` stays in
+# the recipe because upstream's CI pins it there, not in mise.
+
+[tools]
+just = "1.59.0"
+bun = "1.4.5"
+actionlint = "1.7.12"
+shellcheck = "0.11.0"
+zizmor = "1.29.0"

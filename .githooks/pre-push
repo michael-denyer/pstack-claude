@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Repository-local pre-push guard.
+#
+# Refuses:
+#   - a push whose remote ref is refs/heads/main (C2.1), unless the owner sets
+#     ALLOW_MAIN_PUSH=1 for one push;
+#   - a commit whose `git log --format=%G?` is not `G`, a good SSH signature (C2.7).
+#
+# Only commits that are not already on the remote are checked, so history that
+# GitHub signed with its web-flow key does not block a new branch.
+set -euo pipefail
+
+remote=${1:-origin}
+zero=0000000000000000000000000000000000000000
+status=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [[ -n ${local_ref:-} ]] || continue
+    case $local_ref in refs/tags/*) continue ;; esac
+
+    if [[ $remote_ref == refs/heads/main && ${ALLOW_MAIN_PUSH:-0} != 1 ]]; then
+        printf 'pre-push: refusing a push to %s on %s. Open a pull request instead.\n' \
+            "$remote_ref" "$remote" >&2
+        status=1
+        continue
+    fi
+
+    [[ $local_sha == "$zero" ]] && continue # branch deletion
+
+    while read -r sha sig; do
+        [[ -n $sha ]] || continue
+        if [[ $sig != G ]]; then
+            printf 'pre-push: commit %s is not signed with a known key (%s).\n' "$sha" "$sig" >&2
+            status=1
+        fi
+    done < <(git rev-list "$local_sha" --not --remotes="$remote" --format='%H %G?' 2>/dev/null |
+        grep -E '^[0-9a-f]{40} ' || true)
+done
+
+exit "$status"

@@ -52,9 +52,19 @@ export default {
     await ctx.skill.transform((editor) => {
       for (const skill of skills) if (!editor.get(skill.id)) editor.add(skill);
     });
-    // The agent editor has no add: update creates an agent it does not have yet,
-    // as a primary agent, so mode is set. A user's agent with the same ID stays.
-    // An OpenCode without the agent API still gets the skills and the routing.
+    await ctx.session.hook("context", async (event) => {
+      const session = await ctx.session.get({ sessionID: event.sessionID });
+      if (session.parentID || !hookEnabled()) return;
+      const installed = new Map((await ctx.skill.list()).data.map((skill) => [skill.id, skill.path]));
+      if (skills.some((skill) => installed.get(skill.id) !== skill.path)) return;
+      event.system.push({ type: "text", text: mandate });
+    });
+    // Last, so a failure here cannot cost the routing hook. The agent editor has
+    // no add: update creates an agent it does not have yet, as a primary agent
+    // with allow-all permissions. OpenCode applies opencode.json after plugins,
+    // so a user's fields for the same ID override these. An agent another plugin
+    // registered first stays as it is. question is denied, as for OpenCode's own
+    // general subagent: a Claude Code subagent cannot ask the user either.
     const agents = readAgents();
     await ctx.agent?.transform((editor) => {
       for (const agent of agents) {
@@ -63,15 +73,9 @@ export default {
           entry.mode = "subagent";
           entry.description = agent.description;
           entry.system = agent.system;
+          entry.permissions.push({ action: "question", resource: "*", effect: "deny" });
         });
       }
-    });
-    await ctx.session.hook("context", async (event) => {
-      const session = await ctx.session.get({ sessionID: event.sessionID });
-      if (session.parentID || !hookEnabled()) return;
-      const installed = new Map((await ctx.skill.list()).data.map((skill) => [skill.id, skill.path]));
-      if (skills.some((skill) => installed.get(skill.id) !== skill.path)) return;
-      event.system.push({ type: "text", text: mandate });
     });
   },
 };

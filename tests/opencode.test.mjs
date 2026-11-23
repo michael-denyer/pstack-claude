@@ -10,12 +10,13 @@ import { mappingCoverage } from "./mapping-coverage.mjs";
 import { sheetCases, writeSheet } from "./session-hook-sheets.mjs";
 
 // OpenCode 2.3.2's agent editor: update creates a missing agent as primary, with
-// default fields, then applies the change.
+// allow-all permissions, then applies the change. opencode.json applies after
+// plugins, so the editor a plugin sees holds only built-in and earlier plugins' agents.
 function agentEditor(agents) {
   return {
     get: (id) => agents.get(id),
     update: (id, change) => {
-      const agent = agents.get(id) ?? { id, name: id, mode: "primary", hidden: false, permissions: [] };
+      const agent = agents.get(id) ?? { id, name: id, mode: "primary", hidden: false, permissions: [{ action: "*", resource: "*", effect: "allow" }] };
       change(agent);
       agents.set(id, agent);
     },
@@ -47,9 +48,10 @@ test("registers each bundled agent as a subagent under its Claude Code name", as
   expect(agent.description).toContain("Delegate subagent");
   expect(agent.system).toContain("# Poteto subagent");
   expect(agent.system).not.toMatch(/^---/);
+  expect(agent.permissions.at(-1)).toEqual({ action: "question", resource: "*", effect: "deny" });
 });
 
-test("keeps a user's agent that has a bundled agent's ID", async () => {
+test("keeps an agent another plugin registered under a bundled agent's ID", async () => {
   const mine = { id: "pstack:poteto-agent", mode: "primary", system: "mine" };
   const { agents } = await setup(new Map(), new Map([[mine.id, mine]]));
   expect(agents.get("pstack:poteto-agent")).toEqual({ id: "pstack:poteto-agent", mode: "primary", system: "mine" });

@@ -1,7 +1,7 @@
 // watch-pr in a Claude Code cloud session: GraphQL and gh pr checks are
 // refused, REST answers. The fake gh serves the REST shapes GitHub returned for
-// PR 528 on 2026-11-23, and the proxy's ccr/review_threads route as the
-// cloud-session reference describes it.
+// PR 528 on 2026-11-23, and the proxy's ccr/review_threads route in the shape
+// a cloud session returned for PR 529 that day.
 import { afterEach, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
@@ -72,7 +72,7 @@ if (path === prefix + 'pulls/1') {
 } else if (path === prefix + 'commits/head/status?per_page=100') {
   value = [{ state: 'pending', total_count: 0, statuses: [] }];
 } else if (path === prefix + 'pulls/1/ccr/review_threads') {
-  const thread = { id: 7, resolved: scenario !== 'unresolved', outdated: false, path: 'a.ts', line: 3, comment_ids: [11] };
+  const thread = { resolved: scenario !== 'unresolved', outdated: false, path: 'a.ts', line: 3, comment_ids: [11] };
   value = scenario === 'thread-shape' ? { threads: [thread] } : [thread];
 } else if (path === prefix + 'pulls/1/comments?per_page=100') {
   const comment = (id) => ({ id, in_reply_to_id: null, body: 'Handle the empty list', created_at: '2026-11-23T10:15:30Z', path: 'a.ts', line: 3, user: { login: 'reviewer' } });
@@ -169,7 +169,7 @@ it("keeps an unresolved thread from the proxy's route, with its first comment", 
   const { verdict } = watch("unresolved", ["--status-only"]);
   expect(verdict.rows[0].threads).toEqual([
     expect.objectContaining({
-      id: "7",
+      id: "comment-11",
       firstComment: expect.objectContaining({
         authorLogin: "reviewer",
         body: "Handle the empty list",

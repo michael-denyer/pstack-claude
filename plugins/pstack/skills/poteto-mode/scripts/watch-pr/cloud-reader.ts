@@ -534,10 +534,8 @@ export class CloudSessionReader implements T.GitHubReader {
       );
       const first = ids.length === 0 ? undefined : byId.get(ids[0]);
       return {
-        id:
-          typeof thread.id === "string" || typeof thread.id === "number"
-            ? String(thread.id)
-            : `comment-${String(ids[0])}`,
+        // The route gives a thread no id of its own.
+        id: `comment-${String(ids[0])}`,
         isResolved: thread.resolved,
         comments: {
           nodes:

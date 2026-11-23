@@ -88,9 +88,9 @@ describe("registry matches the README recipes", () => {
     const copy = readme.match(/cp -R plugins\/pstack "\$\{MINIMAX_DATA_DIR:-\$HOME\/\.minimax\}\/plugins\/pstack"/);
     expect(copy).not.toBeNull();
     const [step] = minimax.steps({ ...ctx, env: {} });
-    expect(step).toEqual({ kind: "copy", from: PLUGIN_DIR, to: "/home/u/.minimax/plugins/pstack" });
+    expect(step).toEqual({ kind: "copy", from: PLUGIN_DIR, to: join("/home/u", ".minimax", "plugins", "pstack") });
     const [moved] = minimax.steps({ ...ctx, env: { MINIMAX_DATA_DIR: "/data" } });
-    expect(moved.to).toBe("/data/plugins/pstack");
+    expect(moved.to).toBe(join("/data", "plugins", "pstack"));
   });
 
   test("skills links each skill dir into ~/.agents/skills", () => {
@@ -98,7 +98,7 @@ describe("registry matches the README recipes", () => {
     const skills = HARNESSES.find((h) => h.id === "skills");
     expect(skills.bin).toBeNull();
     expect(skills.steps({ ...ctx, pluginDir: "/p" })).toEqual([
-      { kind: "link-skills", from: "/p/skills", to: "/home/u/.agents/skills" },
+      { kind: "link-skills", from: join("/p", "skills"), to: join("/home/u", ".agents", "skills") },
     ]);
   });
 

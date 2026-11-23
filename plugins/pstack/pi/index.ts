@@ -13,7 +13,7 @@ export function install(pi: ExtensionAPI, settings: Settings): void {
   const runner = new AgentRunner(pi, settings);
   const scheduler = new Scheduler();
   const oneShot = registerOneShot(pi, settings, runner);
-  // The extension loads in the project directory, so process.cwd() is the project a committed sheet applies to.
+  // Pi registers tools here, before any session directory is known, so these switches come from the directory Pi started in.
   const sheet = readSheet(settings.agentDir, process.cwd());
   if (!sheet?.agentToolsOff) registerAgentTools(pi, runner, settings);
   if (!sheet?.askToolOff) registerAsk(pi, oneShot);

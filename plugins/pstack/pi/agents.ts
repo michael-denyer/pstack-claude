@@ -292,7 +292,7 @@ export class AgentRunner {
     const base = [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills")];
     const flags = childArgs(identity, this.settings.depth);
     const env = { [PARENT_SESSION_ENV]: this.ownSessionId };
-    if (readSheet(this.settings.agentDir)?.hcHost && process.env.HC_TERMINAL_ID) {
+    if (readSheet(this.settings.agentDir, identity.cwd)?.hcHost && process.env.HC_TERMINAL_ID) {
       // An interactive pi asks whether to trust the project before it reports any status; the parent already decided.
       return new HcChild(identity.id, command, [...base, ...flags, this.projectTrusted ? "--approve" : "--no-approve"], {
         cwd: identity.cwd,

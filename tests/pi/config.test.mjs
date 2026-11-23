@@ -1,7 +1,7 @@
 // The settings the extension derives from its flags, environment, and model sheet.
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -108,6 +108,29 @@ test("a sheet committed at the git root replaces the agent sheet, from a subdire
     // Without a working directory the agent sheet stands, as before.
     expect(readSheet(agent)?.piModels.get("opus")).toBe("agent/model");
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test.skipIf(process.platform === "win32")("repeated reads for one working directory run git once and reread the sheet", () => {
+  const { dir, agent, repo } = sheetDirs();
+  const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+  const bin = join(dir, "bin");
+  const log = join(dir, "git-calls.log");
+  mkdirSync(bin);
+  writeFileSync(join(bin, "git"), `#!/bin/sh\necho call >> '${log}'\nexec '${realGit}' "$@"\n`);
+  chmodSync(join(bin, "git"), 0o755);
+  const path = process.env.PATH;
+  try {
+    expect(spawnSync(realGit, ["init", "-q", repo]).status).toBe(0);
+    process.env.PATH = `${bin}:${path}`;
+    expect(readSheet(agent, repo)?.piModels.get("opus")).toBe("project/model");
+    writeFileSync(join(repo, ".claude", "pstack-models.md"), "pi models: opus=edited/model\n");
+    expect(readSheet(agent, repo)?.piModels.get("opus")).toBe("edited/model");
+    expect(readSheet(agent, repo)?.piModels.get("opus")).toBe("edited/model");
+    expect(readFileSync(log, "utf8").trim().split("\n")).toHaveLength(1);
+  } finally {
+    process.env.PATH = path;
     rmSync(dir, { recursive: true, force: true });
   }
 });

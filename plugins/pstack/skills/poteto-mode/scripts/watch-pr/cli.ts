@@ -198,12 +198,10 @@ export interface CliRuntime {
 }
 function realRuntime(timeout: number): CliRuntime {
   const deadline = new WatchDeadline(timeout, () => performance.now() / 1_000);
+  const gh = new GhGitHubReader(deadline);
   return {
     deadline,
-    reader: new FallbackGitHubReader(
-      new GhGitHubReader(deadline),
-      new CloudSessionReader(deadline, new GhGitHubReader(deadline))
-    ),
+    reader: new FallbackGitHubReader(gh, new CloudSessionReader(deadline, gh)),
     clock: {
       now: () => performance.now() / 1_000,
       observedAt: () => new Date().toISOString(),

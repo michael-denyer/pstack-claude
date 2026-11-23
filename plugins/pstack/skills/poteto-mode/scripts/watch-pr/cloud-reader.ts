@@ -160,7 +160,8 @@ function fastChecks(
     // code review (grafana/grafana#138617).
     if (workflow?.event === "dynamic") continue;
     const workflowName = workflow === undefined ? "" : String(workflow.name);
-    const key = `${name}/${workflowName}/${workflow === undefined ? "" : String(workflow.event)}`;
+    const event = workflow === undefined ? "" : String(workflow.event);
+    const key = `${name}/${workflowName}/${event}`;
     if (seen.has(key)) continue;
     seen.add(key);
     const state = text(
@@ -246,15 +247,18 @@ export class CloudSessionReader implements T.GitHubReader {
   private api(path: string): Promise<unknown> {
     return runJson(["gh", "api", path], this.deadline);
   }
-  // Every row of a list read, across its pages.
-  private async rows(path: string): Promise<readonly unknown[]> {
-    const pages = list(
+  private async pages(path: string): Promise<readonly unknown[]> {
+    return list(
       await runJson(
         ["gh", "api", "--paginate", "--slurp", path],
         this.deadline
       ),
       path
     );
+  }
+  // Every row of a list read, across its pages.
+  private async rows(path: string): Promise<readonly unknown[]> {
+    const pages = await this.pages(path);
     return pages.flatMap((page, index) => list(page, `${path} page ${index}`));
   }
   // The rows under `key` across every page, checked against the total_count
@@ -263,13 +267,7 @@ export class CloudSessionReader implements T.GitHubReader {
     path: string,
     key: string
   ): Promise<readonly Record<string, unknown>[]> {
-    const pages = list(
-      await runJson(
-        ["gh", "api", "--paginate", "--slurp", path],
-        this.deadline
-      ),
-      path
-    );
+    const pages = await this.pages(path);
     if (pages.length === 0) missing(`${path} pages`);
     const total = record(pages[0], `${path} page 0`).total_count;
     const rows = pages.flatMap((page, index) =>
@@ -281,6 +279,9 @@ export class CloudSessionReader implements T.GitHubReader {
   }
   private slug(context: T.PrContext | T.Repository): string {
     return `repos/${context.owner}/${context.repo}`;
+  }
+  private prKey(context: T.PrContext): string {
+    return `${this.slug(context)}#${context.number}`;
   }
   private async headOf(context: T.PrContext): Promise<string> {
     const pr = record(
@@ -454,7 +455,7 @@ export class CloudSessionReader implements T.GitHubReader {
   }
   async checksFastPath(context: T.PrContext): Promise<T.ChecksFastPath> {
     const checks = await this.checksAt(context, await this.headOf(context));
-    this.lastChecks = { pr: `${this.slug(context)}#${context.number}`, checks };
+    this.lastChecks = { pr: this.prKey(context), checks };
     // No checks sends resolveChecks to the rollup page, which must agree
     // before the watcher calls the head unchecked.
     return checks.length === 0
@@ -466,9 +467,8 @@ export class CloudSessionReader implements T.GitHubReader {
     after: string | null
   ): Promise<T.RollupPage> {
     if (after !== null) missing("REST check rollup cursor", after);
-    const key = `${this.slug(context)}#${context.number}`;
     const checks =
-      this.lastChecks?.pr === key
+      this.lastChecks?.pr === this.prKey(context)
         ? this.lastChecks.checks
         : await this.checksAt(context, await this.headOf(context));
     this.lastChecks = null;

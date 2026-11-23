@@ -161,8 +161,9 @@ function writeStubs(root, bin, log, exitCodes) {
   }
 }
 
-// The data dir name holds a space and characters cmd.exe treats specially, so
-// a staged path reaches a .cmd shim only if each argument is quoted for it.
+// The data dir name holds a space, &, and ^, so a staged path reaches a .cmd
+// shim only if each argument is quoted for cmd.exe. A lone % is left alone by
+// cmd.exe; a defined %NAME% pair is not covered (#526).
 function sandbox(exitCodes = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "open-pstack-")));
   const home = join(root, "home");

@@ -2,7 +2,7 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-On Windows, `open-pstack` launches a harness installed as a `.cmd` or `.bat` shim through `cmd.exe`. It wrapped each argument in double quotes, which leave `%NAME%` open to expansion, so a staged plugin path that named a defined variable, such as one under a data directory with `%SystemRoot%` in its name, reached the harness changed. Each argument is now caret-escaped for both of `cmd.exe`'s parses, and the shim's own path once. The Windows installer job proves this with such a path and with stubs in a directory whose name has a space and `&` ([#526](https://github.com/michael-denyer/pstack-claude/issues/526)).
+On Windows, `open-pstack` launches a harness installed as a `.cmd` or `.bat` shim through `cmd.exe`. It wrapped each argument in double quotes, which leave `%NAME%` open to expansion, so a staged plugin path that named a defined variable, such as one under a data directory with `%SystemRoot%` in its name, reached the harness changed. Each argument and the shim's own path are now caret-escaped for `cmd.exe`. The Windows installer job proves this with such a path, with stubs in a directory whose name has a space and `&`, and with a stub that reads `%~1` instead of forwarding `%*` ([#526](https://github.com/michael-denyer/pstack-claude/issues/526)).
 
 ## 0.9.152 - OpenCode registers pstack's agents, Pi reads the agent host from the project sheet
 

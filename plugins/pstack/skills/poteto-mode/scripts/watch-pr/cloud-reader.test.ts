@@ -43,10 +43,12 @@ if (path === prefix + 'pulls/1') {
     head: { sha: 'head', ref: 'feature', repo: { name: 'repo', owner: { login: 'owner' } } },
     base: { ref: 'main', sha: 'base' } };
 } else if (path === prefix + 'pulls/1/reviews?per_page=100') {
-  value = [[
-    { user: { login: 'reviewer' }, state: 'CHANGES_REQUESTED' },
-    { user: { login: 'reviewer' }, state: scenario === 'changes-requested' ? 'COMMENTED' : 'APPROVED' },
-  ]];
+  value = scenario === 'full-page'
+    ? [Array.from({ length: 100 }, () => ({ user: { login: 'reviewer' }, state: 'APPROVED' }))]
+    : [[
+      { user: { login: 'reviewer' }, state: 'CHANGES_REQUESTED' },
+      { user: { login: 'reviewer' }, state: scenario === 'changes-requested' ? 'COMMENTED' : 'APPROVED' },
+    ]];
 } else if (path === prefix + 'git/ref/heads/main') {
   value = { object: { sha: 'base' } };
 } else if (path === prefix + 'commits/head/check-runs?per_page=100') {
@@ -54,12 +56,18 @@ if (path === prefix + 'pulls/1') {
     : scenario === 'pending' ? [run('build', 'success'), run('test')]
     // A cancelled run of a workflow run that a newer one of the same workflow and event replaced.
     : scenario === 'replaced' ? [run('build', 'cancelled', 2, '2026-11-23T09:00:00Z'), run('build', 'success'), run('test', 'success')]
+    // Two jobs of one workflow run, started in the same second, one still running.
+    : scenario === 'tie' ? [run('build', 'success'), run('build'), run('test', 'success')]
+    : scenario === 'codeql' ? [run('build', 'success'), run('test', 'success'), run('Analyze (javascript)', null, 3)]
+    : scenario === 'copilot-agent' ? [run('build', 'success'), run('test', 'success'), run('copilot-pull-request-reviewer', null, 4)]
     : [run('build', 'success'), run('test', 'success')];
   value = [{ total_count: scenario === 'short-page' ? runs.length + 1 : runs.length, check_runs: runs }];
 } else if (path === prefix + 'actions/runs?head_sha=head&per_page=100') {
-  value = [{ total_count: 2, workflow_runs: [
-    { id: 1, check_suite_id: 1, name: 'CI', event: 'pull_request' },
-    { id: 2, check_suite_id: 2, name: 'CI', event: 'pull_request' },
+  value = [{ total_count: 4, workflow_runs: [
+    { id: 1, check_suite_id: 1, name: 'CI', event: 'pull_request', path: '.github/workflows/ci.yml' },
+    { id: 2, check_suite_id: 2, name: 'CI', event: 'pull_request', path: '.github/workflows/ci.yml' },
+    { id: 3, check_suite_id: 3, name: 'CodeQL', event: 'dynamic', path: 'dynamic/github-code-scanning/codeql' },
+    { id: 4, check_suite_id: 4, name: 'Running Copilot Code Review', event: 'dynamic', path: 'dynamic/agents/copilot-pull-request-reviewer' },
   ] }];
 } else if (path === prefix + 'commits/head/status?per_page=100') {
   value = [{ state: 'pending', total_count: 0, statuses: [] }];
@@ -67,7 +75,9 @@ if (path === prefix + 'pulls/1') {
   const thread = { id: 7, resolved: scenario !== 'unresolved', outdated: false, path: 'a.ts', line: 3, comment_ids: [11] };
   value = scenario === 'thread-shape' ? { threads: [thread] } : [thread];
 } else if (path === prefix + 'pulls/1/comments?per_page=100') {
-  value = [[{ id: 11, body: 'Handle the empty list', created_at: '2026-11-23T10:15:30Z', path: 'a.ts', line: 3, user: { login: 'reviewer' } }]];
+  const comment = (id) => ({ id, in_reply_to_id: null, body: 'Handle the empty list', created_at: '2026-11-23T10:15:30Z', path: 'a.ts', line: 3, user: { login: 'reviewer' } });
+  // 12 starts a thread the route did not return.
+  value = [scenario === 'missing-thread' ? [comment(11), comment(12)] : [comment(11)]];
 } else if (path === prefix + 'commits/head/check-suites?per_page=100') {
   value = [{ total_count: 1, check_suites: [{ id: 1, head_sha: 'head', status: 'completed', conclusion: 'success', app: { slug: 'github-actions', name: 'GitHub Actions' }, latest_check_runs_count: 2 }] }];
 } else { console.error('unexpected fixture command: ' + JSON.stringify(args)); process.exit(1); }
@@ -201,6 +211,37 @@ it("keeps only the newest run per name, workflow, and event, as gh pr checks doe
         `${check.name}/${check.workflow}`
     )
   ).toEqual(["build/CI", "test/CI"]);
+});
+
+it("counts CodeQL's dynamic workflow, as GitHub's rollup does, and leaves out Copilot's review agent", () => {
+  expect(watch("codeql", ["--status-only"]).verdict.rows[0].ci).toMatchObject({
+    kind: "ci-pending",
+    pending: [expect.objectContaining({ name: "Analyze (javascript)" })],
+  });
+  expect(
+    watch("copilot-agent", ["--status-only"]).verdict.rows[0].ci
+  ).toMatchObject({ kind: "ci-clean" });
+});
+
+it("a same-second tie between jobs of one workflow run goes to the one still running", () => {
+  expect(watch("tie", ["--status-only"]).verdict.rows[0].ci).toMatchObject({
+    kind: "ci-pending",
+    pending: [expect.objectContaining({ name: "build" })],
+  });
+});
+
+it("never reports ready when a thread is missing from the route or a list page is full", () => {
+  for (const [scenario, detail] of [
+    ["missing-thread", "review comment 12"],
+    ["full-page", "the last page is full"],
+  ] as const) {
+    const { verdict } = watch(scenario);
+    expect({ scenario, kind: verdict.kind }).not.toEqual({
+      scenario,
+      kind: "READY",
+    });
+    expect(JSON.stringify(verdict)).toContain(detail);
+  }
 });
 
 it("never reports ready when a page is short or the thread route has another shape", () => {

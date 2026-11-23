@@ -140,11 +140,15 @@ function fastChecks(
   const workflows = new Map(
     workflowRuns.map((run) => [run.check_suite_id, run] as const)
   );
-  // gh sorts by start time alone, so a tie, such as two jobs of one workflow
-  // run started in the same second, goes to the run that finished last.
+  // gh sorts by start time alone, so its pick on a tie, such as two jobs of one
+  // workflow run started in the same second, is arbitrary. Here a tie goes to a
+  // run still in flight, then to the run that finished last.
+  const unfinished = (run: Record<string, unknown>) =>
+    run.status === "completed" ? 0 : 1;
   const newest = [...runs].sort(
     (a, b) =>
       String(b.started_at ?? "").localeCompare(String(a.started_at ?? "")) ||
+      unfinished(b) - unfinished(a) ||
       String(b.completed_at ?? "").localeCompare(
         String(a.completed_at ?? "")
       ) ||
@@ -156,9 +160,10 @@ function fastChecks(
     const name = text(run.name, "check run.name");
     const suite = record(run.check_suite, "check run.check_suite").id;
     const workflow = workflows.get(suite);
-    // GitHub's rollup leaves out runs of dynamic workflows, such as Copilot's
-    // code review (grafana/grafana#138617).
-    if (workflow?.event === "dynamic") continue;
+    // GitHub's rollup leaves out Copilot's code review agent
+    // (grafana/grafana#138617) but keeps other dynamic workflows, such as
+    // CodeQL default setup (github/docs#47025), so only the agents' path is left out.
+    if (String(workflow?.path ?? "").startsWith("dynamic/agents/")) continue;
     const workflowName = workflow === undefined ? "" : String(workflow.name);
     const event = workflow === undefined ? "" : String(workflow.event);
     const key = `${name}/${workflowName}/${event}`;
@@ -227,6 +232,9 @@ function reviewDecision(reviews: readonly unknown[]): T.ReviewDecision {
   return states.includes("APPROVED") ? "APPROVED" : null;
 }
 
+// Every list read asks for this many rows per page.
+const PAGE_SIZE = 100;
+
 const MERGEABLE: ReadonlyMap<unknown, string> = new Map<unknown, string>([
   [true, "MERGEABLE"],
   [false, "CONFLICTING"],
@@ -256,10 +264,19 @@ export class CloudSessionReader implements T.GitHubReader {
       path
     );
   }
-  // Every row of a list read, across its pages.
+  // Every row of a list read, across its pages. These reads report no
+  // total_count, and the proxy's handling of next-page links is untested, so a
+  // full last page counts as a read that may have stopped early. A list of
+  // exactly 100, 200, or more rows fails the same way.
   private async rows(path: string): Promise<readonly unknown[]> {
-    const pages = await this.pages(path);
-    return pages.flatMap((page, index) => list(page, `${path} page ${index}`));
+    const pages = (await this.pages(path)).map((page, index) =>
+      list(page, `${path} page ${index}`)
+    );
+    if ((pages.at(-1)?.length ?? 0) >= PAGE_SIZE)
+      missing(
+        `${path} rows: the last page is full, so later pages may be missing`
+      );
+    return pages.flat();
   }
   // The rows under `key` across every page, checked against the total_count
   // the first page reports, so a page the proxy did not serve is an error.
@@ -496,6 +513,19 @@ export class CloudSessionReader implements T.GitHubReader {
         return [comment.id, comment] as const;
       })
     );
+    // Every review comment that starts a thread must belong to a thread the
+    // route returned, so a thread the route left out cannot read as resolved.
+    const threaded = new Set(
+      list(threads, "ccr/review_threads").flatMap((value, index) =>
+        list(
+          record(value, `ccr/review_threads[${index}]`).comment_ids,
+          `ccr/review_threads[${index}].comment_ids`
+        )
+      )
+    );
+    for (const [id, comment] of byId)
+      if (comment.in_reply_to_id == null && !threaded.has(id))
+        missing(`review comment ${String(id)} in a ccr/review_threads thread`);
     const nodes = list(threads, "ccr/review_threads").map((value, index) => {
       const thread = record(value, `ccr/review_threads[${index}]`);
       const ids = list(

@@ -10,11 +10,11 @@ Each command was run in a cloud session with `gh` 2.89.0, most recently on 2026-
 | ----------------------------------- | ----------------------------------------------------------------------------------------------- |
 | State, draft, mergeability, head    | `gh api "repos/<owner>/<repo>/pulls/<pr>"`                                                      |
 | Open PR for a branch                | `gh api "repos/<owner>/<repo>/pulls?head=<owner>:<branch>&state=open"`                          |
-| Check runs on the head              | `gh api "repos/<owner>/<repo>/commits/<head-sha>/check-runs"`                                   |
+| Check runs on the head              | `gh api --paginate --slurp "repos/<owner>/<repo>/commits/<head-sha>/check-runs?per_page=100"`    |
 | Commit statuses on the head         | `gh api "repos/<owner>/<repo>/commits/<head-sha>/status"`                                       |
 | Check suites on the head            | `gh api --paginate --slurp "repos/<owner>/<repo>/commits/<head-sha>/check-suites?per_page=100"` |
 | Actions runs on the head            | `gh api "repos/<owner>/<repo>/actions/runs?head_sha=<head-sha>"`                                |
-| Jobs and steps of an Actions run    | `gh api "repos/<owner>/<repo>/actions/runs/<run-id>/jobs"`                                      |
+| Jobs and steps of an Actions run    | `gh api --paginate --slurp "repos/<owner>/<repo>/actions/runs/<run-id>/jobs?per_page=100"`       |
 | Log of one Actions job              | `gh api "repos/<owner>/<repo>/actions/jobs/<job-id>/logs"`                                      |
 | Summary of an Actions run           | `gh run view <run-id>`                                                                          |
 | Log of an Actions run               | `gh run view <run-id> --log`                                                                    |

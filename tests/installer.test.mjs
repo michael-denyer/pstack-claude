@@ -15,7 +15,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { delimiter, dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { which } from "../installer/lib/detect.mjs";
@@ -110,7 +110,7 @@ describe("registry matches the README recipes", () => {
 // CLI end to end -----------------------------------------------------------
 
 const onWindows = process.platform === "win32";
-const run = onWindows ? test.skip : (name, fn) => test(name, fn, 30000);
+const run = (name, fn) => test(name, fn, 30000);
 
 describe("detection", () => {
   test("on win32 a .cmd shim wins over the extensionless sh shim", () => {
@@ -123,40 +123,67 @@ describe("detection", () => {
 });
 
 function nodePath() {
-  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
-    if (existsSync(join(dir, "node"))) return join(dir, "node");
+  const name = onWindows ? "node.exe" : "node";
+  for (const dir of (process.env.PATH ?? process.env.Path ?? "").split(delimiter)) {
+    if (existsSync(join(dir, name))) return join(dir, name);
   }
   throw new Error("node not on PATH");
 }
 
+// The environment a user's shell gives the CLI. On Windows, homedir() reads
+// USERPROFILE, and a .cmd shim launches through ComSpec, which needs SystemRoot.
+function userEnv(home, extra) {
+  const windows = onWindows
+    ? { USERPROFILE: home, ComSpec: process.env.ComSpec, SystemRoot: process.env.SystemRoot, PATHEXT: process.env.PATHEXT }
+    : {};
+  return { HOME: home, ...windows, ...extra };
+}
+
+// Each stub records its argv as one JSON line and exits with its code. On
+// Windows it is a .cmd shim, as npm installs, so the CLI launches it through cmd.exe.
+function writeStubs(root, bin, log, exitCodes) {
+  const logger = join(root, "log-call.mjs");
+  writeFileSync(
+    logger,
+    `import { appendFileSync } from "node:fs";\n` +
+      `const [code, ...argv] = process.argv.slice(2);\n` +
+      `appendFileSync(${JSON.stringify(log)}, JSON.stringify(argv) + "\\n");\n` +
+      `process.exit(Number(code));\n`,
+  );
+  for (const name of ["claude", "codex", "pi", "copilot", "muse", "omp", "kimi", "grok", "mcode", "opencode", "agy"]) {
+    const code = exitCodes[name] ?? 0;
+    if (onWindows) {
+      writeFileSync(join(bin, `${name}.cmd`), `@"${nodePath()}" "${logger}" ${code} ${name} %*\r\n@exit /b %ERRORLEVEL%\r\n`);
+    } else {
+      writeFileSync(join(bin, name), `#!/bin/sh\nexec "${nodePath()}" "${logger}" ${code} ${name} "$@"\n`, { mode: 0o755 });
+    }
+  }
+}
+
+// The data dir name holds a space and characters cmd.exe treats specially, so
+// a staged path reaches a .cmd shim only if each argument is quoted for it.
 function sandbox(exitCodes = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "open-pstack-")));
   const home = join(root, "home");
-  const xdg = join(root, "xdg");
+  const xdg = join(root, "x d&g^100%");
   const minimax = join(root, "minimax");
   const bin = join(root, "bin");
   const log = join(root, "calls.log");
   for (const dir of [home, xdg, bin]) mkdirSync(dir);
   writeFileSync(log, "");
-  for (const name of ["claude", "codex", "pi", "copilot", "muse", "omp", "kimi", "grok", "mcode", "opencode", "agy"]) {
-    writeFileSync(
-      join(bin, name),
-      `#!/bin/sh\nprintf '%s\\n' "${name} $*" >> "${log}"\nexit ${exitCodes[name] ?? 0}\n`,
-      { mode: 0o755 },
-    );
-  }
-  const env = {
+  writeStubs(root, bin, log, exitCodes);
+  const env = userEnv(home, {
     PATH: [bin, dirname(nodePath())].join(delimiter),
-    HOME: home,
     XDG_DATA_HOME: xdg,
     MINIMAX_DATA_DIR: minimax,
-  };
+  });
   const open = (...args) => {
     const r = spawnSync(nodePath(), [cli, ...args], { env, encoding: "utf8", input: "" });
     return { code: r.status, out: r.stdout, err: r.stderr };
   };
-  const calls = () => readFileSync(log, "utf8").split("\n").filter(Boolean);
-  return { root, home, xdg, minimax, open, calls, staged: join(xdg, "open-pstack", "pstack") };
+  const argvs = () => readFileSync(log, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  const calls = () => argvs().map((argv) => argv.join(" "));
+  return { root, home, xdg, minimax, open, argvs, calls, staged: join(xdg, "open-pstack", "pstack") };
 }
 
 describe("open-pstack CLI", () => {
@@ -186,6 +213,16 @@ describe("open-pstack CLI", () => {
     expect(existsSync(join(s.staged, ".claude-plugin", "plugin.json"))).toBe(true);
     expect(existsSync(join(s.minimax, "plugins", "pstack", ".claude-plugin", "plugin.json"))).toBe(true);
     expect(existsSync(join(s.home, ".agents"))).toBe(false);
+  });
+
+  run("a harness gets the staged path as one argument, unchanged", () => {
+    const s = sandbox();
+    const r = s.open("--only", "muse");
+    expect(r.code).toBe(0);
+    expect(s.argvs()).toEqual([
+      ["muse", "plugins", "install", s.staged],
+      ["muse", "plugins", "approve", "pstack"],
+    ]);
   });
 
   run("--only skills links every skill into ~/.agents/skills", () => {
@@ -286,10 +323,10 @@ describe("open-pstack CLI", () => {
     }
     cpSync(join(repoRoot, "plugins/pstack"), join(pkg, "plugin"), {
       recursive: true,
-      filter: (src) => !src.split("/").includes("node_modules"),
+      filter: (src) => !src.split(sep).includes("node_modules"),
     });
     const r = spawnSync(nodePath(), [join(pkg, "bin/open-pstack.mjs"), "--only", "skills"], {
-      env: { PATH: dirname(nodePath()), HOME: s.home, XDG_DATA_HOME: s.xdg },
+      env: userEnv(s.home, { PATH: dirname(nodePath()), XDG_DATA_HOME: s.xdg }),
       encoding: "utf8",
     });
     expect(r.status).toBe(0);

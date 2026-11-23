@@ -24,15 +24,24 @@ export function describeStep(step) {
   }
 }
 
-// cmd.exe needs one quoted command line for a .cmd or .bat shim.
-const winQuote = (arg) => `"${arg.replace(/"/g, '""')}"`;
+// A .cmd or .bat shim runs through cmd.exe (https://qntm.org/cmd). Each argument
+// is quoted for the program's own parser, then each cmd.exe metacharacter gets a
+// caret. Double quotes alone would still let cmd.exe expand %NAME%; with a caret
+// before each %, the name it would look up ends in a caret and matches no
+// variable. The shim's own expansion of %* or %~1 does not expand the text it
+// inserts again, so one caret is enough, and a shim that reads %~1 gets the
+// argument without carets. A path cannot hold the : of %NAME:a=b%.
+const CMD_META = /([()\][%!^"`<>&|;, *?])/g;
+const cmdEscape = (text) => text.replace(CMD_META, "^$1");
+const programQuote = (arg) => `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, "$1$1")}"`;
+const shimArg = (arg) => cmdEscape(programQuote(arg));
 
 function spawnArgv(argv, ctx) {
   const [bin, ...args] = argv;
   const file = which(bin, ctx) ?? bin;
   const result =
     ctx.platform === "win32" && /\.(cmd|bat)$/i.test(file)
-      ? spawnSync([file, ...args].map(winQuote).join(" "), { stdio: "inherit", shell: true })
+      ? spawnSync([cmdEscape(file), ...args.map(shimArg)].join(" "), { stdio: "inherit", shell: true })
       : spawnSync(file, args, { stdio: "inherit" });
   if (result.error) return { ok: false, detail: result.error.message };
   return result.status === 0

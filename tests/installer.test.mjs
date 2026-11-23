@@ -141,6 +141,8 @@ function userEnv(home, extra) {
 
 // Each stub records its argv as one JSON line and exits with its code. On
 // Windows it is a .cmd shim, as npm installs, so the CLI launches it through cmd.exe.
+// npm's shims forward %*; muse's stub reads "%~1" "%~2" "%~3" instead, as a
+// launcher that names its arguments does, and gets the staged path that way.
 function writeStubs(root, bin, log, exitCodes) {
   const logger = join(root, "log-call.mjs");
   writeFileSync(
@@ -154,22 +156,24 @@ function writeStubs(root, bin, log, exitCodes) {
   for (const name of ["claude", "codex", "pi", "copilot", "muse", "omp", "kimi", "grok", "mcode", "opencode", "agy"]) {
     const code = exitCodes[name] ?? 0;
     if (onWindows) {
-      writeFileSync(join(bin, `${name}.cmd`), `@"${node}" "${logger}" ${code} ${name} %*\r\n@exit /b %ERRORLEVEL%\r\n`);
+      const forward = name === "muse" ? `"%~1" "%~2" "%~3"` : "%*";
+      writeFileSync(join(bin, `${name}.cmd`), `@"${node}" "${logger}" ${code} ${name} ${forward}\r\n@exit /b %ERRORLEVEL%\r\n`);
     } else {
       writeFileSync(join(bin, name), `#!/bin/sh\nexec "${node}" "${logger}" ${code} ${name} "$@"\n`, { mode: 0o755 });
     }
   }
 }
 
-// The data dir name holds a space, &, and ^, so a staged path reaches a .cmd
-// shim only if each argument is quoted for cmd.exe. A lone % is left alone by
-// cmd.exe; a defined %NAME% pair is not covered (#526).
+// The data dir name holds a space, &, ^, and a %NAME% pair naming a variable
+// the CLI passes on (SystemRoot, on Windows), so a staged path reaches a .cmd
+// shim unchanged only if each argument is escaped for cmd.exe. The stubs sit in
+// a directory with a space and &, as a home like C:\Users\Jane Doe can put them.
 function sandbox(exitCodes = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "open-pstack-")));
   const home = join(root, "home");
-  const xdg = join(root, "x d&g^100%");
+  const xdg = join(root, "x d&g^%SystemRoot%");
   const minimax = join(root, "minimax");
-  const bin = join(root, "bin");
+  const bin = join(root, "b in&");
   const log = join(root, "calls.log");
   for (const dir of [home, xdg, bin]) mkdirSync(dir);
   writeFileSync(log, "");

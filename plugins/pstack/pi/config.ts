@@ -101,9 +101,9 @@ export function parseSheet(text: string): Sheet {
 // the sheet itself is read again on every call.
 const gitRoots = new Map<string, string>();
 function projectRoot(cwd: string): string {
-  let root = gitRoots.get(cwd);
-  if (root !== undefined) return root;
-  root = cwd;
+  const cached = gitRoots.get(cwd);
+  if (cached !== undefined) return cached;
+  let root = cwd;
   try {
     root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {

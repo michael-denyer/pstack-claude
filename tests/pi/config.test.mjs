@@ -127,7 +127,6 @@ test.skipIf(process.platform === "win32")("repeated reads for one working direct
     expect(readSheet(agent, repo)?.piModels.get("opus")).toBe("project/model");
     writeFileSync(join(repo, ".claude", "pstack-models.md"), "pi models: opus=edited/model\n");
     expect(readSheet(agent, repo)?.piModels.get("opus")).toBe("edited/model");
-    expect(readSheet(agent, repo)?.piModels.get("opus")).toBe("edited/model");
     expect(readFileSync(log, "utf8").trim().split("\n")).toHaveLength(1);
   } finally {
     process.env.PATH = path;

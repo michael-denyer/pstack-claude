@@ -150,12 +150,13 @@ function writeStubs(root, bin, log, exitCodes) {
       `appendFileSync(${JSON.stringify(log)}, JSON.stringify(argv) + "\\n");\n` +
       `process.exit(Number(code));\n`,
   );
+  const node = nodePath();
   for (const name of ["claude", "codex", "pi", "copilot", "muse", "omp", "kimi", "grok", "mcode", "opencode", "agy"]) {
     const code = exitCodes[name] ?? 0;
     if (onWindows) {
-      writeFileSync(join(bin, `${name}.cmd`), `@"${nodePath()}" "${logger}" ${code} ${name} %*\r\n@exit /b %ERRORLEVEL%\r\n`);
+      writeFileSync(join(bin, `${name}.cmd`), `@"${node}" "${logger}" ${code} ${name} %*\r\n@exit /b %ERRORLEVEL%\r\n`);
     } else {
-      writeFileSync(join(bin, name), `#!/bin/sh\nexec "${nodePath()}" "${logger}" ${code} ${name} "$@"\n`, { mode: 0o755 });
+      writeFileSync(join(bin, name), `#!/bin/sh\nexec "${node}" "${logger}" ${code} ${name} "$@"\n`, { mode: 0o755 });
     }
   }
 }

@@ -97,14 +97,24 @@ export function parseSheet(text: string): Sheet {
 // A sheet committed with the project replaces the user's in that project, as the
 // Claude session hook does: the git root of the working directory, or the
 // directory itself when git cannot say (not a repository, or no git).
-function projectSheetFile(cwd: string): string | undefined {
+// A directory's git root does not change within a process, so it is asked once;
+// the sheet itself is read again on every call.
+const gitRoots = new Map<string, string>();
+function projectRoot(cwd: string): string {
+  const cached = gitRoots.get(cwd);
+  if (cached !== undefined) return cached;
   let root = cwd;
   try {
     root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     // The directory itself is the root, as in the session hook.
   }
-  const file = join(root, ".claude", "pstack-models.md");
+  gitRoots.set(cwd, root);
+  return root;
+}
+
+function projectSheetFile(cwd: string): string | undefined {
+  const file = join(projectRoot(cwd), ".claude", "pstack-models.md");
   return existsSync(file) ? file : undefined;
 }
 

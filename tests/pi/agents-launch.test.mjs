@@ -251,4 +251,36 @@ describe("model resolution", () => {
     expect(err.message).toContain("opus, fable, sonnet, haiku, inherit-parent, auto");
     expect(w.invocations()).toEqual([]);
   });
+
+  test("the agent host comes from the sheet committed in the agent's working directory", async () => {
+    const { w, pi, ctx } = setup({ sheet: "pi agent host: hc\n" });
+    mkdirSync(join(w.cwd, ".claude"));
+    writeFileSync(join(w.cwd, ".claude", "pstack-models.md"), "bug-fix: opus\n");
+    const terminal = process.env.HC_TERMINAL_ID;
+    process.env.HC_TERMINAL_ID = "t-test";
+    try {
+      await pi.call("agent", { description: "h", prompt: "x" }, ctx);
+    } finally {
+      if (terminal === undefined) delete process.env.HC_TERMINAL_ID;
+      else process.env.HC_TERMINAL_ID = terminal;
+    }
+    expect(w.invocations().map((inv) => flag(inv, "--mode"))).toEqual(["rpc"]);
+  });
+
+  test("a worktree agent's host comes from the session's sheet, not the worktree's checkout", async () => {
+    const { w, pi, ctx } = setup({ sheet: "pi agent host: hc\n" });
+    gitRepo(w.cwd);
+    // Uncommitted, so the agent's worktree, a checkout of HEAD, has no sheet.
+    mkdirSync(join(w.cwd, ".claude"));
+    writeFileSync(join(w.cwd, ".claude", "pstack-models.md"), "bug-fix: opus\n");
+    const terminal = process.env.HC_TERMINAL_ID;
+    process.env.HC_TERMINAL_ID = "t-test";
+    try {
+      await pi.call("agent", { description: "h", prompt: "x", isolation: "worktree" }, ctx);
+    } finally {
+      if (terminal === undefined) delete process.env.HC_TERMINAL_ID;
+      else process.env.HC_TERMINAL_ID = terminal;
+    }
+    expect(w.invocations().map((inv) => flag(inv, "--mode"))).toEqual(["rpc"]);
+  });
 });

@@ -15,6 +15,7 @@
     "plugins/pstack/skills/automate-me/SKILL.md": {
       "kind": "port-feature",
       "why": "Use workspace-scoped Codex run history in Codex.",
+      "since": "0.9.153",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/blast-radius/SKILL.md": {
@@ -80,6 +81,7 @@
     "plugins/pstack/skills/poteto-mode/playbooks/eval.md": {
       "kind": "port-feature",
       "why": "Codex grades candidates from their own runtime transcripts.",
+      "since": "0.9.153",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/playbooks/feature.md": {

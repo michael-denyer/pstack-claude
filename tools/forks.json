@@ -48,9 +48,14 @@
       "since": "0.9.2",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/poteto-mode/playbooks/autonomous-run.md": {
+      "kind": "port-feature",
+      "why": "Codex checks wake-up support before promising unattended work.",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/poteto-mode/playbooks/autopilot-full.md": {
       "kind": "policy",
-      "why": "Owners stop at merge-ready and the operator clicks every merge, with the patch-id rule governing re-verification if trunk moves first, instead of each owner merging after a clean verdict, and the root writes the program objective into the store's notes.md on the go and re-reads it each tick, arms the tick as a dynamic-mode /loop, states the program's size before the first owner starts and waits for the operator's go above three owners, scopes review lanes to what the diff breaks, and stops a PR at two fix-forwards.",
+      "why": "Owners stop at merge-ready and the operator clicks every merge, with the patch-id rule governing re-verification if trunk moves first, instead of each owner merging after a clean verdict, and the root writes the program objective into the store's notes.md on the go and re-reads it each tick, arms the tick as a dynamic-mode /loop, states the program's size before the first owner starts and waits for the operator's go above three owners, scopes review lanes to what the diff breaks, and stops a PR at two fix-forwards. In Codex, confirm the host can wake the root before starting an unattended run.",
       "since": "0.9.39",
       "upstream": "not-proposed"
     },
@@ -68,7 +73,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/bug-fix.md": {
       "kind": "policy",
-      "why": "Quotes decisive failing and passing output trimmed to the assertion and counts, separates verified code, publication, observed runtime behavior, and blockers, selects non-sensitive diagnostic fields before printing, and adds a focused-fix exception with explicit architecture and independent correctness review triggers for higher-risk fixes.",
+      "why": "Quotes decisive failing and passing output trimmed to the assertion and counts, separates verified code, publication, observed runtime behavior, and blockers, selects non-sensitive diagnostic fields before printing, and adds a focused-fix exception with explicit architecture and independent correctness review triggers for higher-risk fixes. Translate the stubborn-hunt loop for Codex.",
       "since": "0.9.10",
       "upstream": "not-proposed"
     },
@@ -104,8 +109,13 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/shipping.md": {
       "kind": "policy",
-      "why": "Lands one PR at a time under the user's landing authority, cancelling pending merges before any chain change, merging only under a service-enforced head condition, arming auto-merge or a queue only behind repository rules that enforce the verdict, and confirming each landing in the destination's history before advancing, with verifiers that drive the real surface through the driver skill in their own worktrees, a matching patch-id that keeps a review only after its applicability to the new base is checked, and the watcher owning blocker classification, with a branch behind its base routed to the topology owner. Stops at merge-ready when GitHub refuses GraphQL, as in a Claude Code cloud session, and points at the REST reads in `cloud-session-pr-reads.md`.",
+      "why": "Lands one PR at a time under the user's landing authority, cancelling pending merges before any chain change, merging only under a service-enforced head condition, arming auto-merge or a queue only behind repository rules that enforce the verdict, and confirming each landing in the destination's history before advancing, with verifiers that drive the real surface through the driver skill in their own worktrees, a matching patch-id that keeps a review only after its applicability to the new base is checked, and the watcher owning blocker classification, with a branch behind its base routed to the topology owner. Stops at merge-ready when GitHub refuses GraphQL, as in a Claude Code cloud session, and points at the REST reads in `cloud-session-pr-reads.md`. In Codex, verify a wake-up is available before initiating a merge request that may queue.",
       "since": "0.9.34",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/poteto-mode/playbooks/visual-parity.md": {
+      "kind": "port-feature",
+      "why": "Use a repeatable verification step and route unattended Codex checks through its wake-up preflight.",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/playbooks/worktree-cleanup.md": {

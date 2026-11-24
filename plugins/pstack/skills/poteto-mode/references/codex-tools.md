@@ -73,7 +73,7 @@ The [driver policy](../SKILL.md#non-negotiables) selects the app driver. For ski
 | `run` (drive a CLI/TUI to see a change work) | Run the app yourself via `shell` and observe the real output. |
 | Project UI driver | Drive the UI with whatever automation you have, or hand the user a concrete manual check. Do not claim done without observing the artifact. |
 | `plugin-dev:skill-development` (Claude's SKILL.md authoring guidance) | Follow your platform's skill-authoring guidance; the `writing-skills` skill if present. Keep `name` + `description` frontmatter and progressive disclosure. |
-| `loop` (recurring/self-paced re-invocation, used by `babysit`) | Codex has no `loop` skill. Re-run the step yourself on a cadence, or use a Codex scheduled task if available. |
+| `loop` (recurring/self-paced re-invocation, used by `babysit`) | Use the [Codex wake-up preflight](codex-wakeups.md) for unattended work. Recheck directly while the turn is active for attended work. |
 
 ## Per-skill notes
 

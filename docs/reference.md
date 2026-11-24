@@ -131,14 +131,9 @@ The [README installation](../README.md#codex) registers that catalog with `codex
 
 OpenAI documents [marketplace registration and the plugin format](https://developers.openai.com/plugins/build/plugins#add-a-marketplace-from-the-cli). If your CLI lacks `plugin add`, use the plugin browser after registering the marketplace, or use the [skills-only installation](#shared-skills-installation).
 
-Invoke a skill the two ways [Codex's skills documentation](https://developers.openai.com/codex/skills) gives. Type `$` and the skill's name, such as `$poteto-mode` or `$babysit`, and choose its entry, or pick it from `/skills`. In a plugin install the entry reads `poteto-mode (pstack)` and inserts `$pstack:poteto-mode`. A skills-only install has no `pstack:` prefix. To enable parallel subagents:
+Invoke a skill the two ways [Codex's skills documentation](https://developers.openai.com/codex/skills) gives. Type `$` and the skill's name, such as `$poteto-mode` or `$babysit`, and choose its entry, or pick it from `/skills`. In a plugin install the entry reads `poteto-mode (pstack)` and inserts `$pstack:poteto-mode`. A skills-only install has no `pstack:` prefix.
 
-```toml
-[features]
-multi_agent = true
-```
-
-Add this setting to `~/.codex/config.toml` if subagents are disabled. Skills such as `arena`, `interrogate`, and `architect` use parallel agents. The [mapping](../plugins/pstack/skills/poteto-mode/references/codex-tools.md) describes a sequential fallback and translates Claude tool names, model defaults, and verification instructions.
+Skills such as `arena`, `interrogate`, and `architect` use parallel agents. The [mapping](../plugins/pstack/skills/poteto-mode/references/codex-tools.md) names the Codex setting that controls subagents, describes a sequential fallback, and translates Claude tool names, model defaults, and verification instructions.
 
 ### Pi
 

@@ -15,7 +15,7 @@ What stays different:
 
 - Upstream marks `/reframe` `disable-model-invocation: true`. The sync drops that key, as it does for every skill, because on Claude Code it makes the Skill tool refuse the invocation.
 
-The sync merged with no conflicts and no fork changes. `README.md` and `docs/reference.md` name the new pin, `docs/reference.md` gains the `/reframe` row, and its skill counts move to 68 directories and 44 public skills; its Muse note also said 65 skills, a count left over from before this sync, and now says 68.
+The sync merged with no conflicts and no fork changes. `README.md` and `docs/reference.md` name the new pin, `docs/reference.md` gains the `/reframe` row, and its skill counts move to 68 directories and 44 public skills; its Muse note also said 65 skills, a count left over from before this sync, and now says 68. From @wes-davis ([#547](https://github.com/michael-denyer/pstack-claude/pull/547)).
 
 ## 0.9.154 - Codex fixes: routing on forked chats, agent roles and isolation, principles out of the skill list
 

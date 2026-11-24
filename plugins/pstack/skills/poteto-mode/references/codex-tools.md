@@ -102,7 +102,7 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | `swarm` | Each worker is a `spawn_agent` call on your configured Codex model, and those calls already run concurrently; give each writing worker its own worktree or output directory (see Subagent policy above). |
 | `why` | List MCP servers from the tools Codex exposes to the session, not from `.mcp.json` or `claude mcp list`. |
 | `figure-it-out` | Read each principle skill it names through the principle-leaf row in Tool actions, since Codex does not list principle leaves. |
-| `typescript-best-practices` | Read the **type-system-discipline** principle skill through the principle-leaf row in Tool actions, since Codex does not list principle leaves. |
+| `typescript-best-practices` | Read each principle skill it names through the principle-leaf row in Tool actions, since Codex does not list principle leaves. |
 
 ## Vendored scripts
 

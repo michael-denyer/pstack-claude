@@ -26,6 +26,8 @@
 //   plugins/pstack/agents/comment-sicko.md, LICENSE, LICENSE-cursor-team-kit,
 //   and NOTICE-skills.md
 //     -> portable copies under poteto-mode/references/{agents,licenses}/
+//   each principle-* skill name
+//     -> its agents/openai.yaml, which keeps it out of Codex's implicit catalog
 //   No other model name (a claude-* ID or a backticked family name) may appear
 //   in skill prose; the scan below fails on strays.
 //
@@ -87,6 +89,9 @@ export const OWNED_DIRS = [
   `${SKILLS}/poteto-mode/references/agents`,
   `${SKILLS}/poteto-mode/references/licenses`,
 ];
+
+// Codex's per-skill metadata, planned for every principle leaf.
+const CODEX_PRINCIPLE_POLICY = "policy:\n  allow_implicit_invocation: false\n";
 
 // Replace the manifest's single "version" value, preserving all formatting.
 // Exactly one "version" field per manifest is a precondition: a second one
@@ -890,6 +895,11 @@ export function plan(root, models) {
     stamp(runtime.manifest, (text) =>
       runtime.stampManifest(text, { skills: agentSkills(join(root, SKILLS)).map(({ name }) => name) }),
     );
+  }
+  // #543: Codex ignores user-invocable, so principle leaves reach its catalog
+  // unless per-skill policy metadata opts them out of implicit invocation.
+  for (const { name } of agentSkills(join(root, SKILLS)).filter(({ name }) => name.startsWith("principle-"))) {
+    put(`${SKILLS}/${name}/agents/openai.yaml`, CODEX_PRINCIPLE_POLICY);
   }
   for (const dir of OWNED_DIRS) {
     const outer = OWNED_DIRS.find((other) => dir.startsWith(`${other}/`));

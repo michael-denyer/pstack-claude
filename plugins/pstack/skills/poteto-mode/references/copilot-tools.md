@@ -121,6 +121,8 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | `swarm` | Workers are `task` calls with `mode: "background"`, each on its own worktree; in the app, `create_session` per worker. |
 | `teach` | Running `how` and `why` in parallel maps to `task` fan-out; image generation uses whatever image tool you have, or skip it and say so. |
 | `why` | Available MCP servers appear in your tool list; there is no `mcp__` prefix convention to scan for. |
+| `figure-it-out` | Each principle skill it names resolves like any other skill (Tool actions above). |
+| `typescript-best-practices` | Each principle skill it names resolves like any other skill (Tool actions above). |
 | `reflect` | Run `find-transcript.mjs <session-state directory> '<opening prompt fragment>' <workspace directory>` with the absolute session-state path under `${COPILOT_HOME:-~/.copilot}`. That directory is outside the workspace, so the call takes the normal permission flow. The workspace defaults to the current directory when omitted. The finder checks the session header's `cwd` against that workspace before reading Copilot's `user.message` records, so matching prompts in other projects are skipped. For a conversation in a related worktree, pass that worktree's directory explicitly. Skill paths under `.claude/skills/` and `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/` mean the Copilot skill locations below. |
 | `recall` | Search Copilot session state scoped to the current workspace (Transcripts above), not `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`. |
 | `show-me-your-work` | The end-of-run check reads this session's `events.jsonl` (Transcripts above). |

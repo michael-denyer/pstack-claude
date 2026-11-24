@@ -114,9 +114,18 @@ jobs:
       # an entry whose path is not forked. bash ignores the exit status of a
       # process substitution, so jq fills a variable first. Fed straight to
       # the loop, a jq error runs it zero times and the step passes.
+      # The sync steps clone upstream repos over HTTPS. Anonymous clones from
+      # shared runners hit HTTP 429, so git sends the job token as a header
+      # from the environment. Nothing is written to a git config file.
       - name: Check every fork from upstream is declared
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -eo pipefail
+          echo "::add-mask::$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_VALUE_0
           components=$(jq -r '.components | to_entries[] | "\(.key) \(.value.sha)"' tools/upstream.json)
           if [ -z "$components" ]; then
             echo "tools/upstream.json lists no components"
@@ -130,7 +139,13 @@ jobs:
       # Rules are shared by every component, so one run checks them all.
       - name: Check every substitution rule matches upstream at the pins
         if: ${{ !cancelled() }}
-        run: bun tools/sync.mjs --check-rules
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_VALUE_0
+          bun tools/sync.mjs --check-rules
       # Annotates rather than fails: generated edits and declared forks are
       # legitimate, but a reviewer should see every upstream skill file a PR
       # touches. A port-only file, from the dry runs above, has no upstream.

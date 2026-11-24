@@ -88,6 +88,9 @@ export const OWNED_DIRS = [
   `${SKILLS}/poteto-mode/references/licenses`,
 ];
 
+// Codex's per-skill metadata, planned for every principle leaf.
+const CODEX_PRINCIPLE_POLICY = "policy:\n  allow_implicit_invocation: false\n";
+
 // Replace the manifest's single "version" value, preserving all formatting.
 // Exactly one "version" field per manifest is a precondition: a second one
 // (say, from a future nested object) would make the blind replace ambiguous,
@@ -890,6 +893,11 @@ export function plan(root, models) {
     stamp(runtime.manifest, (text) =>
       runtime.stampManifest(text, { skills: agentSkills(join(root, SKILLS)).map(({ name }) => name) }),
     );
+  }
+  // #543: Codex ignores user-invocable, so principle leaves reach its catalog
+  // unless per-skill policy metadata opts them out of implicit invocation.
+  for (const { name } of agentSkills(join(root, SKILLS)).filter(({ name }) => name.startsWith("principle-"))) {
+    put(`${SKILLS}/${name}/agents/openai.yaml`, CODEX_PRINCIPLE_POLICY);
   }
   for (const dir of OWNED_DIRS) {
     const outer = OWNED_DIRS.find((other) => dir.startsWith(`${other}/`));

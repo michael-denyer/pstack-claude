@@ -352,6 +352,18 @@ describe("shared Agent Skills tree", () => {
     }
   });
 
+  test("the plan keeps every principle leaf, and only those, out of Codex implicit invocation", () => {
+    const { files } = plan(repoRoot);
+    for (const { name } of agentSkills(skillsDir)) {
+      const metadata = files[`plugins/pstack/skills/${name}/agents/openai.yaml`];
+      if (name.startsWith("principle-")) {
+        expect(Bun.YAML.parse(metadata).policy.allow_implicit_invocation).toBe(false);
+      } else {
+        expect(metadata).toBeUndefined();
+      }
+    }
+  });
+
   test("linked skills keep their own resources and sibling principle leaves", () => {
     const root = mkdtempSync(join(tmpdir(), "pstack-agent-skills-"));
     const installed = join(root, "unrelated-home", ".agents", "skills");

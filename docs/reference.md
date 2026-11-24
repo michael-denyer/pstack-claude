@@ -230,7 +230,7 @@ Skills-only installs use `plugins/pstack/skills/`. Agent references and license 
 
 ### Generated files and checks
 
-The [generator](../tools/generate.mjs) updates versions, model defaults, Copilot and Muse preambles and role lists, the Muse manifest's skill list, and portable reference files, and validates the Pi package manifest. It also fails when the [slash-command table](#slash-commands) and the public skills disagree. Keep a row for every public skill, with `poteto-mode` first.
+The [generator](../tools/generate.mjs) updates versions, model defaults, Copilot and Muse preambles and role lists, the Muse manifest's skill list, Codex invocation metadata for the principle leaves, and portable reference files, and validates the Pi package manifest. It also fails when the [slash-command table](#slash-commands) and the public skills disagree. Keep a row for every public skill, with `poteto-mode` first.
 
 [Documentation fact tests](../tests/readme-facts.test.mjs) check the skill counts and upstream pin. The table parser requires the header `| command | use it when |`.
 

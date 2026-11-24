@@ -51,6 +51,7 @@
     "plugins/pstack/skills/poteto-mode/playbooks/autonomous-run.md": {
       "kind": "port-feature",
       "why": "Codex checks wake-up support before promising unattended work.",
+      "since": "0.9.153",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/playbooks/autopilot-full.md": {
@@ -116,6 +117,7 @@
     "plugins/pstack/skills/poteto-mode/playbooks/visual-parity.md": {
       "kind": "port-feature",
       "why": "Use a repeatable verification step and route unattended Codex checks through its wake-up preflight.",
+      "since": "0.9.153",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/playbooks/worktree-cleanup.md": {

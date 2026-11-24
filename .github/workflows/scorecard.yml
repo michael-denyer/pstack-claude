@@ -28,10 +28,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Held at v2.5.0: the v2.6.0 image cannot be pulled from ghcr.io
+      # (ossf/scorecard-action#1752). Dependabot will propose the next release.
+      #
       # publish_results sends results to api.scorecard.dev and enables the
       # badge. That service verifies this workflow, so the job must keep its
       # write permissions job-scoped and use only allow-listed actions.
-      - uses: ossf/scorecard-action@23f22cd43608bae7a1f1fa2603d7314dee9538a5 # v2.6.0
+      - uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
         with:
           results_file: results.sarif
           results_format: sarif

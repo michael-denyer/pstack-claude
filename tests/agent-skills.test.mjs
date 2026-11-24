@@ -356,6 +356,9 @@ describe("shared Agent Skills tree", () => {
     const { files } = plan(repoRoot);
     const skills = agentSkills(skillsDir);
     expect(skills.filter(({ name }) => name.startsWith("principle-")).length).toBeGreaterThan(0);
+    // Hidden from Codex's skill list, so the Codex mapping must give the path instead.
+    const codexTools = readFileSync(join(skillsDir, "poteto-mode/references/codex-tools.md"), "utf8");
+    expect(codexTools).toContain("`<poteto-mode-dir>/../principle-<title>/SKILL.md`");
     for (const { name } of skills) {
       const metadata = files[`plugins/pstack/skills/${name}/agents/openai.yaml`];
       if (name.startsWith("principle-")) {

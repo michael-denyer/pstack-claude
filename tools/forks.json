@@ -80,7 +80,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/eval.md": {
       "kind": "port-feature",
-      "why": "Codex grades candidates from their own runtime transcripts.",
+      "why": "Codex grades candidates from the transcripts matched by their dispatch IDs and verifies the assigned work directories separately.",
       "since": "0.9.153",
       "upstream": "not-proposed"
     },

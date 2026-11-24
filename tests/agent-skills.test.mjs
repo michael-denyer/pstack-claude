@@ -352,9 +352,11 @@ describe("shared Agent Skills tree", () => {
     }
   });
 
-  test("the plan keeps every principle leaf, and only those, out of Codex implicit invocation", () => {
+  test("the plan writes Codex no-implicit-invocation metadata for every principle leaf and no other skill", () => {
     const { files } = plan(repoRoot);
-    for (const { name } of agentSkills(skillsDir)) {
+    const skills = agentSkills(skillsDir);
+    expect(skills.filter(({ name }) => name.startsWith("principle-")).length).toBeGreaterThan(0);
+    for (const { name } of skills) {
       const metadata = files[`plugins/pstack/skills/${name}/agents/openai.yaml`];
       if (name.startsWith("principle-")) {
         expect(Bun.YAML.parse(metadata).policy.allow_implicit_invocation).toBe(false);

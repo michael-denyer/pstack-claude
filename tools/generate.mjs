@@ -26,6 +26,8 @@
 //   plugins/pstack/agents/comment-sicko.md, LICENSE, LICENSE-cursor-team-kit,
 //   and NOTICE-skills.md
 //     -> portable copies under poteto-mode/references/{agents,licenses}/
+//   each principle-* skill name
+//     -> its agents/openai.yaml, which keeps it out of Codex's implicit catalog
 //   No other model name (a claude-* ID or a backticked family name) may appear
 //   in skill prose; the scan below fails on strays.
 //

@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -359,6 +360,18 @@ describe("shared Agent Skills tree", () => {
     // Hidden from Codex's skill list, so the Codex mapping must give the path instead.
     const codexTools = readFileSync(join(skillsDir, "poteto-mode/references/codex-tools.md"), "utf8");
     expect(codexTools).toContain("`<poteto-mode-dir>/../principle-<title>/SKILL.md`");
+    // Every other skill that names a leaf carries the Codex preamble, so its reader reaches that row.
+    const preamble = "On Codex, read the [platform mapping](../poteto-mode/references/codex-tools.md)";
+    const unreached = skills
+      .map(({ name }) => name)
+      .filter((name) => !name.startsWith("principle-") && name !== "poteto-mode")
+      .filter((name) =>
+        readdirSync(join(skillsDir, name), { recursive: true })
+          .filter((file) => file.endsWith(".md"))
+          .some((file) => /principle skill|\*\*principle-/.test(readFileSync(join(skillsDir, name, file), "utf8"))),
+      )
+      .filter((name) => !readFileSync(join(skillsDir, name, "SKILL.md"), "utf8").includes(preamble));
+    expect(unreached).toEqual([]);
     for (const { name } of skills) {
       const metadata = files[`plugins/pstack/skills/${name}/agents/openai.yaml`];
       if (name.startsWith("principle-")) {

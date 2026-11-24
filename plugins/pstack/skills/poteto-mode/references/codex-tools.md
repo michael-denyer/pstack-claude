@@ -13,7 +13,7 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 | Fetch a URL | `shell` with `curl` / `wget` |
 | Search the web | `web_search` |
 | Invoke a skill (the `Skill` tool, `/command`) | Skills load natively. Follow the instructions presented. |
-| Read a principle leaf (the **principle-<title>** skill a pstack skill names) | Principle leaves are left out of Codex's skill list by their `agents/openai.yaml`. Read the leaf with `shell` at `<poteto-mode-dir>/../principle-<title>/SKILL.md`, with `<poteto-mode-dir>` resolved to the `poteto-mode` skill's directory. |
+| Read a principle leaf (the **principle-<title>** skill, or the **<title>** principle skill, a pstack skill names) | Principle leaves are left out of Codex's skill list by their `agents/openai.yaml`. Read the leaf with `shell` at `<poteto-mode-dir>/../principle-<title>/SKILL.md`, with `<poteto-mode-dir>` resolved to the `poteto-mode` skill's directory and `<title>` in kebab case, or the explicit name a Principles entry gives. |
 | Dispatch a subagent (the `Agent`/`Task` tool) | `spawn_agent` |
 | Dispatch N parallel subagents in one turn | N `spawn_agent` calls in one response |
 | Wait for a subagent result | `wait_agent` |
@@ -101,6 +101,8 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | `show-me-your-work` | Check the log against this run's current Codex rollout, using `CODEX_THREAD_ID` and the state index as described in Tool actions. A filename suffix alone cannot select the current file after revert. If the current path is unavailable or ambiguous, report that the audit could not run instead of guessing a rollout. Do not read Claude Code's projects directory. |
 | `swarm` | Each worker is a `spawn_agent` call on your configured Codex model, and those calls already run concurrently; give each writing worker its own worktree or output directory (see Subagent policy above). |
 | `why` | List MCP servers from the tools Codex exposes to the session, not from `.mcp.json` or `claude mcp list`. |
+| `figure-it-out` | Read each principle skill it names through the principle-leaf row in Tool actions, since Codex does not list principle leaves. |
+| `typescript-best-practices` | Read the **type-system-discipline** principle skill through the principle-leaf row in Tool actions, since Codex does not list principle leaves. |
 
 ## Vendored scripts
 

@@ -2,6 +2,21 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.155 - sync to upstream ca782ed (v0.15.48): adds /reframe
+
+The upstream pin moves from `0b46ec3` to `ca782ed`, upstream v0.15.48, 2 pstack commits (cursor/plugins#1324 and #1326). `cursor-team-kit` and `thermos` did not change upstream, so their pins stay.
+
+What changes for users:
+
+- `/reframe` is new. Starting from your files and your own description, it gives 8 to 12 expert terms for what you're building, ranked by how much each would change what gets built, each tied to the part of your description it names and to a real project whose link it opened. It borrows terms from 2 or 3 neighboring fields that solved the same problem, says where each analogy breaks, names what you didn't mention, and rewrites your description with the new words. When the description could name more than one problem, it first lists the two or three it could be and picks the likeliest (cursor/plugins#1324, #1326).
+- `/poteto-help` lists `/reframe` in its table of skills.
+
+What stays different:
+
+- Upstream marks `/reframe` `disable-model-invocation: true`. The sync drops that key, as it does for every skill, because on Claude Code it makes the Skill tool refuse the invocation.
+
+The sync merged with no conflicts and no fork changes. `README.md` and `docs/reference.md` name the new pin, `docs/reference.md` gains the `/reframe` row, and its skill counts move to 68 directories and 44 public skills; its Muse note also said 65 skills, a count left over from before this sync, and now says 68. From @wes-davis ([#547](https://github.com/michael-denyer/pstack-claude/pull/547)).
+
 ## 0.9.154 - Codex fixes: routing on forked chats, agent roles and isolation, principles out of the skill list
 
 On Codex, the `SessionStart` routing hook now also runs when a chat is forked, so a fork loads the routing instruction and honours `session hook: off` as a new session does. As after every pstack update, Codex asks to review the hook again. The Claude Code and GitHub Copilot hooks are unchanged. From @oliver-mee ([#542](https://github.com/michael-denyer/pstack-claude/pull/542), for [#541](https://github.com/michael-denyer/pstack-claude/issues/541)).

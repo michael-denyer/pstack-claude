@@ -1,6 +1,6 @@
 {
   "name": "open-pstack",
-  "version": "0.9.153",
+  "version": "0.9.154",
   "description": "Install pstack into the agent harnesses on this machine: Claude Code, Codex, Pi, Copilot, Muse, OMP, Kimi, Grok, MiniMax, OpenCode, Antigravity, and the shared skills directory.",
   "type": "module",
   "bin": {

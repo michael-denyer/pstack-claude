@@ -10,6 +10,7 @@ import { noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-te
 import type { AgentParams } from "./agent-tools.ts";
 import { type Activity, type AgentChild, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
 import { HcChild } from "./hc-child.ts";
+import { cancelOrphan, t3Brief, T3Child, t3Session, type T3Task } from "./t3-child.ts";
 import { loadAgentTypes } from "./agent-files.ts";
 import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
@@ -42,6 +43,7 @@ const identitySchema = Type.Object({
   systemPromptFile: Type.Optional(Type.String()),
   cwd: Type.String(),
   worktree: Type.Optional(worktreeSchema),
+  t3ThreadId: Type.Optional(Type.String()),
   startedAt: Type.String(),
 });
 const runningSchema = Type.Object({
@@ -54,7 +56,8 @@ const runningSchema = Type.Object({
   pidStart: Type.Optional(Type.String()),
   // The pi process that launched it. Only that process may reap it.
   parentPid: Type.Number(),
-  host: Type.Optional(Type.Literal("hc")),
+  host: Type.Optional(Type.Union([Type.Literal("hc"), Type.Literal("t3")])),
+  t3TaskId: Type.Optional(Type.String()),
 });
 const endedSchema = Type.Object({
   agent: identitySchema,
@@ -181,6 +184,7 @@ type Fate = "kept" | "orphan" | "unknown" | "gone";
 
 function fateOf(record: RunningRecord): Fate {
   const { pid, pidStart, parentPid } = record;
+  if (record.host === "t3") return record.t3TaskId === undefined ? "gone" : parentPid !== process.pid && alive(parentPid) ? "kept" : "orphan";
   if (pid === undefined || !alive(pid)) return "gone";
   const info = inspect(pid);
   if (info && pidStart !== undefined && info.start !== pidStart) return "gone";
@@ -194,8 +198,13 @@ function fateOf(record: RunningRecord): Fate {
 
 // Stops an orphan, by its group so the bash command it has running goes too.
 // No other fate is signalled: a pid that may have been reused is not ours to hit.
-function reapOrphan(record: RunningRecord, killGraceMs: number): Promise<void> {
-  return record.pid === undefined ? Promise.resolve() : terminateGroup(record.pid, () => fateOf(record) === "orphan", killGraceMs);
+// A T3 Code task is cancelled instead, and its record drops the task once T3 Code confirms it.
+function reapOrphan(record: RunningRecord, killGraceMs: number): Promise<RunningRecord> {
+  const { t3TaskId: taskId, agent } = record;
+  if (record.host === "t3") {
+    return taskId && agent.t3ThreadId ? cancelOrphan({ taskId, threadId: agent.t3ThreadId }).then((done) => (done ? { ...record, t3TaskId: undefined } : record)) : Promise.resolve(record);
+  }
+  return record.pid === undefined ? Promise.resolve(record) : terminateGroup(record.pid, () => fateOf(record) === "orphan", killGraceMs).then(() => record);
 }
 
 const now = () => new Date().toISOString();
@@ -293,7 +302,19 @@ export class AgentRunner {
     const flags = childArgs(identity, this.settings.depth);
     const env = { [PARENT_SESSION_ENV]: this.ownSessionId };
     // The session's sheet, as for the model: a worktree is a checkout of HEAD and lacks an uncommitted sheet.
-    if (readSheet(this.settings.agentDir, identity.worktree?.repo ?? identity.cwd)?.hcHost && process.env.HC_TERMINAL_ID) {
+    const sheet = readSheet(this.settings.agentDir, identity.worktree?.repo ?? identity.cwd);
+    const t3 = t3Session();
+    // An agent keeps the host it first ran on: a resume must reach the same thread or session file.
+    if (identity.t3ThreadId || (sheet?.t3Host && t3 && !identity.worktree && !sessionFile(identity))) {
+      if (!t3) throw new Error(`Agent ${identity.id} runs in T3 Code thread ${identity.t3ThreadId}; message it from a Pi session inside T3 Code.`);
+      const onStart = ({ threadId, taskId }: T3Task) => {
+        identity.t3ThreadId = threadId;
+        this.track(identity.id, { host: "t3", t3TaskId: taskId });
+      };
+      const launch = { title: identity.description, model: identity.model, thinking: identity.thinking, threadId: identity.t3ThreadId, onStart };
+      return new T3Child(t3, launch, identity.t3ThreadId ? prompt : t3Brief(identity, prompt));
+    }
+    if (sheet?.hcHost && process.env.HC_TERMINAL_ID) {
       // An interactive pi asks whether to trust the project before it reports any status; the parent already decided.
       return new HcChild(identity.id, command, [...base, ...flags, this.projectTrusted ? "--approve" : "--no-approve"], {
         cwd: identity.cwd,
@@ -307,7 +328,7 @@ export class AgentRunner {
     return new PiChild(command, [...base, "--mode", "rpc", ...flags], { cwd: identity.cwd, env, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() }, prompt);
   }
 
-  private track(id: string, handle: Pick<RunningRecord, "host" | "pid" | "pidStart">): void {
+  private track(id: string, handle: Partial<Pick<RunningRecord, "host" | "pid" | "pidStart" | "t3TaskId">>): void {
     const state = this.agents.get(id);
     if (state?.kind !== "local") return;
     Object.assign(state.record, handle);
@@ -407,7 +428,8 @@ export class AgentRunner {
       throw new Error(`Agent ${state.record.agent.id} is running under another pi process (pid ${state.record.parentPid}); only that process can message or stop it.`);
     }
     if (state.kind === "unverified" || state.kind === "interrupted") {
-      throw new Error(`Agent ${state.record.agent.id}'s previous process (pid ${state.record.pid}) has not exited; it cannot resume or be stopped here until its exit is confirmed.`);
+      const run = state.record.host === "t3" ? `T3 Code task ${state.record.t3TaskId} has not been cancelled` : `previous process (pid ${state.record.pid}) has not exited`;
+      throw new Error(`Agent ${state.record.agent.id}'s ${run}; it cannot resume or be stopped here until its exit is confirmed.`);
     }
     return state;
   }
@@ -475,9 +497,9 @@ export class AgentRunner {
       };
       this.agents.set(record.agent.id, restored);
       if (restored.kind === "interrupted") {
-        void reapOrphan(record, this.settings.killGraceMs).then(() => {
+        void reapOrphan(record, this.settings.killGraceMs).then((reaped) => {
           if (this.agents.get(record.agent.id) === restored) {
-            this.agents.set(record.agent.id, { kind: "unverified", record });
+            this.agents.set(record.agent.id, { kind: "unverified", record: reaped });
           }
         });
       }

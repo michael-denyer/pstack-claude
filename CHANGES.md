@@ -2,6 +2,8 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+On Codex, the agent lifecycle in `codex-tools.md` now follows the agent tools the session lists. With `close_agent`, `wait_agent` waits for a final status. With `interrupt_agent`, `wait_agent` reports mailbox activity without the content, so the agent reads the delegate's own message or final-status notification, and an interrupt stops a turn without closing the agent. Before taking over a writer's worktree, the agent confirms through a later status that the writer's turn has ended. Thanks to @oliver-mee ([#551](https://github.com/michael-denyer/pstack-claude/pull/551)).
+
 ## 0.9.155 - sync to upstream ca782ed (v0.15.48): adds /reframe
 
 The upstream pin moves from `0b46ec3` to `ca782ed`, upstream v0.15.48, 2 pstack commits (cursor/plugins#1324 and #1326). `cursor-team-kit` and `thermos` did not change upstream, so their pins stay.

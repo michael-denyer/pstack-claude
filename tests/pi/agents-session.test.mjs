@@ -271,6 +271,47 @@ describe("registry", () => {
     expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
   });
 
+  for (const [what, found] of [
+    ["is found by its terminal name, and its program is ended", true],
+    ["is stopped, and nothing is signalled, when hc names no terminal", false],
+  ]) {
+    test(`a restored hc agent whose launching pi died before hc reported its terminal's pid ${what}`, async () => {
+      const { w, pi, ctx } = setup({ sheet: "pi agent host: hc\n" });
+      const bin = join(w.cwd, "..", "bin");
+      fs.mkdirSync(bin);
+      fs.writeFileSync(
+        join(bin, "hc"),
+        `#!/bin/sh\nif [ "$1" = get ] && [ -f "${bin}/$3.pid" ]; then printf '{"pid":%s,"status":null,"turn":0}\\n' "$(cat "${bin}/$3.pid")"; exit 0; fi\nexit 1\n`,
+        { mode: 0o755 },
+      );
+      const env = { PATH: `${bin}:${process.env.PATH}`, HC_TERMINAL_ID: "t-test" };
+      const withHc = async (fn) => {
+        const saved = { PATH: process.env.PATH, HC_TERMINAL_ID: process.env.HC_TERMINAL_ID };
+        Object.assign(process.env, env);
+        try {
+          return await fn();
+        } finally {
+          for (const [name, value] of Object.entries(saved)) {
+            if (value === undefined) delete process.env[name];
+            else process.env[name] = value;
+          }
+        }
+      };
+      await withHc(() => pi.call("agent", { description: "terminal", prompt: "x" }, ctx));
+      const [launched] = pi.entries;
+      expect(launched.data).toMatchObject({ status: "running", host: "hc" });
+      expect(launched.data.pid).toBeUndefined();
+      const program = w.spawn("sleep", ["30"], { detached: true });
+      if (found) fs.writeFileSync(join(bin, `${launched.data.agent.id}.pid`), String(program.pid));
+
+      const resumed = await withHc(() => restore(w, [launched]));
+      if (found) await waitFor(() => !alive(program.pid));
+      else await sleep(2 * w.settings.killGraceMs);
+      expect(alive(program.pid)).toBe(!found);
+      expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
+    });
+  }
+
   test("send_message and stop_agent refuse an agent another live pi process is running, naming that process", async () => {
     const { w, ctx, host: liveParent, entries } = await otherPi();
     const id = entries[0].data.agent.id;

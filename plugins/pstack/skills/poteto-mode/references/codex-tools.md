@@ -16,15 +16,37 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 | Read a principle leaf (the **principle-<title>** skill, or the **<title>** principle skill, a pstack skill names) | Principle leaves are left out of Codex's skill list by their `agents/openai.yaml`. Read the leaf with `shell` at `<poteto-mode-dir>/../principle-<title>/SKILL.md`, with `<poteto-mode-dir>` resolved to the `poteto-mode` skill's directory and `<title>` in kebab case, or the explicit name a Principles entry gives. |
 | Dispatch a subagent (the `Agent`/`Task` tool) | `spawn_agent` |
 | Dispatch N parallel subagents in one turn | N `spawn_agent` calls in one response |
-| Wait for a subagent result | `wait_agent` |
-| Free a finished subagent slot | `close_agent`, when the session exposes it. Some Codex hosts don't. |
+| Wait for a subagent result | Use `wait_agent` as described under [Agent lifecycle](#agent-lifecycle). |
+| Stop a delegate before replacing it or reusing its worktree | Use the host's close or interrupt tool, then confirm the delegate has stopped writing. See [Agent lifecycle](#agent-lifecycle). |
 | Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | `update_plan` |
 | Ask the human a fixed-choice question (`AskUserQuestion`) | Use `request_user_input` when the current mode and client support delivering structured questions, such as an interactive Plan mode session. If support is unclear or the tool is unavailable, ask in plain text. Outside Plan mode, ask a required decision or approval in plain text, because Codex continues on its own judgment when `request_user_input` returns no answer. |
 | Read this workspace's session transcripts (Claude Code's `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/`) | Codex sessions live in `${CODEX_HOME:-~/.codex}/sessions/YYYY/MM/DD/`. Ordinary names end in `-<thread-id>.jsonl`; replacements after `thread/revert` end in `-<thread-id>_<rollout-id>.jsonl`. Revert keeps the old files. Resolve the current path from the state database's `threads.rollout_path`, matched by thread ID, rather than filename order or modification time. Archived sessions are in `${CODEX_HOME:-~/.codex}/archived_sessions/`. Older rollouts in both directories can end in `.jsonl.zst`; read those with `zstd -dc`. The first line of each rollout is a `session_meta` record. Keep only rollouts whose `payload.cwd` is the workspace or one of its worktrees. Never read other projects' sessions. |
 
 Subagents are enabled by default in current Codex, and `agents.enabled` controls them. Inspect the current tool surface. If dispatch is unavailable, the fan-out skills (`interrogate`, `why`, `how`, `arena`, `reflect`) degrade to a labeled sequential pass. A required independent review does not degrade. It stays blocked, as poteto-mode's [Subagents](../SKILL.md#subagents) section says.
 
-Enabling subagents does not lift the host's thread limit. A thread-limit error from `spawn_agent` is a capacity error, not a rejected model slug, so the skills' fallback to another model does not apply. After the first capacity rejection, stop spawning. Close a finished agent with `close_agent` before you try again, and where the session has no `close_agent`, do not assume a finished agent's slot is free.
+## Agent lifecycle
+
+Choose by the tools and schemas the current session exposes.
+
+- With the older interface, `wait_agent` waits for final statuses for the
+  requested agents. Use the final result or completion notification. Close an
+  agent with `close_agent` when you no longer need it. The tool reports the
+  status before shutdown was requested.
+- With v2, `wait_agent` signals mailbox activity. Read the delivered agent
+  message or final-status notification for the delegate you are waiting on.
+  Another agent's message, a timeout, or steering from the user leaves the
+  delegate's result pending. If the host does not expose `wait_agent`, use
+  the notifications or status tools it does expose.
+- When v2 exposes `interrupt_agent`, use it to stop a delegate's current
+  turn. The agent remains available for follow-up tasks. An interrupt
+  response gives the previous status. Before replacing a writer or reusing
+  its worktree, confirm through a subsequent status or completion signal that
+  it has stopped writing. Apply the same check after closing on the older
+  interface. If you cannot establish that, leave the worktree with its writer.
+- A thread-limit error is a capacity error. Changing the model does not fix
+  it. After the first rejection, stop spawning until capacity is available.
+  On the older interface, close a finished agent to release its slot. On v2,
+  use the host's capacity behavior; interrupting a turn does not close the agent.
 
 ## Subagent policy
 

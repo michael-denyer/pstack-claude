@@ -6,8 +6,6 @@ import type { ChildExit } from "./child.ts";
 
 const PROTOCOL = "2025-06-18";
 const WAIT_MS = 30_000;
-// The thinking levels T3 Code's Pi driver takes; it rejects a task that names any other.
-const T3_THINKING = new Set(["low", "medium", "high", "xhigh", "max"]);
 
 const toolResult = Type.Object({
   content: Type.Optional(Type.Array(Type.Object({ type: Type.String(), text: Type.Optional(Type.String()) }))),
@@ -18,6 +16,16 @@ const delegated = Type.Object({ taskId: Type.String(), childThreadId: Type.Strin
 const sent = Type.Object({ taskId: Type.Optional(Type.Union([Type.String(), Type.Null()])), runId: Type.String(), delivery: Type.String() });
 const waited = Type.Object({ timedOut: Type.Boolean() });
 const taskResult = Type.Object({ status: Type.String(), summary: Type.Union([Type.String(), Type.Null()]) });
+const capabilities = Type.Object({
+  inheritedProviderInstanceId: Type.String(),
+  inheritedModel: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  providers: Type.Array(
+    Type.Object({
+      providerInstanceId: Type.String(),
+      models: Type.Array(Type.Object({ id: Type.String(), options: Type.Optional(Type.Array(Type.Object({ id: Type.String(), values: Type.Optional(Type.Array(Type.Unknown())) }))) })),
+    }),
+  ),
+});
 
 export interface T3Session {
   endpoint: string;
@@ -113,13 +121,21 @@ export class T3Child {
       launch.onStart({ threadId: launch.threadId, taskId });
       return { threadId: launch.threadId, runId };
     }
-    const thinking = launch.thinking && T3_THINKING.has(launch.thinking) ? { options: { thinking: launch.thinking } } : {};
+    const thinking = launch.thinking && (await this.takesThinking(launch.model, launch.thinking)) ? { options: { thinking: launch.thinking } } : {};
     const target = { ...(launch.model && { model: launch.model }), ...thinking };
     const task = await this.mcp.call(delegated, "delegate_task", { task: prompt, title: launch.title, target, mode: "async" });
     this.threadId = task.childThreadId;
     this.taskId = task.taskId;
     launch.onStart({ threadId: task.childThreadId, taskId: task.taskId });
     return { threadId: task.childThreadId, runId: task.childRunId ?? undefined };
+  }
+
+  private async takesThinking(model: string | undefined, thinking: string): Promise<boolean> {
+    const caps = await this.mcp.call(capabilities, "orchestrator_capabilities", model ? { search: model } : {});
+    const id = model ?? caps.inheritedModel;
+    const provider = caps.providers.find((p) => p.providerInstanceId === caps.inheritedProviderInstanceId);
+    const levels = provider?.models.find((m) => m.id === id)?.options?.find((o) => o.id === "thinking")?.values ?? [];
+    return levels.includes(thinking);
   }
 
   private async cancel(): Promise<void> {

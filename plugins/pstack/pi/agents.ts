@@ -198,7 +198,6 @@ function fateOf(record: RunningRecord): Fate {
 
 // Stops an orphan, by its group so the bash command it has running goes too.
 // No other fate is signalled: a pid that may have been reused is not ours to hit.
-// A T3 Code task is cancelled instead, and its record drops the task once T3 Code confirms it.
 function reapOrphan(record: RunningRecord, killGraceMs: number): Promise<RunningRecord> {
   const { t3TaskId: taskId, agent } = record;
   if (record.host === "t3") {
@@ -304,8 +303,8 @@ export class AgentRunner {
     // The session's sheet, as for the model: a worktree is a checkout of HEAD and lacks an uncommitted sheet.
     const sheet = readSheet(this.settings.agentDir, identity.worktree?.repo ?? identity.cwd);
     const t3 = t3Session();
-    // An agent keeps the host it first ran on: a resume must reach the same thread or session file.
-    if (identity.t3ThreadId || (sheet?.t3Host && t3 && !identity.worktree && !sessionFile(identity))) {
+    const firstRun = !sessionFile(identity);
+    if (identity.t3ThreadId || (firstRun && sheet?.t3Host && t3 && !identity.worktree)) {
       if (!t3) throw new Error(`Agent ${identity.id} runs in T3 Code thread ${identity.t3ThreadId}; message it from a Pi session inside T3 Code.`);
       const onStart = ({ threadId, taskId }: T3Task) => {
         identity.t3ThreadId = threadId;

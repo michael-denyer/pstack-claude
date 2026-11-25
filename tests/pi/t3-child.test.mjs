@@ -1,6 +1,3 @@
-// The T3 Code agent host: T3Child against a fake T3 Code MCP server, the agent
-// tools routed through it by a pi agent host: t3 line, and the same calls on a
-// live T3 Code server with PSTACK_PI_T3_LIVE=1.
 import { afterEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
@@ -26,7 +23,6 @@ const reply = (value) => ({ content: [{ type: "text", text: JSON.stringify(value
 const failure = (message) => ({ content: [{ type: "text", text: JSON.stringify({ _tag: "OrchestratorMcpFailure", message }) }], isError: true });
 const delegated = { taskId: "task-1", childThreadId: "thread-1", childRunId: "run-1" };
 
-// A T3 Code MCP server answering each tool with the given handler, and the session it sets in the environment.
 function fakeT3(tools) {
   const calls = [];
   server = Bun.serve({
@@ -49,7 +45,29 @@ function fakeT3(tools) {
   return { session, calls };
 }
 
+const levels = (...values) => [{ id: "thinking", values }];
+const ALL_LEVELS = levels("low", "medium", "high", "xhigh", "max");
+const capabilities = () =>
+  reply({
+    inheritedProviderInstanceId: "pi",
+    inheritedModel: "anthropic/parent-model",
+    providers: [
+      { providerInstanceId: "codex", models: [{ id: "m", options: ALL_LEVELS }] },
+      {
+        providerInstanceId: "pi",
+        models: [
+          { id: "magpie/claude/claude-haiku-5-5", options: ALL_LEVELS },
+          { id: "anthropic/fixture-haiku", options: ALL_LEVELS },
+          { id: "anthropic/parent-model", options: levels("low") },
+          { id: "m", options: levels("low", "medium", "high") },
+          { id: "no-reasoning" },
+        ],
+      },
+    ],
+  });
+
 const completing = (summary = "the answer") => ({
+  orchestrator_capabilities: capabilities,
   delegate_task: () => reply(delegated),
   t3_thread_send: () => reply({ taskId: "task-2", runId: "run-2", delivery: "started" }),
   t3_thread_wait: () => reply({ status: "completed", timedOut: false }),
@@ -64,18 +82,37 @@ describe("T3Child", () => {
     const child = new T3Child(session, { title: "probe", model: "magpie/claude/claude-haiku-5-5", thinking: "low", onStart: (task) => (started = task) }, "do it");
     expect(await child.exited).toEqual({ exitCode: 0, settled: true, finalText: "the answer", errorMessage: "", stderr: "" });
     expect(started).toEqual({ threadId: "thread-1", taskId: "task-1" });
-    expect(calls.map((c) => c.name)).toEqual(["delegate_task", "t3_thread_wait", "t3_thread_wait", "task_status"]);
-    expect(calls[0].args).toEqual({ task: "do it", title: "probe", target: { model: "magpie/claude/claude-haiku-5-5", options: { thinking: "low" } }, mode: "async" });
-    expect(calls[1].args).toMatchObject({ threadId: "thread-1", runId: "run-1", untilDelegatedWorkSettled: true });
-    expect(calls[3].args).toEqual({ taskId: "task-1" });
+    expect(calls.map((c) => c.name)).toEqual(["orchestrator_capabilities", "delegate_task", "t3_thread_wait", "t3_thread_wait", "task_status"]);
+    expect(calls[1].args).toEqual({ task: "do it", title: "probe", target: { model: "magpie/claude/claude-haiku-5-5", options: { thinking: "low" } }, mode: "async" });
+    expect(calls[2].args).toMatchObject({ threadId: "thread-1", runId: "run-1", untilDelegatedWorkSettled: true });
+    expect(calls[4].args).toEqual({ taskId: "task-1" });
     expect(calls.every((c) => c.session === "s1" && c.auth === "Bearer tok")).toBe(true);
   });
 
-  test("a thinking level T3 Code rejects is left out, and a task with no run yet waits on its thread", async () => {
+  test("the thinking level goes to T3 Code only when the model lists it, and a task with no run yet waits on its thread", async () => {
     const { session, calls } = fakeT3({ ...completing(), delegate_task: () => reply({ ...delegated, childRunId: null }) });
-    for (const thinking of ["off", "minimal"]) await new T3Child(session, { title: "probe", model: "m", thinking, onStart: () => {} }, "x").exited;
-    const delegations = calls.filter((c) => c.name === "delegate_task");
-    expect(delegations.map((c) => c.args.target)).toEqual([{ model: "m" }, { model: "m" }]);
+    const launches = [
+      { model: "m", thinking: "high" },
+      { model: "m", thinking: "xhigh" },
+      { model: "m", thinking: "off" },
+      { model: "no-reasoning", thinking: "low" },
+      { model: "unlisted", thinking: "low" },
+      { thinking: "low" },
+      { thinking: "high" },
+      { model: "m" },
+    ];
+    for (const launch of launches) await new T3Child(session, { title: "probe", ...launch, onStart: () => {} }, "x").exited;
+    expect(calls.filter((c) => c.name === "delegate_task").map((c) => c.args.target)).toEqual([
+      { model: "m", options: { thinking: "high" } },
+      { model: "m" },
+      { model: "m" },
+      { model: "no-reasoning" },
+      { model: "unlisted" },
+      { options: { thinking: "low" } },
+      {},
+      { model: "m" },
+    ]);
+    expect(calls.filter((c) => c.name === "orchestrator_capabilities").map((c) => c.args)).toEqual([...Array(5).fill(null).map((_, i) => ({ search: launches[i].model })), {}, {}]);
     expect(calls.find((c) => c.name === "t3_thread_wait").args.runId).toBeUndefined();
   });
 
@@ -163,7 +200,7 @@ describe("the pi agent host: t3 sheet line", () => {
     const result = await pi.call("agent", { description: "probe", prompt: "look", subagent_type: "pstack:poteto-agent", readonly: true, model: "haiku", effort: "low" }, ctx);
     expect(resultText(result)).toContain("the answer");
     expect(w.invocations()).toEqual([]);
-    const { task, title, target } = calls[0].args;
+    const { task, title, target } = calls.find((c) => c.name === "delegate_task").args;
     expect({ title, target }).toEqual({ title: "probe", target: { model: "anthropic/fixture-haiku", options: { thinking: "low" } } });
     expect(task).toBe(`<agent name="pstack:poteto-agent">\n${agentBody("agents/poteto-agent.md")}\n</agent>\n\nYou are read-only: do not change any file, with the edit and write tools or with bash.\n\nlook`);
     const running = pi.entries.map((e) => e.data).find((r) => r.status === "running" && r.host === "t3");
@@ -195,6 +232,7 @@ describe("the pi agent host: t3 sheet line", () => {
     let finish;
     const done = new Promise((resolve) => (finish = resolve));
     const { calls } = fakeT3({
+      orchestrator_capabilities: capabilities,
       delegate_task: () => reply(delegated),
       t3_thread_wait: async () => (await done, reply({ status: "interrupted", timedOut: false })),
       task_cancel: () => (finish(), reply({ taskId: "task-1", status: "cancel_requested" })),

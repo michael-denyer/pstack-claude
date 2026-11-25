@@ -2,6 +2,8 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+On Pi, a `pi agent host: t3` line in the sheet runs each agent without a worktree as a T3 Code child thread of the session's thread, when the session runs inside [T3 Code](https://github.com/pingdotgg/t3code). The extension starts it with T3 Code's `delegate_task`, on the agent's model and effort. `send_message` steers a running agent or resumes it in the same thread, `stop_agent` cancels its task, and the reply is the task's result. The agent file's body and the read-only rule go at the top of the first message, because a T3 Code thread takes no launch flags. A resumed session cancels the task of an agent whose launching Pi is gone, and the agent stays unavailable until T3 Code confirms the cancel. Outside T3 Code, where `T3_MCP_URL` and `T3_MCP_BEARER_TOKEN` are unset, the line has no effect, and the sheet can carry it beside `pi agent host: hc`. Follows [#447](https://github.com/michael-denyer/pstack-claude/pull/447).
+
 ## 0.9.155 - sync to upstream ca782ed (v0.15.48): adds /reframe
 
 The upstream pin moves from `0b46ec3` to `ca782ed`, upstream v0.15.48, 2 pstack commits (cursor/plugins#1324 and #1326). `cursor-team-kit` and `thermos` did not change upstream, so their pins stay.

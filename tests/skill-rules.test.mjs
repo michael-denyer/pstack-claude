@@ -37,6 +37,29 @@ const rules = [
     phrase: "which can still change it even when no explicit role is passed",
   },
   {
+    source: "#545 Codex interrogate row gates model diversity on the schema",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase:
+      "Substitute configured Codex models only when the exposed schema has `model`, independently of `reasoning_effort`.",
+  },
+  {
+    source: "#545 Codex interrogate omits model instead of claiming diversity",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase:
+      "When `model` is absent, omit it and report reduced diversity instead of keeping the adversary panel model-diverse through that spawn.",
+  },
+  {
+    source: "#545 generated Codex skills gate named-model dispatch on the schema",
+    file: "poteto-mode/SKILL.md",
+    phrase:
+      "On Codex, pass a model name as `model` only when the exposed `spawn_agent` schema has that field, independently of `reasoning_effort`",
+  },
+  {
+    source: "#545 asymmetric host can expose effort without model",
+    file: "poteto-mode/SKILL.md",
+    phrase: "a host can expose effort without model, or model without effort",
+  },
+  {
     source: "#331 unknown Codex session effort",
     file: "poteto-mode/references/codex-tools.md",
     phrase: "Do not substitute an omitted `reasoning_effort` for the missing starting level.",

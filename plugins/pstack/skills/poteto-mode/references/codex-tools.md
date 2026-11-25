@@ -78,7 +78,7 @@ Affected skill entry points point here. Most skills need only the tables above. 
 
 | Skill | On Codex |
 |-------|----------|
-| `interrogate` | The `subagent_type`/`model` dispatch fields map to `spawn_agent`; substitute your configured Codex models and keep the adversary panel model-diverse. |
+| `interrogate` | The `subagent_type`/`model` dispatch fields map to `spawn_agent`. Substitute configured Codex models only when the exposed schema has `model`, independently of `reasoning_effort`. When `model` is absent, omit it and report reduced diversity instead of keeping the adversary panel model-diverse through that spawn. |
 | `setup-pstack` | The skill's [Other runtimes](../../setup-pstack/references/runtimes.md) table names the Codex sheet path and how it loads; the slugs are your Codex models (see Model names above). The role rows are identical. |
 | `no-comments` | There is no `comment-sicko` subagent type; see Subagent policy above. |
 | `thermos` | There are no thermo-nuclear subagent types; see Subagent policy above. |

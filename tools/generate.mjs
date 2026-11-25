@@ -28,7 +28,7 @@
 //     -> portable copies under poteto-mode/references/{agents,licenses}/
 //   each principle-* skill name
 //     -> its agents/openai.yaml, which keeps it out of Codex's implicit catalog
-//   No other model name (a claude-* ID or a backticked family name) may appear
+//   No other model name (a claude-* ID or a backticked family name) may appea
 //   in skill prose; the scan below fails on strays.
 //
 // Also validated: each RUNTIMES row's packaging, through the row's `validate`
@@ -127,7 +127,7 @@ export function assertChangesHeading(changelog, version) {
   const lines = outsideFences(changelog.split("\n"));
   const current = lines.find((line) => line.startsWith(`## ${version} `));
   if (!current) throw new Error(`CHANGES.md has no "## ${version} - <title>" heading`);
-  // An entry is a heading whose first word carries a version, at any level or
+  // An entry is a heading whose first word carries a version, at any level o
   // decoration: "# 1.2.3", "## v1.2.3", "## [1.2.3]". A heading without one is
   // not read as an entry, because "## Unreleased" over forgotten work has the
   // shape of a preamble section such as "## About this file". The word is
@@ -155,7 +155,7 @@ export function parseFrontmatter(text) {
 }
 
 // Validate the shared subset of the Agent Skills contract before deriving any
-// runtime-specific views. Runtime-only frontmatter keys may be ignored by other
+// runtime-specific views. Runtime-only frontmatter keys may be ignored by othe
 // consumers, but every skill needs a portable name and description.
 export function agentSkills(skillsDir) {
   const skills = [];
@@ -664,7 +664,9 @@ export function effortSection(levels, defaultEffort) {
     `and ${code(defaultEffort)} when the sheet has no such line. On Claude Code, \`session\` sets no effort. ` +
     "On other runtimes, follow the platform mapping for `session`. " +
     "Strip the suffix before reading the model: `inherit-parent` or `auto` still omits `model` " +
-    "at every level, and a model name is passed as `model`. " +
+    "at every level. On Claude Code, a model name is passed as `model`. " +
+    "On Codex, pass a model name as `model` only when the exposed `spawn_agent` schema has that field, " +
+    "independently of `reasoning_effort`: a host can expose effort without model, or model without effort. " +
     "Pass the level as the dispatch's effort field and keep the `subagent_type` you would otherwise use. " +
     "That is `effort` on the Claude Code `Agent` call and `reasoning_effort` on Codex's `spawn_agent` when its exposed schema has that field. " +
     "On Muse it is `effort` on a Workflow child; a `subagent_spawn` dispatch keeps the session's effort."
@@ -810,7 +812,7 @@ function shapeFaults(schema, value, subject) {
 
 // A hooks file must have the documented shape, every ${<root>}/<path> a
 // command hook names must exist in the plugin, and one the command executes
-// directly must be executable, or the SessionStart hook fails silently for
+// directly must be executable, or the SessionStart hook fails silently fo
 // every user.
 // The root is the variable the runtime exports with the plugin's directory.
 export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", root = "CLAUDE_PLUGIN_ROOT", checkExecutable = true }) {
@@ -965,7 +967,7 @@ export function apply(root, intended, { log = console.log } = {}) {
   return pending;
 }
 
-// Every cross-file contract the tree under `root` breaks, one message per
+// Every cross-file contract the tree under `root` breaks, one message pe
 // failing check. The checks read the tree, not the plan, so on a stale tree
 // they see the stale copies. Without `models`, the policy load is one of the checks.
 export function problems(root, models) {

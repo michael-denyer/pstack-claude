@@ -541,6 +541,17 @@ describe("effort section", () => {
     expect(text).not.toContain("effort-<level>");
   });
 
+  test("Codex model and effort schema gates stay independent for asymmetric hosts", () => {
+    const text = effortSection(["low", "max"], "high");
+    expect(text).toContain("On Claude Code, a model name is passed as `model`");
+    expect(text).toContain(
+      "On Codex, pass a model name as `model` only when the exposed `spawn_agent` schema has that field, independently of `reasoning_effort`",
+    );
+    expect(text).toContain("a host can expose effort without model, or model without effort");
+    expect(text).toContain("`reasoning_effort` on Codex's `spawn_agent` when its exposed schema has that field");
+    expect(text).not.toContain("and a model name is passed as `model`. ");
+  });
+
   test("session effort outside Claude Code defers to the platform mapping", () => {
     const text = effortSection(["low", "max"], "session");
     expect(text).toContain("On other runtimes, follow the platform mapping for `session`");

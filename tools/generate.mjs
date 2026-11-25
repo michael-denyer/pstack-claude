@@ -664,11 +664,10 @@ export function effortSection(levels, defaultEffort) {
     `and ${code(defaultEffort)} when the sheet has no such line. On Claude Code, \`session\` sets no effort. ` +
     "On other runtimes, follow the platform mapping for `session`. " +
     "Strip the suffix before reading the model: `inherit-parent` or `auto` still omits `model` " +
-    "at every level. On Claude Code, a model name is passed as `model`. " +
-    "On Codex, pass a model name as `model` only when the exposed `spawn_agent` schema has that field, " +
-    "independently of `reasoning_effort`: a host can expose effort without model, or model without effort. " +
+    "at every level, and a model name is passed as `model`. " +
     "Pass the level as the dispatch's effort field and keep the `subagent_type` you would otherwise use. " +
-    "That is `effort` on the Claude Code `Agent` call and `reasoning_effort` on Codex's `spawn_agent` when its exposed schema has that field. " +
+    "That is `effort` on the Claude Code `Agent` call and `reasoning_effort` on Codex's `spawn_agent`. " +
+    "On Codex, pass `model` and `reasoning_effort` only as the platform mapping's schema check allows. " +
     "On Muse it is `effort` on a Workflow child; a `subagent_spawn` dispatch keeps the session's effort."
   );
 }

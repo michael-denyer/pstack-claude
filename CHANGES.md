@@ -2,6 +2,8 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+On Codex, skills now pass `model` and `reasoning_effort` to `spawn_agent` only when its exposed schema has each field, because Codex's multi-agent v2 schema can drop either one. Without `reasoning_effort`, the session effort lookup is skipped and the dispatch reports that it set no level. Without `model`, a diverse-model panel varies reasoning effort where it can and notes the reduced diversity in its verdict. Arena runs its cross-judge on Codex only when the judge and the provisional winner are known to be different families. The rule lives in the Codex platform mapping, and each skill's Reasoning effort section points there. Thanks to @flipcyde101 for [#548](https://github.com/michael-denyer/pstack-claude/pull/548), which addresses [#545](https://github.com/michael-denyer/pstack-claude/issues/545).
+
 ## 0.9.155 - sync to upstream ca782ed (v0.15.48): adds /reframe
 
 The upstream pin moves from `0b46ec3` to `ca782ed`, upstream v0.15.48, 2 pstack commits (cursor/plugins#1324 and #1326). `cursor-team-kit` and `thermos` did not change upstream, so their pins stay.

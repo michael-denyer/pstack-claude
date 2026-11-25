@@ -14,50 +14,22 @@ const rules = [
   {
     source: "#331 Codex session effort with an explicit model",
     file: "poteto-mode/references/codex-tools.md",
-    phrase: "pass the final level as `reasoning_effort` only when the schema has that field, including when a model is selected explicitly",
+    phrase: "pass the final level as `reasoning_effort`",
   },
   {
-    source: "#545 Codex spawn model gated on the exposed schema",
+    source: "#545 Codex passes model and reasoning_effort only when the schema has each",
     file: "poteto-mode/references/codex-tools.md",
-    phrase: "Pass a Codex model only when the schema has a `model` field.",
+    phrase: "check the exposed schema before resolving either, and pass each only when the schema has it.",
   },
   {
-    source: "#545 Codex absent reasoning_effort is no dispatch override",
+    source: "#545 Codex without reasoning_effort skips effort resolution",
     file: "poteto-mode/references/codex-tools.md",
-    phrase: "Where the field is absent, omit it: that is no dispatch override for effort.",
+    phrase: "Without `reasoning_effort`, skip the effort steps below and say that the dispatch set no level",
   },
   {
-    source: "#545 Codex absent model follows host and role defaults",
+    source: "#545 Codex without model claims no distinct model",
     file: "poteto-mode/references/codex-tools.md",
-    phrase: "The child's effective model then follows the host and any applicable role defaults",
-  },
-  {
-    source: "#545 Codex absent fields allow role defaults to change settings",
-    file: "poteto-mode/references/codex-tools.md",
-    phrase: "which can still change it even when no explicit role is passed",
-  },
-  {
-    source: "#545 Codex interrogate row gates model diversity on the schema",
-    file: "poteto-mode/references/codex-tools.md",
-    phrase:
-      "Substitute configured Codex models only when the exposed schema has `model`, independently of `reasoning_effort`.",
-  },
-  {
-    source: "#545 Codex interrogate omits model instead of claiming diversity",
-    file: "poteto-mode/references/codex-tools.md",
-    phrase:
-      "When `model` is absent, omit it and report reduced diversity instead of keeping the adversary panel model-diverse through that spawn.",
-  },
-  {
-    source: "#545 generated Codex skills gate named-model dispatch on the schema",
-    file: "poteto-mode/SKILL.md",
-    phrase:
-      "On Codex, pass a model name as `model` only when the exposed `spawn_agent` schema has that field, independently of `reasoning_effort`",
-  },
-  {
-    source: "#545 asymmetric host can expose effort without model",
-    file: "poteto-mode/SKILL.md",
-    phrase: "a host can expose effort without model, or model without effort",
+    phrase: "so say so instead of claiming a distinct model.",
   },
   {
     source: "#331 unknown Codex session effort",
@@ -68,24 +40,6 @@ const rules = [
     source: "#331 resolve active Codex effort before dispatch",
     file: "poteto-mode/references/codex-tools.md",
     phrase: "run `node <poteto-mode-dir>/scripts/codex-session-effort.mjs` before dispatching",
-  },
-  {
-    source: "#548 gate session effort lookup on exposed reasoning_effort",
-    file: "poteto-mode/references/codex-tools.md",
-    phrase:
-      "If it does not expose `reasoning_effort`, skip the session lookup and the question about starting effort.",
-  },
-  {
-    source: "#548 session helper runs only when reasoning_effort is present",
-    file: "poteto-mode/references/codex-tools.md",
-    phrase:
-      "If it exposes `reasoning_effort` and the configured effort is `session`, run `node <poteto-mode-dir>/scripts/codex-session-effort.mjs` before dispatching",
-  },
-  {
-    source: "#548 ask for effort only when reasoning_effort is present",
-    file: "poteto-mode/references/codex-tools.md",
-    phrase:
-      "When the schema exposes `reasoning_effort` and the configured effort is `session`, do not guess the session's effort",
   },
   {
     source: "#548 Arena Phase C needs known different families",
@@ -279,11 +233,11 @@ describe("port-local skill rules", () => {
     });
   }
 
-  test("codex-tools no longer starts session effort resolution before the schema gate", () => {
+  test("#548 the Codex spawn schema check comes before the session effort lookup", () => {
     const text = readFileSync(join(skillsDir, "poteto-mode/references/codex-tools.md"), "utf8");
-    expect(text).not.toContain("- For `session`, run `node <poteto-mode-dir>/scripts/codex-session-effort.mjs` before dispatching");
-    expect(text).not.toContain(
-      "- Do not guess the session's effort from the model, a config default, or a previous turn.",
-    );
+    const gate = text.indexOf("check the exposed schema before resolving either");
+    const lookup = text.indexOf("- For `session`, run `node <poteto-mode-dir>/scripts/codex-session-effort.mjs`");
+    expect(gate).toBeGreaterThan(-1);
+    expect(lookup).toBeGreaterThan(gate);
   });
 });

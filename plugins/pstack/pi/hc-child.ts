@@ -11,6 +11,8 @@ const execHc = promisify(execFile);
 const SCREEN_LINES = "30";
 const CLOSE_POLL_MS = 200;
 const STARTUP_POLL_MS = 500;
+// hc answers a get in milliseconds. pidOfTerminal waits for it synchronously, so it gives up on a core that never answers.
+const GET_TIMEOUT_MS = 2000;
 const NOT_THE_CHILD = new Set(["timeout", "message"]);
 const TERMINAL_VARS = new Set(["COLORTERM", "TERM", "TERM_PROGRAM", "PWD", "OLDPWD", "SHLVL", "_"]);
 const LOAD_ENV = '. "$1" && rm -- "$1" && shift && exec "$@"';
@@ -183,7 +185,7 @@ export function replyIn(file: string | undefined, from: number): Pick<ChildExit,
 export function pidOfTerminal(name: string): number | undefined {
   const args = ["get", "--json", name];
   try {
-    return answer(getResult, args, execFileSync("hc", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })).pid ?? undefined;
+    return answer(getResult, args, execFileSync("hc", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: GET_TIMEOUT_MS })).pid ?? undefined;
   } catch {
     return undefined;
   }

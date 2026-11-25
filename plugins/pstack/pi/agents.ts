@@ -174,7 +174,9 @@ function inspect(pid: number): { parentPid: number; start: string } | undefined 
 
 // What became of the process a running record names:
 // - kept: it is still a child of the live pi process that launched it;
-// - orphan: it is the process the record was written for, its launcher gone;
+// - orphan: it is the process the record was written for, its launcher gone
+//   (an hc record written before its pid takes the pid and start that hc names
+//   for the agent's terminal, in identifyByTerminalName);
 // - unknown: a process is there, and nothing says whether it is the agent's;
 // - gone: no process is there, or another one is.
 type Fate = "kept" | "orphan" | "unknown" | "gone";
@@ -192,7 +194,7 @@ function fateOf(record: RunningRecord): Fate {
   return info && info.start === pidStart ? "orphan" : "unknown";
 }
 
-function withTerminalPid(record: RunningRecord): RunningRecord {
+function identifyByTerminalName(record: RunningRecord): RunningRecord {
   if (record.host !== "hc" || record.pid !== undefined) return record;
   const pid = pidOfTerminal(record.agent.id);
   return pid === undefined ? record : { ...record, pid, pidStart: inspect(pid)?.start };
@@ -513,7 +515,7 @@ export class AgentRunner {
       this.agents.set(id, entry.data.status === "running" ? { kind: "remote", record: entry.data } : { kind: "ended", record: entry.data });
     }
     for (const state of this.agents.values()) {
-      if (state.kind === "remote") state.record = withTerminalPid(state.record);
+      if (state.kind === "remote") state.record = identifyByTerminalName(state.record);
       this.refreshRestored(state);
     }
   }

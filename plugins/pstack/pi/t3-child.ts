@@ -32,6 +32,8 @@ export interface T3Session {
   token: string;
 }
 
+export const T3_ENV_REMOVED = { T3_MCP_URL: undefined, T3_MCP_BEARER_TOKEN: undefined };
+
 export function t3Session(): T3Session | undefined {
   const endpoint = process.env.T3_MCP_URL;
   const token = process.env.T3_MCP_BEARER_TOKEN;
@@ -71,9 +73,13 @@ export class T3Child {
   private taskId?: string;
   private settled = false;
   private ending = false;
+  private readonly refused: Promise<never>;
+  private refuse!: (e: Error) => void;
 
   constructor(session: T3Session, launch: T3Launch, prompt: string) {
     this.mcp = new T3Mcp(session);
+    this.refused = new Promise<never>((_, reject) => (this.refuse = reject));
+    this.refused.catch(() => undefined);
     this.exited = this.drive(launch, prompt);
   }
 
@@ -101,14 +107,15 @@ export class T3Child {
     try {
       const { threadId, runId } = await this.start(launch, prompt);
       if (this.ending) await this.cancel();
-      await settled(this.mcp, threadId, runId);
+      await Promise.race([settled(this.mcp, threadId, runId), this.refused]);
       const { status, summary } = await this.mcp.call(taskResult, "task_status", { taskId: this.taskId });
       this.settled = status === "completed";
       const text = summary ?? "";
       if (this.settled) return { exitCode: 0, settled: true, finalText: text, errorMessage: "", stderr: "" };
       return { exitCode: null, settled: false, finalText: "", errorMessage: text || `The T3 Code task ended with status ${status}.`, stderr: "" };
     } catch (e) {
-      return { exitCode: null, settled: false, finalText: "", errorMessage: (e as Error).message, stderr: "" };
+      const message = (e as Error).message;
+      return { exitCode: null, settled: false, finalText: this.ending ? message : "", errorMessage: message, stderr: "" };
     }
   }
 
@@ -140,7 +147,10 @@ export class T3Child {
 
   private async cancel(): Promise<void> {
     if (this.taskId === undefined) return;
-    await this.mcp.call(Type.Unknown(), "task_cancel", { taskId: this.taskId, reason: "stop_agent" }).catch(() => undefined);
+    const { taskId, threadId } = this;
+    await this.mcp.call(Type.Unknown(), "task_cancel", { taskId, reason: "stop_agent" }).catch((e: Error) => {
+      this.refuse(new Error(`T3 Code did not cancel task ${taskId}, so thread ${threadId} may still be running: ${e.message}`));
+    });
   }
 }
 

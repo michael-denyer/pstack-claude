@@ -215,6 +215,7 @@ log({
   parentSession: process.env.PI_SUBAGENT_PARENT_SESSION ?? null,
   activeAgent: activeAgent ?? null,
   path: process.env.PATH ?? null,
+  t3Url: process.env.T3_MCP_URL ?? null,
   // As pi: a value that names no file is appended as the prompt text itself.
   systemPrompt: systemFile && existsSync(systemFile) ? readFileSync(systemFile, "utf8") : (systemFile ?? null),
 });

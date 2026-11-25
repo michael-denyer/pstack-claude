@@ -246,15 +246,45 @@ describe("the pi agent host: t3 sheet line", () => {
     expect(pi.entries.at(-1).data.status).toBe("stopped");
   });
 
-  test("a worktree agent, an agent outside T3 Code, and an agent without the line all run as local processes", async () => {
-    const { calls } = fakeT3(completing());
+  test("a worktree agent runs as a local process without the T3 Code session, so its own agents stay in its worktree", async () => {
+    const { session, calls } = fakeT3(completing());
     const { w, pi, ctx } = setup(t3Sheet);
     gitRepo(w.cwd);
     await pi.call("agent", { description: "w", prompt: "x", isolation: "worktree" }, ctx);
-    for (const name of T3_ENV) delete process.env[name];
-    await pi.call("agent", { description: "o", prompt: "x" }, ctx);
-    expect(w.invocations().map((inv) => flag(inv, "--mode"))).toEqual(["rpc", "rpc"]);
+    const [inv] = w.invocations();
+    expect({ mode: flag(inv, "--mode"), t3Url: inv.t3Url }).toEqual({ mode: "rpc", t3Url: null });
+    expect(process.env.T3_MCP_URL).toBe(session.endpoint);
     expect(calls).toEqual([]);
+  });
+
+  test("without the line, or outside T3 Code, an agent runs as a local process", async () => {
+    const { session, calls } = fakeT3(completing());
+    const { w, pi, ctx } = setup();
+    await pi.call("agent", { description: "no line", prompt: "x" }, ctx);
+    writeSheet(join(w.agentDir, "pstack-models.md"), "pi agent host: t3\n");
+    for (const name of T3_ENV) delete process.env[name];
+    await pi.call("agent", { description: "outside", prompt: "x" }, ctx);
+    expect(w.invocations().map((inv) => [flag(inv, "--mode"), inv.t3Url])).toEqual([["rpc", session.endpoint], ["rpc", null]]);
+    expect(calls).toEqual([]);
+  });
+
+  test("stop_agent on an agent whose task T3 Code will not cancel returns stopped with T3 Code's refusal, and the session can close", async () => {
+    const { calls } = fakeT3({
+      orchestrator_capabilities: capabilities,
+      delegate_task: () => reply(delegated),
+      t3_thread_wait: () => new Promise(() => {}),
+      task_cancel: () => failure("Child runtime mode full-access is broader than parent mode approval-required."),
+    });
+    const { pi, ctx } = setup(t3Sheet);
+    await pi.call("agent", { description: "long", prompt: "x", run_in_background: true }, ctx);
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const stopped = JSON.parse(resultText(await pi.call("stop_agent", { id: "long" }, ctx)));
+    expect(stopped.status).toBe("stopped");
+    const record = pi.entries.at(-1).data;
+    expect(record).toMatchObject({ status: "stopped" });
+    expect(record.finalText).toContain("T3 Code did not cancel task task-1, so thread thread-1 may still be running");
+    expect(record.finalText).toContain("broader than parent mode");
+    await pi.emit("session_shutdown", {}, ctx);
   });
 
   test("an agent that ran as a local process resumes as one, even once the line is added", async () => {

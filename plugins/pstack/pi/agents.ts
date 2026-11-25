@@ -10,7 +10,7 @@ import { noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-te
 import type { AgentParams } from "./agent-tools.ts";
 import { type Activity, type AgentChild, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
 import { HcChild } from "./hc-child.ts";
-import { cancelOrphan, t3Brief, T3Child, t3Session, type T3Task } from "./t3-child.ts";
+import { cancelOrphan, t3Brief, T3_ENV_REMOVED, T3Child, t3Session, type T3Task } from "./t3-child.ts";
 import { loadAgentTypes } from "./agent-files.ts";
 import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
@@ -299,7 +299,8 @@ export class AgentRunner {
     const { command, args } = this.settings.pi;
     const base = [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills")];
     const flags = childArgs(identity, this.settings.depth);
-    const env = { [PARENT_SESSION_ENV]: this.ownSessionId };
+    // T3 Code runs a task in its thread's folder, so an agent in a worktree must not hand its own agents to T3 Code.
+    const env = { [PARENT_SESSION_ENV]: this.ownSessionId, ...(identity.worktree && T3_ENV_REMOVED) };
     // The session's sheet, as for the model: a worktree is a checkout of HEAD and lacks an uncommitted sheet.
     const sheet = readSheet(this.settings.agentDir, identity.worktree?.repo ?? identity.cwd);
     const t3 = t3Session();

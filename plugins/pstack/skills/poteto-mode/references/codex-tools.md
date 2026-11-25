@@ -17,7 +17,7 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 | Dispatch a subagent (the `Agent`/`Task` tool) | `spawn_agent` |
 | Dispatch N parallel subagents in one turn | N `spawn_agent` calls in one response |
 | Wait for a subagent result | Use `wait_agent` as described under [Agent lifecycle](#agent-lifecycle). |
-| Stop a delegate before replacing it or reusing its worktree | Use the host's close or interrupt tool, then confirm the delegate has stopped writing. See [Agent lifecycle](#agent-lifecycle). |
+| Stop a subagent (`TaskStop`) | `close_agent` or `interrupt_agent`, whichever the session exposes. See [Agent lifecycle](#agent-lifecycle). |
 | Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | `update_plan` |
 | Ask the human a fixed-choice question (`AskUserQuestion`) | Use `request_user_input` when the current mode and client support delivering structured questions, such as an interactive Plan mode session. If support is unclear or the tool is unavailable, ask in plain text. Outside Plan mode, ask a required decision or approval in plain text, because Codex continues on its own judgment when `request_user_input` returns no answer. |
 | Read this workspace's session transcripts (Claude Code's `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/`) | Codex sessions live in `${CODEX_HOME:-~/.codex}/sessions/YYYY/MM/DD/`. Ordinary names end in `-<thread-id>.jsonl`; replacements after `thread/revert` end in `-<thread-id>_<rollout-id>.jsonl`. Revert keeps the old files. Resolve the current path from the state database's `threads.rollout_path`, matched by thread ID, rather than filename order or modification time. Archived sessions are in `${CODEX_HOME:-~/.codex}/archived_sessions/`. Older rollouts in both directories can end in `.jsonl.zst`; read those with `zstd -dc`. The first line of each rollout is a `session_meta` record. Keep only rollouts whose `payload.cwd` is the workspace or one of its worktrees. Never read other projects' sessions. |
@@ -26,27 +26,15 @@ Subagents are enabled by default in current Codex, and `agents.enabled` controls
 
 ## Agent lifecycle
 
-Choose by the tools and schemas the current session exposes.
+Codex has two sets of agent tools, and `wait_agent` behaves differently in each. Choose by the tools the current session lists.
 
-- With the older interface, `wait_agent` waits for final statuses for the
-  requested agents. Use the final result or completion notification. Close an
-  agent with `close_agent` when you no longer need it. The tool reports the
-  status before shutdown was requested.
-- With v2, `wait_agent` signals mailbox activity. Read the delivered agent
-  message or final-status notification for the delegate you are waiting on.
-  Another agent's message, a timeout, or steering from the user leaves the
-  delegate's result pending. If the host does not expose `wait_agent`, use
-  the notifications or status tools it does expose.
-- When v2 exposes `interrupt_agent`, use it to stop a delegate's current
-  turn. The agent remains available for follow-up tasks. An interrupt
-  response gives the previous status. Before replacing a writer or reusing
-  its worktree, confirm through a subsequent status or completion signal that
-  it has stopped writing. Apply the same check after closing on the older
-  interface. If you cannot establish that, leave the worktree with its writer.
-- A thread-limit error is a capacity error. Changing the model does not fix
-  it. After the first rejection, stop spawning until capacity is available.
-  On the older interface, close a finished agent to release its slot. On v2,
-  use the host's capacity behavior; interrupting a turn does not close the agent.
+- With `close_agent`, `wait_agent` waits until the requested agents reach a final status. Use the final result or the completion notification. Close an agent with `close_agent` when you no longer need it. Its response is the status before shutdown was requested, not a confirmation that the agent stopped.
+- With `interrupt_agent`, `wait_agent` returns on mailbox activity from any agent and does not carry the content. Read the delivered message or final-status notification from the delegate you are waiting on. Another agent's message, a timeout, or steering from the user leaves the delegate's result pending. `interrupt_agent` stops the delegate's current turn and returns its previous status; the agent stays available for follow-up tasks. `list_agents` reports each live agent's last known status.
+- With neither tool, or without `wait_agent`, use the notification or status tools the session does expose.
+
+Before you replace a writer or reuse its worktree, confirm through a later status (a final status, a completion notification, or `list_agents`) that its turn has ended. A close or interrupt response alone does not confirm it. If you cannot confirm it, leave the worktree with its writer.
+
+A thread-limit error from `spawn_agent` is a capacity error, so changing the model does not fix it. After the first rejection, stop spawning. Close a finished agent with `close_agent` before you try again; a completed agent counts toward the limit until it is closed. Where the session has no `close_agent`, do not assume a finished agent's slot is free. Interrupting a turn does not close the agent.
 
 ## Subagent policy
 

@@ -328,8 +328,8 @@ export function codexModelNamesSection(models) {
     block: models.codex,
     worker: "fast Codex code model",
     panel: (list) =>
-      `on ChatGPT is ${list}. If only one model family is reachable, vary reasoning ` +
-      "effort and note in the verdict that diversity was reduced.",
+      `on ChatGPT is ${list}. If only one model family is reachable, or \`spawn_agent\` exposes no \`model\` field, ` +
+      "vary reasoning effort where the schema has `reasoning_effort`, and note in the verdict that diversity was reduced.",
     ids: "Codex model slugs",
   });
 }

@@ -17,6 +17,21 @@ const rules = [
     phrase: "pass the final level as `reasoning_effort`",
   },
   {
+    source: "#545 Codex passes model and reasoning_effort only when the schema has each",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase: "check the exposed schema before resolving either, and pass each only when the schema has it.",
+  },
+  {
+    source: "#545 Codex without reasoning_effort skips effort resolution",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase: "Without `reasoning_effort`, skip the effort steps below and say that the dispatch set no level",
+  },
+  {
+    source: "#545 Codex without model claims no distinct model",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase: "so say so instead of claiming a distinct model.",
+  },
+  {
     source: "#331 unknown Codex session effort",
     file: "poteto-mode/references/codex-tools.md",
     phrase: "Do not substitute an omitted `reasoning_effort` for the missing starting level.",
@@ -25,6 +40,18 @@ const rules = [
     source: "#331 resolve active Codex effort before dispatch",
     file: "poteto-mode/references/codex-tools.md",
     phrase: "run `node <poteto-mode-dir>/scripts/codex-session-effort.mjs` before dispatching",
+  },
+  {
+    source: "#548 Arena Phase C needs known different families",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase:
+      "Run Phase C only when the effective judge and provisional winner are known to be different families.",
+  },
+  {
+    source: "#548 Arena skips cross-family check then continues Phase D",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase:
+      "If the judge's family is unknown or repeats the winner's family, report the skipped cross-family check and continue with Phase D scoring.",
   },
   {
     source: "#71 callable driver policy",
@@ -205,4 +232,12 @@ describe("port-local skill rules", () => {
       expect(readFileSync(join(skillsDir, file), "utf8")).toContain(phrase);
     });
   }
+
+  test("#548 the Codex spawn schema check comes before the session effort lookup", () => {
+    const text = readFileSync(join(skillsDir, "poteto-mode/references/codex-tools.md"), "utf8");
+    const gate = text.indexOf("check the exposed schema before resolving either");
+    const lookup = text.indexOf("- For `session`, run `node <poteto-mode-dir>/scripts/codex-session-effort.mjs`");
+    expect(gate).toBeGreaterThan(-1);
+    expect(lookup).toBeGreaterThan(gate);
+  });
 });

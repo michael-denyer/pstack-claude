@@ -667,6 +667,7 @@ export function effortSection(levels, defaultEffort) {
     "at every level, and a model name is passed as `model`. " +
     "Pass the level as the dispatch's effort field and keep the `subagent_type` you would otherwise use. " +
     "That is `effort` on the Claude Code `Agent` call and `reasoning_effort` on Codex's `spawn_agent`. " +
+    "On Codex, pass `model` and `reasoning_effort` only as the platform mapping's schema check allows. " +
     "On Muse it is `effort` on a Workflow child; a `subagent_spawn` dispatch keeps the session's effort."
   );
 }

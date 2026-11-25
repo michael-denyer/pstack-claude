@@ -199,8 +199,8 @@ function fateOf(record: RunningRecord): Fate {
 // Stops an orphan, by its group so the bash command it has running goes too.
 // No other fate is signalled: a pid that may have been reused is not ours to hit.
 function reapOrphan(record: RunningRecord, killGraceMs: number): Promise<RunningRecord> {
-  const { t3TaskId: taskId, agent } = record;
   if (record.host === "t3") {
+    const { t3TaskId: taskId, agent } = record;
     return taskId && agent.t3ThreadId ? cancelOrphan({ taskId, threadId: agent.t3ThreadId }).then((done) => (done ? { ...record, t3TaskId: undefined } : record)) : Promise.resolve(record);
   }
   return record.pid === undefined ? Promise.resolve(record) : terminateGroup(record.pid, () => fateOf(record) === "orphan", killGraceMs).then(() => record);

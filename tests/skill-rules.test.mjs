@@ -70,6 +70,36 @@ const rules = [
     phrase: "run `node <poteto-mode-dir>/scripts/codex-session-effort.mjs` before dispatching",
   },
   {
+    source: "#548 gate session effort lookup on exposed reasoning_effort",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase:
+      "If it does not expose `reasoning_effort`, skip the session lookup and the question about starting effort.",
+  },
+  {
+    source: "#548 session helper runs only when reasoning_effort is present",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase:
+      "If it exposes `reasoning_effort` and the configured effort is `session`, run `node <poteto-mode-dir>/scripts/codex-session-effort.mjs` before dispatching",
+  },
+  {
+    source: "#548 ask for effort only when reasoning_effort is present",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase:
+      "When the schema exposes `reasoning_effort` and the configured effort is `session`, do not guess the session's effort",
+  },
+  {
+    source: "#548 Arena Phase C needs known different families",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase:
+      "Run Phase C only when the effective judge and provisional winner are known to be different families.",
+  },
+  {
+    source: "#548 Arena skips cross-family check then continues Phase D",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase:
+      "If the judge's family is unknown or repeats the winner's family, report the skipped cross-family check and continue with Phase D scoring.",
+  },
+  {
     source: "#71 callable driver policy",
     file: "poteto-mode/SKILL.md",
     phrase: "fall back to `run` when the repo has none",
@@ -248,4 +278,12 @@ describe("port-local skill rules", () => {
       expect(readFileSync(join(skillsDir, file), "utf8")).toContain(phrase);
     });
   }
+
+  test("codex-tools no longer starts session effort resolution before the schema gate", () => {
+    const text = readFileSync(join(skillsDir, "poteto-mode/references/codex-tools.md"), "utf8");
+    expect(text).not.toContain("- For `session`, run `node <poteto-mode-dir>/scripts/codex-session-effort.mjs` before dispatching");
+    expect(text).not.toContain(
+      "- Do not guess the session's effort from the model, a config default, or a previous turn.",
+    );
+  });
 });

@@ -14,7 +14,17 @@ const rules = [
   {
     source: "#331 Codex session effort with an explicit model",
     file: "poteto-mode/references/codex-tools.md",
-    phrase: "pass the final level as `reasoning_effort`",
+    phrase: "pass the final level as `reasoning_effort` only when the schema has that field, including when a model is selected explicitly",
+  },
+  {
+    source: "#545 Codex spawn model gated on the exposed schema",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase: "Pass a Codex model only when the schema has a `model` field.",
+  },
+  {
+    source: "#545 Codex absent reasoning_effort inherits the parent",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase: "Where the field is absent, omit it: the child inherits the parent's effort",
   },
   {
     source: "#331 unknown Codex session effort",

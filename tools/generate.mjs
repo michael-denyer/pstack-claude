@@ -666,7 +666,7 @@ export function effortSection(levels, defaultEffort) {
     "Strip the suffix before reading the model: `inherit-parent` or `auto` still omits `model` " +
     "at every level, and a model name is passed as `model`. " +
     "Pass the level as the dispatch's effort field and keep the `subagent_type` you would otherwise use. " +
-    "That is `effort` on the Claude Code `Agent` call and `reasoning_effort` on Codex's `spawn_agent`. " +
+    "That is `effort` on the Claude Code `Agent` call and `reasoning_effort` on Codex's `spawn_agent` when its exposed schema has that field. " +
     "On Muse it is `effort` on a Workflow child; a `subagent_spawn` dispatch keeps the session's effort."
   );
 }

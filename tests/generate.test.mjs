@@ -537,7 +537,7 @@ describe("effort section", () => {
     const text = effortSection(["low", "max"], "high");
     for (const level of ["low", "max", "high"]) expect(text).toContain(`\`${level}\``);
     expect(text).toContain("`effort` on the Claude Code `Agent` call");
-    expect(text).toContain("`reasoning_effort`");
+    expect(text).toContain("`reasoning_effort` on Codex's `spawn_agent` when its exposed schema has that field");
     expect(text).not.toContain("effort-<level>");
   });
 

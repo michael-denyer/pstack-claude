@@ -73,6 +73,7 @@ export class T3Child {
   private taskId?: string;
   private settled = false;
   private ending = false;
+  private cancelled?: Promise<void>;
   private readonly refused: Promise<never>;
   private refuse!: (e: Error) => void;
 
@@ -145,12 +146,14 @@ export class T3Child {
     return levels.includes(thinking);
   }
 
-  private async cancel(): Promise<void> {
-    if (this.taskId === undefined) return;
+  private cancel(): Promise<void> | undefined {
     const { taskId, threadId } = this;
-    await this.mcp.call(Type.Unknown(), "task_cancel", { taskId, reason: "stop_agent" }).catch((e: Error) => {
-      this.refuse(new Error(`T3 Code did not cancel task ${taskId}, so thread ${threadId} may still be running: ${e.message}`));
-    });
+    if (taskId === undefined) return;
+    this.cancelled ??= this.mcp.call(Type.Unknown(), "task_cancel", { taskId, reason: "stop_agent" }).then(
+      () => undefined,
+      (e: Error) => this.refuse(new Error(`T3 Code did not cancel task ${taskId}, so thread ${threadId} may still be running: ${e.message}`)),
+    );
+    return this.cancelled;
   }
 }
 

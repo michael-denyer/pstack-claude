@@ -161,7 +161,7 @@ describe("T3Child", () => {
       t3_thread_wait: () => reply({ status: "interrupted", timedOut: false }),
       task_status: () => reply({ status: "interrupted", summary: null }),
     });
-    const child = new T3Child(session, { title: "probe", onStart: () => {} }, "work");
+    const child = new T3Child(session, { title: "probe", onStart: () => child.end() }, "work");
     await waitFor(() => calls.length === 1);
     child.end();
     answer();

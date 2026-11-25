@@ -22,9 +22,19 @@ const rules = [
     phrase: "Pass a Codex model only when the schema has a `model` field.",
   },
   {
-    source: "#545 Codex absent reasoning_effort inherits the parent",
+    source: "#545 Codex absent reasoning_effort is no dispatch override",
     file: "poteto-mode/references/codex-tools.md",
-    phrase: "Where the field is absent, omit it: the child inherits the parent's effort",
+    phrase: "Where the field is absent, omit it: that is no dispatch override for effort.",
+  },
+  {
+    source: "#545 Codex absent model follows host and role defaults",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase: "The child's effective model then follows the host and any applicable role defaults",
+  },
+  {
+    source: "#545 Codex absent fields allow role defaults to change settings",
+    file: "poteto-mode/references/codex-tools.md",
+    phrase: "which can still change it even when no explicit role is passed",
   },
   {
     source: "#331 unknown Codex session effort",

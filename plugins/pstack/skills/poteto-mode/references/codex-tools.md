@@ -13,30 +13,26 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 | Fetch a URL | `shell` with `curl` / `wget` |
 | Search the web | `web_search` |
 | Invoke a skill (the `Skill` tool, `/command`) | Skills load natively. Follow the instructions presented. |
+| Read a principle leaf (the **principle-<title>** skill, or the **<title>** principle skill, a pstack skill names) | Principle leaves are left out of Codex's skill list by their `agents/openai.yaml`. Read the leaf with `shell` at `<poteto-mode-dir>/../principle-<title>/SKILL.md`, with `<poteto-mode-dir>` resolved to the `poteto-mode` skill's directory and `<title>` in kebab case, or the explicit name a Principles entry gives. |
 | Dispatch a subagent (the `Agent`/`Task` tool) | `spawn_agent` |
 | Dispatch N parallel subagents in one turn | N `spawn_agent` calls in one response |
 | Wait for a subagent result | `wait_agent` |
 | Free a finished subagent slot | `close_agent`, when the session exposes it. Some Codex hosts don't. |
 | Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | `update_plan` |
-| Ask the human a fixed-choice question (`AskUserQuestion`) | Ask in plain text and let the user answer. Codex has no structured-choice tool. |
+| Ask the human a fixed-choice question (`AskUserQuestion`) | Use `request_user_input` when the current mode and client support delivering structured questions, such as an interactive Plan mode session. If support is unclear or the tool is unavailable, ask in plain text. Outside Plan mode, ask a required decision or approval in plain text, because Codex continues on its own judgment when `request_user_input` returns no answer. |
 | Read this workspace's session transcripts (Claude Code's `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/<encoded-cwd>/`) | Codex sessions live in `${CODEX_HOME:-~/.codex}/sessions/YYYY/MM/DD/`. Ordinary names end in `-<thread-id>.jsonl`; replacements after `thread/revert` end in `-<thread-id>_<rollout-id>.jsonl`. Revert keeps the old files. Resolve the current path from the state database's `threads.rollout_path`, matched by thread ID, rather than filename order or modification time. Archived sessions are in `${CODEX_HOME:-~/.codex}/archived_sessions/`. Older rollouts in both directories can end in `.jsonl.zst`; read those with `zstd -dc`. The first line of each rollout is a `session_meta` record. Keep only rollouts whose `payload.cwd` is the workspace or one of its worktrees. Never read other projects' sessions. |
 
-Subagent dispatch needs `multi_agent` enabled. Add to `~/.codex/config.toml`:
+Subagents are enabled by default in current Codex, and `agents.enabled` controls them. Inspect the current tool surface. If dispatch is unavailable, the fan-out skills (`interrogate`, `why`, `how`, `arena`, `reflect`) degrade to a labeled sequential pass. A required independent review does not degrade. It stays blocked, as poteto-mode's [Subagents](../SKILL.md#subagents) section says.
 
-```toml
-[features]
-multi_agent = true
-```
-
-Without it, `spawn_agent` is unavailable and the fan-out skills (`interrogate`, `why`, `how`, `arena`, `reflect`) degrade to a single sequential pass. A required independent review does not degrade. It stays blocked, as poteto-mode's [Subagents](../SKILL.md#subagents) section says.
-
-Enabling `multi_agent` does not lift the host's thread limit. A thread-limit error from `spawn_agent` is a capacity error, not a rejected model slug, so the skills' fallback to another model does not apply. After the first capacity rejection, stop spawning. Close a finished agent with `close_agent` before you try again, and where the session has no `close_agent`, do not assume a finished agent's slot is free.
+Enabling subagents does not lift the host's thread limit. A thread-limit error from `spawn_agent` is a capacity error, not a rejected model slug, so the skills' fallback to another model does not apply. After the first capacity rejection, stop spawning. Close a finished agent with `close_agent` before you try again, and where the session has no `close_agent`, do not assume a finished agent's slot is free.
 
 ## Subagent policy
 
 poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "pstack:poteto-agent"`, `run_in_background: true`). On Codex:
 
 - There is no `poteto-agent` subagent type. Route an ad-hoc subagent through poteto-mode's style by dispatching a `spawn_agent` whose instructions tell it to read the `poteto-mode` skill in full first.
+- When the exposed spawn schema accepts a role, map Claude's `general-purpose` to `agent_type: "default"`, or use `explorer` for exploration when available. Omit the role field when the schema has none, and on a full-history fork (`fork_context: true`), which inherits the parent's role and rejects a new one. Instruct exploration agents to leave files unchanged on either interface. A read-oriented role does not enforce read-only permissions. If the job requires enforced read-only access, use a Codex session with a read-only sandbox or report that the current host cannot provide that guarantee.
+- For blind candidates or reviewers who should see only the brief, use `fork_context: false` on the older spawn interface or `fork_turns: "none"` where available. Check the exposed tool schema before dispatching.
 - `spawn_agent` calls already run concurrently with your turn, so `run_in_background: true` has no separate flag. Issue the dispatch and continue.
 - For `session`, run `node <poteto-mode-dir>/scripts/codex-session-effort.mjs` before dispatching, with `<poteto-mode-dir>` resolved to this skill's directory. The [helper](../scripts/codex-session-effort.mjs) reads the active turn's effort from the exact runtime log identified by `CODEX_THREAD_ID`, under `$CODEX_HOME/sessions` (default `~/.codex/sessions`). It prints only the effort. Run it again on each turn; a UI effort change must not reuse the previous turn's value.
 - The helper finds the current log through `threads.rollout_path` in `$CODEX_HOME/state_*.sqlite`, or a single `-<thread-id>.jsonl` log when no indexed path is available and no replacement exists; anything else makes effort unavailable.
@@ -44,8 +40,8 @@ poteto-mode's Subagents section sets Claude-specific defaults (`subagent_type: "
 - Do not guess the session's effort from the model, a config default, or a previous turn. If the helper cannot identify the active turn's effort, ask for an explicit role or `default effort` level before dispatching. Do not substitute an omitted `reasoning_effort` for the missing starting level. Automatic `session` resolution depends on the host exposing the current thread's runtime log; it is not available on every Codex host.
 - There is no `comment-sicko` subagent type either. The **no-comments** skill spawns it on Claude Code; on Codex dispatch a `spawn_agent` whose instructions tell it to read `poteto-mode/references/agents/comment-sicko.md` in full first.
 - There are no `thermo-nuclear-review-subagent` or `thermo-nuclear-code-quality-review-subagent` types. The **thermos** skill spawns both on Claude Code; on Codex dispatch two `spawn_agent` calls whose instructions tell each to read the `thermo-nuclear-review` or `thermo-nuclear-code-quality-review` skill in full first and review only the diff and file contents in its prompt.
-- Claude Code runs every subagent on this machine, so the **swarm** skill's workers and the fan-out playbooks (`autopilot-full`, `autopilot-stack`) isolate writers with worktrees. The same holds on Codex.
-- Keep the rest of the policy unchanged. Pass file pointers not inlined context, give each worker its own worktree or branch when they write, review every subagent's diff yourself.
+- Codex `spawn_agent` has no Claude `isolation: "worktree"` argument. For each writer, create a separate worktree from the intended base (use `git worktree add -b <delegate-branch> <path> <base-sha>`), verify the worktree's HEAD, and include its absolute path in the brief. Direct the delegate to use that directory for its edits and commands. Separate branches in one checkout still share the files and index.
+- Keep the rest of the policy unchanged. Pass file pointers not inlined context, give each writing worker its own worktree or exclusive output directory, review every subagent's diff yourself.
 
 ## Model names
 
@@ -60,7 +56,7 @@ Skills name Claude defaults (a single-role default for code/prose/judgment, a wo
 
 ## Session routing hook
 
-The native pstack plugin bundles the same `SessionStart` routing instruction as the Claude Code plugin, through `session-start.sh` on macOS and Linux and `session-start.ps1` on Windows. Codex runs the hook on startup, resume, clear, and compact after the user trusts the hook through `/hooks`. The hook reads `session hook` from the Codex sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/references/runtimes.md); `session hook: off` disables injection.
+The native pstack plugin bundles the same `SessionStart` routing instruction as the Claude Code plugin, through `session-start.sh` on macOS and Linux and `session-start.ps1` on Windows. Codex runs the hook on startup, resume, clear, compact, and fork after the user trusts the hook through `/hooks`. The hook reads `session hook` from the Codex sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/references/runtimes.md); `session hook: off` disables injection.
 
 A skills-only installation does not include plugin hooks. Request `poteto-mode` explicitly or add a standing instruction to `AGENTS.md` in that case.
 
@@ -73,7 +69,16 @@ The [driver policy](../SKILL.md#non-negotiables) selects the app driver. For ski
 | `run` (drive a CLI/TUI to see a change work) | Run the app yourself via `shell` and observe the real output. |
 | Project UI driver | Drive the UI with whatever automation you have, or hand the user a concrete manual check. Do not claim done without observing the artifact. |
 | `plugin-dev:skill-development` (Claude's SKILL.md authoring guidance) | Follow your platform's skill-authoring guidance; the `writing-skills` skill if present. Keep `name` + `description` frontmatter and progressive disclosure. |
-| `loop` (recurring/self-paced re-invocation, used by `babysit`) | Use the [Codex wake-up preflight](codex-wakeups.md) for unattended work. Recheck directly while the turn is active for attended work. |
+| `loop` (recurring/self-paced re-invocation, used by `babysit`) | Use [Wake-ups on Codex](#wake-ups-on-codex). For attended work, recheck while the current turn is active. |
+
+### Wake-ups on Codex
+
+A Codex Goal can keep active work moving toward a checkable outcome. A watcher can report a CI or queue event during an active turn. Work that must continue after the turn ends needs a wake-up mechanism that the current surface exposes.
+
+- Before starting unattended Autopilot or requesting a merge that may queue, confirm an authorized same-chat scheduled task or equivalent wake-up is armed in the same checkout. Record its handle, next wake-up, and stop condition.
+- If the surface cannot wake the agent, report the limit before starting unattended work or requesting a merge that may queue. In Shipping, stop at merge-ready. For attended work, report the last observed state when the turn ends.
+- For queued shipping, keep the original bottom-to-top PR list. Use the existing watcher and `ship-pr inspect` at each wake-up to compare the queued head, destination branch, and base OID with the approved record. Follow Shipping's cancellation and completion rules. Report a blocker if the inputs or the queue state cannot be read.
+- Stop recurring wake-ups when the run ends or the user stops it. Retain the last verified state for handoff.
 
 ## Per-skill notes
 
@@ -100,6 +105,8 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | `show-me-your-work` | Check the log against this run's current Codex rollout, using `CODEX_THREAD_ID` and the state index as described in Tool actions. A filename suffix alone cannot select the current file after revert. If the current path is unavailable or ambiguous, report that the audit could not run instead of guessing a rollout. Do not read Claude Code's projects directory. |
 | `swarm` | Each worker is a `spawn_agent` call on your configured Codex model, and those calls already run concurrently; give each writing worker its own worktree or output directory (see Subagent policy above). |
 | `why` | List MCP servers from the tools Codex exposes to the session, not from `.mcp.json` or `claude mcp list`. |
+| `figure-it-out` | Read each principle skill it names through the principle-leaf row in Tool actions, since Codex does not list principle leaves. |
+| `typescript-best-practices` | Read each principle skill it names through the principle-leaf row in Tool actions, since Codex does not list principle leaves. |
 
 ## Vendored scripts
 

@@ -81,6 +81,8 @@ Most skills need only the tables above. These need one more mapping:
 | `swarm` | Each worker is an `invoke_subagent` call; use `Workspace: "share"` or `git worktree add` for writing workers. |
 | `teach` | Running `how` and `why` in parallel maps to two `invoke_subagent` calls in one response; image generation uses `image-generator` via `invoke_subagent`. |
 | `why` | List MCP servers from the tools Antigravity exposes to the session, not from Claude Code's MCP files. |
+| `figure-it-out` | Each principle skill it names resolves like any other skill (Tool actions above). |
+| `typescript-best-practices` | Each principle skill it names resolves like any other skill (Tool actions above). |
 | `recall` | Read Antigravity transcripts under `~/.gemini/antigravity-cli/brain/<conversation-id>/.system_generated/logs/transcript.jsonl` instead of `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/`. |
 | `reflect` | Pass the current session's transcript path (`<appDataDir>/brain/<conversation-id>/.system_generated/logs/transcript.jsonl`) to the transcript reading the skill does. |
 | `show-me-your-work` | Check the log against this session's transcript or context, not a Claude Code transcript. |

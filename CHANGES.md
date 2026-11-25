@@ -2,6 +2,29 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.155 - sync to upstream ca782ed (v0.15.48): adds /reframe
+
+The upstream pin moves from `0b46ec3` to `ca782ed`, upstream v0.15.48, 2 pstack commits (cursor/plugins#1324 and #1326). `cursor-team-kit` and `thermos` did not change upstream, so their pins stay.
+
+What changes for users:
+
+- `/reframe` is new. Starting from your files and your own description, it gives 8 to 12 expert terms for what you're building, ranked by how much each would change what gets built, each tied to the part of your description it names and to a real project whose link it opened. It borrows terms from 2 or 3 neighboring fields that solved the same problem, says where each analogy breaks, names what you didn't mention, and rewrites your description with the new words. When the description could name more than one problem, it first lists the two or three it could be and picks the likeliest (cursor/plugins#1324, #1326).
+- `/poteto-help` lists `/reframe` in its table of skills.
+
+What stays different:
+
+- Upstream marks `/reframe` `disable-model-invocation: true`. The sync drops that key, as it does for every skill, because on Claude Code it makes the Skill tool refuse the invocation.
+
+The sync merged with no conflicts and no fork changes. `README.md` and `docs/reference.md` name the new pin, `docs/reference.md` gains the `/reframe` row, and its skill counts move to 68 directories and 44 public skills; its Muse note also said 65 skills, a count left over from before this sync, and now says 68. From @wes-davis ([#547](https://github.com/michael-denyer/pstack-claude/pull/547)).
+
+## 0.9.154 - Codex fixes: routing on forked chats, agent roles and isolation, principles out of the skill list
+
+On Codex, the `SessionStart` routing hook now also runs when a chat is forked, so a fork loads the routing instruction and honours `session hook: off` as a new session does. As after every pstack update, Codex asks to review the hook again. The Claude Code and GitHub Copilot hooks are unchanged. From @oliver-mee ([#542](https://github.com/michael-denyer/pstack-claude/pull/542), for [#541](https://github.com/michael-denyer/pstack-claude/issues/541)).
+
+The Codex mapping now names Codex's native agent roles. `general-purpose` maps to `default`, and exploration maps to `explorer`. The mapping notes that a read-oriented role does not enforce read-only access. The role is omitted when the spawn schema has no role field, and on a full-history fork, which inherits the parent's role. A reviewer that should see only its brief is spawned with `fork_context: false` or `fork_turns: "none"`. Each writer gets its own worktree, created and checked at the intended base, because `spawn_agent` has no isolation argument. `request_user_input` is used only where the mode and client deliver it, and a required decision is asked in plain text outside Plan mode. Current Codex enables subagents by default, and `agents.enabled` controls them. `docs/reference.md` no longer tells users to set `[features] multi_agent = true`. From @oliver-mee ([#540](https://github.com/michael-denyer/pstack-claude/pull/540), for [#539](https://github.com/michael-denyer/pstack-claude/issues/539)).
+
+Codex ignores `user-invocable: false`, so it listed all 24 `principle-*` leaves in its default skill catalog. The generator now writes an `agents/openai.yaml` with `policy.allow_implicit_invocation: false` into every principle leaf, and `generate --check` enforces it. On Codex CLI 0.171.0 this took the catalog from 24 principle entries to 0. With the leaves unlisted, the Codex mapping now gives their path, `<poteto-mode-dir>/../principle-<title>/SKILL.md`. `figure-it-out` and `typescript-best-practices` name principle leaves, so they now carry the Codex, GitHub Copilot, and Antigravity mapping preambles. A test checks that every skill naming a leaf carries the Codex preamble. From @oliver-mee ([#544](https://github.com/michael-denyer/pstack-claude/pull/544), for [#543](https://github.com/michael-denyer/pstack-claude/issues/543)).
+
 ## 0.9.153 - watch-pr reads PRs over REST in a Claude Code cloud session, open-pstack escapes cmd.exe arguments
 
 On Windows, `open-pstack` launches a harness installed as a `.cmd` or `.bat` shim through `cmd.exe`. It wrapped each argument in double quotes, which leave `%NAME%` open to expansion, so a staged plugin path that named a defined variable, such as one under a data directory with `%SystemRoot%` in its name, reached the harness changed. Each argument and the shim's own path are now caret-escaped for `cmd.exe`. The Windows installer job proves this with such a path, with stubs in a directory whose name has a space and `&`, and with a stub that reads `%~1` instead of forwarding `%*` ([#526](https://github.com/michael-denyer/pstack-claude/issues/526)).

@@ -9,7 +9,7 @@ import { Value } from "typebox/value";
 import { noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
 import { type Activity, type AgentChild, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
-import { HcChild } from "./hc-child.ts";
+import { HcChild, pidOfTerminal } from "./hc-child.ts";
 import { loadAgentTypes } from "./agent-files.ts";
 import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
@@ -192,6 +192,12 @@ function fateOf(record: RunningRecord): Fate {
   return info && info.start === pidStart ? "orphan" : "unknown";
 }
 
+function withTerminalPid(record: RunningRecord): RunningRecord {
+  if (record.host !== "hc" || record.pid !== undefined) return record;
+  const pid = pidOfTerminal(record.agent.id);
+  return pid === undefined ? record : { ...record, pid, pidStart: inspect(pid)?.start };
+}
+
 // Stops an orphan, by its group so the bash command it has running goes too.
 // No other fate is signalled: a pid that may have been reused is not ours to hit.
 function reapOrphan(record: RunningRecord, killGraceMs: number): Promise<void> {
@@ -279,7 +285,7 @@ export class AgentRunner {
     }
     const child = this.spawnChild(identity, prompt);
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
-    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid };
+    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, host: child instanceof HcChild ? "hc" : undefined };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
     this.agents.set(identity.id, { kind: "local", record, run });
     this.persist(record);
@@ -301,13 +307,13 @@ export class AgentRunner {
         envFile: join(identity.sessionDir, `${identity.id}.env`),
         graceMs: this.settings.killGraceMs,
         transcript: () => sessionFile(identity),
-        onStart: (pid) => this.track(identity.id, { host: "hc", pid, pidStart: inspect(pid)?.start }),
+        onStart: (pid) => this.track(identity.id, { pid, pidStart: inspect(pid)?.start }),
       }, prompt);
     }
     return new PiChild(command, [...base, "--mode", "rpc", ...flags], { cwd: identity.cwd, env, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() }, prompt);
   }
 
-  private track(id: string, handle: Pick<RunningRecord, "host" | "pid" | "pidStart">): void {
+  private track(id: string, handle: Pick<RunningRecord, "pid" | "pidStart">): void {
     const state = this.agents.get(id);
     if (state?.kind !== "local") return;
     Object.assign(state.record, handle);
@@ -506,6 +512,9 @@ export class AgentRunner {
       if (this.agents.get(id)?.kind === "local") continue;
       this.agents.set(id, entry.data.status === "running" ? { kind: "remote", record: entry.data } : { kind: "ended", record: entry.data });
     }
-    for (const state of this.agents.values()) this.refreshRestored(state);
+    for (const state of this.agents.values()) {
+      if (state.kind === "remote") state.record = withTerminalPid(state.record);
+      this.refreshRestored(state);
+    }
   }
 }

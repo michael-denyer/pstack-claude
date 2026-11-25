@@ -2,6 +2,8 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+On Pi with `pi agent host: hc`, a resumed session now ends an agent whose launching pi died between `hc run` and `hc get`. Its record had no pid and no host yet, so the resumed session read the agent as gone and left its terminal's pi running. The record now names the hc host from the start, and on resume the extension asks `hc get` for the pid of the terminal named by the agent id. When `hc get` names none, the agent reads as gone, as before. The hc live test of the stop grace period runs `sleep 90` instead of `ping`, which some images lack. Follow-up to [#447](https://github.com/michael-denyer/pstack-claude/pull/447).
+
 ## 0.9.155 - sync to upstream ca782ed (v0.15.48): adds /reframe
 
 The upstream pin moves from `0b46ec3` to `ca782ed`, upstream v0.15.48, 2 pstack commits (cursor/plugins#1324 and #1326). `cursor-team-kit` and `thermos` did not change upstream, so their pins stay.

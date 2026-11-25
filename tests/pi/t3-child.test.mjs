@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { readdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 
 import { cancelOrphan, T3Child, t3Session } from "../../plugins/pstack/pi/t3-child.ts";
@@ -287,10 +288,12 @@ describe("the pi agent host: t3 sheet line", () => {
     await pi.emit("session_shutdown", {}, ctx);
   });
 
-  test("an agent that ran as a local process resumes as one, even once the line is added", async () => {
+  test("an agent that ran as a local process resumes as one, even once the line is added and its session file is gone", async () => {
     const { calls } = fakeT3(completing());
     const { w, pi, ctx } = setup();
     await pi.call("agent", { description: "local", prompt: "x" }, ctx);
+    const { sessionDir } = pi.entries[0].data.agent;
+    for (const name of readdirSync(sessionDir).filter((n) => n.endsWith(".jsonl"))) renameSync(join(sessionDir, name), join(sessionDir, `${name}.moved`));
     const resumed = await restore(w, pi.entries, "resume");
     writeSheet(join(w.agentDir, "pstack-models.md"), "pi agent host: t3\n");
     await resumed.call("send_message", { to: pi.entries[0].data.agent.id, message: "more" }, ctx);

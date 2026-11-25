@@ -285,7 +285,7 @@ export class AgentRunner {
       }
       throw e;
     }
-    const child = this.spawnChild(identity, prompt);
+    const child = this.spawnChild(identity, prompt, !this.agents.has(identity.id));
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
     const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
@@ -295,7 +295,7 @@ export class AgentRunner {
     return record;
   }
 
-  private spawnChild(identity: AgentIdentity, prompt: string): AgentChild {
+  private spawnChild(identity: AgentIdentity, prompt: string, firstRun: boolean): AgentChild {
     const { command, args } = this.settings.pi;
     const base = [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills")];
     const flags = childArgs(identity, this.settings.depth);
@@ -304,7 +304,6 @@ export class AgentRunner {
     // The session's sheet, as for the model: a worktree is a checkout of HEAD and lacks an uncommitted sheet.
     const sheet = readSheet(this.settings.agentDir, identity.worktree?.repo ?? identity.cwd);
     const t3 = t3Session();
-    const firstRun = !sessionFile(identity);
     if (identity.t3ThreadId || (firstRun && sheet?.t3Host && t3 && !identity.worktree)) {
       if (!t3) throw new Error(`Agent ${identity.id} runs in T3 Code thread ${identity.t3ThreadId}; message it from a Pi session inside T3 Code.`);
       const onStart = ({ threadId, taskId }: T3Task) => {

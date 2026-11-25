@@ -30,7 +30,7 @@ test.each([
     const { typeRoots, baseUrl, paths } = piCompilerPaths(piDir);
 
     expect(typeRoots.map((dir) => existsSync(join(dir, "node", "index.d.ts")))).toEqual([true]);
-    const named = Object.values(paths).flat().map((target) => resolve(baseUrl, target.replace("*", "value")));
+    const named = Object.values(paths).flat().map((target) => resolve(baseUrl, target.replaceAll("*", "value")));
     expect(named.filter((file) => !existsSync(file))).toEqual([]);
   } finally {
     rmSync(root, { recursive: true, force: true });

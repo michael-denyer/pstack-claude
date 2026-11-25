@@ -12,12 +12,6 @@
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
-    "plugins/pstack/skills/automate-me/SKILL.md": {
-      "kind": "port-feature",
-      "why": "Use workspace-scoped Codex run history in Codex.",
-      "since": "0.9.153",
-      "upstream": "not-proposed"
-    },
     "plugins/pstack/skills/blast-radius/SKILL.md": {
       "kind": "policy",
       "why": "Extends the trigger to run before design when a brief asserts something about existing code.",
@@ -56,7 +50,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/autopilot-full.md": {
       "kind": "policy",
-      "why": "Owners stop at merge-ready and the operator clicks every merge, with the patch-id rule governing re-verification if trunk moves first, instead of each owner merging after a clean verdict, and the root writes the program objective into the store's notes.md on the go and re-reads it each tick, arms the tick as a dynamic-mode /loop, states the program's size before the first owner starts and waits for the operator's go above three owners, scopes review lanes to what the diff breaks, and stops a PR at two fix-forwards. Codex stores the objective and trail together in the repository's Git common directory.",
+      "why": "Owners stop at merge-ready and the operator clicks every merge, with the patch-id rule governing re-verification if trunk moves first, instead of each owner merging after a clean verdict, and the root writes the program objective into the store's notes.md on the go and re-reads it each tick, arms the tick as a dynamic-mode /loop, states the program's size before the first owner starts and waits for the operator's go above three owners, scopes review lanes to what the diff breaks, and stops a PR at two fix-forwards.",
       "since": "0.9.39",
       "upstream": "not-proposed"
     },
@@ -76,12 +70,6 @@
       "kind": "policy",
       "why": "Quotes decisive failing and passing output trimmed to the assertion and counts, separates verified code, publication, observed runtime behavior, and blockers, selects non-sensitive diagnostic fields before printing, and adds a focused-fix exception with explicit architecture and independent correctness review triggers for higher-risk fixes.",
       "since": "0.9.10",
-      "upstream": "not-proposed"
-    },
-    "plugins/pstack/skills/poteto-mode/playbooks/eval.md": {
-      "kind": "port-feature",
-      "why": "Codex grades candidates from the transcripts matched by their dispatch IDs and verifies the assigned work directories separately.",
-      "since": "0.9.153",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-mode/playbooks/feature.md": {
@@ -110,7 +98,7 @@
     },
     "plugins/pstack/skills/poteto-mode/playbooks/session-pickup.md": {
       "kind": "policy",
-      "why": "Reads the project checkpoint first and applies the human-rulings epistemics when reconstructing state, and verifies inherited claims before it routes and ends. Codex checkpoint fallback searches Codex history for the same workspace.",
+      "why": "Reads the project checkpoint first and applies the human-rulings epistemics when reconstructing state, and verifies inherited claims before it routes and ends.",
       "since": "0.9.34",
       "upstream": "not-proposed"
     },

@@ -127,7 +127,7 @@ describe("SessionStart hook", () => {
   test("declares the hook in the Codex manifest", () => {
     expect(codexManifest.hooks).toBe("./hooks/codex-hooks.json");
     expect(sessionStart.claude.matcher).toBe("startup|resume|clear|compact");
-    expect(sessionStart.codex.matcher).toBe("startup|resume|clear|compact");
+    expect(sessionStart.codex.matcher).toBe("startup|resume|clear|compact|fork");
     expect(sessionStart.copilot.matcher).toBe("startup|resume|clear|compact");
   });
 

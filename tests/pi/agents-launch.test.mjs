@@ -282,10 +282,20 @@ describe("model resolution", () => {
       await w.until("invocation", 3);
       expect(w.invocations().map((inv) => flag(inv, "--mode"))).toEqual(["rpc", "rpc", "rpc"]);
       await waitFor(() => resumed.entries.at(-1)?.data.status === "completed");
-      expect(resumed.entries.findLast((e) => e.data.status === "running").data).toMatchObject({ host: "rpc", agent: { host: "hc" } });
+      const running = resumed.entries.findLast((e) => e.data.status === "running").data;
+      expect(running).toMatchObject({ agent: { host: "hc" } });
+      expect(running.host).toBeUndefined();
     } finally {
       if (terminal !== undefined) process.env.HC_TERMINAL_ID = terminal;
     }
+  });
+
+  test("a running RPC agent's record leaves host unset, the only form an older pstack restores besides hc", async () => {
+    const { pi, ctx } = setup();
+    await pi.call("agent", { description: "r", prompt: "x" }, ctx);
+    const running = pi.entries.find((e) => e.data.status === "running").data;
+    expect(running.agent.host).toBe("rpc");
+    expect("host" in JSON.parse(JSON.stringify(running))).toBe(false);
   });
 
   test("a worktree agent's host comes from the session's sheet, not the worktree's checkout", async () => {

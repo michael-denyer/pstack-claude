@@ -6,6 +6,8 @@ import { alive, type ChildExit, type Fate } from "./child.ts";
 
 const PROTOCOL = "2025-06-18";
 const WAIT_MS = 30_000;
+// T3 Code's terminal task statuses (OrchestratorMcpTerminalDelegatedTaskStatus).
+const ENDED = new Set(["completed", "failed", "cancelled", "interrupted"]);
 
 const toolResult = Type.Object({
   content: Type.Optional(Type.Array(Type.Object({ type: Type.String(), text: Type.Optional(Type.String()) }))),
@@ -74,7 +76,7 @@ export class T3Child {
   private settled = false;
   private ending = false;
   private cancelled?: Promise<void>;
-  private readonly refused = new AbortController();
+  private readonly stopWaiting = new AbortController();
 
   constructor(session: T3Session, launch: T3Launch, prompt: string) {
     this.mcp = new T3Mcp(session);
@@ -91,9 +93,11 @@ export class T3Child {
     }
   }
 
-  end(): void {
+  // T3 Code has no kill, so after graceMs the agent stops waiting for the thread to settle.
+  end(graceMs: number): void {
     this.ending = true;
     void this.cancel();
+    setTimeout(() => this.stopWaiting.abort(new Error(`T3 Code had not settled thread ${this.threadId} ${graceMs} ms after the cancel of task ${this.taskId}.`)), graceMs).unref();
   }
 
   // The exit hook runs synchronously, so a task_cancel would never go out; a resumed session inside T3 Code cancels the task as an orphan.
@@ -103,7 +107,7 @@ export class T3Child {
     try {
       const { threadId, runId } = await this.start(launch, prompt);
       if (this.ending) await this.cancel();
-      await settled(this.mcp, threadId, runId, this.refused.signal);
+      await settled(this.mcp, threadId, runId, this.stopWaiting.signal);
       const { status, summary } = await this.mcp.call(taskResult, "task_status", { taskId: this.taskId });
       this.settled = status === "completed";
       const text = summary ?? "";
@@ -146,7 +150,7 @@ export class T3Child {
     if (taskId === undefined) return;
     this.cancelled ??= this.mcp.call(Type.Unknown(), "task_cancel", { taskId, reason: "stop_agent" }).then(
       () => undefined,
-      (e: Error) => this.refused.abort(new Error(`T3 Code did not cancel task ${taskId}, so thread ${threadId} may still be running: ${e.message}`)),
+      (e: Error) => this.stopWaiting.abort(new Error(`T3 Code did not cancel task ${taskId}, so thread ${threadId} may still be running: ${e.message}`)),
     );
     return this.cancelled;
   }
@@ -161,7 +165,8 @@ export async function cancelOrphan(task: T3Task): Promise<boolean> {
     await settled(mcp, task.threadId);
     return true;
   } catch {
-    return false;
+    // A task that has already ended needs no cancel, and T3 Code may refuse one for good.
+    return mcp.call(taskResult, "task_status", { taskId: task.taskId }).then(({ status }) => ENDED.has(status), () => false);
   }
 }
 

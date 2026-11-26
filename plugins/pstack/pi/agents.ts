@@ -304,7 +304,8 @@ export class AgentRunner {
     }
     const { child, host } = this.spawnChild(identity, prompt);
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
-    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, host };
+    // An RPC record leaves host unset, as earlier versions wrote it, so an older pstack can still restore it.
+    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, host: host === "rpc" ? undefined : host };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
     this.agents.set(identity.id, { kind: "local", record, run });
     this.persist(record);

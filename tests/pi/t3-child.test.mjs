@@ -38,7 +38,7 @@ function fakeT3(tools, frame = sse) {
       }
       const { name, arguments: args } = message.params;
       calls.push({ name, args, session: request.headers.get("mcp-session-id"), auth: request.headers.get("authorization") });
-      const result = await tools[name](args, calls);
+      const result = name in tools ? await tools[name](args, calls) : failure(`The fake has no ${name} tool.`);
       return new Response(frame({ jsonrpc: "2.0", id: message.id, result }), { headers: { "content-type": "text/event-stream" } });
     },
   });
@@ -404,6 +404,52 @@ describe("the pi agent host: t3 sheet line", () => {
     refuse = false;
     await waitFor(async () => (await listAgents(resumed, ctx))[0].status === "stopped");
     expect(calls.filter((c) => c.name === "task_cancel").length).toBeGreaterThan(1);
+  });
+
+  test("cancelOrphan treats a refused cancel as done only when T3 Code reports the task ended", async () => {
+    let status = "running";
+    fakeT3({ task_cancel: () => failure("Child runtime mode full-access is broader than parent mode approval-required."), task_status: () => reply({ status, summary: null }) });
+    expect(await cancelOrphan({ taskId: "task-1", threadId: "thread-1" })).toBe(false);
+    status = "completed";
+    expect(await cancelOrphan({ taskId: "task-1", threadId: "thread-1" })).toBe(true);
+  });
+
+  test("a restored T3 agent whose cancel T3 Code always refuses reads as stopped once its task has ended", async () => {
+    let status = "running";
+    const { calls } = fakeT3({
+      task_cancel: () => failure("Child runtime mode full-access is broader than parent mode approval-required."),
+      task_status: () => reply({ status, summary: null }),
+    });
+    const { w, pi, ctx } = setup();
+    await pi.call("agent", { description: "in t3", prompt: "x" }, ctx);
+    const gone = w.spawn("sleep", ["0.1"]);
+    await new Promise((resolve) => gone.on("exit", resolve));
+    const record = recordWith(pi.entries[0].data, { agent: { host: "t3", t3ThreadId: "thread-1" }, status: "running", host: "t3", t3TaskId: "task-1", pid: undefined, parentPid: gone.pid });
+    const resumed = await restore(w, [agentEntry(record)]);
+    await waitFor(() => calls.some((c) => c.name === "task_status"));
+    expect((await listAgents(resumed, ctx))[0].status).toBe("running");
+    status = "completed";
+    await waitFor(async () => (await listAgents(resumed, ctx))[0].status === "stopped");
+  });
+
+  test("stop_agent stops waiting after the kill grace when T3 Code accepts the cancel but the thread never settles", async () => {
+    const { calls } = fakeT3({
+      orchestrator_capabilities: capabilities,
+      delegate_task: () => reply(delegated),
+      t3_thread_wait: async () => (await Bun.sleep(20), reply({ timedOut: true })),
+      task_cancel: () => reply({ taskId: "task-1", status: "cancel_requested" }),
+    });
+    const { pi, ctx } = setup({ ...t3Sheet, settings: { killGraceMs: 300 } });
+    await pi.call("agent", { description: "long", prompt: "x", run_in_background: true }, ctx);
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const started = Date.now();
+    const stopped = JSON.parse(resultText(await pi.call("stop_agent", { id: "long" }, ctx)));
+    expect(Date.now() - started).toBeLessThan(3000);
+    expect(stopped.status).toBe("stopped");
+    expect(pi.entries.at(-1).data.finalText).toContain("T3 Code had not settled thread thread-1 300 ms after the cancel of task task-1");
+    const waits = calls.filter((c) => c.name === "t3_thread_wait").length;
+    await Bun.sleep(200);
+    expect(calls.filter((c) => c.name === "t3_thread_wait").length).toBe(waits);
   });
 });
 

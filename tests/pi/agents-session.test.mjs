@@ -130,6 +130,24 @@ describe("registry", () => {
     expect(alive(first.pid)).toBe(false);
   });
 
+  test("a reap that ends after the session is replaced writes nothing to it, and the next look records the agent stopped", async () => {
+    const { w, ctx, host, entries } = await otherPi();
+    const [first] = w.invocations();
+    const exited = exitOf(host);
+    host.kill("SIGKILL");
+    await exited;
+    const resumed = await restore(w, entries);
+    const appendEntry = resumed.api.appendEntry;
+    resumed.api.appendEntry = () => {
+      throw new Error("This extension ctx is stale after session replacement or reload.");
+    };
+    await waitFor(() => !alive(first.pid));
+    await sleep(2 * w.settings.killGraceMs);
+    resumed.api.appendEntry = appendEntry;
+    expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
+    expect(resumed.entries.map((e) => e.data.status)).toEqual(["stopped"]);
+  });
+
   test("an orphan without recorded process identity cannot resume or be signalled until it exits", async () => {
     const { w, ctx, host, entries } = await otherPi();
     const [first] = w.invocations();

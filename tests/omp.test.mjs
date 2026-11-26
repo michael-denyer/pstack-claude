@@ -58,13 +58,15 @@ describe("OMP marketplace plugin", () => {
     const main = before(event, { agent: { kind: "main" } });
     expect(main.systemPrompt[0]).toBe("existing instructions");
     expect(main.systemPrompt[1]).toContain(readFileSync(join(plugin, "hooks/session-start-context.md"), "utf8"));
-    expect(main.systemPrompt[1]).toContain(join(plugin, "skills/poteto-mode/references/omp-tools.md"));
-    expect(main.systemPrompt[1]).toContain(join(plugin, "skills/poteto-mode/SKILL.md"));
-    expect(main.systemPrompt[1]).toContain(join(plugin, "skills/<name>/SKILL.md"));
-    expect(main.systemPrompt[1]).toContain("Do not resolve these names through a bare skill name");
+    expect(main.systemPrompt[1]).toContain("read skill://poteto-mode/references/omp-tools.md");
+    expect(main.systemPrompt[1]).toContain("by reading skill://<name>");
+    expect(main.systemPrompt[1]).toContain("read skill://poteto-mode for pstack:poteto-mode");
+    expect(main.systemPrompt[1]).toContain("skill://<namespace>/<name>");
+    expect(main.systemPrompt[1]).not.toContain(plugin);
     expect(before(main, { agent: { kind: "main" } })).toBeUndefined();
     const child = before(event, { agent: { kind: "sub" } });
     expect(child.systemPrompt[1]).toContain("OMP tool and model mappings");
+    expect(child.systemPrompt[1]).toContain("by reading skill://<name>");
     expect(child.systemPrompt[1]).not.toContain("<EXTREMELY_IMPORTANT>");
     expect(event.systemPrompt).toEqual(["existing instructions"]);
   });
@@ -127,6 +129,15 @@ describe("omp-tools.md", () => {
     });
     expect(missing).toEqual([]);
     expect(mapping).toContain("look under `.omp/skills/verify/` first");
+  });
+
+  test("skills and poteto-mode's agent kickoff resolve through skill:// URLs", () => {
+    const mapping = readFileSync(join(plugin, "skills/poteto-mode/references/omp-tools.md"), "utf8");
+    expect(mapping).toContain("| Invoke the `Skill` tool | Read `skill://<name>` |");
+    expect(mapping).toContain("`Read skill://poteto-mode/worker.md before anything else.`");
+    expect(mapping).toContain("write `skill://poteto-mode`");
+    expect(mapping).toContain("`skill://<namespace>/<name>`");
+    expect(mapping).not.toContain("installed plugin path");
   });
 });
 

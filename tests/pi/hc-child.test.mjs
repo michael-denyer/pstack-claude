@@ -45,7 +45,7 @@ test("a run that ends on a failed message keeps its earlier text and reports the
 test("the env file sets the parent's variables, quoted for sh, and leaves the terminal's own variables to herdr-core", () => {
   const file = join(mkdtempSync(join(tmpdir(), "pstack-hc-env-")), "env");
   const tricky = "it's $HOME `id` \"q\"\nnext line \\ end";
-  writeFileSync(file, envScript({ PSTACK_A: tricky, PSTACK_EMPTY: "", TERM: "dumb", HC_TERMINAL_ID: "t0", "BAD-NAME": "x", PSTACK_UNSET: undefined }));
+  writeFileSync(file, envScript({ PSTACK_A: tricky, PSTACK_EMPTY: "", TERM: "dumb", HC_TERMINAL_ID: "t0", "BAD-NAME": "x", PSTACK_UNSET: undefined }, "HC_"));
   const read = '. "$1" && printf "%s|%s|%s|%s|%s" "$PSTACK_A" "${PSTACK_EMPTY-unset}" "$TERM" "$HC_TERMINAL_ID" "${PSTACK_UNSET-unset}"';
   const result = spawnSync("sh", ["-c", read, "sh", file], { encoding: "utf8", env: { PATH: process.env.PATH, TERM: "xterm", HC_TERMINAL_ID: "t9" } });
   expect(result.stdout).toBe(`${tricky}||xterm|t9|unset`);

@@ -7,7 +7,9 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { AgentRecord, EndedRecord } from "./agents.ts";
 import type { Activity } from "./child.ts";
 
-const NOTICE_TYPE = "pstack-agent";
+export const NOTICE_TYPE = "pstack-agent";
+// The session entry type an agent's record is saved under.
+export const AGENTS_ENTRY = "pstack-agents";
 export const OUTPUT_CAP_BYTES = 50 * 1024;
 
 export function truncateUtf8(text: string, cap: number): string {

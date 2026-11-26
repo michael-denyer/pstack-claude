@@ -6,7 +6,7 @@ import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-wor
 import { type Static, Type } from "typebox";
 import { Value } from "typebox/value";
 
-import { noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-text.ts";
+import { AGENTS_ENTRY, noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
 import { type Activity, type AgentChild, alive, type ChildExit, type Fate, PiChild, terminateGroup } from "./child.ts";
 import { HcChild, pidOfTerminal } from "./hc-child.ts";
@@ -15,7 +15,6 @@ import { loadAgentTypes } from "./agent-files.ts";
 import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
 
-const ENTRY_TYPE = "pstack-agents";
 const STATUS_KEY = "pstack-agents";
 // Claude Code lets agents nest three layers below the main session and withholds
 // the Agent tool at the third.
@@ -502,7 +501,7 @@ export class AgentRunner {
   }
 
   private persist(record: AgentRecord): void {
-    this.pi.appendEntry(ENTRY_TYPE, record);
+    this.pi.appendEntry(AGENTS_ENTRY, record);
   }
 
   private refreshRestored(state: AgentState): AgentState {
@@ -544,7 +543,7 @@ export class AgentRunner {
   // its host identifies as the record's is stopped.
   restore(entries: readonly SessionEntry[]): void {
     for (const entry of entries) {
-      if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE || !Value.Check(recordSchema, entry.data)) continue;
+      if (entry.type !== "custom" || entry.customType !== AGENTS_ENTRY || !Value.Check(recordSchema, entry.data)) continue;
       const { id } = entry.data.agent;
       if (this.agents.get(id)?.kind === "local") continue;
       this.agents.set(id, entry.data.status === "running" ? { kind: "remote", record: entry.data } : { kind: "ended", record: entry.data });

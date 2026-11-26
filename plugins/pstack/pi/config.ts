@@ -71,6 +71,7 @@ interface Sheet {
   agentToolsOff: boolean;
   hcHost: boolean;
   t3Host: boolean;
+  orcaHost: boolean;
   piModels: Map<string, string>;
 }
 
@@ -92,6 +93,7 @@ export function parseSheet(text: string): Sheet {
     agentToolsOff: lines.some((l) => l === "pi agent tools: off"),
     hcHost: lines.some((l) => l === "pi agent host: hc"),
     t3Host: lines.some((l) => l === "pi agent host: t3"),
+    orcaHost: lines.some((l) => l === "pi agent host: orca"),
     piModels,
   };
 }

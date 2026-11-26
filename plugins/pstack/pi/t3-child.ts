@@ -96,7 +96,7 @@ export class T3Child {
     void this.cancel();
   }
 
-  // From the exit hook, which cannot wait for task_cancel's reply: a resumed session cancels the task as an orphan.
+  // The exit hook runs synchronously, so a task_cancel would never go out; a resumed session inside T3 Code cancels the task as an orphan.
   signal(): void {}
 
   private async drive(launch: T3Launch, prompt: string): Promise<ChildExit> {
@@ -171,7 +171,7 @@ export const t3Host = {
   fate: ({ t3TaskId, parentPid }: T3Record): Fate => (t3TaskId === undefined ? "gone" : parentPid !== process.pid && alive(parentPid) ? "kept" : "orphan"),
   reap: async ({ t3TaskId, agent }: T3Record): Promise<Fate> =>
     t3TaskId && agent.t3ThreadId && (await cancelOrphan({ taskId: t3TaskId, threadId: agent.t3ThreadId })) ? "gone" : "orphan",
-  pending: ({ t3TaskId }: T3Record): string => `T3 Code task ${t3TaskId} has not been cancelled`,
+  notEnded: ({ t3TaskId }: T3Record): string => `T3 Code task ${t3TaskId} has not been cancelled`,
 };
 
 async function settled(mcp: T3Mcp, threadId: string, runId?: string): Promise<void> {

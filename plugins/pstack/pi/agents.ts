@@ -26,7 +26,7 @@ const PARENT_SESSION_ENV = "PI_SUBAGENT_PARENT_SESSION";
 
 const endedStatus = Type.Union([Type.Literal("completed"), Type.Literal("failed"), Type.Literal("stopped")]);
 type EndedStatus = Static<typeof endedStatus>;
-// Absent on a record an earlier version wrote, which ran as an RPC child.
+// Absent on a record an earlier version wrote; such an agent runs as an RPC child.
 const hostSchema = Type.Union([Type.Literal("rpc"), Type.Literal("hc"), Type.Literal("t3")]);
 type Host = Static<typeof hostSchema>;
 
@@ -179,11 +179,8 @@ function inspect(pid: number): { parentPid: number; start: string } | undefined 
   return m ? { parentPid: Number(m[1]), start: m[2] } : undefined;
 }
 
-// A process host's run is its process: kept while it is a child of the live pi
-// that launched it, an orphan when it is the process the record was written for
-// (an hc record written before its pid takes the pid and start that hc names for
-// the agent's terminal, in identifyByTerminalName), and gone when no process is
-// there or another one is.
+// A process host's run is the process the record names by pid and start time. An
+// hc record written before its pid takes both from hc, in identifyByTerminalName.
 function processFate(record: RunningRecord): Fate {
   const { pid, pidStart, parentPid } = record;
   if (pid === undefined || !alive(pid)) return "gone";
@@ -210,16 +207,13 @@ async function reapProcess(record: RunningRecord, killGraceMs: number): Promise<
   return processFate(record);
 }
 
-// What a host knows about a restored run that the runner does not.
 interface HostPolicy {
   fate(record: RunningRecord): Fate;
-  // Stops an orphan's run and reports what is left of it.
   reap(record: RunningRecord, killGraceMs: number): Promise<Fate>;
-  // Why a restored run that is not known to have ended keeps the agent unavailable.
-  pending(record: RunningRecord): string;
+  notEnded(record: RunningRecord): string;
 }
 
-const processHost: HostPolicy = { fate: processFate, reap: reapProcess, pending: ({ pid }) => `previous process (pid ${pid}) has not exited` };
+const processHost: HostPolicy = { fate: processFate, reap: reapProcess, notEnded: ({ pid }) => `previous process (pid ${pid}) has not exited` };
 const hosts: Record<Host, HostPolicy> = { rpc: processHost, hc: processHost, t3: t3Host };
 const hostOf = (record: RunningRecord): HostPolicy => hosts[record.host ?? "rpc"];
 
@@ -270,7 +264,7 @@ export class AgentRunner {
     mkdirSync(sessionDir, { recursive: true });
     const systemPromptFile = def.body ? join(state, "prompts", `${id}.md`) : undefined;
     const worktree = params.isolation === "worktree" ? planWorktree(ctx.cwd, id) : undefined;
-    // T3 Code runs a task in its thread's folder, not in a worktree.
+    // delegate_task runs a task in the session thread's folder, never in the agent's worktree.
     const host: Host = sheet?.t3Host && t3Session() && !worktree ? "t3" : sheet?.hcHost && process.env.HC_TERMINAL_ID ? "hc" : "rpc";
     const identity: AgentIdentity = {
       id,
@@ -450,7 +444,7 @@ export class AgentRunner {
       throw new Error(`Agent ${state.record.agent.id} is running under another pi process (pid ${state.record.parentPid}); only that process can message or stop it.`);
     }
     if (state.kind === "unverified" || state.kind === "interrupted") {
-      throw new Error(`Agent ${state.record.agent.id}'s ${hostOf(state.record).pending(state.record)}; it cannot resume or be stopped here until its exit is confirmed.`);
+      throw new Error(`Agent ${state.record.agent.id}'s ${hostOf(state.record).notEnded(state.record)}; it cannot resume or be stopped here until its exit is confirmed.`);
     }
     return state;
   }
@@ -544,8 +538,8 @@ export class AgentRunner {
     return ended;
   }
 
-  // A restored run stays unavailable until its host confirms it ended. Only a
-  // run its host identifies as the record's is stopped.
+  // A restored run stays unavailable until its host reports it gone. Only a run
+  // its host identifies as the record's is stopped.
   restore(entries: readonly SessionEntry[]): void {
     for (const entry of entries) {
       if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE || !Value.Check(recordSchema, entry.data)) continue;

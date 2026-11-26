@@ -114,6 +114,24 @@ Affected skill entry points point here. Most skills need only the tables above. 
 
 `skills/poteto-mode/scripts/` ships the `watch-pr` PR watcher and `worktree-audit.mjs`. The `watch-pr/ship-pr` command owns pending-merge inspection and cancellation; `resume.mjs` owns the shared checkpoint locator described in [Resume storage](resume-storage.md). These scripts use bun and Node.js and run the same on Codex; invoke them through `shell`. They need `bun` and `gh`, or `origin` when the forge is Origin. Run `worktree-audit.mjs` with `node`, as its shebang does. The audit follows each link in a worktree's ancestor directories with `stat` and matches it by the directory it lands on, under bun and node alike. A worktree whose own path bun cannot resolve loses its last chat and lands in `review`. A dangling or looping link is ignored. Any other link that `stat` cannot follow puts every worktree under the link's directory in `review`, with a warning that names the link. `worktree-audit.mjs` scans Codex sessions under `$CODEX_HOME/sessions` and `$CODEX_HOME/archived_sessions` (default `~/.codex`), along with any Claude Code or Pi transcript directory that exists. It imports the transcript walker from `skills/reflect/scripts/find-transcript.mjs`, so keep the `reflect` skill installed beside `poteto-mode`.
 
+## Sandbox writes under the Git common directory
+
+The `workspace-write` sandbox makes `.git` read-only inside each writable root. A linked worktree's Git common directory is outside its writable roots. [Resume storage](resume-storage.md) keeps checkpoints under the common directory, so `resume.mjs begin`, the note and artifact writes into the checkpoint directory, and `resume.mjs publish` fail there with `EPERM`. `resume.mjs read` only reads, so it works in the sandbox. Treat any other pstack write under the Git common directory the same way.
+
+- With approval policy `on-request`, run each of those writes as a `shell` command with `sandbox_permissions: "require_escalated"` and a `justification` that asks the user to allow saving the pstack checkpoint.
+- With approval policy `never`, Codex rejects escalated commands. To save checkpoints in unattended runs, the user defines a permissions profile in `~/.codex/config.toml` that grants the store, one line per repository. The path is the `pstack` folder inside the directory that `git rev-parse --path-format=absolute --git-common-dir` prints.
+
+  ```toml
+  [permissions.pstack]
+  extends = ":workspace"
+
+  [permissions.pstack.filesystem]
+  "/absolute/path/to/repo/.git/pstack" = "write"
+  ```
+
+  Select the profile for each run with `codex exec -c 'default_permissions="pstack"'`, and leave out `-s`/`--sandbox`, which overrides the profile and drops the grant. A profile ignores the `[sandbox_workspace_write]` table, such as its `writable_roots` and `network_access`, so put any setting the run needs into the profile. A relative `.git/pstack` entry under `":project_roots"` works only in a primary checkout. In a linked worktree `.git` is a file, and Codex cannot start the sandbox for any command.
+- If neither route is available, tell the user the checkpoint was not saved. A failed `begin` or `publish` is not a ready checkpoint.
+
 ## Instructions file
 
 Where a pstack skill says "your instructions file", on Codex that is `AGENTS.md` (project root, plus `~/.codex/AGENTS.md` global). On Claude Code it is `CLAUDE.md`.

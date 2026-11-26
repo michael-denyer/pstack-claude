@@ -284,11 +284,11 @@ describe("the pi agent host: t3 sheet line", () => {
     expect(calls).toEqual([]);
   });
 
-  test("stop_agent on an agent whose task T3 Code will not cancel returns stopped with T3 Code's refusal, and the session can close", async () => {
+  test("stop_agent on an agent whose task T3 Code will not cancel returns stopped with T3 Code's refusal, and waits no more", async () => {
     const { calls } = fakeT3({
       orchestrator_capabilities: capabilities,
       delegate_task: () => reply(delegated),
-      t3_thread_wait: () => new Promise(() => {}),
+      t3_thread_wait: async () => (await Bun.sleep(20), reply({ timedOut: true })),
       task_cancel: () => failure("Child runtime mode full-access is broader than parent mode approval-required."),
     });
     const { pi, ctx } = setup(t3Sheet);
@@ -300,6 +300,9 @@ describe("the pi agent host: t3 sheet line", () => {
     expect(record).toMatchObject({ status: "stopped" });
     expect(record.finalText).toContain("T3 Code did not cancel task task-1, so thread thread-1 may still be running");
     expect(record.finalText).toContain("broader than parent mode");
+    const waits = calls.filter((c) => c.name === "t3_thread_wait").length;
+    await Bun.sleep(200);
+    expect(calls.filter((c) => c.name === "t3_thread_wait").length).toBe(waits);
     await pi.emit("session_shutdown", {}, ctx);
   });
 

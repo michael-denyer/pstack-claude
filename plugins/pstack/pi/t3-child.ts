@@ -74,13 +74,10 @@ export class T3Child {
   private settled = false;
   private ending = false;
   private cancelled?: Promise<void>;
-  private readonly refused: Promise<never>;
-  private refuse!: (e: Error) => void;
+  private readonly refused = new AbortController();
 
   constructor(session: T3Session, launch: T3Launch, prompt: string) {
-    this.mcp = new T3Mcp(session);
-    this.refused = new Promise<never>((_, reject) => (this.refuse = reject));
-    this.refused.catch(() => undefined);
+    this.mcp = new T3Mcp(session, this.refused.signal);
     this.exited = this.drive(launch, prompt);
   }
 
@@ -108,7 +105,7 @@ export class T3Child {
     try {
       const { threadId, runId } = await this.start(launch, prompt);
       if (this.ending) await this.cancel();
-      await Promise.race([settled(this.mcp, threadId, runId), this.refused]);
+      await settled(this.mcp, threadId, runId);
       const { status, summary } = await this.mcp.call(taskResult, "task_status", { taskId: this.taskId });
       this.settled = status === "completed";
       const text = summary ?? "";
@@ -151,7 +148,7 @@ export class T3Child {
     if (taskId === undefined) return;
     this.cancelled ??= this.mcp.call(Type.Unknown(), "task_cancel", { taskId, reason: "stop_agent" }).then(
       () => undefined,
-      (e: Error) => this.refuse(new Error(`T3 Code did not cancel task ${taskId}, so thread ${threadId} may still be running: ${e.message}`)),
+      (e: Error) => this.refused.abort(new Error(`T3 Code did not cancel task ${taskId}, so thread ${threadId} may still be running: ${e.message}`)),
     );
     return this.cancelled;
   }
@@ -191,7 +188,10 @@ class T3Mcp {
   private sessionId?: string;
   private ready?: Promise<unknown>;
 
-  constructor(private readonly session: T3Session) {}
+  constructor(
+    private readonly session: T3Session,
+    private readonly signal?: AbortSignal,
+  ) {}
 
   async call<T extends TSchema>(schema: T, name: string, args: Record<string, unknown>): Promise<Static<T>> {
     this.ready ??= this.request("initialize", { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: "pstack", version: "1" } }).then(() =>
@@ -224,7 +224,7 @@ class T3Mcp {
       "mcp-protocol-version": PROTOCOL,
       ...(this.sessionId && { "mcp-session-id": this.sessionId }),
     };
-    const response = await fetch(this.session.endpoint, { method: "POST", headers, body: JSON.stringify(message) });
+    const response = await fetch(this.session.endpoint, { method: "POST", headers, body: JSON.stringify(message), signal: this.signal });
     this.sessionId = response.headers.get("mcp-session-id") ?? this.sessionId;
     return response;
   }

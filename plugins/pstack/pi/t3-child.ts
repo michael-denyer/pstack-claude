@@ -80,7 +80,7 @@ export class T3Child {
   private readonly onStart: (task: T3Task) => void;
   private threadId?: string;
   private taskId?: string;
-  private readonly runs: (string | undefined)[] = [];
+  private runId?: string;
   private steers: Promise<unknown> = Promise.resolve();
   private done = false;
   private ending = false;
@@ -96,15 +96,16 @@ export class T3Child {
   async steer(message: string): Promise<{ response: { success: boolean } | undefined; taken: boolean }> {
     const threadId = this.threadId;
     if (this.done || threadId === undefined) return { response: undefined, taken: false };
-    const send = this.mcp.call(sent, "t3_thread_send", { threadId, message, mode: "steer" }, this.stopWaiting.signal).then(({ taskId, runId, delivery }) => {
+    const send = this.steers.then(async () => {
+      const { taskId, runId, delivery } = await this.mcp.call(sent, "t3_thread_send", { threadId, message, mode: "steer" }, this.stopWaiting.signal);
       if (delivery === "steered") return;
-      this.runs.push(runId);
+      this.runId = runId;
       if (!taskId) return;
       this.taskId = taskId;
       this.onStart({ threadId, taskId });
       if (this.ending) void this.cancel();
     });
-    this.steers = Promise.allSettled([this.steers, send]);
+    this.steers = send.catch(() => undefined);
     try {
       await send;
       return { response: { success: true }, taken: true };
@@ -132,7 +133,7 @@ export class T3Child {
       do {
         steers = this.steers;
         await steers;
-        for (const runId of this.runs) await settled(this.mcp, threadId, runId, this.stopWaiting.signal);
+        await settled(this.mcp, threadId, this.runId, this.stopWaiting.signal);
         result = await this.mcp.call(taskResult, "task_status", { taskId: this.taskId });
       } while (steers !== this.steers);
       this.done = true;
@@ -152,7 +153,7 @@ export class T3Child {
       const { taskId, runId } = await this.mcp.call(sent, "t3_thread_send", { threadId: launch.threadId, message: prompt, mode: "auto" });
       if (!taskId) throw new Error(`T3 Code took the message in thread ${launch.threadId} without starting a task.`);
       this.taskId = taskId;
-      this.runs.push(runId);
+      this.runId = runId;
       launch.onStart({ threadId: launch.threadId, taskId });
       return launch.threadId;
     }
@@ -161,7 +162,7 @@ export class T3Child {
     const task = await this.mcp.call(delegated, "delegate_task", { task: prompt, title: launch.title, target, mode: "async", clientRequestId: launch.requestId });
     this.threadId = task.childThreadId;
     this.taskId = task.taskId;
-    this.runs.push(task.childRunId ?? undefined);
+    this.runId = task.childRunId ?? undefined;
     launch.onStart({ threadId: task.childThreadId, taskId: task.taskId });
     return task.childThreadId;
   }

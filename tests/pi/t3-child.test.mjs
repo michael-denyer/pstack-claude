@@ -198,20 +198,21 @@ describe("T3Child", () => {
     expect(Date.now() - at).toBeLessThan(2000);
   });
 
-  test("two queued steers whose answers come back out of order both run before the run ends, with the last turn's reply", async () => {
-    let answerFirst;
-    const firstHeld = new Promise((resolve) => (answerFirst = resolve));
+  test("two queued steers go to T3 Code one at a time, and the run ends with the last queued turn's reply", async () => {
     let sends = 0;
+    let answered = 0;
     let lastRunDone = false;
     const { session, calls } = fakeT3({
       delegate_task: () => reply(delegated),
       t3_thread_send: async () => {
-        if (++sends === 1) return (await firstHeld, reply({ threadId: "thread-1", runId: "run-2", status: "queued", delivery: "queued" }));
-        setTimeout(answerFirst, 20);
-        return reply({ threadId: "thread-1", runId: "run-3", status: "queued", delivery: "queued" });
+        const n = ++sends;
+        if (n === 1) await Bun.sleep(30);
+        const answer = reply({ threadId: "thread-1", runId: `run-${n + 1}`, status: "queued", delivery: "queued" });
+        answered++;
+        return answer;
       },
       t3_thread_wait: async ({ runId }) => {
-        if (runId === "run-1") await waitFor(() => sends === 2);
+        if (runId === "run-1") await waitFor(() => answered === 2);
         if (runId === "run-3") lastRunDone = true;
         return reply({ timedOut: false });
       },
@@ -219,10 +220,32 @@ describe("T3Child", () => {
     });
     const child = new T3Child(session, { title: "probe", onStart: () => {} }, "work");
     await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
-    const first = child.steer("/a first");
-    await waitFor(() => sends === 1);
-    await Promise.all([first, child.steer("/b second")]);
+    await Promise.all([child.steer("/a first"), child.steer("/b second")]);
     expect(await child.exited).toMatchObject({ settled: true, finalText: "reply to /b" });
+    expect(calls.filter((c) => c.name === "t3_thread_wait").map((c) => c.args.runId)).toEqual(["run-1", "run-3"]);
+  });
+
+  test("two steers that T3 Code starts as new turns leave the run on the task of the later one, even when the earlier answer is slow", async () => {
+    let sends = 0;
+    let releaseRun;
+    const run = new Promise((resolve) => (releaseRun = resolve));
+    const { session, calls } = fakeT3({
+      delegate_task: () => reply(delegated),
+      t3_thread_send: async () => {
+        const n = ++sends;
+        if (n === 1) await Bun.sleep(30);
+        return reply({ threadId: "thread-1", taskId: `task-${n + 1}`, runId: `run-${n + 1}`, status: "starting", delivery: "started" });
+      },
+      t3_thread_wait: async ({ runId }) => (runId === "run-1" && (await run), reply({ timedOut: false })),
+      task_status: ({ taskId }) => reply({ status: "completed", summary: taskId }),
+    });
+    const started = [];
+    const child = new T3Child(session, { title: "probe", onStart: (task) => started.push(task.taskId) }, "work");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    await Promise.all([child.steer("first"), child.steer("second")]);
+    releaseRun();
+    expect(await child.exited).toMatchObject({ settled: true, finalText: "task-3" });
+    expect(started).toEqual(["task-1", "task-2", "task-3"]);
   });
 
   test("an end before T3 Code answers the launch cancels the task once it has one", async () => {
@@ -409,6 +432,7 @@ describe("the pi agent host: t3 sheet line", () => {
     await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
     const sent = await pi.call("send_message", { to: "long", message: "/note more" }, ctx);
     expect(sent.details.running).toBe(true);
+    expect(resultText(sent)).toContain("once its current turn ends");
     await waitFor(() => pi.entries.at(-1).data.status === "completed");
     expect(calls.filter((c) => c.name === "t3_thread_send").map((c) => [c.args.mode, c.args.message])).toEqual([["steer", "/note more"]]);
     expect(pi.entries.at(-1).data.finalText).toBe("the queued reply");

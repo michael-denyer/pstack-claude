@@ -15,6 +15,7 @@ const STARTUP_POLL_MS = 500;
 const GET_TIMEOUT_MS = 2000;
 const NOT_THE_CHILD = new Set(["timeout", "message"]);
 const TERMINAL_VARS = new Set(["COLORTERM", "TERM", "TERM_PROGRAM", "PWD", "OLDPWD", "SHLVL", "_"]);
+const READONLY_VARS = new Set(["BASHOPTS", "BASH_VERSINFO", "EUID", "PPID", "SHELLOPTS", "UID"]);
 const LOAD_ENV = '. "$1" && rm -- "$1" && shift && exec "$@"';
 
 const waitResult = Type.Object({
@@ -164,7 +165,7 @@ export class HcChild {
 
 export function envScript(env: NodeJS.ProcessEnv, terminalPrefix: string): string {
   return Object.entries(env)
-    .filter(([name, value]) => value !== undefined && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !name.startsWith(terminalPrefix) && !TERMINAL_VARS.has(name))
+    .filter(([name, value]) => value !== undefined && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !name.startsWith(terminalPrefix) && !TERMINAL_VARS.has(name) && !READONLY_VARS.has(name))
     .map(([name, value]) => `export ${name}='${(value ?? "").replaceAll("'", "'\\''")}'\n`)
     .join("");
 }

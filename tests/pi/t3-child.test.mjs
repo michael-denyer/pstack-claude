@@ -184,6 +184,21 @@ describe("T3Child", () => {
     expect(exit.errorMessage).toBe("T3 Code delegate_task answered: Task queued, no id yet.");
   });
 
+  test("a cancel that T3 Code refuses once the run has finished keeps the run's summary", async () => {
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    const { session, calls } = fakeT3({
+      delegate_task: () => reply(delegated),
+      t3_thread_wait: () => reply({ timedOut: false }),
+      task_status: async () => (await held, reply({ status: "completed", summary: "the answer" })),
+      task_cancel: () => (setTimeout(release, 20), failure("Task task-1 already completed.")),
+    });
+    const child = new T3Child(session, { title: "probe", onStart: () => {} }, "x");
+    await waitFor(() => calls.some((c) => c.name === "task_status"));
+    child.end();
+    expect(await child.exited).toMatchObject({ settled: true, finalText: "the answer" });
+  });
+
   test("signal from the exit hook sends T3 Code nothing", async () => {
     const { session, calls } = fakeT3({
       delegate_task: () => reply(delegated),
@@ -212,6 +227,8 @@ describe("T3Child", () => {
     expect(await cancelOrphan({ taskId: "task-1", threadId: "thread-1" })).toBe(true);
     expect(calls.map((c) => [c.name, c.args.taskId ?? c.args.threadId])).toEqual([["task_cancel", "task-1"], ["t3_thread_wait", "thread-1"]]);
     fakeT3({ task_cancel: () => failure("T3 Code is restarting.") });
+    expect(await cancelOrphan({ taskId: "task-1", threadId: "thread-1" })).toBe(false);
+    fakeT3({ task_cancel: () => ({ content: [{ type: "text", text: "Cancelled." }] }) });
     expect(await cancelOrphan({ taskId: "task-1", threadId: "thread-1" })).toBe(false);
     for (const name of T3_ENV) delete process.env[name];
     expect(await cancelOrphan({ taskId: "task-1", threadId: "thread-1" })).toBe(false);

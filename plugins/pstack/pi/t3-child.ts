@@ -77,7 +77,7 @@ export class T3Child {
   private readonly refused = new AbortController();
 
   constructor(session: T3Session, launch: T3Launch, prompt: string) {
-    this.mcp = new T3Mcp(session, this.refused.signal);
+    this.mcp = new T3Mcp(session);
     this.exited = this.drive(launch, prompt);
   }
 
@@ -103,7 +103,7 @@ export class T3Child {
     try {
       const { threadId, runId } = await this.start(launch, prompt);
       if (this.ending) await this.cancel();
-      await settled(this.mcp, threadId, runId);
+      await settled(this.mcp, threadId, runId, this.refused.signal);
       const { status, summary } = await this.mcp.call(taskResult, "task_status", { taskId: this.taskId });
       this.settled = status === "completed";
       const text = summary ?? "";
@@ -174,9 +174,9 @@ export const t3Host = {
   notEnded: ({ t3TaskId }: T3Record): string => `T3 Code task ${t3TaskId} has not been cancelled`,
 };
 
-async function settled(mcp: T3Mcp, threadId: string, runId?: string): Promise<void> {
+async function settled(mcp: T3Mcp, threadId: string, runId?: string, signal?: AbortSignal): Promise<void> {
   for (;;) {
-    const { timedOut } = await mcp.call(waited, "t3_thread_wait", { threadId, ...(runId && { runId }), timeoutMs: WAIT_MS, untilDelegatedWorkSettled: true });
+    const { timedOut } = await mcp.call(waited, "t3_thread_wait", { threadId, ...(runId && { runId }), timeoutMs: WAIT_MS, untilDelegatedWorkSettled: true }, signal);
     if (!timedOut) return;
   }
 }
@@ -186,27 +186,24 @@ class T3Mcp {
   private sessionId?: string;
   private ready?: Promise<unknown>;
 
-  constructor(
-    private readonly session: T3Session,
-    private readonly signal?: AbortSignal,
-  ) {}
+  constructor(private readonly session: T3Session) {}
 
-  async call<T extends TSchema>(schema: T, name: string, args: Record<string, unknown>): Promise<Static<T>> {
+  async call<T extends TSchema>(schema: T, name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<Static<T>> {
     this.ready ??= this.request("initialize", { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: "pstack", version: "1" } }).then(() =>
       this.post({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }),
     );
     await this.ready;
-    const result = await this.request("tools/call", { name, arguments: args });
+    const result = await this.request("tools/call", { name, arguments: args }, signal);
     if (!Value.Check(toolResult, result)) throw new Error(`T3 Code ${name} answered: ${JSON.stringify(result).slice(0, 300)}`);
     const text = result.content?.find((part) => part.type === "text")?.text ?? "";
     if (result.isError) throw new Error(`T3 Code ${name} failed: ${text.slice(0, 1000)}`);
     const value = result.structuredContent ?? parseJson(text);
-    if (!Value.Check(schema, value)) throw new Error(`T3 Code ${name} answered: ${text.slice(0, 300)}`);
+    if (value === undefined || !Value.Check(schema, value)) throw new Error(`T3 Code ${name} answered: ${text.slice(0, 300)}`);
     return value;
   }
 
-  private async request(method: string, params: unknown): Promise<unknown> {
-    const response = await this.post({ jsonrpc: "2.0", id: this.nextId++, method, params });
+  private async request(method: string, params: unknown, signal?: AbortSignal): Promise<unknown> {
+    const response = await this.post({ jsonrpc: "2.0", id: this.nextId++, method, params }, signal);
     const body = await response.text();
     if (!response.ok) throw new Error(`T3 Code MCP ${method} failed (${response.status}): ${body.slice(0, 300)}`);
     const reply = rpcReply(body, response.headers.get("content-type") ?? "");
@@ -214,7 +211,7 @@ class T3Mcp {
     return reply.result;
   }
 
-  private async post(message: unknown): Promise<Response> {
+  private async post(message: unknown, signal?: AbortSignal): Promise<Response> {
     const headers: Record<string, string> = {
       accept: "application/json, text/event-stream",
       authorization: `Bearer ${this.session.token}`,
@@ -222,7 +219,7 @@ class T3Mcp {
       "mcp-protocol-version": PROTOCOL,
       ...(this.sessionId && { "mcp-session-id": this.sessionId }),
     };
-    const response = await fetch(this.session.endpoint, { method: "POST", headers, body: JSON.stringify(message), signal: this.signal });
+    const response = await fetch(this.session.endpoint, { method: "POST", headers, body: JSON.stringify(message), signal });
     this.sessionId = response.headers.get("mcp-session-id") ?? this.sessionId;
     return response;
   }

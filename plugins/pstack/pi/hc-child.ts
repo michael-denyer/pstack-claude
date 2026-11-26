@@ -1,4 +1,4 @@
-import { execFile, spawn } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import { readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
@@ -11,6 +11,8 @@ const execHc = promisify(execFile);
 const SCREEN_LINES = "30";
 const CLOSE_POLL_MS = 200;
 const STARTUP_POLL_MS = 500;
+// hc answers a get in milliseconds. pidOfTerminal waits for it synchronously, so it gives up on a core that never answers.
+const GET_TIMEOUT_MS = 2000;
 const NOT_THE_CHILD = new Set(["timeout", "message"]);
 const TERMINAL_VARS = new Set(["COLORTERM", "TERM", "TERM_PROGRAM", "PWD", "OLDPWD", "SHLVL", "_"]);
 const LOAD_ENV = '. "$1" && rm -- "$1" && shift && exec "$@"';
@@ -180,8 +182,21 @@ export function replyIn(file: string | undefined, from: number): Pick<ChildExit,
   return reply;
 }
 
+export function pidOfTerminal(name: string): number | undefined {
+  const args = ["get", "--json", name];
+  try {
+    return answer(getResult, args, execFileSync("hc", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: GET_TIMEOUT_MS })).pid ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function hc<T extends TSchema>(schema: T, args: string[]): Promise<Static<T>> {
   const { stdout } = await execHc("hc", args);
+  return answer(schema, args, stdout);
+}
+
+function answer<T extends TSchema>(schema: T, args: string[], stdout: string): Static<T> {
   const result: unknown = JSON.parse(stdout.trim().split("\n").at(-1) ?? "");
   if (!Value.Check(schema, result)) throw new Error(`hc ${args[0]} answered: ${stdout.trim().slice(0, 300)}`);
   return result;

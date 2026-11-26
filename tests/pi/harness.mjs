@@ -229,4 +229,18 @@ export function alive(pid) {
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Runs fn with env's variables set, then puts back what was there, unset ones included.
+export async function withEnv(env, fn) {
+  const saved = Object.fromEntries(Object.keys(env).map((name) => [name, process.env[name]]));
+  Object.assign(process.env, env);
+  try {
+    return await fn();
+  } finally {
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
+
 export const readEntries = (file) => readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));

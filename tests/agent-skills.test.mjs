@@ -463,4 +463,14 @@ describe("Codex model names", () => {
     }
     for (const family of raw.available) expect(section).not.toContain(`\`${family}\``);
   });
+
+  test("diverse-model panels fall back to varied effort when the spawn schema has no model field", () => {
+    const raw = JSON.parse(readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8"));
+    const panelLine = codexModelNamesSection(resolveModels(raw))
+      .split("\n")
+      .find((line) => line.startsWith("- Diverse-model panels"));
+    expect(panelLine).toContain(
+      "or `spawn_agent` exposes no `model` field, vary reasoning effort where the schema has `reasoning_effort`",
+    );
+  });
 });

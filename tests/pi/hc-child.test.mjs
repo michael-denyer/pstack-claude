@@ -170,7 +170,7 @@ suite("HcChild on a live hc core", () => {
   test(
     "end stops a working run within the grace period and removes its terminal",
     async () => {
-      const { child, name } = launch("Run `ping -c 90 127.0.0.1 > /dev/null` with bash and wait for it to finish, then say done.");
+      const { child, name } = launch("Run `sleep 90` with bash and wait for it to finish, then say done.");
       await Bun.sleep(10_000);
       const started = Date.now();
       child.end(GRACE);

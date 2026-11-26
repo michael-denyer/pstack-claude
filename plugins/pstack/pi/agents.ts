@@ -9,7 +9,7 @@ import { Value } from "typebox/value";
 import { noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
 import { type Activity, type AgentChild, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
-import { HcChild } from "./hc-child.ts";
+import { HcChild, pidOfTerminal } from "./hc-child.ts";
 import { cancelOrphan, t3Brief, T3_ENV_REMOVED, T3Child, t3Session, type T3Task } from "./t3-child.ts";
 import { loadAgentTypes } from "./agent-files.ts";
 import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
@@ -177,7 +177,9 @@ function inspect(pid: number): { parentPid: number; start: string } | undefined 
 
 // What became of the process a running record names:
 // - kept: it is still a child of the live pi process that launched it;
-// - orphan: it is the process the record was written for, its launcher gone;
+// - orphan: it is the process the record was written for, its launcher gone
+//   (an hc record written before its pid takes the pid and start that hc names
+//   for the agent's terminal, in identifyByTerminalName);
 // - unknown: a process is there, and nothing says whether it is the agent's;
 // - gone: no process is there, or another one is.
 type Fate = "kept" | "orphan" | "unknown" | "gone";
@@ -194,6 +196,12 @@ function fateOf(record: RunningRecord): Fate {
   const launcherHasIt = info && record.host !== "hc" ? info.parentPid === parentPid : alive(parentPid);
   if (parentPid !== process.pid && launcherHasIt) return "kept";
   return info && info.start === pidStart ? "orphan" : "unknown";
+}
+
+function identifyByTerminalName(record: RunningRecord): RunningRecord {
+  if (record.host !== "hc" || record.pid !== undefined) return record;
+  const pid = pidOfTerminal(record.agent.id);
+  return pid === undefined ? record : { ...record, pid, pidStart: inspect(pid)?.start };
 }
 
 // Stops an orphan, by its group so the bash command it has running goes too.
@@ -287,7 +295,7 @@ export class AgentRunner {
     }
     const child = this.spawnChild(identity, prompt, !this.agents.has(identity.id));
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
-    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid };
+    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, host: child instanceof HcChild ? "hc" : undefined };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
     this.agents.set(identity.id, { kind: "local", record, run });
     this.persist(record);
@@ -321,7 +329,7 @@ export class AgentRunner {
         envFile: join(identity.sessionDir, `${identity.id}.env`),
         graceMs: this.settings.killGraceMs,
         transcript: () => sessionFile(identity),
-        onStart: (pid) => this.track(identity.id, { host: "hc", pid, pidStart: inspect(pid)?.start }),
+        onStart: (pid) => this.track(identity.id, { pid, pidStart: inspect(pid)?.start }),
       }, prompt);
     }
     return new PiChild(command, [...base, "--mode", "rpc", ...flags], { cwd: identity.cwd, env, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() }, prompt);
@@ -527,6 +535,9 @@ export class AgentRunner {
       if (this.agents.get(id)?.kind === "local") continue;
       this.agents.set(id, entry.data.status === "running" ? { kind: "remote", record: entry.data } : { kind: "ended", record: entry.data });
     }
-    for (const state of this.agents.values()) this.refreshRestored(state);
+    for (const state of this.agents.values()) {
+      if (state.kind === "remote") state.record = identifyByTerminalName(state.record);
+      this.refreshRestored(state);
+    }
   }
 }

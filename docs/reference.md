@@ -153,7 +153,7 @@ Family names such as `opus` resolve through the `pi` block of [`models.json`](..
 
 #### Agent hosts
 
-The extension picks an agent's host when the agent starts and records it, and every later run of the agent uses that host. A `pi agent host: t3` line wins for an agent without a worktree inside T3 Code, then a `pi agent host: hc` line inside herdr-core, and otherwise the agent is an RPC child. The sheet can carry both lines. Each line affects only agents started after it is added.
+The extension picks an agent's host when the agent starts and records it, and every later run of the agent uses that host, except that an hc agent messaged outside herdr-core runs that turn as an RPC child. A `pi agent host: t3` line wins for an agent without a worktree inside T3 Code, then a `pi agent host: hc` line inside herdr-core, and otherwise the agent is an RPC child. The sheet can carry both lines. Each line affects only agents started after it is added.
 
 **RPC.** The default: a hidden `pi --mode rpc` process, as described above. A record written before hosts were recorded reads as RPC.
 

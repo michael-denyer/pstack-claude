@@ -24,7 +24,9 @@ const reply = (value) => ({ content: [{ type: "text", text: JSON.stringify(value
 const failure = (message) => ({ content: [{ type: "text", text: JSON.stringify({ _tag: "OrchestratorMcpFailure", message }) }], isError: true });
 const delegated = { taskId: "task-1", childThreadId: "thread-1", childRunId: "run-1" };
 
-function fakeT3(tools) {
+const sse = (reply) => `event: message\ndata: ${JSON.stringify(reply)}\n\n`;
+
+function fakeT3(tools, frame = sse) {
   const calls = [];
   server = Bun.serve({
     port: 0,
@@ -37,7 +39,7 @@ function fakeT3(tools) {
       const { name, arguments: args } = message.params;
       calls.push({ name, args, session: request.headers.get("mcp-session-id"), auth: request.headers.get("authorization") });
       const result = await tools[name](args, calls);
-      return new Response(`event: message\ndata: ${JSON.stringify({ jsonrpc: "2.0", id: message.id, result })}\n\n`, { headers: { "content-type": "text/event-stream" } });
+      return new Response(frame({ jsonrpc: "2.0", id: message.id, result }), { headers: { "content-type": "text/event-stream" } });
     },
   });
   const session = { endpoint: `http://127.0.0.1:${server.port}/mcp`, token: "tok" };
@@ -168,6 +170,31 @@ describe("T3Child", () => {
     answer();
     expect((await child.exited).settled).toBe(false);
     expect(calls.map((c) => c.name)).toEqual(["delegate_task", "task_cancel", "t3_thread_wait", "task_status"]);
+  });
+
+  test("a reply split over several data lines with CRLF line endings, after a notification, is read whole", async () => {
+    const crlf = (reply) => `: ping\r\ndata: {"jsonrpc": "2.0", "method": "notifications/message"}\r\n\r\nevent: message\r\n${JSON.stringify(reply, null, 2).split("\n").map((line) => `data: ${line}`).join("\r\n")}\r\n\r\n`;
+    const { session } = fakeT3(completing(), crlf);
+    expect(await new T3Child(session, { title: "probe", onStart: () => {} }, "x").exited).toMatchObject({ settled: true, finalText: "the answer" });
+  });
+
+  test("a tool answer that is not JSON is an error naming the tool and the answer", async () => {
+    const { session } = fakeT3({ delegate_task: () => ({ content: [{ type: "text", text: "Task queued, no id yet." }] }) });
+    const exit = await new T3Child(session, { title: "probe", onStart: () => {} }, "x").exited;
+    expect(exit.errorMessage).toBe("T3 Code delegate_task answered: Task queued, no id yet.");
+  });
+
+  test("signal from the exit hook sends T3 Code nothing", async () => {
+    const { session, calls } = fakeT3({
+      delegate_task: () => reply(delegated),
+      t3_thread_wait: async () => (await Bun.sleep(20), reply({ timedOut: true })),
+      task_cancel: () => reply({ taskId: "task-1", status: "cancel_requested" }),
+    });
+    const child = new T3Child(session, { title: "probe", onStart: () => {} }, "x");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    child.signal("SIGTERM");
+    await Bun.sleep(50);
+    expect(calls.some((c) => c.name === "task_cancel")).toBe(false);
   });
 
   test("a T3 error becomes the run's error message", async () => {

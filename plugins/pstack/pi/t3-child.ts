@@ -96,10 +96,8 @@ export class T3Child {
     void this.cancel();
   }
 
-  // From the exit hook, which cannot wait for a reply: a resumed session cancels the task instead.
-  signal(): void {
-    this.end();
-  }
+  // From the exit hook, which cannot wait for task_cancel's reply: a resumed session cancels the task as an orphan.
+  signal(): void {}
 
   private async drive(launch: T3Launch, prompt: string): Promise<ChildExit> {
     try {
@@ -202,7 +200,7 @@ class T3Mcp {
     if (!Value.Check(toolResult, result)) throw new Error(`T3 Code ${name} answered: ${JSON.stringify(result).slice(0, 300)}`);
     const text = result.content?.find((part) => part.type === "text")?.text ?? "";
     if (result.isError) throw new Error(`T3 Code ${name} failed: ${text.slice(0, 1000)}`);
-    const value = result.structuredContent ?? JSON.parse(text);
+    const value = result.structuredContent ?? parseJson(text);
     if (!Value.Check(schema, value)) throw new Error(`T3 Code ${name} answered: ${text.slice(0, 300)}`);
     return value;
   }
@@ -232,10 +230,22 @@ class T3Mcp {
 
 function rpcReply(body: string, contentType: string): { result?: unknown; error?: { message?: string } } {
   if (!contentType.includes("text/event-stream")) return JSON.parse(body);
-  for (const line of body.split("\n")) {
-    if (!line.startsWith("data:")) continue;
-    const reply = JSON.parse(line.slice(5));
-    if (reply.id !== undefined) return reply;
+  let data: string[] = [];
+  for (const line of [...body.split(/\r\n|\r|\n/), ""]) {
+    if (line.startsWith("data:")) data.push(line.slice(line.startsWith("data: ") ? 6 : 5));
+    else if (line === "" && data.length) {
+      const reply = JSON.parse(data.join("\n"));
+      if (reply.id !== undefined) return reply;
+      data = [];
+    }
   }
   throw new Error("T3 Code MCP sent an event stream with no reply.");
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }

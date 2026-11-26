@@ -60,6 +60,7 @@ const runningSchema = Type.Object({
   pidStart: Type.Optional(Type.String()),
   // The pi process that launched it. Only that process may reap it.
   parentPid: Type.Number(),
+  parentStart: Type.Optional(Type.String()),
   host: Type.Optional(hostSchema),
   t3TaskId: Type.Optional(Type.String()),
 });
@@ -222,7 +223,7 @@ function processPolicy(launcherHolds: (processParentPid: number, record: Running
 
 const processHost = processPolicy((processParentPid, { parentPid }) => processParentPid === parentPid);
 // A terminal's program is a child of its terminal server (herdr-core, Orca), not of the pi that launched it.
-const terminalHost = processPolicy((_, { parentPid, parentStart }) => alive(parentPid));
+const terminalHost = processPolicy((_, { parentPid, parentStart }) => (parentStart === undefined ? alive(parentPid) : inspect(parentPid)?.start === parentStart));
 const hosts: Record<Host, HostPolicy> = { rpc: processHost, hc: terminalHost, orca: terminalHost, t3: t3Host };
 const hostOf = (record: RunningRecord): HostPolicy => hosts[record.host ?? "rpc"];
 
@@ -318,7 +319,7 @@ export class AgentRunner {
     const { child, host } = this.spawnChild(identity, prompt);
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
     // An RPC record leaves host unset, as earlier versions wrote it, so an older pstack can still restore it.
-    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, host: host === "rpc" ? undefined : host };
+    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, parentStart: inspect(process.pid)?.start, host: host === "rpc" ? undefined : host };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
     this.agents.set(identity.id, { kind: "local", record, run });
     this.persist(record);

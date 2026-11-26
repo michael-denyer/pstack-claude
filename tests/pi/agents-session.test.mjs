@@ -13,6 +13,10 @@ const exitOf = (proc) => new Promise((r) => proc.on("exit", r));
 
 // A record's pid once another process has it: that one started at another time.
 const reusedBy = (proc) => ({ pid: proc.pid, pidStart: "another time" });
+const startOf = (pid) => {
+  const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+  return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19];
+};
 
 describe("registry", () => {
   test("list_agents survives a reload through the persisted entries", async () => {
@@ -277,9 +281,9 @@ describe("registry", () => {
     const launcher = w.spawn("sleep", ["30"], { detached: true });
     const gone = w.spawn("sleep", ["0.1"]);
     await exitOf(gone);
-    const hosted = (parentPid) => pi.entries.map((e) => agentEntry(recordWith(e.data, { host, parentPid })));
+    const hosted = (parentPid, parentStart) => pi.entries.map((e) => agentEntry(recordWith(e.data, { host, parentPid, parentStart })));
 
-    const kept = await restore(w, hosted(launcher.pid));
+    const kept = await restore(w, hosted(launcher.pid, startOf(launcher.pid)));
     await sleep(2 * w.settings.killGraceMs);
     expect(alive(program)).toBe(true);
     expect((await listAgents(kept, ctx))[0].status).toBe("running");
@@ -289,6 +293,18 @@ describe("registry", () => {
     expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
   });
 
+  for (const host of ["hc", "orca"]) test(`a restored ${host} agent whose launching pi's pid now belongs to another process is stopped, and its terminal's program is ended`, async () => {
+    const { w, pi, ctx } = setup({ script: { default: [{ sleep: 30000 }] } });
+    await pi.call("agent", { description: "terminal", prompt: "x", run_in_background: true }, ctx);
+    await w.until("invocation");
+    const program = w.invocations()[0].pid;
+    const stranger = w.spawn("sleep", ["30"], { detached: true });
+
+    const resumed = await restore(w, pi.entries.map((e) => agentEntry(recordWith(e.data, { host, parentPid: stranger.pid }))));
+    await waitFor(() => !alive(program));
+    expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
+    expect(alive(stranger.pid)).toBe(true);
+  });
 
   // The fake hc fails every call but `get`, which names the pid in the terminal's
   // pid file, fails without one, or never answers once a hang file exists.

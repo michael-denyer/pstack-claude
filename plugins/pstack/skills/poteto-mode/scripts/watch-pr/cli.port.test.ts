@@ -7,6 +7,77 @@ import type { GitHubReader } from "./types.ts";
 
 const silentIo = { stdout: () => {}, stderr: () => {} };
 
+describe("watching a head without checks after an earlier commit passed", () => {
+  it.each([
+    [
+      "CONFLICTING",
+      { mergeable: "CONFLICTING" },
+      2,
+      ["BLOCKER"],
+      "merge-conflicts",
+    ],
+    [
+      "DIRTY",
+      { mergeable: "UNKNOWN", mergeStateStatus: "DIRTY" },
+      2,
+      ["BLOCKER"],
+      "merge-conflicts",
+    ],
+    [
+      "MERGEABLE",
+      { mergeable: "MERGEABLE" },
+      7,
+      ["RETRY", "BLOCKER"],
+      "status-query",
+    ],
+  ] as const)(
+    "uses the correct verdict for %s",
+    async (_label, facts, exitCode, kinds, blocker) => {
+      const stdout: string[] = [];
+      const runtime = {
+        reader: fakeReader({
+          facts,
+          fastPath: { kind: "none-reported" },
+          rollupPages: [{ kind: "no-rollup" }],
+          commitRollups: [
+            { oid: "earlier", state: "SUCCESS" },
+            { oid: "head", state: null },
+          ],
+        }),
+        deadline: new WatchDeadline(0, () => 0),
+        clock: {
+          now: () => 0,
+          observedAt: () => "2026-07-26T00:00:00.000Z",
+          async sleep() {},
+        },
+        stdout: (text: string) => stdout.push(text),
+        stderr: () => {},
+      } satisfies CliRuntime;
+      const code = await main(
+        [
+          "--owner",
+          "owner",
+          "--repo",
+          "repo",
+          "--pr",
+          "1",
+          "--max-query-errors",
+          "2",
+        ],
+        runtime
+      );
+      expect(code).toBe(exitCode);
+      const verdicts = stdout.map((line) => JSON.parse(line));
+      expect(verdicts.map((verdict) => verdict.kind)).toEqual([...kinds]);
+      expect(verdicts.at(-1)).toMatchObject({
+        terminal: true,
+        exitCode,
+        blocker: { kind: blocker },
+      });
+    }
+  );
+});
+
 describe("--expect-app", () => {
   it("collects each named app into the polling options", () => {
     expect(

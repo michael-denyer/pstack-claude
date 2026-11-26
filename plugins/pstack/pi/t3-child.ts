@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { type Static, type TSchema, Type } from "typebox";
 import { Value } from "typebox/value";
 
-import type { ChildExit } from "./child.ts";
+import { alive, type ChildExit, type Fate } from "./child.ts";
 
 const PROTOCOL = "2025-06-18";
 const WAIT_MS = 30_000;
@@ -169,6 +169,15 @@ export async function cancelOrphan(task: T3Task): Promise<boolean> {
     return false;
   }
 }
+
+type T3Record = { parentPid: number; t3TaskId?: string; agent: { t3ThreadId?: string } };
+
+export const t3Host = {
+  fate: ({ t3TaskId, parentPid }: T3Record): Fate => (t3TaskId === undefined ? "gone" : parentPid !== process.pid && alive(parentPid) ? "kept" : "orphan"),
+  reap: async ({ t3TaskId, agent }: T3Record): Promise<Fate> =>
+    t3TaskId && agent.t3ThreadId && (await cancelOrphan({ taskId: t3TaskId, threadId: agent.t3ThreadId })) ? "gone" : "orphan",
+  pending: ({ t3TaskId }: T3Record): string => `T3 Code task ${t3TaskId} has not been cancelled`,
+};
 
 async function settled(mcp: T3Mcp, threadId: string, runId?: string): Promise<void> {
   for (;;) {

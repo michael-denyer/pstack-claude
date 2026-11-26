@@ -8,9 +8,9 @@ import { Value } from "typebox/value";
 
 import { noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
-import { type Activity, type AgentChild, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
+import { type Activity, type AgentChild, alive, type ChildExit, type Fate, PiChild, terminateGroup } from "./child.ts";
 import { HcChild, pidOfTerminal } from "./hc-child.ts";
-import { cancelOrphan, t3Brief, T3_ENV_REMOVED, T3Child, t3Session, type T3Task } from "./t3-child.ts";
+import { t3Brief, T3_ENV_REMOVED, T3Child, t3Host, t3Session, type T3Task } from "./t3-child.ts";
 import { loadAgentTypes } from "./agent-files.ts";
 import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
@@ -179,18 +179,13 @@ function inspect(pid: number): { parentPid: number; start: string } | undefined 
   return m ? { parentPid: Number(m[1]), start: m[2] } : undefined;
 }
 
-// What became of the process a running record names:
-// - kept: it is still a child of the live pi process that launched it;
-// - orphan: it is the process the record was written for, its launcher gone
-//   (an hc record written before its pid takes the pid and start that hc names
-//   for the agent's terminal, in identifyByTerminalName);
-// - unknown: a process is there, and nothing says whether it is the agent's;
-// - gone: no process is there, or another one is.
-type Fate = "kept" | "orphan" | "unknown" | "gone";
-
-function fateOf(record: RunningRecord): Fate {
+// A process host's run is its process: kept while it is a child of the live pi
+// that launched it, an orphan when it is the process the record was written for
+// (an hc record written before its pid takes the pid and start that hc names for
+// the agent's terminal, in identifyByTerminalName), and gone when no process is
+// there or another one is.
+function processFate(record: RunningRecord): Fate {
   const { pid, pidStart, parentPid } = record;
-  if (record.host === "t3") return record.t3TaskId === undefined ? "gone" : parentPid !== process.pid && alive(parentPid) ? "kept" : "orphan";
   if (pid === undefined || !alive(pid)) return "gone";
   const info = inspect(pid);
   if (info && pidStart !== undefined && info.start !== pidStart) return "gone";
@@ -208,15 +203,25 @@ function identifyByTerminalName(record: RunningRecord): RunningRecord {
   return pid === undefined ? record : { ...record, pid, pidStart: inspect(pid)?.start };
 }
 
-// Stops an orphan, by its group so the bash command it has running goes too.
+// Stops an orphan process, by its group so the bash command it has running goes too.
 // No other fate is signalled: a pid that may have been reused is not ours to hit.
-function reapOrphan(record: RunningRecord, killGraceMs: number): Promise<RunningRecord> {
-  if (record.host === "t3") {
-    const { t3TaskId: taskId, agent } = record;
-    return taskId && agent.t3ThreadId ? cancelOrphan({ taskId, threadId: agent.t3ThreadId }).then((done) => (done ? { ...record, t3TaskId: undefined } : record)) : Promise.resolve(record);
-  }
-  return record.pid === undefined ? Promise.resolve(record) : terminateGroup(record.pid, () => fateOf(record) === "orphan", killGraceMs).then(() => record);
+async function reapProcess(record: RunningRecord, killGraceMs: number): Promise<Fate> {
+  if (record.pid !== undefined) await terminateGroup(record.pid, () => processFate(record) === "orphan", killGraceMs);
+  return processFate(record);
 }
+
+// What a host knows about a restored run that the runner does not.
+interface HostPolicy {
+  fate(record: RunningRecord): Fate;
+  // Stops an orphan's run and reports what is left of it.
+  reap(record: RunningRecord, killGraceMs: number): Promise<Fate>;
+  // Why a restored run that is not known to have ended keeps the agent unavailable.
+  pending(record: RunningRecord): string;
+}
+
+const processHost: HostPolicy = { fate: processFate, reap: reapProcess, pending: ({ pid }) => `previous process (pid ${pid}) has not exited` };
+const hosts: Record<Host, HostPolicy> = { rpc: processHost, hc: processHost, t3: t3Host };
+const hostOf = (record: RunningRecord): HostPolicy => hosts[record.host ?? "rpc"];
 
 const now = () => new Date().toISOString();
 
@@ -438,15 +443,14 @@ export class AgentRunner {
   }
 
   // An agent this process can act on. One running under another pi process is
-  // not: only that process holds its stdin and can message or stop it.
+  // not: only that process holds its run and can message or stop it.
   private owned(to: string): Exclude<AgentState, { kind: "remote" | "unverified" | "interrupted" }> {
     const state = this.find(to);
     if (state.kind === "remote") {
       throw new Error(`Agent ${state.record.agent.id} is running under another pi process (pid ${state.record.parentPid}); only that process can message or stop it.`);
     }
     if (state.kind === "unverified" || state.kind === "interrupted") {
-      const run = state.record.host === "t3" ? `T3 Code task ${state.record.t3TaskId} has not been cancelled` : `previous process (pid ${state.record.pid}) has not exited`;
-      throw new Error(`Agent ${state.record.agent.id}'s ${run}; it cannot resume or be stopped here until its exit is confirmed.`);
+      throw new Error(`Agent ${state.record.agent.id}'s ${hostOf(state.record).pending(state.record)}; it cannot resume or be stopped here until its exit is confirmed.`);
     }
     return state;
   }
@@ -504,7 +508,7 @@ export class AgentRunner {
   private refreshRestored(state: AgentState): AgentState {
     if (state.kind === "local" || state.kind === "ended") return state;
     const { record } = state;
-    const fate = fateOf(record);
+    const fate = hostOf(record).fate(record);
     if (fate === "kept" && state.kind === "remote") return state;
     if (fate !== "gone") {
       if (state.kind === "interrupted") return state;
@@ -514,14 +518,18 @@ export class AgentRunner {
       };
       this.agents.set(record.agent.id, restored);
       if (restored.kind === "interrupted") {
-        void reapOrphan(record, this.settings.killGraceMs).then((reaped) => {
-          if (this.agents.get(record.agent.id) === restored) {
-            this.agents.set(record.agent.id, { kind: "unverified", record: reaped });
-          }
+        void hostOf(record).reap(record, this.settings.killGraceMs).then((next) => {
+          if (this.agents.get(record.agent.id) !== restored) return;
+          if (next === "gone") this.endRestored(record);
+          else this.agents.set(record.agent.id, { kind: "unverified", record });
         });
       }
       return restored;
     }
+    return this.endRestored(record);
+  }
+
+  private endRestored(record: RunningRecord): AgentState {
     const stopped: EndedRecord = {
       agent: record.agent,
       status: "stopped",
@@ -536,8 +544,8 @@ export class AgentRunner {
     return ended;
   }
 
-  // A restored process stays unavailable until its exit is confirmed. Only a
-  // process whose identity matches the record can be signalled.
+  // A restored run stays unavailable until its host confirms it ended. Only a
+  // run its host identifies as the record's is stopped.
   restore(entries: readonly SessionEntry[]): void {
     for (const entry of entries) {
       if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE || !Value.Check(recordSchema, entry.data)) continue;

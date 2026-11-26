@@ -260,6 +260,13 @@ export class PiChild {
 
 export type AgentChild = Pick<PiChild, "pid" | "exited" | "activity" | "steer" | "end" | "signal">;
 
+// What became of a restored running record's run, as its host reports it:
+// - kept: the live pi that launched it still holds it;
+// - orphan: it is the run the record was written for, and its launcher is gone;
+// - unknown: something runs there, and nothing says whether it is the agent's;
+// - gone: nothing of the run is left.
+export type Fate = "kept" | "orphan" | "unknown" | "gone";
+
 // Splits pi's stdout into lines on LF only: a Unicode line separator is valid
 // inside a JSON string.
 export function lineSplitter(onLine: (line: string) => void): { write(chunk: Buffer | string): void; end(): void } {

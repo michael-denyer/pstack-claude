@@ -80,11 +80,11 @@ export class T3Child {
   private readonly onStart: (task: T3Task) => void;
   private threadId?: string;
   private taskId?: string;
-  private runId?: string;
-  private sends: Promise<unknown> = Promise.resolve();
+  private readonly runs: (string | undefined)[] = [];
+  private steers: Promise<unknown> = Promise.resolve();
   private done = false;
   private ending = false;
-  private cancelled?: Promise<void>;
+  private cancelled?: { taskId: string; done: Promise<void> };
   private readonly stopWaiting = new AbortController();
 
   constructor(session: T3Session, launch: T3Launch, prompt: string) {
@@ -96,14 +96,15 @@ export class T3Child {
   async steer(message: string): Promise<{ response: { success: boolean } | undefined; taken: boolean }> {
     const threadId = this.threadId;
     if (this.done || threadId === undefined) return { response: undefined, taken: false };
-    const send = this.mcp.call(sent, "t3_thread_send", { threadId, message, mode: "steer" }).then(({ taskId, runId, delivery }) => {
+    const send = this.mcp.call(sent, "t3_thread_send", { threadId, message, mode: "steer" }, this.stopWaiting.signal).then(({ taskId, runId, delivery }) => {
       if (delivery === "steered") return;
-      this.runId = runId;
+      this.runs.push(runId);
       if (!taskId) return;
       this.taskId = taskId;
       this.onStart({ threadId, taskId });
+      if (this.ending) void this.cancel();
     });
-    this.sends = Promise.allSettled([this.sends, send]);
+    this.steers = Promise.allSettled([this.steers, send]);
     try {
       await send;
       return { response: { success: true }, taken: true };
@@ -126,15 +127,14 @@ export class T3Child {
     try {
       const threadId = await this.start(launch, prompt);
       if (this.ending) await this.cancel();
-      let sends: Promise<unknown>;
+      let steers: Promise<unknown>;
       let result: Static<typeof taskResult>;
-      // A steer that T3 Code queues or starts as a new turn moves the run on, so the run ends only once no steer is in flight.
       do {
-        sends = this.sends;
-        await sends;
-        await settled(this.mcp, threadId, this.runId, this.stopWaiting.signal);
+        steers = this.steers;
+        await steers;
+        for (const runId of this.runs) await settled(this.mcp, threadId, runId, this.stopWaiting.signal);
         result = await this.mcp.call(taskResult, "task_status", { taskId: this.taskId });
-      } while (sends !== this.sends);
+      } while (steers !== this.steers);
       this.done = true;
       const { status, summary } = result;
       const text = summary ?? "";
@@ -152,7 +152,7 @@ export class T3Child {
       const { taskId, runId } = await this.mcp.call(sent, "t3_thread_send", { threadId: launch.threadId, message: prompt, mode: "auto" });
       if (!taskId) throw new Error(`T3 Code took the message in thread ${launch.threadId} without starting a task.`);
       this.taskId = taskId;
-      this.runId = runId;
+      this.runs.push(runId);
       launch.onStart({ threadId: launch.threadId, taskId });
       return launch.threadId;
     }
@@ -161,7 +161,7 @@ export class T3Child {
     const task = await this.mcp.call(delegated, "delegate_task", { task: prompt, title: launch.title, target, mode: "async", clientRequestId: launch.requestId });
     this.threadId = task.childThreadId;
     this.taskId = task.taskId;
-    this.runId = task.childRunId ?? undefined;
+    this.runs.push(task.childRunId ?? undefined);
     launch.onStart({ threadId: task.childThreadId, taskId: task.taskId });
     return task.childThreadId;
   }
@@ -177,11 +177,14 @@ export class T3Child {
   private cancel(): Promise<void> | undefined {
     const { taskId, threadId } = this;
     if (taskId === undefined) return;
-    this.cancelled ??= this.mcp.call(Type.Unknown(), "task_cancel", { taskId, reason: "stop_agent" }).then(
-      () => undefined,
-      (e: Error) => this.stopWaiting.abort(new Error(`T3 Code did not cancel task ${taskId}, so thread ${threadId} may still be running: ${e.message}`)),
-    );
-    return this.cancelled;
+    if (this.cancelled?.taskId !== taskId) {
+      const done = this.mcp.call(Type.Unknown(), "task_cancel", { taskId, reason: "stop_agent" }).then(
+        () => undefined,
+        (e: Error) => this.stopWaiting.abort(new Error(`T3 Code did not cancel task ${taskId}, so thread ${threadId} may still be running: ${e.message}`)),
+      );
+      this.cancelled = { taskId, done };
+    }
+    return this.cancelled.done;
   }
 }
 

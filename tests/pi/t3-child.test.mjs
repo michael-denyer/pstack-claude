@@ -156,6 +156,75 @@ describe("T3Child", () => {
     expect(await child.steer("late")).toEqual({ response: undefined, taken: false });
   });
 
+  test("an end while a steer is in flight cancels the task that T3 Code starts with the steer", async () => {
+    let releaseRun, releaseSend;
+    const run = new Promise((resolve) => (releaseRun = resolve));
+    const send = new Promise((resolve) => (releaseSend = resolve));
+    const cancelled = new Set();
+    const { session, calls } = fakeT3({
+      delegate_task: () => reply(delegated),
+      t3_thread_send: async () => (await send, reply({ threadId: "thread-1", taskId: "task-2", runId: "run-2", status: "starting", delivery: "started" })),
+      task_cancel: ({ taskId }) => (cancelled.add(taskId), taskId === "task-1" && releaseRun(), reply({ taskId, status: "cancel_requested" })),
+      t3_thread_wait: async ({ runId }) => (runId === "run-1" && (await run), reply({ timedOut: runId === "run-2" && !cancelled.has("task-2") })),
+      task_status: ({ taskId }) => reply({ status: cancelled.has(taskId) ? "interrupted" : "running", summary: null }),
+    });
+    const child = new T3Child(session, { title: "probe", onStart: () => {} }, "work");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const steering = child.steer("more");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_send"));
+    child.end(5000);
+    await waitFor(() => calls.some((c) => c.name === "task_cancel"));
+    releaseSend();
+    expect((await steering).taken).toBe(true);
+    expect(await child.exited).toMatchObject({ settled: false, errorMessage: "The T3 Code task ended with status interrupted." });
+    expect(calls.filter((c) => c.name === "task_cancel").map((c) => c.args.taskId)).toEqual(["task-1", "task-2"]);
+  });
+
+  test("an end stops waiting after the grace while T3 Code has not answered a steer", async () => {
+    const { session, calls } = fakeT3({
+      delegate_task: () => reply(delegated),
+      t3_thread_send: () => new Promise(() => {}),
+      task_cancel: () => reply({ taskId: "task-1", status: "cancel_requested" }),
+      t3_thread_wait: async () => (await waitFor(() => calls.some((c) => c.name === "t3_thread_send")), reply({ timedOut: false })),
+      task_status: () => reply({ status: "completed", summary: "the answer" }),
+    });
+    const child = new T3Child(session, { title: "probe", onStart: () => {} }, "work");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    void child.steer("more");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_send"));
+    const at = Date.now();
+    child.end(100);
+    await child.exited;
+    expect(Date.now() - at).toBeLessThan(2000);
+  });
+
+  test("two queued steers whose answers come back out of order both run before the run ends, with the last turn's reply", async () => {
+    let answerFirst;
+    const firstHeld = new Promise((resolve) => (answerFirst = resolve));
+    let sends = 0;
+    let lastRunDone = false;
+    const { session, calls } = fakeT3({
+      delegate_task: () => reply(delegated),
+      t3_thread_send: async () => {
+        if (++sends === 1) return (await firstHeld, reply({ threadId: "thread-1", runId: "run-2", status: "queued", delivery: "queued" }));
+        setTimeout(answerFirst, 20);
+        return reply({ threadId: "thread-1", runId: "run-3", status: "queued", delivery: "queued" });
+      },
+      t3_thread_wait: async ({ runId }) => {
+        if (runId === "run-1") await waitFor(() => sends === 2);
+        if (runId === "run-3") lastRunDone = true;
+        return reply({ timedOut: false });
+      },
+      task_status: () => reply(lastRunDone ? { status: "completed", summary: "reply to /b" } : { status: "running", summary: null }),
+    });
+    const child = new T3Child(session, { title: "probe", onStart: () => {} }, "work");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const first = child.steer("/a first");
+    await waitFor(() => sends === 1);
+    await Promise.all([first, child.steer("/b second")]);
+    expect(await child.exited).toMatchObject({ settled: true, finalText: "reply to /b" });
+  });
+
   test("an end before T3 Code answers the launch cancels the task once it has one", async () => {
     let answer;
     const answered = new Promise((resolve) => (answer = resolve));

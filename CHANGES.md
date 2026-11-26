@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.158 - Report known conflicts when PR checks have not started
+
+`watch-pr` reports a merge conflict immediately when GitHub marks the current head as conflicting and has reported no checks for it. A mergeable head with missing checks still retries the status query. ([#559](https://github.com/michael-denyer/pstack-claude/issues/559))
+
 ## 0.9.157 - Codex saves resume checkpoints under workspace-write
 
 On Codex, `codex-tools.md` now says how to save a resume checkpoint under the `workspace-write` sandbox, which makes `.git` read-only and so blocked every checkpoint write with `EPERM` ([#555](https://github.com/michael-denyer/pstack-claude/issues/555)). With approval policy `on-request`, the agent runs `resume.mjs begin`, `publish`, and the note writes as escalated commands. With `never`, the user grants `<git common dir>/pstack` in a permissions profile that extends `:workspace` and selects it per run with `-c 'default_permissions="pstack"'`. Without either, the agent reports that the checkpoint was not saved.

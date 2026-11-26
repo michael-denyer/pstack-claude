@@ -8,8 +8,9 @@ import { Value } from "typebox/value";
 
 import { noticeOf, OUTPUT_CAP_BYTES, statusText, truncateUtf8 } from "./agent-text.ts";
 import type { AgentParams } from "./agent-tools.ts";
-import { type Activity, type AgentChild, alive, type ChildExit, PiChild, terminateGroup } from "./child.ts";
+import { type Activity, type AgentChild, alive, type ChildExit, type Fate, PiChild, terminateGroup } from "./child.ts";
 import { HcChild, pidOfTerminal } from "./hc-child.ts";
+import { t3Brief, T3_ENV_REMOVED, T3Child, t3Host, t3Session, type T3Task } from "./t3-child.ts";
 import { loadAgentTypes } from "./agent-files.ts";
 import { checkEffort, DEPTH_FLAG, GENERAL_PURPOSE, InvalidValueError, PSTACK_STATE_DIR, readSheet, resolveModel, type Settings } from "./config.ts";
 import { ensureWorktree, planWorktree, settleWorktree, type Worktree, worktreeSchema } from "./worktree.ts";
@@ -25,6 +26,9 @@ const PARENT_SESSION_ENV = "PI_SUBAGENT_PARENT_SESSION";
 
 const endedStatus = Type.Union([Type.Literal("completed"), Type.Literal("failed"), Type.Literal("stopped")]);
 type EndedStatus = Static<typeof endedStatus>;
+// Absent on a record an earlier version wrote; such an agent runs as an RPC child.
+const hostSchema = Type.Union([Type.Literal("rpc"), Type.Literal("hc"), Type.Literal("t3")]);
+type Host = Static<typeof hostSchema>;
 
 // Fixed when the agent starts and reused by every launch of it, so a resume
 // runs the same session, model, thinking, system prompt, and worktree.
@@ -42,6 +46,8 @@ const identitySchema = Type.Object({
   systemPromptFile: Type.Optional(Type.String()),
   cwd: Type.String(),
   worktree: Type.Optional(worktreeSchema),
+  host: Type.Optional(hostSchema),
+  t3ThreadId: Type.Optional(Type.String()),
   startedAt: Type.String(),
 });
 const runningSchema = Type.Object({
@@ -54,7 +60,8 @@ const runningSchema = Type.Object({
   pidStart: Type.Optional(Type.String()),
   // The pi process that launched it. Only that process may reap it.
   parentPid: Type.Number(),
-  host: Type.Optional(Type.Literal("hc")),
+  host: Type.Optional(hostSchema),
+  t3TaskId: Type.Optional(Type.String()),
 });
 const endedSchema = Type.Object({
   agent: identitySchema,
@@ -86,9 +93,11 @@ interface Run {
 // A remote agent runs under the live pi process that restore left it to.
 type LocalAgent = { kind: "local"; record: RunningRecord; run: Run };
 // Unverified restores retry identity checks; interrupted ones await termination.
+// A reap that finds the run gone leaves the record to the next look, which can
+// persist it: by the time the reap ends, the session may have been replaced.
 type AgentState = LocalAgent
   | { kind: "remote"; record: RunningRecord }
-  | { kind: "unverified"; record: RunningRecord }
+  | { kind: "unverified"; record: RunningRecord; gone?: boolean }
   | { kind: "interrupted"; record: RunningRecord }
   | { kind: "ended"; record: EndedRecord };
 
@@ -172,16 +181,9 @@ function inspect(pid: number): { parentPid: number; start: string } | undefined 
   return m ? { parentPid: Number(m[1]), start: m[2] } : undefined;
 }
 
-// What became of the process a running record names:
-// - kept: it is still a child of the live pi process that launched it;
-// - orphan: it is the process the record was written for, its launcher gone
-//   (an hc record written before its pid takes the pid and start that hc names
-//   for the agent's terminal, in identifyByTerminalName);
-// - unknown: a process is there, and nothing says whether it is the agent's;
-// - gone: no process is there, or another one is.
-type Fate = "kept" | "orphan" | "unknown" | "gone";
-
-function fateOf(record: RunningRecord): Fate {
+// A process host's run is the process the record names by pid and start time. An
+// hc record written before its pid takes both from hc, in identifyByTerminalName.
+function processFate(record: RunningRecord): Fate {
   const { pid, pidStart, parentPid } = record;
   if (pid === undefined || !alive(pid)) return "gone";
   const info = inspect(pid);
@@ -200,11 +202,22 @@ function identifyByTerminalName(record: RunningRecord): RunningRecord {
   return pid === undefined ? record : { ...record, pid, pidStart: inspect(pid)?.start };
 }
 
-// Stops an orphan, by its group so the bash command it has running goes too.
+// Stops an orphan process, by its group so the bash command it has running goes too.
 // No other fate is signalled: a pid that may have been reused is not ours to hit.
-function reapOrphan(record: RunningRecord, killGraceMs: number): Promise<void> {
-  return record.pid === undefined ? Promise.resolve() : terminateGroup(record.pid, () => fateOf(record) === "orphan", killGraceMs);
+async function reapProcess(record: RunningRecord, killGraceMs: number): Promise<Fate> {
+  if (record.pid !== undefined) await terminateGroup(record.pid, () => processFate(record) === "orphan", killGraceMs);
+  return processFate(record);
 }
+
+interface HostPolicy {
+  fate(record: RunningRecord): Fate;
+  reap(record: RunningRecord, killGraceMs: number): Promise<Fate>;
+  notEnded(record: RunningRecord): string;
+}
+
+const processHost: HostPolicy = { fate: processFate, reap: reapProcess, notEnded: ({ pid }) => `previous process (pid ${pid}) has not exited` };
+const hosts: Record<Host, HostPolicy> = { rpc: processHost, hc: processHost, t3: t3Host };
+const hostOf = (record: RunningRecord): HostPolicy => hosts[record.host ?? "rpc"];
 
 const now = () => new Date().toISOString();
 
@@ -241,7 +254,8 @@ export class AgentRunner {
     const def = types.get(type);
     if (!def) throw new Error(`Unknown subagent_type "${type}". Valid types: ${[...types.keys()].join(", ")}.`);
     const parentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
-    const model = fromAgentFile(def.file, params.model, () => resolveModel(params.model ?? def.model, this.settings, readSheet(this.settings.agentDir, ctx.cwd), parentModel, ctx.modelRegistry));
+    const sheet = readSheet(this.settings.agentDir, ctx.cwd);
+    const model = fromAgentFile(def.file, params.model, () => resolveModel(params.model ?? def.model, this.settings, sheet, parentModel, ctx.modelRegistry));
     // Claude Code subagents without an effort run at their definition's effort, else the session's.
     const effort = params.effort ?? def.effort;
     const thinking = effort === undefined ? this.pi.getThinkingLevel() : fromAgentFile(def.file, params.effort, () => checkEffort(effort, this.settings));
@@ -252,6 +266,8 @@ export class AgentRunner {
     mkdirSync(sessionDir, { recursive: true });
     const systemPromptFile = def.body ? join(state, "prompts", `${id}.md`) : undefined;
     const worktree = params.isolation === "worktree" ? planWorktree(ctx.cwd, id) : undefined;
+    // delegate_task runs a task in the session thread's folder, never in the agent's worktree.
+    const host: Host = sheet?.t3Host && t3Session() && !worktree ? "t3" : sheet?.hcHost && process.env.HC_TERMINAL_ID ? "hc" : "rpc";
     const identity: AgentIdentity = {
       id,
       description: params.description,
@@ -264,6 +280,7 @@ export class AgentRunner {
       systemPromptFile,
       cwd: worktree?.path ?? ctx.cwd,
       worktree,
+      host,
       startedAt: now(),
     };
     this.attachSession(ctx);
@@ -285,9 +302,10 @@ export class AgentRunner {
       }
       throw e;
     }
-    const child = this.spawnChild(identity, prompt);
+    const { child, host } = this.spawnChild(identity, prompt);
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
-    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, host: child instanceof HcChild ? "hc" : undefined };
+    // An RPC record leaves host unset, as earlier versions wrote it, so an older pstack can still restore it.
+    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, host: host === "rpc" ? undefined : host };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
     this.agents.set(identity.id, { kind: "local", record, run });
     this.persist(record);
@@ -295,15 +313,27 @@ export class AgentRunner {
     return record;
   }
 
-  private spawnChild(identity: AgentIdentity, prompt: string): AgentChild {
+  private spawnChild(identity: AgentIdentity, prompt: string): { child: AgentChild; host: Host } {
     const { command, args } = this.settings.pi;
     const base = [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills")];
     const flags = childArgs(identity, this.settings.depth);
-    const env = { [PARENT_SESSION_ENV]: this.ownSessionId };
-    // The session's sheet, as for the model: a worktree is a checkout of HEAD and lacks an uncommitted sheet.
-    if (readSheet(this.settings.agentDir, identity.worktree?.repo ?? identity.cwd)?.hcHost && process.env.HC_TERMINAL_ID) {
+    // T3 Code runs a task in its thread's folder, so an agent in a worktree must not hand its own agents to T3 Code.
+    const env = { [PARENT_SESSION_ENV]: this.ownSessionId, ...(identity.worktree && T3_ENV_REMOVED) };
+    const host = identity.host ?? "rpc";
+    if (host === "t3") {
+      const t3 = t3Session();
+      if (!t3) throw new Error(`Agent ${identity.id} runs in T3 Code; message it from a Pi session inside T3 Code.`);
+      const onStart = ({ threadId, taskId }: T3Task) => {
+        identity.t3ThreadId = threadId;
+        this.track(identity.id, { t3TaskId: taskId });
+      };
+      const launch = { title: identity.description, model: identity.model, thinking: identity.thinking, threadId: identity.t3ThreadId, onStart };
+      return { child: new T3Child(t3, launch, identity.t3ThreadId ? prompt : t3Brief(identity, prompt)), host };
+    }
+    // An hc agent's session is a Pi session file, so outside herdr-core an RPC child resumes it.
+    if (host === "hc" && process.env.HC_TERMINAL_ID) {
       // An interactive pi asks whether to trust the project before it reports any status; the parent already decided.
-      return new HcChild(identity.id, command, [...base, ...flags, this.projectTrusted ? "--approve" : "--no-approve"], {
+      const child = new HcChild(identity.id, command, [...base, ...flags, this.projectTrusted ? "--approve" : "--no-approve"], {
         cwd: identity.cwd,
         env: { ...env, PI_CODING_AGENT_DIR: this.settings.agentDir },
         envFile: join(identity.sessionDir, `${identity.id}.env`),
@@ -311,11 +341,13 @@ export class AgentRunner {
         transcript: () => sessionFile(identity),
         onStart: (pid) => this.track(identity.id, { pid, pidStart: inspect(pid)?.start }),
       }, prompt);
+      return { child, host };
     }
-    return new PiChild(command, [...base, "--mode", "rpc", ...flags], { cwd: identity.cwd, env, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() }, prompt);
+    const child = new PiChild(command, [...base, "--mode", "rpc", ...flags], { cwd: identity.cwd, env, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() }, prompt);
+    return { child, host: "rpc" };
   }
 
-  private track(id: string, handle: Pick<RunningRecord, "pid" | "pidStart">): void {
+  private track(id: string, handle: Pick<RunningRecord, "pid" | "pidStart"> | Pick<RunningRecord, "t3TaskId">): void {
     const state = this.agents.get(id);
     if (state?.kind !== "local") return;
     Object.assign(state.record, handle);
@@ -408,14 +440,14 @@ export class AgentRunner {
   }
 
   // An agent this process can act on. One running under another pi process is
-  // not: only that process holds its stdin and can message or stop it.
+  // not: only that process holds its run and can message or stop it.
   private owned(to: string): Exclude<AgentState, { kind: "remote" | "unverified" | "interrupted" }> {
     const state = this.find(to);
     if (state.kind === "remote") {
       throw new Error(`Agent ${state.record.agent.id} is running under another pi process (pid ${state.record.parentPid}); only that process can message or stop it.`);
     }
     if (state.kind === "unverified" || state.kind === "interrupted") {
-      throw new Error(`Agent ${state.record.agent.id}'s previous process (pid ${state.record.pid}) has not exited; it cannot resume or be stopped here until its exit is confirmed.`);
+      throw new Error(`Agent ${state.record.agent.id}'s ${hostOf(state.record).notEnded(state.record)}; it cannot resume or be stopped here until its exit is confirmed.`);
     }
     return state;
   }
@@ -473,7 +505,7 @@ export class AgentRunner {
   private refreshRestored(state: AgentState): AgentState {
     if (state.kind === "local" || state.kind === "ended") return state;
     const { record } = state;
-    const fate = fateOf(record);
+    const fate = state.kind === "unverified" && state.gone ? "gone" : hostOf(record).fate(record);
     if (fate === "kept" && state.kind === "remote") return state;
     if (fate !== "gone") {
       if (state.kind === "interrupted") return state;
@@ -483,9 +515,9 @@ export class AgentRunner {
       };
       this.agents.set(record.agent.id, restored);
       if (restored.kind === "interrupted") {
-        void reapOrphan(record, this.settings.killGraceMs).then(() => {
+        void hostOf(record).reap(record, this.settings.killGraceMs).then((next) => {
           if (this.agents.get(record.agent.id) === restored) {
-            this.agents.set(record.agent.id, { kind: "unverified", record });
+            this.agents.set(record.agent.id, { kind: "unverified", record, gone: next === "gone" });
           }
         });
       }
@@ -505,8 +537,8 @@ export class AgentRunner {
     return ended;
   }
 
-  // A restored process stays unavailable until its exit is confirmed. Only a
-  // process whose identity matches the record can be signalled.
+  // A restored run stays unavailable until its host reports it gone. Only a run
+  // its host identifies as the record's is stopped.
   restore(entries: readonly SessionEntry[]): void {
     for (const entry of entries) {
       if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE || !Value.Check(recordSchema, entry.data)) continue;

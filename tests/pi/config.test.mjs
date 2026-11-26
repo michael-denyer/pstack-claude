@@ -46,10 +46,11 @@ test("only an exact pi agent tools: off line turns the agent tools off", () => {
   }
 });
 
-test("only an exact pi agent host: hc line moves agents into hc terminals", () => {
-  expect(parseSheet("bug-fix: opus\r\npi agent host: hc\r\n").hcHost).toBe(true);
-  for (const sheet of ["bug-fix: opus\n", "pi agent host: rpc\n", "pi agent host: hc \n", "agent host: hc\n", "pi agent tools: off\n"]) {
-    expect({ sheet, hc: parseSheet(sheet).hcHost }).toEqual({ sheet, hc: false });
+test("only exact pi agent host: lines turn on the hc and t3 agent hosts, and both can be on", () => {
+  expect(parseSheet("bug-fix: opus\r\npi agent host: hc\r\n")).toMatchObject({ hcHost: true, t3Host: false });
+  expect(parseSheet("pi agent host: t3\npi agent host: hc\n")).toMatchObject({ hcHost: true, t3Host: true });
+  for (const sheet of ["bug-fix: opus\n", "pi agent host: rpc\n", "pi agent host: hc \n", "pi agent host: T3\n", "agent host: t3\n", "pi agent tools: off\n"]) {
+    expect({ sheet, ...parseSheet(sheet) }).toMatchObject({ sheet, hcHost: false, t3Host: false });
   }
 });
 

@@ -93,9 +93,11 @@ interface Run {
 // A remote agent runs under the live pi process that restore left it to.
 type LocalAgent = { kind: "local"; record: RunningRecord; run: Run };
 // Unverified restores retry identity checks; interrupted ones await termination.
+// A reap that finds the run gone leaves the record to the next look, which can
+// persist it: by the time the reap ends, the session may have been replaced.
 type AgentState = LocalAgent
   | { kind: "remote"; record: RunningRecord }
-  | { kind: "unverified"; record: RunningRecord }
+  | { kind: "unverified"; record: RunningRecord; gone?: boolean }
   | { kind: "interrupted"; record: RunningRecord }
   | { kind: "ended"; record: EndedRecord };
 
@@ -502,7 +504,7 @@ export class AgentRunner {
   private refreshRestored(state: AgentState): AgentState {
     if (state.kind === "local" || state.kind === "ended") return state;
     const { record } = state;
-    const fate = hostOf(record).fate(record);
+    const fate = state.kind === "unverified" && state.gone ? "gone" : hostOf(record).fate(record);
     if (fate === "kept" && state.kind === "remote") return state;
     if (fate !== "gone") {
       if (state.kind === "interrupted") return state;
@@ -513,17 +515,13 @@ export class AgentRunner {
       this.agents.set(record.agent.id, restored);
       if (restored.kind === "interrupted") {
         void hostOf(record).reap(record, this.settings.killGraceMs).then((next) => {
-          if (this.agents.get(record.agent.id) !== restored) return;
-          if (next === "gone") this.endRestored(record);
-          else this.agents.set(record.agent.id, { kind: "unverified", record });
+          if (this.agents.get(record.agent.id) === restored) {
+            this.agents.set(record.agent.id, { kind: "unverified", record, gone: next === "gone" });
+          }
         });
       }
       return restored;
     }
-    return this.endRestored(record);
-  }
-
-  private endRestored(record: RunningRecord): AgentState {
     const stopped: EndedRecord = {
       agent: record.agent,
       status: "stopped",

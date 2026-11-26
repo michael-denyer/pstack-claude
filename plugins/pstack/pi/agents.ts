@@ -26,6 +26,9 @@ const PARENT_SESSION_ENV = "PI_SUBAGENT_PARENT_SESSION";
 
 const endedStatus = Type.Union([Type.Literal("completed"), Type.Literal("failed"), Type.Literal("stopped")]);
 type EndedStatus = Static<typeof endedStatus>;
+// Absent on a record an earlier version wrote, which ran as an RPC child.
+const hostSchema = Type.Union([Type.Literal("rpc"), Type.Literal("hc"), Type.Literal("t3")]);
+type Host = Static<typeof hostSchema>;
 
 // Fixed when the agent starts and reused by every launch of it, so a resume
 // runs the same session, model, thinking, system prompt, and worktree.
@@ -43,6 +46,7 @@ const identitySchema = Type.Object({
   systemPromptFile: Type.Optional(Type.String()),
   cwd: Type.String(),
   worktree: Type.Optional(worktreeSchema),
+  host: Type.Optional(hostSchema),
   t3ThreadId: Type.Optional(Type.String()),
   startedAt: Type.String(),
 });
@@ -56,7 +60,7 @@ const runningSchema = Type.Object({
   pidStart: Type.Optional(Type.String()),
   // The pi process that launched it. Only that process may reap it.
   parentPid: Type.Number(),
-  host: Type.Optional(Type.Union([Type.Literal("hc"), Type.Literal("t3")])),
+  host: Type.Optional(hostSchema),
   t3TaskId: Type.Optional(Type.String()),
 });
 const endedSchema = Type.Object({
@@ -249,7 +253,8 @@ export class AgentRunner {
     const def = types.get(type);
     if (!def) throw new Error(`Unknown subagent_type "${type}". Valid types: ${[...types.keys()].join(", ")}.`);
     const parentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
-    const model = fromAgentFile(def.file, params.model, () => resolveModel(params.model ?? def.model, this.settings, readSheet(this.settings.agentDir, ctx.cwd), parentModel, ctx.modelRegistry));
+    const sheet = readSheet(this.settings.agentDir, ctx.cwd);
+    const model = fromAgentFile(def.file, params.model, () => resolveModel(params.model ?? def.model, this.settings, sheet, parentModel, ctx.modelRegistry));
     // Claude Code subagents without an effort run at their definition's effort, else the session's.
     const effort = params.effort ?? def.effort;
     const thinking = effort === undefined ? this.pi.getThinkingLevel() : fromAgentFile(def.file, params.effort, () => checkEffort(effort, this.settings));
@@ -260,6 +265,8 @@ export class AgentRunner {
     mkdirSync(sessionDir, { recursive: true });
     const systemPromptFile = def.body ? join(state, "prompts", `${id}.md`) : undefined;
     const worktree = params.isolation === "worktree" ? planWorktree(ctx.cwd, id) : undefined;
+    // T3 Code runs a task in its thread's folder, not in a worktree.
+    const host: Host = sheet?.t3Host && t3Session() && !worktree ? "t3" : sheet?.hcHost && process.env.HC_TERMINAL_ID ? "hc" : "rpc";
     const identity: AgentIdentity = {
       id,
       description: params.description,
@@ -272,6 +279,7 @@ export class AgentRunner {
       systemPromptFile,
       cwd: worktree?.path ?? ctx.cwd,
       worktree,
+      host,
       startedAt: now(),
     };
     this.attachSession(ctx);
@@ -293,9 +301,9 @@ export class AgentRunner {
       }
       throw e;
     }
-    const child = this.spawnChild(identity, prompt, !this.agents.has(identity.id));
+    const { child, host } = this.spawnChild(identity, prompt);
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
-    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, host: child instanceof HcChild ? "hc" : undefined };
+    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, host };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
     this.agents.set(identity.id, { kind: "local", record, run });
     this.persist(record);
@@ -303,27 +311,27 @@ export class AgentRunner {
     return record;
   }
 
-  private spawnChild(identity: AgentIdentity, prompt: string, firstRun: boolean): AgentChild {
+  private spawnChild(identity: AgentIdentity, prompt: string): { child: AgentChild; host: Host } {
     const { command, args } = this.settings.pi;
     const base = [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills")];
     const flags = childArgs(identity, this.settings.depth);
     // T3 Code runs a task in its thread's folder, so an agent in a worktree must not hand its own agents to T3 Code.
     const env = { [PARENT_SESSION_ENV]: this.ownSessionId, ...(identity.worktree && T3_ENV_REMOVED) };
-    // The session's sheet, as for the model: a worktree is a checkout of HEAD and lacks an uncommitted sheet.
-    const sheet = readSheet(this.settings.agentDir, identity.worktree?.repo ?? identity.cwd);
-    const t3 = t3Session();
-    if (identity.t3ThreadId || (firstRun && sheet?.t3Host && t3 && !identity.worktree)) {
-      if (!t3) throw new Error(`Agent ${identity.id} runs in T3 Code thread ${identity.t3ThreadId}; message it from a Pi session inside T3 Code.`);
+    const host = identity.host ?? "rpc";
+    if (host === "t3") {
+      const t3 = t3Session();
+      if (!t3) throw new Error(`Agent ${identity.id} runs in T3 Code; message it from a Pi session inside T3 Code.`);
       const onStart = ({ threadId, taskId }: T3Task) => {
         identity.t3ThreadId = threadId;
-        this.track(identity.id, { host: "t3", t3TaskId: taskId });
+        this.track(identity.id, { t3TaskId: taskId });
       };
       const launch = { title: identity.description, model: identity.model, thinking: identity.thinking, threadId: identity.t3ThreadId, onStart };
-      return new T3Child(t3, launch, identity.t3ThreadId ? prompt : t3Brief(identity, prompt));
+      return { child: new T3Child(t3, launch, identity.t3ThreadId ? prompt : t3Brief(identity, prompt)), host };
     }
-    if (sheet?.hcHost && process.env.HC_TERMINAL_ID) {
+    // An hc agent's session is a Pi session file, so outside herdr-core an RPC child resumes it.
+    if (host === "hc" && process.env.HC_TERMINAL_ID) {
       // An interactive pi asks whether to trust the project before it reports any status; the parent already decided.
-      return new HcChild(identity.id, command, [...base, ...flags, this.projectTrusted ? "--approve" : "--no-approve"], {
+      const child = new HcChild(identity.id, command, [...base, ...flags, this.projectTrusted ? "--approve" : "--no-approve"], {
         cwd: identity.cwd,
         env: { ...env, PI_CODING_AGENT_DIR: this.settings.agentDir },
         envFile: join(identity.sessionDir, `${identity.id}.env`),
@@ -331,11 +339,13 @@ export class AgentRunner {
         transcript: () => sessionFile(identity),
         onStart: (pid) => this.track(identity.id, { pid, pidStart: inspect(pid)?.start }),
       }, prompt);
+      return { child, host };
     }
-    return new PiChild(command, [...base, "--mode", "rpc", ...flags], { cwd: identity.cwd, env, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() }, prompt);
+    const child = new PiChild(command, [...base, "--mode", "rpc", ...flags], { cwd: identity.cwd, env, exitGraceMs: this.settings.exitGraceMs, onActivity: () => this.showStatus() }, prompt);
+    return { child, host: "rpc" };
   }
 
-  private track(id: string, handle: Partial<Pick<RunningRecord, "host" | "pid" | "pidStart" | "t3TaskId">>): void {
+  private track(id: string, handle: Pick<RunningRecord, "pid" | "pidStart"> | Pick<RunningRecord, "t3TaskId">): void {
     const state = this.agents.get(id);
     if (state?.kind !== "local") return;
     Object.assign(state.record, handle);

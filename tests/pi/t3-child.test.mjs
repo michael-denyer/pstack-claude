@@ -204,8 +204,11 @@ describe("the pi agent host: t3 sheet line", () => {
     const { task, title, target } = calls.find((c) => c.name === "delegate_task").args;
     expect({ title, target }).toEqual({ title: "probe", target: { model: "anthropic/fixture-haiku", options: { thinking: "low" } } });
     expect(task).toBe(`<agent name="pstack:poteto-agent">\n${agentBody("agents/poteto-agent.md")}\n</agent>\n\nYou are read-only: do not change any file, with the edit and write tools or with bash.\n\nlook`);
-    const running = pi.entries.map((e) => e.data).find((r) => r.status === "running" && r.host === "t3");
-    expect(running).toMatchObject({ host: "t3", t3TaskId: "task-1", agent: { t3ThreadId: "thread-1" } });
+    const running = pi.entries.map((e) => e.data).filter((r) => r.status === "running");
+    expect(running.map((r) => [r.host, r.agent.host, r.t3TaskId, r.agent.t3ThreadId])).toEqual([
+      ["t3", "t3", undefined, undefined],
+      ["t3", "t3", "task-1", "thread-1"],
+    ]);
     expect(pi.entries.at(-1).data).toMatchObject({ status: "completed", finalText: "the answer" });
   });
 
@@ -220,13 +223,25 @@ describe("the pi agent host: t3 sheet line", () => {
     expect(pi.entries.findLast((e) => e.data.status === "running").data).toMatchObject({ host: "t3", t3TaskId: "task-2" });
   });
 
-  test("send_message to a T3 agent from a session outside T3 Code is an error naming its thread", async () => {
+  test("an agent whose first T3 launch failed starts in T3 Code on send_message", async () => {
+    let launches = 0;
+    const { calls } = fakeT3({ ...completing(), delegate_task: () => (++launches === 1 ? failure("Provider instance is disabled.") : reply(delegated)) });
+    const { w, pi, ctx } = setup(t3Sheet);
+    await pi.call("agent", { description: "probe", prompt: "first" }, ctx).catch(() => undefined);
+    expect(pi.entries.at(-1).data.status).toBe("failed");
+    await pi.call("send_message", { to: pi.entries[0].data.agent.id, message: "more" }, ctx);
+    await waitFor(() => pi.entries.at(-1).data.status === "completed");
+    expect(calls.filter((c) => c.name === "delegate_task").map((c) => c.args.task.split("\n\n").at(-1))).toEqual(["first", "more"]);
+    expect(w.invocations()).toEqual([]);
+  });
+
+  test("send_message to a T3 agent from a session outside T3 Code is an error", async () => {
     fakeT3(completing());
     const { pi, ctx } = setup(t3Sheet);
     await pi.call("agent", { description: "probe", prompt: "first" }, ctx);
     for (const name of T3_ENV) delete process.env[name];
     const err = await pi.call("send_message", { to: pi.entries[0].data.agent.id, message: "more" }, ctx).catch((e) => e);
-    expect(err.message).toContain("runs in T3 Code thread thread-1; message it from a Pi session inside T3 Code");
+    expect(err.message).toContain("runs in T3 Code; message it from a Pi session inside T3 Code");
   });
 
   test("stop_agent cancels a background T3 agent's task and records it stopped", async () => {
@@ -312,7 +327,7 @@ describe("the pi agent host: t3 sheet line", () => {
     const launcher = w.spawn("sleep", ["30"], { detached: true });
     const gone = w.spawn("sleep", ["0.1"]);
     await new Promise((resolve) => gone.on("exit", resolve));
-    const asT3 = (parentPid) => [agentEntry(recordWith(pi.entries[0].data, { agent: { t3ThreadId: "thread-1" }, status: "running", host: "t3", t3TaskId: "task-1", pid: undefined, parentPid }))];
+    const asT3 = (parentPid) => [agentEntry(recordWith(pi.entries[0].data, { agent: { host: "t3", t3ThreadId: "thread-1" }, status: "running", host: "t3", t3TaskId: "task-1", pid: undefined, parentPid }))];
 
     const kept = await restore(w, asT3(launcher.pid));
     expect((await listAgents(kept, ctx))[0].status).toBe("running");
@@ -333,7 +348,7 @@ describe("the pi agent host: t3 sheet line", () => {
     await pi.call("agent", { description: "in t3", prompt: "x" }, ctx);
     const gone = w.spawn("sleep", ["0.1"]);
     await new Promise((resolve) => gone.on("exit", resolve));
-    const record = recordWith(pi.entries[0].data, { agent: { t3ThreadId: "thread-1" }, status: "running", host: "t3", t3TaskId: "task-1", pid: undefined, parentPid: gone.pid });
+    const record = recordWith(pi.entries[0].data, { agent: { host: "t3", t3ThreadId: "thread-1" }, status: "running", host: "t3", t3TaskId: "task-1", pid: undefined, parentPid: gone.pid });
     const resumed = await restore(w, [agentEntry(record)]);
     await waitFor(() => calls.some((c) => c.name === "task_cancel"));
     await Bun.sleep(50);

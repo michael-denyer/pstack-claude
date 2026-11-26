@@ -180,32 +180,10 @@ function inspect(pid: number): { parentPid: number; start: string } | undefined 
   return m ? { parentPid: Number(m[1]), start: m[2] } : undefined;
 }
 
-// A process host's run is the process the record names by pid and start time. An
-// hc record written before its pid takes both from hc, in identifyByTerminalName.
-function processFate(record: RunningRecord): Fate {
-  const { pid, pidStart, parentPid } = record;
-  if (pid === undefined || !alive(pid)) return "gone";
-  const info = inspect(pid);
-  if (info && pidStart !== undefined && info.start !== pidStart) return "gone";
-  // With no word from the system, two live pids keep the record: calling a
-  // live agent stopped would let a message start a second process on its session.
-  // An hc terminal's program is a child of herdr-core, not of the pi that launched it.
-  const launcherHasIt = info && record.host !== "hc" ? info.parentPid === parentPid : alive(parentPid);
-  if (parentPid !== process.pid && launcherHasIt) return "kept";
-  return info && info.start === pidStart ? "orphan" : "unknown";
-}
-
 function identifyByTerminalName(record: RunningRecord): RunningRecord {
   if (record.host !== "hc" || record.pid !== undefined) return record;
   const pid = pidOfTerminal(record.agent.id);
   return pid === undefined ? record : { ...record, pid, pidStart: inspect(pid)?.start };
-}
-
-// Stops an orphan process, by its group so the bash command it has running goes too.
-// No other fate is signalled: a pid that may have been reused is not ours to hit.
-async function reapProcess(record: RunningRecord, killGraceMs: number): Promise<Fate> {
-  if (record.pid !== undefined) await terminateGroup(record.pid, () => processFate(record) === "orphan", killGraceMs);
-  return processFate(record);
 }
 
 interface HostPolicy {
@@ -214,8 +192,36 @@ interface HostPolicy {
   notEnded(record: RunningRecord): string;
 }
 
-const processHost: HostPolicy = { fate: processFate, reap: reapProcess, notEnded: ({ pid }) => `previous process (pid ${pid}) has not exited` };
-const hosts: Record<Host, HostPolicy> = { rpc: processHost, hc: processHost, t3: t3Host };
+// A process host's run is the process the record names by pid and start time. An
+// hc record written before its pid takes both from hc, in identifyByTerminalName.
+// launcherHolds says whether the live launching pi still holds that process.
+function processPolicy(launcherHolds: (processParentPid: number, launcherPid: number) => boolean): HostPolicy {
+  const fate = ({ pid, pidStart, parentPid }: RunningRecord): Fate => {
+    if (pid === undefined || !alive(pid)) return "gone";
+    const info = inspect(pid);
+    if (info && pidStart !== undefined && info.start !== pidStart) return "gone";
+    // With no word from the system, two live pids keep the record: calling a
+    // live agent stopped would let a message start a second process on its session.
+    const launcherHasIt = info ? launcherHolds(info.parentPid, parentPid) : alive(parentPid);
+    if (parentPid !== process.pid && launcherHasIt) return "kept";
+    return info && info.start === pidStart ? "orphan" : "unknown";
+  };
+  return {
+    fate,
+    // Stops an orphan process, by its group so the bash command it has running goes too.
+    // No other fate is signalled: a pid that may have been reused is not ours to hit.
+    async reap(record, killGraceMs) {
+      if (record.pid !== undefined) await terminateGroup(record.pid, () => fate(record) === "orphan", killGraceMs);
+      return fate(record);
+    },
+    notEnded: ({ pid }) => `previous process (pid ${pid}) has not exited`,
+  };
+}
+
+const processHost = processPolicy((processParentPid, launcherPid) => processParentPid === launcherPid);
+// A terminal's program is a child of its terminal server, such as herdr-core, not of the pi that launched it.
+const terminalHost = processPolicy((_, launcherPid) => alive(launcherPid));
+const hosts: Record<Host, HostPolicy> = { rpc: processHost, hc: terminalHost, t3: t3Host };
 const hostOf = (record: RunningRecord): HostPolicy => hosts[record.host ?? "rpc"];
 
 const now = () => new Date().toISOString();

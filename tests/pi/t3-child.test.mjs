@@ -239,21 +239,37 @@ describe("the pi agent host: t3 sheet line", () => {
   const setup = useWorld();
   const t3Sheet = { sheet: "pi agent host: t3\n" };
 
-  test("inside T3 Code, an agent runs as a T3 Code child thread with its agent file, read-only rule, model, and effort in the task", async () => {
+  test("inside T3 Code, an agent runs as a T3 Code child thread with its agent file, model, and effort in the task", async () => {
     const { calls } = fakeT3(completing());
     const { w, pi, ctx } = setup(t3Sheet);
-    const result = await pi.call("agent", { description: "probe", prompt: "look", subagent_type: "pstack:poteto-agent", readonly: true, model: "haiku", effort: "low" }, ctx);
+    const result = await pi.call("agent", { description: "probe", prompt: "look", subagent_type: "pstack:poteto-agent", model: "haiku", effort: "low" }, ctx);
     expect(resultText(result)).toContain("the answer");
     expect(w.invocations()).toEqual([]);
     const { task, title, target } = calls.find((c) => c.name === "delegate_task").args;
     expect({ title, target }).toEqual({ title: "probe", target: { model: "anthropic/fixture-haiku", options: { thinking: "low" } } });
-    expect(task).toBe(`<agent name="pstack:poteto-agent">\n${agentBody("agents/poteto-agent.md")}\n</agent>\n\nYou are read-only: do not change any file, with the edit and write tools or with bash.\n\nlook`);
+    expect(task).toBe(`<agent name="pstack:poteto-agent">\n${agentBody("agents/poteto-agent.md")}\n</agent>\n\nlook`);
     const running = pi.entries.map((e) => e.data).filter((r) => r.status === "running");
     expect(running.map((r) => [r.host, r.agent.host, r.t3TaskId, r.agent.t3ThreadId])).toEqual([
       ["t3", "t3", undefined, undefined],
       ["t3", "t3", "task-1", "thread-1"],
     ]);
     expect(pi.entries.at(-1).data).toMatchObject({ status: "completed", finalText: "the answer" });
+  });
+
+  test("a read-only agent runs as a local process without the edit and write tools, because T3 Code cannot remove a thread's tools", async () => {
+    const { calls } = fakeT3(completing());
+    const { w, pi, ctx } = setup(t3Sheet);
+    await pi.call("agent", { description: "ro", prompt: "x", readonly: true }, ctx);
+    expect(w.invocations().map((inv) => [flag(inv, "--mode"), flag(inv, "--exclude-tools")])).toEqual([["rpc", "edit,write"]]);
+    expect(calls).toEqual([]);
+  });
+
+  test("an agent at the depth limit runs as a local process without the agent tool", async () => {
+    const { calls } = fakeT3(completing());
+    const { w, pi, ctx } = setup({ ...t3Sheet, settings: { depth: 2 } });
+    await pi.call("agent", { description: "deep", prompt: "x" }, ctx);
+    expect(w.invocations().map((inv) => [flag(inv, "--mode"), flag(inv, "--exclude-tools")])).toEqual([["rpc", "agent"]]);
+    expect(calls).toEqual([]);
   });
 
   test("send_message to a finished T3 agent resumes it in its thread with the message alone", async () => {

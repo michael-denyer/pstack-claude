@@ -266,8 +266,11 @@ export class AgentRunner {
     mkdirSync(sessionDir, { recursive: true });
     const systemPromptFile = def.body ? join(state, "prompts", `${id}.md`) : undefined;
     const worktree = params.isolation === "worktree" ? planWorktree(ctx.cwd, id) : undefined;
-    // delegate_task runs a task in the session thread's folder, never in the agent's worktree.
-    const host: Host = sheet?.t3Host && t3Session() && !worktree ? "t3" : sheet?.hcHost && process.env.HC_TERMINAL_ID ? "hc" : "rpc";
+    // delegate_task runs a task in the session thread's folder, never in the agent's worktree. T3 Code
+    // cannot remove a thread's tools, so a read-only agent and one at the depth limit stay local, where
+    // --exclude-tools enforces them.
+    const t3 = sheet?.t3Host && t3Session() && !worktree && !params.readonly && this.settings.depth + 1 < MAX_SPAWN_DEPTH;
+    const host: Host = t3 ? "t3" : sheet?.hcHost && process.env.HC_TERMINAL_ID ? "hc" : "rpc";
     const identity: AgentIdentity = {
       id,
       description: params.description,

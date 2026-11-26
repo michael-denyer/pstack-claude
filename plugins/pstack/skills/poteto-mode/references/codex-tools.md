@@ -118,12 +118,10 @@ Affected skill entry points point here. Most skills need only the tables above. 
 
 The `workspace-write` sandbox makes `.git` read-only inside each writable root. A linked worktree's Git common directory is outside its writable roots. [Resume storage](resume-storage.md) keeps checkpoints under the common directory, so `resume.mjs begin`, the note and artifact writes into the checkpoint directory, and `resume.mjs publish` fail there with `EPERM`. `resume.mjs read` only reads, so it works in the sandbox. Treat any other pstack write under the Git common directory the same way.
 
-- With approval policy `on-request`, run each of those writes as a `shell` command with `sandbox_permissions: "require_escalated"` and a `justification` that names the checkpoint.
-- With approval policy `never`, Codex rejects escalated commands. To save checkpoints in unattended runs, the user grants the store in `~/.codex/config.toml` with a permissions profile, one line per repository. The path is the output of `git rev-parse --path-format=absolute --git-common-dir` followed by `/pstack`. Setting `default_permissions` replaces a `sandbox_mode` set in the same file.
+- With approval policy `on-request`, run each of those writes as a `shell` command with `sandbox_permissions: "require_escalated"` and a `justification` that asks the user to allow saving the pstack checkpoint.
+- With approval policy `never`, Codex rejects escalated commands. To save checkpoints in unattended runs, the user defines a permissions profile in `~/.codex/config.toml` that grants the store, one line per repository. The path is the `pstack` folder inside the directory that `git rev-parse --path-format=absolute --git-common-dir` prints.
 
   ```toml
-  default_permissions = "pstack"
-
   [permissions.pstack]
   extends = ":workspace"
 
@@ -131,7 +129,7 @@ The `workspace-write` sandbox makes `.git` read-only inside each writable root. 
   "/absolute/path/to/repo/.git/pstack" = "write"
   ```
 
-  A relative `.git/pstack` entry under `":project_roots"` does not work. In a linked worktree `.git` is a file, and Codex fails to start the sandbox.
+  Select the profile for each run with `codex exec -c 'default_permissions="pstack"'`, and leave out `-s`/`--sandbox`, which overrides the profile and drops the grant. A profile ignores the `[sandbox_workspace_write]` table, such as its `writable_roots` and `network_access`, so put any setting the run needs into the profile. A relative `.git/pstack` entry under `":project_roots"` works only in a primary checkout. In a linked worktree `.git` is a file, and Codex cannot start the sandbox for any command.
 - If neither route is available, tell the user the checkpoint was not saved. A failed `begin` or `publish` is not a ready checkpoint.
 
 ## Instructions file

@@ -2,7 +2,7 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-On Codex, `codex-tools.md` now says how to save a resume checkpoint under the `workspace-write` sandbox, which makes `.git` read-only and so blocked every checkpoint write with `EPERM` ([#555](https://github.com/michael-denyer/pstack-claude/issues/555)). With approval policy `on-request`, the agent runs `resume.mjs begin`, `publish`, and the note writes as escalated commands. With `never`, the user grants `<git common dir>/pstack` in a permissions profile that extends `:workspace`. Without either, the agent reports that the checkpoint was not saved.
+On Codex, `codex-tools.md` now says how to save a resume checkpoint under the `workspace-write` sandbox, which makes `.git` read-only and so blocked every checkpoint write with `EPERM` ([#555](https://github.com/michael-denyer/pstack-claude/issues/555)). With approval policy `on-request`, the agent runs `resume.mjs begin`, `publish`, and the note writes as escalated commands. With `never`, the user grants `<git common dir>/pstack` in a permissions profile that extends `:workspace` and selects it per run with `-c 'default_permissions="pstack"'`. Without either, the agent reports that the checkpoint was not saved.
 
 ## 0.9.156 - Codex agent lifecycle and spawn schema gate, Pi finds an hc agent's terminal on restore
 

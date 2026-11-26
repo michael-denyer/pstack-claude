@@ -55,12 +55,11 @@ export interface T3Launch {
   onStart: (task: T3Task) => void;
 }
 
-// A T3 Code thread takes no launch flags, so its first message carries the agent file's body and the read-only rule.
-export function t3Brief(agent: { subagentType: string; systemPromptFile?: string; readonly?: true }, prompt: string): string {
+// A T3 Code thread takes no launch flags, so its first message carries the agent file's body.
+export function t3Brief(agent: { subagentType: string; systemPromptFile?: string }, prompt: string): string {
   const body = agent.systemPromptFile ? readFileSync(agent.systemPromptFile, "utf8").trim() : "";
   const parts = [
     body && `<agent name="${agent.subagentType}">\n${body}\n</agent>`,
-    agent.readonly && "You are read-only: do not change any file, with the edit and write tools or with bash.",
     prompt,
   ];
   return parts.filter(Boolean).join("\n\n");

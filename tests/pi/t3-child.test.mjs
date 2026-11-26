@@ -172,8 +172,8 @@ describe("T3Child", () => {
     expect(calls.map((c) => c.name)).toEqual(["delegate_task", "task_cancel", "t3_thread_wait", "task_status"]);
   });
 
-  test("a reply split over several data lines with CRLF line endings, after a notification, is read whole", async () => {
-    const crlf = (reply) => `: ping\r\ndata: {"jsonrpc": "2.0", "method": "notifications/message"}\r\n\r\nevent: message\r\n${JSON.stringify(reply, null, 2).split("\n").map((line) => `data: ${line}`).join("\r\n")}\r\n\r\n`;
+  test("a reply split over several data lines with CRLF line endings, after a priming event and a notification, is read whole", async () => {
+    const crlf = (reply) => `id: 1\r\ndata:\r\n\r\n: ping\r\ndata: {"jsonrpc": "2.0", "method": "notifications/message"}\r\n\r\nevent: message\r\n${JSON.stringify(reply, null, 2).split("\n").map((line) => `data: ${line}`).join("\r\n")}\r\n\r\n`;
     const { session } = fakeT3(completing(), crlf);
     expect(await new T3Child(session, { title: "probe", onStart: () => {} }, "x").exited).toMatchObject({ settled: true, finalText: "the answer" });
   });

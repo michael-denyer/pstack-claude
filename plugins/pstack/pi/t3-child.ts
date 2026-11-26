@@ -231,9 +231,11 @@ function rpcReply(body: string, contentType: string): { result?: unknown; error?
   for (const line of [...body.split(/\r\n|\r|\n/), ""]) {
     if (line.startsWith("data:")) data.push(line.slice(line.startsWith("data: ") ? 6 : 5));
     else if (line === "" && data.length) {
-      const reply = JSON.parse(data.join("\n"));
-      if (reply.id !== undefined) return reply;
+      const text = data.join("\n");
       data = [];
+      if (!text) continue;
+      const reply = JSON.parse(text);
+      if (reply.id !== undefined) return reply;
     }
   }
   throw new Error("T3 Code MCP sent an event stream with no reply.");

@@ -4,7 +4,7 @@ This file is the release changelog, with one `## <version> - <title>` entry per 
 
 ## 0.9.159 - Pi finishes and stops hc agents on Windows
 
-On Windows with `pi agent host: hc`, `/pstack-agents` now reports an agent as finished when its run ends. A compiled Pi binary reports its script as a path under Bun's virtual `B:/~BUN/` root, and the extension passed that path to each child Pi, which broke `hc wait` and kept the agent in `running`. The extension now treats that path as virtual, as it already did for `/$bunfs/`, and starts the child from the binary alone. Stopping an hc agent on Windows now runs `hc kill`, because a process-group signal does nothing there and left the agent's terminal alive. `hc kill` does not wait for the kill grace period. Thanks to @spolom ([#565](https://github.com/michael-denyer/pstack-claude/pull/565)).
+On Windows with `pi agent host: hc`, `/pstack-agents` now reports an agent as finished when its run ends. A compiled Pi binary reports its script as a path under Bun's virtual `B:/~BUN/` root, and the extension passed that path to each child Pi, which broke `hc wait` and kept the agent in `running`. When Pi runs as a compiled binary, the extension now treats that path as virtual, as it already did for `/$bunfs/`, and starts the child from the binary alone. Stopping an hc agent on Windows now runs `hc kill`, because a process-group signal does nothing there and left the agent's terminal alive. `hc kill` does not wait for the kill grace period. Thanks to @spolom ([#565](https://github.com/michael-denyer/pstack-claude/pull/565)).
 
 ## 0.9.158 - Pi agents as T3 Code child threads, watch-pr reports known conflicts at once
 

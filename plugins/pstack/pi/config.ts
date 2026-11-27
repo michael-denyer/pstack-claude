@@ -2,7 +2,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { dirname, join, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Static, Type } from "typebox";
 import { Value } from "typebox/value";
@@ -32,15 +32,26 @@ export interface Settings {
   exitGraceMs: number;
 }
 
+const isBunVirtualPath = (path: string, execPath: string) => {
+  const normalized = path.replaceAll("\\", "/");
+  if (normalized.startsWith("/$bunfs/")) return true;
+  const runtime = win32.basename(execPath).toLowerCase();
+  return !/^(node|bun)(\.exe)?$/.test(runtime) && /^[A-Za-z]:\/~BUN\//i.test(normalized);
+};
+
 // Pi re-runs itself for children when it can: the same runtime and CLI script,
 // so a child never picks up a different pi from PATH.
-function piInvocation(): Settings["pi"] {
-  const script = process.argv[1];
-  if (script && !script.startsWith("/$bunfs/") && existsSync(script)) {
-    return { command: process.execPath, args: [script] };
+export function piInvocation({ execPath = process.execPath, argv = process.argv, fileExists = existsSync }: {
+  execPath?: string;
+  argv?: string[];
+  fileExists?: (path: string) => boolean;
+} = {}): Settings["pi"] {
+  const script = argv[1];
+  if (script && !isBunVirtualPath(script, execPath) && fileExists(script)) {
+    return { command: execPath, args: [script] };
   }
-  const exe = basename(process.execPath).toLowerCase();
-  return /^(node|bun)(\.exe)?$/.test(exe) ? { command: "pi", args: [] } : { command: process.execPath, args: [] };
+  const exe = win32.basename(execPath).toLowerCase();
+  return /^(node|bun)(\.exe)?$/.test(exe) ? { command: "pi", args: [] } : { command: execPath, args: [] };
 }
 
 // readDepth is called on each use: pi parses extension flags after it loads

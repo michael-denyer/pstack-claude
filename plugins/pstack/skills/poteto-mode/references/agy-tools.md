@@ -18,7 +18,7 @@ The Antigravity CLI (`agy`) loads the native pstack plugin manifest, the skills,
 | Wait for a subagent result | End the turn (call no more tools). Antigravity resumes the session automatically when a subagent sends a message or finishes. |
 | Continue or steer a subagent (`SendMessage`) | `send_message` with `Recipient` set to the subagent's `conversationId` and `Message` |
 | List or stop subagents | `manage_subagents` with `Action: "list"`, `"kill"`, or `"kill_all"` and `ConversationIds` |
-| Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | Keep an uncommitted `todo.md` Markdown checklist in the work dir (or `.audit/<task-slug>.todo.md` when sessions share a checkout) |
+| Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | `update_steps` with the whole `steps` list, each with a `title` and a `status` (`pending`, `in_progress`, `done`, `skipped`, `failed`); a skipped step keeps its place with status `skipped`. It takes at most 12 steps with titles of 2 to 6 words, so give it that short plan, and keep the uncommitted `todo.md` checklist poteto-mode describes as well (`.audit/<task-slug>.todo.md` when sessions share a checkout), with the playbook steps verbatim and each `skip: <reason>` line. |
 | Ask the human a fixed-choice question (`AskUserQuestion`) | `ask_question` with `questions` (`question`, `options`, `is_multi_select`) |
 | Schedule a self-paced re-invocation (`ScheduleWakeup`, the `loop` skill) | `schedule` with `DurationSeconds` (one-shot timer) or `CronExpression` (recurring schedule) and `Prompt` |
 | Call an MCP tool (`mcp__<server>__<tool>`) | Call the MCP tool directly as declared in the session's tool list |

@@ -6,8 +6,16 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { loadAgentTypes } from "../../plugins/pstack/pi/agent-files.ts";
-import { checkEffort, defaultSettings, parseSheet, readSheet, resolveModel } from "../../plugins/pstack/pi/config.ts";
+import { checkEffort, defaultSettings, parseSheet, piInvocation, readSheet, resolveModel } from "../../plugins/pstack/pi/config.ts";
 import { chmodDeniesReads } from "../session-hook-sheets.mjs";
+
+test("compiled Bun virtual script paths are not forwarded to child Pi processes", () => {
+  const exists = () => true;
+  const executable = "C:\\tools\\pi.exe";
+  expect(piInvocation({ execPath: executable, argv: [executable, "B:/~BUN/root/pi.exe"], fileExists: exists })).toEqual({ command: executable, args: [] });
+  expect(piInvocation({ execPath: executable, argv: [executable, "/$bunfs/root/pi"], fileExists: exists })).toEqual({ command: executable, args: [] });
+  expect(piInvocation({ execPath: "C:\\tools\\bun.exe", argv: ["bun.exe", "B:/~BUN/root/test-runner.js"], fileExists: exists })).toEqual({ command: "C:\\tools\\bun.exe", args: ["B:/~BUN/root/test-runner.js"] });
+});
 
 test("depth comes from the reader on each use and PI_CODING_AGENT_DIR moves the sheet", () => {
   let flag = 0;

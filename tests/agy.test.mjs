@@ -69,6 +69,7 @@ describe("agy-tools.md task tracking", () => {
 
   test("names update_steps and keeps the verbatim checklist beside its short titles", () => {
     expect(row).toContain("`update_steps`");
+    expect(row).toContain("`todo.md` checklist");
     expect(row).toContain("with the playbook steps verbatim and each `skip: <reason>` line");
   });
 });

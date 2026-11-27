@@ -223,7 +223,11 @@ function processPolicy(launcherHolds: (processParentPid: number, record: Running
 
 const processHost = processPolicy((processParentPid, { parentPid }) => processParentPid === parentPid);
 // A terminal's program is a child of its terminal server (herdr-core, Orca), not of the pi that launched it.
-const terminalHost = processPolicy((_, { parentPid, parentStart }) => (parentStart === undefined ? alive(parentPid) : inspect(parentPid)?.start === parentStart));
+const terminalHost = processPolicy((_, { parentPid, parentStart }) => {
+  // A launcher the system will not describe falls back to the alive check, as one with no recorded start does.
+  const launcher = parentStart === undefined ? undefined : inspect(parentPid);
+  return launcher ? launcher.start === parentStart : alive(parentPid);
+});
 const hosts: Record<Host, HostPolicy> = { rpc: processHost, hc: terminalHost, orca: terminalHost, t3: t3Host };
 const hostOf = (record: RunningRecord): HostPolicy => hosts[record.host ?? "rpc"];
 

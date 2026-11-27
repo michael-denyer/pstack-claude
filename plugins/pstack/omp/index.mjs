@@ -4,13 +4,12 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const skills = join(root, "skills");
-const mapping = join(root, "skills", "poteto-mode", "references", "omp-tools.md");
 const mandate = readFileSync(join(root, "hooks", "session-start-context.md"), "utf8");
 const marker = "[pstack OMP instructions]";
+const adapter = `${marker}
+A pstack skill's URL is skill://pstack/<name> when OMP's skill list names pstack/<name>, and skill://<name> otherwise; read a file inside it as that URL followed by /<path>. Before following a pstack skill, read skill://poteto-mode/references/omp-tools.md, or skill://pstack/poteto-mode/references/omp-tools.md when the list names pstack/poteto-mode, for OMP tool and model mappings. Resolve every pstack:<name> skill in the following instructions by reading its URL. For example, read skill://poteto-mode for pstack:poteto-mode, or skill://pstack/poteto-mode when the list names pstack/poteto-mode. Do not read pstack skills by their absolute install path, which can sit in a folder the user restricted.`;
 
 function instructions(routed) {
-  const adapter = `${marker}\nBefore following a pstack skill, read ${JSON.stringify(mapping)} for OMP tool and model mappings. Resolve every pstack:<name> skill in the following instructions by reading the installed plugin file at ${JSON.stringify(join(skills, "<name>", "SKILL.md"))}, substituting the named skill. For example, read ${JSON.stringify(join(skills, "poteto-mode", "SKILL.md"))} for pstack:poteto-mode. Do not resolve these names through a bare skill name, which can select a different installation.`;
   return routed ? `${adapter}\n${mandate}` : adapter;
 }
 

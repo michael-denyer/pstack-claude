@@ -2,7 +2,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { dirname, join, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Static, Type } from "typebox";
 import { Value } from "typebox/value";
@@ -35,7 +35,7 @@ export interface Settings {
 const isBunVirtualPath = (path: string, execPath: string) => {
   const normalized = path.replaceAll("\\", "/");
   if (normalized.startsWith("/$bunfs/")) return true;
-  const runtime = basename(execPath).toLowerCase();
+  const runtime = win32.basename(execPath).toLowerCase();
   return !/^(node|bun)(\.exe)?$/.test(runtime) && /^[A-Za-z]:\/~BUN\//i.test(normalized);
 };
 
@@ -50,7 +50,7 @@ export function piInvocation({ execPath = process.execPath, argv = process.argv,
   if (script && !isBunVirtualPath(script, execPath) && fileExists(script)) {
     return { command: execPath, args: [script] };
   }
-  const exe = basename(execPath).toLowerCase();
+  const exe = win32.basename(execPath).toLowerCase();
   return /^(node|bun)(\.exe)?$/.test(exe) ? { command: "pi", args: [] } : { command: execPath, args: [] };
 }
 

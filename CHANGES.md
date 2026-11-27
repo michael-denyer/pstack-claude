@@ -2,9 +2,11 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
-## 0.9.159 - Pi finishes and stops hc agents on Windows
+## 0.9.159 - Pi finishes and stops hc agents on Windows, Antigravity maps the todolist to update_steps
 
 On Windows with `pi agent host: hc`, `/pstack-agents` now reports an agent as finished when its run ends. A compiled Pi binary reports its script as a path under Bun's virtual `B:/~BUN/` root, and the extension passed that path to each child Pi, which broke `hc wait` and kept the agent in `running`. When Pi runs as a compiled binary, the extension now treats that path as virtual, as it already did for `/$bunfs/`, and starts the child from the binary alone. Stopping an hc agent on Windows now runs `hc kill`, because a process-group signal does nothing there and left the agent's terminal alive. `hc kill` does not wait for the kill grace period. Thanks to @spolom ([#565](https://github.com/michael-denyer/pstack-claude/pull/565)).
+
+On Antigravity, `agy-tools.md` now maps the todolist to `update_steps`, the task tool `agy` declares, in place of a `todo.md`-only row that sessions ignored for `update_steps` ([#574](https://github.com/michael-denyer/pstack-claude/issues/574)). `update_steps` takes at most 12 steps with 2-to-6-word titles and has no field for a skip reason, so, as in the Claude desktop app since 0.9.127, the agent gives it the short plan and keeps the `todo.md` checklist beside it with the playbook steps verbatim and each `skip: <reason>` line. Reported by @jokiatgithub.
 
 ## 0.9.158 - Pi agents as T3 Code child threads, watch-pr reports known conflicts at once
 

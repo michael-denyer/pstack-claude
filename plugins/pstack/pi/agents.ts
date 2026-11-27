@@ -332,7 +332,7 @@ export class AgentRunner {
         this.track(identity.id, { t3TaskId: taskId });
       };
       const requestId = identity.t3ThreadId ? undefined : randomUUID();
-      const launch = { title: identity.description, model: identity.model, thinking: identity.thinking, threadId: identity.t3ThreadId, requestId, onStart };
+      const launch = { title: identity.description, model: identity.model, thinking: identity.thinking, threadId: identity.t3ThreadId, requestId, graceMs: this.settings.killGraceMs, onStart };
       return { child: new T3Child(t3, launch, identity.t3ThreadId ? prompt : t3Brief(identity, prompt)), host, t3RequestId: requestId };
     }
     // An hc agent's session is a Pi session file, so outside herdr-core an RPC child resumes it.

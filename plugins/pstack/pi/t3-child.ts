@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { setTimeout as sleep } from "node:timers/promises";
 import { type Static, type TSchema, Type } from "typebox";
 import { Value } from "typebox/value";
 
@@ -7,6 +8,7 @@ import { alive, type ChildExit, type Fate } from "./child.ts";
 const PROTOCOL = "2025-06-18";
 const WAIT_MS = 30_000;
 const LOST_LAUNCH = "pstack: the Pi session that started this agent ended before T3 Code answered its launch, so the task is cancelled.";
+const LATE_STEER = "T3 Code put it in the agent's thread after its run had ended, so no run reads the reply.";
 // T3 Code's terminal task statuses (OrchestratorMcpTerminalDelegatedTaskStatus).
 const ENDED = new Set(["completed", "failed", "cancelled", "interrupted"]);
 
@@ -54,6 +56,7 @@ export interface T3Launch {
   thinking?: string;
   threadId?: string;
   requestId?: string;
+  graceMs: number;
   onStart: (task: T3Task) => void;
 }
 
@@ -93,7 +96,7 @@ export class T3Child {
     this.exited = this.drive(launch, prompt);
   }
 
-  async steer(message: string): Promise<{ response: { success: boolean } | undefined; taken: boolean }> {
+  async steer(message: string): Promise<{ response: { success: boolean; error?: string } | undefined; taken: boolean }> {
     const threadId = this.threadId;
     if (this.done || threadId === undefined) return { response: undefined, taken: false };
     const send = this.steers.then(async () => {
@@ -103,12 +106,12 @@ export class T3Child {
       if (!taskId) return;
       this.taskId = taskId;
       this.onStart({ threadId, taskId });
-      if (this.ending) void this.cancel();
+      if (this.ending || this.done) void this.cancel();
     });
     this.steers = send.catch(() => undefined);
     try {
       await send;
-      return { response: { success: true }, taken: true };
+      return this.done ? { response: { success: false, error: LATE_STEER }, taken: false } : { response: { success: true }, taken: true };
     } catch {
       return { response: undefined, taken: false };
     }
@@ -129,14 +132,21 @@ export class T3Child {
       const threadId = await this.start(launch, prompt);
       if (this.ending) await this.cancel();
       let steers: Promise<unknown>;
-      let result: Static<typeof taskResult>;
+      let result: Static<typeof taskResult> | Error;
       do {
         steers = this.steers;
         await steers;
-        await settled(this.mcp, threadId, this.runId, this.stopWaiting.signal);
-        result = await this.mcp.call(taskResult, "task_status", { taskId: this.taskId });
+        try {
+          await settled(this.mcp, threadId, this.runId, this.stopWaiting.signal);
+          result = await this.mcp.call(taskResult, "task_status", { taskId: this.taskId });
+        } catch (e) {
+          result = e as Error;
+          // The steer is not aborted at the grace, so a later answer still names any task it started, which steer() then cancels.
+          if (steers === this.steers || !(await Promise.race([this.steers.then(() => true), sleep(launch.graceMs, false, { ref: false })]))) break;
+        }
       } while (steers !== this.steers);
       this.done = true;
+      if (result instanceof Error) throw result;
       const { status, summary } = result;
       const text = summary ?? "";
       if (status === "completed") return { exitCode: 0, settled: true, finalText: text, errorMessage: "", stderr: "" };

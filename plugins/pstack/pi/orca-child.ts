@@ -35,6 +35,7 @@ export interface OrcaSession {
 
 // Orca's macOS app sets no ORCA_CLI_COMMAND, and on Linux a bare orca is the screen reader.
 export function orcaSession(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): OrcaSession | undefined {
+  if (platform === "win32") return undefined;
   const handle = env.ORCA_TERMINAL_HANDLE;
   const cli = env.ORCA_CLI_COMMAND || (platform === "darwin" ? "orca" : undefined);
   const workspace = env.ORCA_WORKTREE_ID || env.ORCA_WORKSPACE_ID;

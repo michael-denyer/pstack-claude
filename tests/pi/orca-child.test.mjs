@@ -314,6 +314,12 @@ test("without ORCA_CLI_COMMAND only macOS falls back to orca on PATH, as Orca's 
   expect(orcaSession(env, "win32")).toBeUndefined();
 });
 
+test("Windows has no Orca session even with ORCA_CLI_COMMAND set, since the tab's launch script needs sh", () => {
+  const env = { ORCA_TERMINAL_HANDLE: "term_1", ORCA_CLI_COMMAND: "C:\\Orca\\bin\\orca.cmd", ORCA_WORKTREE_ID: "r::/p" };
+  expect(orcaSession(env, "win32")).toBeUndefined();
+  expect(orcaSession(env, "linux")).toEqual({ cli: "C:\\Orca\\bin\\orca.cmd", workspace: "r::/p" });
+});
+
 test("without ORCA_WORKTREE_ID the workspace is ORCA_WORKSPACE_ID, which Orca sets on every tab", () => {
   const env = { ORCA_TERMINAL_HANDLE: "term_1", ORCA_CLI_COMMAND: "/data/cli/bin/orca", ORCA_WORKSPACE_ID: "r::/w" };
   expect(orcaSession(env, "linux")).toEqual({ cli: "/data/cli/bin/orca", workspace: "r::/w" });

@@ -190,11 +190,12 @@ describe("T3Child", () => {
     });
     const child = new T3Child(session, { title: "probe", onStart: () => {} }, "work");
     await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
-    void child.steer("more");
+    const steering = child.steer("more");
     await waitFor(() => calls.some((c) => c.name === "t3_thread_send"));
     const at = Date.now();
     child.end(100);
     await child.exited;
+    expect(await steering).toEqual({ response: undefined, taken: false });
     expect(Date.now() - at).toBeLessThan(2000);
   });
 
@@ -570,6 +571,44 @@ describe("the pi agent host: t3 sheet line", () => {
     await Bun.sleep(200);
     expect(calls.filter((c) => c.name === "t3_thread_wait").length).toBe(waits);
     await pi.emit("session_shutdown", {}, ctx);
+  });
+
+  test.each([
+    ["waits for that turn's task to end once T3 Code cancels it", false],
+    ["names that turn's task when T3 Code refuses to cancel it too", true],
+  ])("stop_agent whose cancel T3 Code refuses for an ended task while it answers a steer with a new turn %s", async (_, refuse) => {
+    let release;
+    const answered = new Promise((resolve) => (release = resolve));
+    const cancelled = new Set();
+    const { calls } = fakeT3({
+      orchestrator_capabilities: capabilities,
+      delegate_task: () => reply(delegated),
+      t3_thread_send: async () => (await answered, reply({ threadId: "thread-1", taskId: "task-2", runId: "run-2", status: "starting", delivery: "started" })),
+      t3_thread_wait: async ({ runId }) => {
+        if (runId === "run-1") return (await waitFor(() => calls.some((c) => c.name === "t3_thread_send")), reply({ timedOut: false }));
+        return (await Bun.sleep(20), reply({ timedOut: !cancelled.has("task-2") }));
+      },
+      task_status: ({ taskId }) => reply(taskId === "task-1" ? { status: "completed", summary: "the first reply" } : { status: "interrupted", summary: null }),
+      task_cancel: ({ taskId }) => {
+        if (taskId === "task-1") return (setTimeout(release, 20), failure("Task task-1 has already ended."));
+        if (refuse) return failure("Child runtime mode full-access is broader than parent mode approval-required.");
+        cancelled.add(taskId);
+        return reply({ taskId, status: "cancel_requested" });
+      },
+    });
+    const { pi, ctx } = setup({ ...t3Sheet, settings: { killGraceMs: 5000 } });
+    await pi.call("agent", { description: "long", prompt: "x", run_in_background: true }, ctx);
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const sending = pi.call("send_message", { to: "long", message: "more" }, ctx).catch((e) => e);
+    await waitFor(() => calls.some((c) => c.name === "task_status"));
+    await pi.call("stop_agent", { id: "long" }, ctx);
+    expect(calls.filter((c) => c.name === "task_cancel").map((c) => c.args.taskId)).toEqual(["task-1", "task-2"]);
+    expect(calls.filter((c) => c.name === "task_status").map((c) => c.args.taskId)).toEqual(refuse ? ["task-1"] : ["task-1", "task-2"]);
+    expect(pi.entries.findLast((e) => e.data.status === "running").data.t3TaskId).toBe("task-2");
+    expect(pi.entries.at(-1).data).toMatchObject({ status: "stopped" });
+    expect(pi.entries.at(-1).data.finalText).toContain(refuse ? "T3 Code did not cancel task task-2, so thread thread-1 may still be running" : "(stopped before it replied)");
+    await sending;
+    expect(calls.filter((c) => c.name === "t3_thread_send").length).toBe(1);
   });
 
   test("an agent that ran as a local process resumes as one, even once the line is added and its session file is gone", async () => {

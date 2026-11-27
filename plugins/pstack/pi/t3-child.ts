@@ -89,6 +89,7 @@ export class T3Child {
   private ending = false;
   private cancelled?: { taskId: string; done: Promise<void> };
   private readonly stopWaiting = new AbortController();
+  private readonly stopped = new Promise<void>((resolve) => this.stopWaiting.signal.addEventListener("abort", () => resolve()));
 
   constructor(session: T3Session, launch: T3Launch, prompt: string) {
     this.mcp = new T3Mcp(session);
@@ -100,7 +101,9 @@ export class T3Child {
     const threadId = this.threadId;
     if (this.done || threadId === undefined) return { response: undefined, taken: false };
     const send = this.steers.then(async () => {
-      const { taskId, runId, delivery } = await this.mcp.call(sent, "t3_thread_send", { threadId, message, mode: "steer" }, this.stopWaiting.signal);
+      this.stopWaiting.signal.throwIfAborted();
+      // A stop never aborts a sent steer, so an answer that names a task the steer started still arrives, and that task is cancelled.
+      const { taskId, runId, delivery } = await this.mcp.call(sent, "t3_thread_send", { threadId, message, mode: "steer" });
       if (delivery === "steered") return;
       this.runId = runId;
       if (!taskId) return;
@@ -109,6 +112,7 @@ export class T3Child {
       if (this.ending || this.done) void this.cancel();
     });
     this.steers = send.catch(() => undefined);
+    if (!(await this.steersAnswered())) return { response: undefined, taken: false };
     try {
       await send;
       return this.done ? { response: { success: false, error: LATE_STEER }, taken: false } : { response: { success: true }, taken: true };
@@ -135,14 +139,13 @@ export class T3Child {
       let result: Static<typeof taskResult> | Error;
       do {
         steers = this.steers;
-        await steers;
+        await this.steersAnswered();
         try {
           await settled(this.mcp, threadId, this.runId, this.stopWaiting.signal);
           result = await this.mcp.call(taskResult, "task_status", { taskId: this.taskId });
         } catch (e) {
           result = e as Error;
-          // The steer is not aborted at the grace, so a later answer still names any task it started, which steer() then cancels.
-          if (steers === this.steers || !(await Promise.race([this.steers.then(() => true), sleep(launch.graceMs, false, { ref: false })]))) break;
+          if (steers === this.steers || !(await Promise.race([this.steersAnswered(), sleep(launch.graceMs, false, { ref: false })]))) break;
         }
       } while (steers !== this.steers);
       this.done = true;
@@ -191,11 +194,18 @@ export class T3Child {
     if (this.cancelled?.taskId !== taskId) {
       const done = this.mcp.call(Type.Unknown(), "task_cancel", { taskId, reason: "stop_agent" }).then(
         () => undefined,
-        (e: Error) => this.stopWaiting.abort(new Error(`T3 Code did not cancel task ${taskId}, so thread ${threadId} may still be running: ${e.message}`)),
+        async (e: Error) => {
+          await this.steersAnswered();
+          if (this.taskId === taskId) this.stopWaiting.abort(new Error(`T3 Code did not cancel task ${taskId}, so thread ${threadId} may still be running: ${e.message}`));
+        },
       );
       this.cancelled = { taskId, done };
     }
     return this.cancelled.done;
+  }
+
+  private steersAnswered(): Promise<boolean> {
+    return Promise.race([this.steers.then(() => true), this.stopped.then(() => false)]);
   }
 }
 

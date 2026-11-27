@@ -49,6 +49,10 @@ export interface HcOptions {
   onStart: (pid: number) => void;
 }
 
+export function terminalTermination(platform: NodeJS.Platform, pid: number | undefined): { kind: "hc" } | { kind: "process-group"; pid: number } {
+  return platform === "win32" || pid === undefined ? { kind: "hc" } : { kind: "process-group", pid };
+}
+
 export class HcChild {
   readonly pid = undefined;
   readonly activity = undefined;
@@ -85,8 +89,9 @@ export class HcChild {
   }
 
   signal(signal: NodeJS.Signals): void {
-    if (this.terminalPid === undefined) spawn("hc", ["kill", this.name], { detached: true, stdio: "ignore" }).unref();
-    else signalGroup(this.terminalPid, signal);
+    const termination = terminalTermination(process.platform, this.terminalPid);
+    if (termination.kind === "hc") spawn("hc", ["kill", this.name], { detached: true, stdio: "ignore" }).unref();
+    else signalGroup(termination.pid, signal);
   }
 
   private async drive(run: string[], opts: HcOptions, prompt: string): Promise<ChildExit> {
@@ -115,9 +120,9 @@ export class HcChild {
   }
 
   private stop(graceMs: number): void {
-    const pid = this.terminalPid;
-    if (pid === undefined) void quiet(["kill", this.name]);
-    else void terminateGroup(pid, () => alive(pid), graceMs);
+    const termination = terminalTermination(process.platform, this.terminalPid);
+    if (termination.kind === "hc") void quiet(["kill", this.name]);
+    else void terminateGroup(termination.pid, () => alive(termination.pid), graceMs);
   }
 
   private async turn(prompt: string): Promise<WaitResult> {

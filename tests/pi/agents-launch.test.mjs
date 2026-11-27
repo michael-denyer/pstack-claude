@@ -401,6 +401,25 @@ describe("pi agent host: orca", () => {
     }
   });
 
+  for (const host of ["hc", "orca"]) test(`an ${host} agent refuses a prompt that is empty once trimmed, at its launch and at a resume, before any terminal opens`, async () => {
+    const { w, pi, ctx } = setup({ sheet: `pi agent host: ${host}\n` });
+    const bin = join(w.cwd, "..", "bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "hc"), `#!/bin/sh\necho "$1" >> '${bin}/calls'\nexit 1\n`, { mode: 0o755 });
+    await withEnv(outsideOrca(w), () => pi.call("agent", { description: "e", prompt: "x" }, ctx));
+    const ended = pi.entries.at(-1).data;
+    const resumed = await restore({ ...w, settings: { ...w.settings, ...tabPi } }, [agentEntry(recordWith(ended, { agent: { host } }))]);
+    const inside = host === "hc" ? { ...outsideOrca(w), PATH: `${bin}:${process.env.PATH}`, HC_TERMINAL_ID: "t-test" } : inOrca(w);
+    await withEnv(inside, async () => {
+      await expect(resumed.call("agent", { description: "new", prompt: "" }, ctx)).rejects.toThrow("The prompt is empty once trimmed");
+      await expect(resumed.call("send_message", { to: ended.agent.id, message: " \n\t" }, ctx)).rejects.toThrow("The prompt is empty once trimmed");
+    });
+    expect(resumed.entries).toEqual([]);
+    expect(existsSync(join(bin, "calls"))).toBe(false);
+    expect(orcaCalls(w)).toEqual([]);
+    expect(w.invocations()).toHaveLength(1);
+  });
+
   test("an RPC agent stays one when messaged inside Orca", async () => {
     const { w, pi, ctx } = setup({ sheet });
     await withEnv(outsideOrca(w), () => pi.call("agent", { description: "r", prompt: "x" }, ctx));

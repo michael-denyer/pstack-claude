@@ -307,6 +307,7 @@ export class AgentRunner {
 
   private launch(identity: AgentIdentity, prompt: string, background: boolean): RunningRecord {
     if (this.closed) throw new Error("This session is shutting down; no agent can start.");
+    if ((identity.host === "hc" || identity.host === "orca") && !prompt.trim()) throw new Error("The prompt is empty once trimmed, so the agent would have no task; send the task as text.");
     try {
       // First, so a failure here leaves no worktree or branch behind.
       this.ensureSystemPrompt(identity);

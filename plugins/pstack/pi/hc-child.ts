@@ -15,6 +15,7 @@ const STARTUP_POLL_MS = 500;
 const GET_TIMEOUT_MS = 2000;
 const NOT_THE_CHILD = new Set(["timeout", "message"]);
 const TERMINAL_VARS = new Set(["COLORTERM", "TERM", "TERM_PROGRAM", "PWD", "OLDPWD", "SHLVL", "_"]);
+const READONLY_VARS = new Set(["BASHOPTS", "BASH_VERSINFO", "EUID", "PPID", "SHELLOPTS", "UID"]);
 const LOAD_ENV = '. "$1" && rm -- "$1" && shift && exec "$@"';
 
 const waitResult = Type.Object({
@@ -68,7 +69,7 @@ export class HcChild {
     opts: HcOptions,
     prompt: string,
   ) {
-    writeFileSync(opts.envFile, envScript({ ...process.env, ...opts.env }), { mode: 0o600 });
+    writeFileSync(opts.envFile, envScript({ ...process.env, ...opts.env }, "HC_"), { mode: 0o600 });
     const run = ["run", "--json", "--bg", "--no-notify", "--name", name, "--cwd", opts.cwd, "--", "sh", "-c", LOAD_ENV, "pstack-env", opts.envFile, command, ...args];
     this.exited = this.drive(run, opts, prompt);
   }
@@ -167,17 +168,20 @@ export class HcChild {
   }
 }
 
-export function envScript(env: NodeJS.ProcessEnv): string {
+export function envScript(env: NodeJS.ProcessEnv, terminalPrefix: string): string {
   return Object.entries(env)
-    .filter(([name, value]) => value !== undefined && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !name.startsWith("HC_") && !TERMINAL_VARS.has(name))
+    .filter(([name, value]) => value !== undefined && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !name.startsWith(terminalPrefix) && !TERMINAL_VARS.has(name) && !READONLY_VARS.has(name))
     .map(([name, value]) => `export ${name}='${(value ?? "").replaceAll("'", "'\\''")}'\n`)
     .join("");
 }
 
 export function replyIn(file: string | undefined, from: number): Pick<ChildExit, "finalText" | "errorMessage"> {
+  return replyOf(file ? jsonLines(readFileSync(file).subarray(from).toString("utf8")) : []);
+}
+
+export function replyOf(entries: unknown[]): Pick<ChildExit, "finalText" | "errorMessage"> {
   const reply = { finalText: "", errorMessage: "" };
-  if (!file) return reply;
-  for (const entry of jsonLines(readFileSync(file).subarray(from).toString("utf8"))) {
+  for (const entry of entries) {
     if (!Value.Check(transcriptReply, entry)) continue;
     const { message } = entry;
     const text = assistantText(message.content);
@@ -215,11 +219,11 @@ function hcError(e: unknown): string {
   return (e as { stderr?: string }).stderr?.trim() || (e as Error).message;
 }
 
-function sizeOf(file: string | undefined): number {
+export function sizeOf(file: string | undefined): number {
   return file ? statSync(file).size : 0;
 }
 
-function jsonLines(text: string): unknown[] {
+export function jsonLines(text: string): unknown[] {
   return text.split("\n").flatMap((line) => {
     try {
       return [JSON.parse(line)];

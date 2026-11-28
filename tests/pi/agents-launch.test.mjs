@@ -2,10 +2,11 @@
 import { describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
 import { chmodDeniesReads } from "../session-hook-sheets.mjs";
-import { agentBody, agentEntry, fakeCtx, fakePi, flag, gitRepo, listAgents, pluginRoot, recordWith, restore, useWorld, waitFor, withEnv } from "./harness.mjs";
+import { agentBody, agentEntry, fakeCtx, fakePi, flag, gitRepo, listAgents, pluginRoot, readEntries, recordWith, restore, resultText, useWorld, waitFor, withEnv } from "./harness.mjs";
 
 const setup = useWorld();
 
@@ -313,5 +314,153 @@ describe("model resolution", () => {
       else process.env.HC_TERMINAL_ID = terminal;
     }
     expect(w.invocations().map((inv) => flag(inv, "--mode"))).toEqual(["rpc"]);
+  });
+});
+
+describe("pi agent host: orca", () => {
+  const fakeOrca = fileURLToPath(new URL("./fake-orca.mjs", import.meta.url));
+  const interactivePi = fileURLToPath(new URL("./fake-interactive-pi.mjs", import.meta.url));
+  const sheet = "pi agent host: orca\n";
+  const tabPi = { pi: { command: interactivePi, args: [] } };
+  const inOrca = (w) => ({ ORCA_TERMINAL_HANDLE: "term_parent", ORCA_CLI_COMMAND: fakeOrca, ORCA_WORKTREE_ID: "repo::/path", FAKE_ORCA_DIR: w.agentDir, HC_TERMINAL_ID: undefined });
+  const outsideOrca = (w) => ({ ...inOrca(w), ORCA_TERMINAL_HANDLE: undefined });
+  const orcaCalls = (w) => (existsSync(join(w.agentDir, "calls.jsonl")) ? readEntries(join(w.agentDir, "calls.jsonl")) : []);
+  const modes = (w) => w.invocations().map((inv) => flag(inv, "--mode"));
+
+  test("an agent runs as an interactive pi in an Orca terminal, and its record names the host and the pid", async () => {
+    const { w, pi, ctx } = setup({ sheet, settings: tabPi });
+    const result = await withEnv(inOrca(w), () => pi.call("agent", { description: "watch me", prompt: "hello" }, ctx));
+    expect(resultText(result)).toContain("reply to hello");
+    const [child] = readEntries(join(w.agentDir, "pi.jsonl"));
+    expect(child.argv).toContain("--no-approve");
+    expect(child.argv).not.toContain("--mode");
+    expect(orcaCalls(w)[0]).toEqual(expect.arrayContaining(["--worktree=id:repo::/path", "--title=watch me"]));
+    expect(pi.entries.map((e) => [e.data.status, e.data.host, e.data.pid])).toContainEqual(["running", "orca", child.pid]);
+    expect(pi.entries.at(-1).data.status).toBe("completed");
+  });
+
+  test("an orca agent whose first launch Orca refuses ends failed with its host kept, and a message opens a tab", async () => {
+    const { w, pi, ctx } = setup({ sheet, settings: tabPi });
+    writeFileSync(join(w.agentDir, "script.json"), JSON.stringify({ fail: { "terminal create": "selector_not_found: no such worktree" } }));
+    await withEnv(inOrca(w), async () => {
+      const failed = await pi.call("agent", { description: "o", prompt: "x" }, ctx);
+      expect(failed.details.status).toBe("failed");
+      expect(resultText(failed)).toContain("no such worktree");
+      const { id, host } = pi.entries.at(-1).data.agent;
+      expect(host).toBe("orca");
+      writeFileSync(join(w.agentDir, "script.json"), "{}");
+      await pi.call("send_message", { to: id, message: "again" }, ctx);
+      await waitFor(() => pi.entries.at(-1).data.status === "completed");
+    });
+    expect(w.invocations()).toEqual([]);
+    expect(orcaCalls(w).filter((argv) => argv[1] === "create")).toHaveLength(2);
+  });
+
+  test("outside an Orca terminal, the orca line leaves the child on rpc", async () => {
+    const { w, pi, ctx } = setup({ sheet });
+    await withEnv(outsideOrca(w), () => pi.call("agent", { description: "o", prompt: "x" }, ctx));
+    expect(modes(w)).toEqual(["rpc"]);
+    expect(orcaCalls(w)).toEqual([]);
+  });
+
+  test("with both lines in an hc terminal inside Orca, hc wins", async () => {
+    const { w, pi, ctx } = setup({ sheet: "pi agent host: hc\npi agent host: orca\n" });
+    const bin = join(w.cwd, "..", "bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "hc"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    await withEnv({ ...inOrca(w), PATH: `${bin}:${process.env.PATH}`, HC_TERMINAL_ID: "t-test" }, () => pi.call("agent", { description: "both", prompt: "x" }, ctx));
+    expect(pi.entries[0].data).toMatchObject({ status: "running", host: "hc" });
+    expect(orcaCalls(w)).toEqual([]);
+  });
+
+  test("t3 wins over orca, and a worktree agent, which t3 does not take, gets an Orca tab running in its worktree", async () => {
+    const { w, pi, ctx } = setup({ sheet: "pi agent host: t3\npi agent host: orca\n", settings: tabPi });
+    gitRepo(w.cwd);
+    const env = { ...inOrca(w), T3_MCP_URL: "http://127.0.0.1:1/mcp", T3_MCP_BEARER_TOKEN: "tok" };
+    await withEnv(env, () => pi.call("agent", { description: "shared", prompt: "x" }, ctx).catch(() => undefined));
+    expect(pi.entries[0].data).toMatchObject({ status: "running", host: "t3" });
+    expect(orcaCalls(w)).toEqual([]);
+    await withEnv(env, () => pi.call("agent", { description: "own tree", prompt: "x", isolation: "worktree" }, ctx));
+    const { agent } = pi.entries.at(-1).data;
+    expect(agent.host).toBe("orca");
+    expect(agent.cwd).toBe(agent.worktree.path);
+    expect(agent.cwd).not.toBe(w.cwd);
+    expect(readEntries(join(w.agentDir, "pi.jsonl"))[0].cwd).toBe(agent.cwd);
+    expect(orcaCalls(w)[0]).toContain("--worktree=id:repo::/path");
+  });
+
+  test("a read-only agent and one at the depth limit, which t3 does not take, get an Orca tab without the tools they lose", async () => {
+    const t3InOrca = (w) => ({ ...inOrca(w), T3_MCP_URL: "http://127.0.0.1:1/mcp", T3_MCP_BEARER_TOKEN: "tok" });
+    const both = "pi agent host: t3\npi agent host: orca\n";
+    for (const [settings, params, excluded] of [[tabPi, { readonly: true }, "edit,write"], [{ ...tabPi, depth: 2 }, {}, "agent"]]) {
+      const { w, pi, ctx } = setup({ sheet: both, settings });
+      await withEnv(t3InOrca(w), () => pi.call("agent", { description: "local", prompt: "x", ...params }, ctx));
+      expect(pi.entries[0].data.agent.host).toBe("orca");
+      const [child] = readEntries(join(w.agentDir, "pi.jsonl"));
+      expect(child.argv[child.argv.indexOf("--exclude-tools") + 1]).toBe(excluded);
+    }
+  });
+
+  for (const host of ["hc", "orca"]) test(`an ${host} agent refuses a prompt that is empty once trimmed, at its launch and at a resume, before any terminal opens`, async () => {
+    const { w, pi, ctx } = setup({ sheet: `pi agent host: ${host}\n` });
+    const bin = join(w.cwd, "..", "bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "hc"), `#!/bin/sh\necho "$1" >> '${bin}/calls'\nexit 1\n`, { mode: 0o755 });
+    await withEnv(outsideOrca(w), () => pi.call("agent", { description: "e", prompt: "x" }, ctx));
+    const ended = pi.entries.at(-1).data;
+    const resumed = await restore({ ...w, settings: { ...w.settings, ...tabPi } }, [agentEntry(recordWith(ended, { agent: { host } }))]);
+    const inside = host === "hc" ? { ...outsideOrca(w), PATH: `${bin}:${process.env.PATH}`, HC_TERMINAL_ID: "t-test" } : inOrca(w);
+    await withEnv(inside, async () => {
+      await expect(resumed.call("agent", { description: "new", prompt: "" }, ctx)).rejects.toThrow("The prompt is empty once trimmed");
+      await expect(resumed.call("send_message", { to: ended.agent.id, message: " \n\t" }, ctx)).rejects.toThrow("The prompt is empty once trimmed");
+    });
+    expect(resumed.entries).toEqual([]);
+    expect(existsSync(join(bin, "calls"))).toBe(false);
+    expect(orcaCalls(w)).toEqual([]);
+    expect(w.invocations()).toHaveLength(1);
+  });
+
+  test("an RPC agent stays one when messaged inside Orca", async () => {
+    const { w, pi, ctx } = setup({ sheet });
+    await withEnv(outsideOrca(w), () => pi.call("agent", { description: "r", prompt: "x" }, ctx));
+    const { agent } = pi.entries.at(-1).data;
+    expect(agent.host).toBe("rpc");
+    await withEnv(inOrca(w), () => pi.call("send_message", { to: agent.id, message: "more" }, ctx));
+    await w.until("invocation", 2);
+    expect(modes(w)).toEqual(["rpc", "rpc"]);
+    expect(orcaCalls(w)).toEqual([]);
+  });
+
+  test("an orca agent messaged outside Orca resumes as an RPC child that keeps its recorded host, and inside Orca it opens a tab again", async () => {
+    const { w, pi, ctx } = setup({ sheet, settings: tabPi });
+    await withEnv(inOrca(w), () => pi.call("agent", { description: "o", prompt: "x" }, ctx));
+    const { id } = pi.entries[0].data.agent;
+    const runs = ({ entries }) => entries.filter((e) => e.data.status === "running").map((e) => [e.data.host, e.data.agent.host]);
+
+    const outside = await restore(w, pi.entries);
+    await withEnv(outsideOrca(w), () => outside.call("send_message", { to: id, message: "more" }, ctx));
+    await waitFor(() => outside.entries.at(-1)?.data.status === "completed");
+    expect(modes(w)).toEqual(["rpc"]);
+    expect(runs(outside)).toEqual([[undefined, "orca"]]);
+
+    const inside = await restore({ ...w, settings: { ...w.settings, ...tabPi } }, [...pi.entries, ...outside.entries]);
+    await withEnv(inOrca(w), async () => {
+      await inside.call("send_message", { to: id, message: "again" }, ctx);
+      await waitFor(() => inside.entries.at(-1)?.data.status === "completed");
+    });
+    expect(runs(inside)[0]).toEqual(["orca", "orca"]);
+    expect(orcaCalls(w).filter((argv) => argv[1] === "create")).toHaveLength(2);
+  }, 15_000);
+
+  test("a run stopped with Escape in Orca ends stopped, and its notice starts a turn", async () => {
+    const { w, pi, ctx } = setup({ sheet, settings: tabPi });
+    writeFileSync(join(w.agentDir, "script.json"), JSON.stringify({ stopReason: "aborted" }));
+    await withEnv(inOrca(w), async () => {
+      await pi.call("agent", { description: "esc", prompt: "x", run_in_background: true }, ctx);
+      await waitFor(() => pi.messages.length === 1);
+    });
+    expect(pi.entries.at(-1).data).toMatchObject({ status: "stopped", finalText: "reply to x\n\nstopped in Orca" });
+    expect(pi.messages[0].options).toEqual({ triggerTurn: true, deliverAs: "steer" });
+    expect(pi.messages[0].message.details.triggerTurn).toBe(true);
   });
 });

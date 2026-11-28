@@ -7,7 +7,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { AgentRecord, EndedRecord } from "./agents.ts";
 import type { Activity } from "./child.ts";
 
-const NOTICE_TYPE = "pstack-agent";
+export const NOTICE_TYPE = "pstack-agent";
+export const AGENTS_ENTRY = "pstack-agents";
 export const OUTPUT_CAP_BYTES = 50 * 1024;
 
 export function truncateUtf8(text: string, cap: number): string {
@@ -89,11 +90,11 @@ export function agentsReport(records: AgentRecord[], { transcriptOf, activityOf 
     .join("\n\n");
 }
 
-export function noticeOf(record: EndedRecord, transcript: string | undefined): Parameters<ExtensionAPI["sendMessage"]>[0] {
+export function noticeOf(record: EndedRecord, transcript: string | undefined, triggerTurn: boolean): Parameters<ExtensionAPI["sendMessage"]>[0] {
   return {
     customType: NOTICE_TYPE,
     content: `pstack agent finished.\n${header(record, transcript)}${record.outputFile ? `\nfull output: ${record.outputFile}` : ""}\n\n${report(record)}`,
     display: true,
-    details: { agentId: record.agent.id, status: record.status, exitCode: record.exitCode, outputFile: record.outputFile },
+    details: { agentId: record.agent.id, status: record.status, exitCode: record.exitCode, outputFile: record.outputFile, triggerTurn },
   };
 }

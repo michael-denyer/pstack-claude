@@ -62,6 +62,14 @@ test("only exact pi agent host: lines turn on the hc and t3 agent hosts, and bot
   }
 });
 
+test("only an exact pi agent host: orca line runs agents in Orca terminals", () => {
+  expect(parseSheet("bug-fix: opus\r\npi agent host: orca\r\n").orcaHost).toBe(true);
+  expect(parseSheet("pi agent host: hc\npi agent host: orca\n")).toMatchObject({ hcHost: true, orcaHost: true });
+  for (const sheet of ["bug-fix: opus\n", "pi agent host: hc\n", "pi agent host: orca \n", "agent host: orca\n", "pi agent host: Orca\n"]) {
+    expect({ sheet, orca: parseSheet(sheet).orcaHost }).toEqual({ sheet, orca: false });
+  }
+});
+
 test("an agent file loads as pstack:<name> with its body and model, and an effort is checked against models.json", () => {
   const root = mkdtempSync(join(tmpdir(), "pstack-agents-"));
   try {

@@ -359,7 +359,10 @@ describe("stop_agent", () => {
     expect(notice(quiet)).toContain("stopped before it replied");
     expect(notice(chatty)).toContain("halfway");
     for (const id of [quiet, chatty]) expect(notice(id)).not.toContain("No project session");
-    for (const { options } of pi.messages) expect(options).toEqual({ triggerTurn: false });
+    for (const { options, message } of pi.messages) {
+      expect(options).toEqual({ triggerTurn: false });
+      expect(message.details.triggerTurn).toBe(false);
+    }
   });
 
   test("a stop that lands after the child exited, while a process still holds its pipes, signals nothing", async () => {

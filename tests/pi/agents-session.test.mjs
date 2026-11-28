@@ -13,6 +13,15 @@ const exitOf = (proc) => new Promise((r) => proc.on("exit", r));
 
 // A record's pid once another process has it: that one started at another time.
 const reusedBy = (proc) => ({ pid: proc.pid, pidStart: "another time" });
+// The start time as inspect() in agents.ts reads it: from /proc where it exists, else from ps.
+const startOf = (pid) => {
+  if (!fs.existsSync(`/proc/${pid}/stat`)) {
+    const ps = childProcess.spawnSync("ps", ["-o", "lstart=", "-p", String(pid)], { encoding: "utf8", env: { ...process.env, LC_ALL: "C", TZ: "UTC" } });
+    return ps.stdout.trim();
+  }
+  const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+  return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19];
+};
 
 describe("registry", () => {
   test("list_agents survives a reload through the persisted entries", async () => {
@@ -269,7 +278,7 @@ describe("registry", () => {
     expect(alive(reusedParent.pid)).toBe(true);
   });
 
-  test("a restored hc agent is left to its live launching pi, and once that pi is gone its terminal's program is ended", async () => {
+  for (const host of ["hc", "orca"]) test(`a restored ${host} agent is left to its live launching pi, and once that pi is gone its terminal's program is ended`, async () => {
     const { w, pi, ctx } = setup({ script: { default: [{ sleep: 30000 }] } });
     await pi.call("agent", { description: "terminal", prompt: "x", run_in_background: true }, ctx);
     await w.until("invocation");
@@ -277,16 +286,57 @@ describe("registry", () => {
     const launcher = w.spawn("sleep", ["30"], { detached: true });
     const gone = w.spawn("sleep", ["0.1"]);
     await exitOf(gone);
-    const asHc = (parentPid) => pi.entries.map((e) => agentEntry(recordWith(e.data, { host: "hc", parentPid })));
+    const hosted = (parentPid, parentStart) => pi.entries.map((e) => agentEntry(recordWith(e.data, { host, parentPid, parentStart })));
 
-    const kept = await restore(w, asHc(launcher.pid));
+    const kept = await restore(w, hosted(launcher.pid, startOf(launcher.pid)));
     await sleep(2 * w.settings.killGraceMs);
     expect(alive(program)).toBe(true);
     expect((await listAgents(kept, ctx))[0].status).toBe("running");
 
-    const resumed = await restore(w, asHc(gone.pid));
+    const resumed = await restore(w, hosted(gone.pid));
     await waitFor(() => !alive(program));
     expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
+  });
+
+  for (const host of ["hc", "orca"]) test(`a restored ${host} agent whose launching pi's pid now belongs to another process is stopped, and its terminal's program is ended`, async () => {
+    const { w, pi, ctx } = setup({ script: { default: [{ sleep: 30000 }] } });
+    await pi.call("agent", { description: "terminal", prompt: "x", run_in_background: true }, ctx);
+    await w.until("invocation");
+    const program = w.invocations()[0].pid;
+    const stranger = w.spawn("sleep", ["30"], { detached: true });
+
+    const resumed = await restore(w, pi.entries.map((e) => agentEntry(recordWith(e.data, { host, parentPid: stranger.pid }))));
+    await waitFor(() => !alive(program));
+    expect((await listAgents(resumed, ctx))[0].status).toBe("stopped");
+    expect(alive(stranger.pid)).toBe(true);
+  });
+
+  for (const host of ["hc", "orca"]) test(`a restored ${host} agent is left running when only its launching pi cannot be inspected`, async () => {
+    const { w, pi, ctx } = setup({ script: { default: [{ sleep: 30000 }] } });
+    await pi.call("agent", { description: "terminal", prompt: "x", run_in_background: true }, ctx);
+    await w.until("invocation");
+    const program = w.invocations()[0].pid;
+    const launcher = w.spawn("sleep", ["30"], { detached: true });
+    const entries = pi.entries.map((e) => agentEntry(recordWith(e.data, { host, parentPid: launcher.pid, parentStart: startOf(launcher.pid) })));
+
+    const readFile = fs.readFileSync;
+    const spawn = childProcess.spawnSync;
+    const proc = spyOn(fs, "readFileSync").mockImplementation((path, ...args) => {
+      if (path === `/proc/${launcher.pid}/stat`) throw Object.assign(new Error("inspection unavailable"), { code: "EACCES" });
+      return readFile(path, ...args);
+    });
+    const ps = spyOn(childProcess, "spawnSync").mockImplementation((command, args, ...options) =>
+      command === "ps" && args.includes(String(launcher.pid)) ? { status: 1, stdout: "" } : spawn(command, args, ...options),
+    );
+    try {
+      const resumed = await restore(w, entries);
+      await sleep(2 * w.settings.killGraceMs);
+      expect(alive(program)).toBe(true);
+      expect((await listAgents(resumed, ctx))[0].status).toBe("running");
+    } finally {
+      proc.mockRestore();
+      ps.mockRestore();
+    }
   });
 
   // The fake hc fails every call but `get`, which names the pid in the terminal's

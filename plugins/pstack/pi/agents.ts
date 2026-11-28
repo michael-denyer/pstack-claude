@@ -62,6 +62,7 @@ const runningSchema = Type.Object({
   parentPid: Type.Number(),
   host: Type.Optional(hostSchema),
   t3TaskId: Type.Optional(Type.String()),
+  t3RequestId: Type.Optional(Type.String()),
 });
 const endedSchema = Type.Object({
   agent: identitySchema,
@@ -305,10 +306,10 @@ export class AgentRunner {
       }
       throw e;
     }
-    const { child, host } = this.spawnChild(identity, prompt);
+    const { child, host, t3RequestId } = this.spawnChild(identity, prompt);
     const pidStart = child.pid === undefined ? undefined : inspect(child.pid)?.start;
     // An RPC record leaves host unset, as earlier versions wrote it, so an older pstack can still restore it.
-    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, host: host === "rpc" ? undefined : host };
+    const record: RunningRecord = { agent: identity, status: "running", pid: child.pid, pidStart, parentPid: process.pid, host: host === "rpc" ? undefined : host, t3RequestId };
     const run: Run = { child, background, done: child.exited.then((exit) => this.finish(identity, run, exit)) };
     this.agents.set(identity.id, { kind: "local", record, run });
     this.persist(record);
@@ -316,7 +317,7 @@ export class AgentRunner {
     return record;
   }
 
-  private spawnChild(identity: AgentIdentity, prompt: string): { child: AgentChild; host: Host } {
+  private spawnChild(identity: AgentIdentity, prompt: string): { child: AgentChild; host: Host; t3RequestId?: string } {
     const { command, args } = this.settings.pi;
     const base = [...args, "--extension", join(this.settings.pluginRoot, "pi", "index.ts"), "--skill", join(this.settings.pluginRoot, "skills")];
     const flags = childArgs(identity, this.settings.depth);
@@ -330,8 +331,9 @@ export class AgentRunner {
         identity.t3ThreadId = threadId;
         this.track(identity.id, { t3TaskId: taskId });
       };
-      const launch = { title: identity.description, model: identity.model, thinking: identity.thinking, threadId: identity.t3ThreadId, onStart };
-      return { child: new T3Child(t3, launch, identity.t3ThreadId ? prompt : t3Brief(identity, prompt)), host };
+      const requestId = identity.t3ThreadId ? undefined : randomUUID();
+      const launch = { title: identity.description, model: identity.model, thinking: identity.thinking, threadId: identity.t3ThreadId, requestId, graceMs: this.settings.killGraceMs, onStart };
+      return { child: new T3Child(t3, launch, identity.t3ThreadId ? prompt : t3Brief(identity, prompt)), host, t3RequestId: requestId };
     }
     // An hc agent's session is a Pi session file, so outside herdr-core an RPC child resumes it.
     if (host === "hc" && process.env.HC_TERMINAL_ID) {

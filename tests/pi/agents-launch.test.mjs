@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { install } from "../../plugins/pstack/pi/index.ts";
 import { chmodDeniesReads } from "../session-hook-sheets.mjs";
-import { agentBody, agentEntry, fakeCtx, fakePi, flag, gitRepo, listAgents, pluginRoot, recordWith, restore, useWorld, waitFor } from "./harness.mjs";
+import { agentBody, agentEntry, fakeCtx, fakePi, flag, gitRepo, listAgents, pluginRoot, recordWith, restore, useWorld, waitFor, withEnv } from "./harness.mjs";
 
 const setup = useWorld();
 
@@ -265,6 +265,37 @@ describe("model resolution", () => {
       else process.env.HC_TERMINAL_ID = terminal;
     }
     expect(w.invocations().map((inv) => flag(inv, "--mode"))).toEqual(["rpc"]);
+  });
+
+  test("an RPC agent stays one when messaged inside herdr-core, and an hc agent messaged outside it resumes as an RPC child", async () => {
+    const terminal = process.env.HC_TERMINAL_ID;
+    delete process.env.HC_TERMINAL_ID;
+    try {
+      const { w, pi, ctx } = setup({ sheet: "pi agent host: hc\n" });
+      await pi.call("agent", { description: "r", prompt: "x" }, ctx);
+      const ended = pi.entries.at(-1).data;
+      expect(ended.agent.host).toBe("rpc");
+      await withEnv({ HC_TERMINAL_ID: "t-test" }, () => pi.call("send_message", { to: ended.agent.id, message: "more" }, ctx));
+      await w.until("invocation", 2);
+      const resumed = await restore(w, [agentEntry(recordWith(ended, { agent: { host: "hc" } }))]);
+      await resumed.call("send_message", { to: ended.agent.id, message: "again" }, ctx);
+      await w.until("invocation", 3);
+      expect(w.invocations().map((inv) => flag(inv, "--mode"))).toEqual(["rpc", "rpc", "rpc"]);
+      await waitFor(() => resumed.entries.at(-1)?.data.status === "completed");
+      const running = resumed.entries.findLast((e) => e.data.status === "running").data;
+      expect(running).toMatchObject({ agent: { host: "hc" } });
+      expect(running.host).toBeUndefined();
+    } finally {
+      if (terminal !== undefined) process.env.HC_TERMINAL_ID = terminal;
+    }
+  });
+
+  test("a running RPC agent's record leaves host unset, the only form an older pstack restores besides hc", async () => {
+    const { pi, ctx } = setup();
+    await pi.call("agent", { description: "r", prompt: "x" }, ctx);
+    const running = pi.entries.find((e) => e.data.status === "running").data;
+    expect(running.agent.host).toBe("rpc");
+    expect("host" in JSON.parse(JSON.stringify(running))).toBe(false);
   });
 
   test("a worktree agent's host comes from the session's sheet, not the worktree's checkout", async () => {

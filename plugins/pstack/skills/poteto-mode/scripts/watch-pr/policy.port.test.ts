@@ -152,17 +152,55 @@ describe("facts that change while the snapshot is read", () => {
       });
   });
 
+  it.each([
+    [
+      { mergeable: "UNKNOWN", mergeStateStatus: "DIRTY" },
+      "mergeStateStatus DIRTY -> CLEAN",
+    ],
+    [
+      { mergeable: "CONFLICTING", mergeStateStatus: "UNKNOWN" },
+      "mergeable CONFLICTING -> MERGEABLE",
+    ],
+  ] as const)(
+    "retries when one merge field is unknown and the other clears a known conflict (%j)",
+    async (facts, detail) => {
+      await expect(
+        read({
+          facts,
+          factsOnReread: { mergeable: "MERGEABLE", mergeStateStatus: "CLEAN" },
+          fastPath: { kind: "none-reported" },
+          rollupPages: [{ kind: "no-rollup" }],
+          commitRollups: [
+            { oid: "earlier", state: "SUCCESS" },
+            { oid: "head", state: null },
+          ],
+        })
+      ).rejects.toMatchObject({
+        failure: {
+          kind: "snapshot-changed",
+          retryable: true,
+          detail: expect.stringContaining(detail),
+        },
+      });
+    }
+  );
+
   it("keeps an unknown first read when GitHub computes mergeability before the re-read", async () => {
     const unknown = {
       mergeable: "UNKNOWN",
       mergeStateStatus: "UNKNOWN",
     } as const;
-    expect(
-      await read({
-        facts: unknown,
-        factsOnReread: { mergeable: "MERGEABLE", mergeStateStatus: "CLEAN" },
-      })
-    ).toMatchObject({ kind: "open", facts: unknown });
+    for (const facts of [
+      unknown,
+      { mergeable: "UNKNOWN", mergeStateStatus: "CLEAN" },
+      { mergeable: "MERGEABLE", mergeStateStatus: "UNKNOWN" },
+    ] as const)
+      expect(
+        await read({
+          facts,
+          factsOnReread: { mergeable: "MERGEABLE", mergeStateStatus: "CLEAN" },
+        })
+      ).toMatchObject({ kind: "open", facts });
     await expect(
       read({
         facts: unknown,
@@ -689,6 +727,24 @@ describe("a PR with no checks configured", () => {
         kind: "blocker",
         blocker,
       });
+  });
+
+  it("keeps earlier passing CI in a conflicting head's unreported status", async () => {
+    const snapshot = await read({
+      facts: { mergeStateStatus: "DIRTY" },
+      commitRollups: [
+        { oid: "earlier", state: "SUCCESS" },
+        { oid: "head", state: null },
+      ],
+    });
+    expect(snapshot).toMatchObject({
+      kind: "open",
+      ci: { kind: "ci-unreported", hadPreviousPassingCi: true },
+    });
+    expect(classifyPr(snapshot)).toMatchObject({
+      kind: "blocker",
+      blocker: { kind: "merge-conflicts" },
+    });
   });
 
   it("fails closed while the head may not have reported yet", async () => {

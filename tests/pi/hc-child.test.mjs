@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { sessionFile } from "../../plugins/pstack/pi/agents.ts";
-import { envScript, HcChild, replyIn } from "../../plugins/pstack/pi/hc-child.ts";
+import { envScript, HcChild, replyIn, terminalTermination } from "../../plugins/pstack/pi/hc-child.ts";
 
 const entry = (role, content, extra = {}) => JSON.stringify({ type: "message", id: randomUUID().slice(0, 8), message: { role, content, ...extra } });
 const text = (value) => [{ type: "text", text: value }];
@@ -40,6 +40,12 @@ test("a run that ends on a failed message keeps its earlier text and reports the
   ]);
   expect(replyIn(file, 0)).toEqual({ finalText: "partial findings", errorMessage: "overloaded" });
   expect(replyIn(undefined, 0)).toEqual({ finalText: "", errorMessage: "" });
+});
+
+test("Windows and pid-less hc terminals are terminated through herdr-core", () => {
+  expect(terminalTermination("win32", 42)).toEqual({ kind: "hc" });
+  expect(terminalTermination("linux", undefined)).toEqual({ kind: "hc" });
+  expect(terminalTermination("linux", 42)).toEqual({ kind: "process-group", pid: 42 });
 });
 
 test("the env file sets the parent's variables, quoted for sh, and leaves the terminal's own variables to herdr-core", () => {
@@ -170,7 +176,7 @@ suite("HcChild on a live hc core", () => {
   test(
     "end stops a working run within the grace period and removes its terminal",
     async () => {
-      const { child, name } = launch("Run `ping -c 90 127.0.0.1 > /dev/null` with bash and wait for it to finish, then say done.");
+      const { child, name } = launch("Run `sleep 90` with bash and wait for it to finish, then say done.");
       await Bun.sleep(10_000);
       const started = Date.now();
       child.end(GRACE);

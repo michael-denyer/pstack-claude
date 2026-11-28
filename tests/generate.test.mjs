@@ -541,6 +541,11 @@ describe("effort section", () => {
     expect(text).not.toContain("effort-<level>");
   });
 
+  test("Codex model and effort fields defer to the platform mapping's schema check", () => {
+    const text = effortSection(["low", "max"], "high");
+    expect(text).toContain("On Codex, pass `model` and `reasoning_effort` only as the platform mapping's schema check allows");
+  });
+
   test("session effort outside Claude Code defers to the platform mapping", () => {
     const text = effortSection(["low", "max"], "session");
     expect(text).toContain("On other runtimes, follow the platform mapping for `session`");

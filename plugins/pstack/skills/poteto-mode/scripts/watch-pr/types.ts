@@ -187,7 +187,7 @@ export interface CiUnreported {
   readonly kind: "ci-unreported";
   readonly failed: readonly [];
   readonly pending: readonly [];
-  readonly hadPreviousPassingCi: false;
+  readonly hadPreviousPassingCi: boolean;
 }
 export type CiState =
   | CiFailing

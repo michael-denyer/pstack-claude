@@ -80,7 +80,16 @@ The [driver policy](../SKILL.md#non-negotiables) selects the app driver. For ski
 | `run` (drive a CLI/TUI to see a change work) | Run the app yourself via `shell` and observe the real output. |
 | Project UI driver | Drive the UI with whatever automation you have, or hand the user a concrete manual check. Do not claim done without observing the artifact. |
 | `plugin-dev:skill-development` (Claude's SKILL.md authoring guidance) | Follow your platform's skill-authoring guidance; the `writing-skills` skill if present. Keep `name` + `description` frontmatter and progressive disclosure. |
-| `loop` (recurring/self-paced re-invocation, used by `babysit`) | Codex has no `loop` skill. Re-run the step yourself on a cadence, or use a Codex scheduled task if available. |
+| `loop` (recurring/self-paced re-invocation, used by `babysit`) | Use [Wake-ups on Codex](#wake-ups-on-codex). For attended work, recheck while the current turn is active. |
+
+### Wake-ups on Codex
+
+A Codex Goal can keep active work moving toward a checkable outcome. A watcher can report a CI or queue event during an active turn. Work that must continue after the turn ends needs a wake-up mechanism that the current surface exposes.
+
+- Before starting unattended Autopilot or requesting a merge that may queue, confirm an authorized same-chat scheduled task or equivalent wake-up is armed in the same checkout. Record its handle, next wake-up, and stop condition.
+- If the surface cannot wake the agent, report the limit before starting unattended work or requesting a merge that may queue. In Shipping, stop at merge-ready. For attended work, report the last observed state when the turn ends.
+- For queued shipping, keep the original bottom-to-top PR list. Use the existing watcher and `ship-pr inspect` at each wake-up to compare the queued head, destination branch, and base OID with the approved record. Follow Shipping's cancellation and completion rules. Report a blocker if the inputs or the queue state cannot be read.
+- Stop recurring wake-ups when the run ends or the user stops it. Retain the last verified state for handoff.
 
 ## Per-skill notes
 

@@ -65,6 +65,18 @@ Skills name Claude defaults (a single-role default for code/prose/judgment, a wo
 
 `/setup-pstack` writes the configured model list. On Codex, set it to your Codex model slugs.
 
+## Repeating work on Codex
+
+- For a check that can finish in this turn, such as Visual Parity's image diff,
+  repeat the check in the active turn until its stated stop condition. Use the
+  matching driver and keep the original baseline.
+- When adapting an unattended recipe from poteto-help, omit the literal
+  `/loop` command. Keep the goal, checkout, checks, and stop condition. If
+  the work needs to resume after this turn, confirm that the current host
+  exposes an authorized wake-up for the same task and checkout before
+  promising unattended progress. If that capability is unavailable, say
+  what can be done in the active turn and what needs a later wake-up.
+
 ## Session routing hook
 
 The native pstack plugin bundles the same `SessionStart` routing instruction as the Claude Code plugin, through `session-start.sh` on macOS and Linux and `session-start.ps1` on Windows. Codex runs the hook on startup, resume, clear, compact, and fork after the user trusts the hook through `/hooks`. The hook reads `session hook` from the Codex sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/references/runtimes.md); `session hook: off` disables injection.

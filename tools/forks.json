@@ -38,7 +38,7 @@
     },
     "plugins/pstack/skills/poteto-help/SKILL.md": {
       "kind": "port-feature",
-      "why": "Routes installation, model-sheet loading, and persistent routing preferences to the current runtime's setup sources, gives installed playbooks precedence over upstream guides, and keeps the port's public skill loading, hidden principles, verification-skill naming, local-worker advice, driver and built-in equivalents, excluded make-bot-ui row, and orchestrate wording as prose changes in this fork, and routes \"stack them, don't ship\" to Autopilot-stack, because neither autopilot merges. Points a Claude Code cloud session to PSTACK_SESSION_HOOK=off, since its sheet does not persist.",
+      "why": "Routes installation, model-sheet loading, and persistent routing preferences to the current runtime's setup sources, gives installed playbooks precedence over upstream guides, and keeps the port's public skill loading, hidden principles, verification-skill naming, local-worker advice, driver and built-in equivalents, excluded make-bot-ui row, and orchestrate wording as prose changes in this fork, checks the Codex repeat and wake-up mapping before offering an unattended recipe, and routes \"stack them, don't ship\" to Autopilot-stack, because neither autopilot merges. Points a Claude Code cloud session to PSTACK_SESSION_HOOK=off, since its sheet does not persist.",
       "since": "0.9.71",
       "upstream": "not-proposed"
     },

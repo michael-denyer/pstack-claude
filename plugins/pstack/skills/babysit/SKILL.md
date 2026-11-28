@@ -31,6 +31,8 @@ Inside poteto-mode, the **Babysit** playbook ([`../poteto-mode/playbooks/babysit
    gh pr view <number> --json number,title,state,mergeable,reviewDecision,statusCheckRollup,mergeStateStatus,comments,reviews
    ```
 
+   When `gh pr view` fails with a GraphQL refusal, as in a Claude Code cloud session, take status from the watcher at `skills/poteto-mode/scripts/watch-pr/watch-pr` under the installed plugin, with `--owner <owner> --repo <repo> --pr <number> --status-only`. It reads the PR over REST there. In the row of its JSON, a conflict is `facts.mergeable` `CONFLICTING`, failing checks are listed in `ci.failed`, and unresolved review threads are in `threads`. Read comments, reviews, and CI logs with the REST commands in [Reading a PR from a Claude Code cloud session](../poteto-mode/references/cloud-session-pr-reads.md).
+
 2. **Triage in priority order.**
    - Merge conflicts (`mergeStateStatus == DIRTY`): run the **fix-merge-conflicts** skill. Force-push only if the branch is yours and not shared.
    - Failing checks (`statusCheckRollup` entries with `conclusion: FAILURE`): run the **fix-ci** skill. Root-cause the failure; fix the underlying code or test; commit; push.
@@ -38,7 +40,7 @@ Inside poteto-mode, the **Babysit** playbook ([`../poteto-mode/playbooks/babysit
    - Review-bot comments (Bugbot and similar automation): classify fix/dismiss/ask before acting, per [`bugbot-triage.md`](../poteto-mode/references/bugbot-triage.md). Ask by default on security, data, and high-severity findings.
 
 3. **Loop.** Use the Claude Code `loop` skill to pace re-checks. Pick the interval from what you're watching:
-   - Active CI run: poll `gh pr checks --watch` (it blocks until checks finish, so no separate loop interval needed).
+   - Active CI run: poll `gh pr checks --watch` (it blocks until checks finish, so no separate loop interval needed). In a cloud session, where `gh pr checks` fails the same way, re-run the watcher's `--status-only` read every few minutes while its `ci.kind` is `ci-pending` or `ci-unreported`. Its default mode is no substitute here, because it exits at an open thread or a merge gate without waiting for the checks.
    - Awaiting reviewer: 20–30 min heartbeat.
    - Idle but want to catch new comments: hourly.
 
@@ -55,7 +57,7 @@ Inside poteto-mode, the **Babysit** playbook ([`../poteto-mode/playbooks/babysit
 - Don't tweak a test's expected values just to get a pass. Only change an assertion when the behaviour genuinely changed and the assertion was pinned to the old behaviour.
 - Never skip hooks (`--no-verify`).
 - Never bypass a failing check by marking it as not required.
-- `gh pr ready` only when all checks are green and no unresolved review comments remain.
+- `gh pr ready` only when all checks are green and no unresolved review comments remain. In a cloud session, where `gh pr ready` fails the same way, mark the PR ready under the same condition with `gh api --method POST "repos/<owner>/<repo>/pulls/<number>/ccr/ready_for_review"`, a route of the session's proxy.
 
 ## Cross-refs
 

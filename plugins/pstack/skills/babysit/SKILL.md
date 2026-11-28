@@ -31,7 +31,7 @@ Inside poteto-mode, the **Babysit** playbook ([`../poteto-mode/playbooks/babysit
    gh pr view <number> --json number,title,state,mergeable,reviewDecision,statusCheckRollup,mergeStateStatus,comments,reviews
    ```
 
-   When `gh pr view` fails with a GraphQL refusal, as in a Claude Code cloud session, take status from the watcher at `skills/poteto-mode/scripts/watch-pr/watch-pr` under the installed plugin, with `--owner <owner> --repo <repo> --pr <number> --status-only`. It reads the PR over REST there and reports conflicts, checks, the review decision, and unresolved review threads. Read comments and CI logs with the REST commands in [Reading a PR from a Claude Code cloud session](../poteto-mode/references/cloud-session-pr-reads.md).
+   When `gh pr view` fails with a GraphQL refusal, as in a Claude Code cloud session, take status from the watcher at `skills/poteto-mode/scripts/watch-pr/watch-pr` under the installed plugin, with `--owner <owner> --repo <repo> --pr <number> --status-only`. It reads the PR over REST there. In the row of its JSON, a conflict is `facts.mergeable` `CONFLICTING`, failing checks are listed in `ci.failed`, and unresolved review threads are in `threads`. Read comments, reviews, and CI logs with the REST commands in [Reading a PR from a Claude Code cloud session](../poteto-mode/references/cloud-session-pr-reads.md).
 
 2. **Triage in priority order.**
    - Merge conflicts (`mergeStateStatus == DIRTY`): run the **fix-merge-conflicts** skill. Force-push only if the branch is yours and not shared.
@@ -40,7 +40,7 @@ Inside poteto-mode, the **Babysit** playbook ([`../poteto-mode/playbooks/babysit
    - Review-bot comments (Bugbot and similar automation): classify fix/dismiss/ask before acting, per [`bugbot-triage.md`](../poteto-mode/references/bugbot-triage.md). Ask by default on security, data, and high-severity findings.
 
 3. **Loop.** Use the Claude Code `loop` skill to pace re-checks. Pick the interval from what you're watching:
-   - Active CI run: poll `gh pr checks --watch` (it blocks until checks finish, so no separate loop interval needed). In a cloud session, where `gh pr checks` fails the same way, run the watcher without `--status-only`, and with `--allow-draft` while the PR is a draft. It polls until the PR is ready and exits on the first blocker: a conflict, unresolved threads, failing checks, or a merge gate such as a required review.
+   - Active CI run: poll `gh pr checks --watch` (it blocks until checks finish, so no separate loop interval needed). In a cloud session, where `gh pr checks` fails the same way, re-run the watcher's `--status-only` read every few minutes while its `ci.kind` is `ci-pending` or `ci-unreported`. Its default mode is no substitute here, because it exits at an open thread or a merge gate without waiting for the checks.
    - Awaiting reviewer: 20–30 min heartbeat.
    - Idle but want to catch new comments: hourly.
 

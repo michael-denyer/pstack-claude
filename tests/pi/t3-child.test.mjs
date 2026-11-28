@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { readdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 
@@ -133,7 +134,7 @@ describe("T3Child", () => {
     expect(calls[2].args).toEqual({ taskId: "task-2" });
   });
 
-  test("a steer is taken only when T3 steers the running turn, and end cancels the task", async () => {
+  test("a steer that T3 Code refuses is not taken, and end cancels the task", async () => {
     let finish;
     const done = new Promise((resolve) => (finish = resolve));
     let steers = 0;
@@ -155,6 +156,122 @@ describe("T3Child", () => {
     expect(await child.steer("late")).toEqual({ response: undefined, taken: false });
   });
 
+  test("an end while a steer is in flight cancels the task that T3 Code starts with the steer", async () => {
+    let releaseRun, releaseSend;
+    const run = new Promise((resolve) => (releaseRun = resolve));
+    const send = new Promise((resolve) => (releaseSend = resolve));
+    const cancelled = new Set();
+    const { session, calls } = fakeT3({
+      delegate_task: () => reply(delegated),
+      t3_thread_send: async () => (await send, reply({ threadId: "thread-1", taskId: "task-2", runId: "run-2", status: "starting", delivery: "started" })),
+      task_cancel: ({ taskId }) => (cancelled.add(taskId), taskId === "task-1" && releaseRun(), reply({ taskId, status: "cancel_requested" })),
+      t3_thread_wait: async ({ runId }) => (runId === "run-1" && (await run), reply({ timedOut: runId === "run-2" && !cancelled.has("task-2") })),
+      task_status: ({ taskId }) => reply({ status: cancelled.has(taskId) ? "interrupted" : "running", summary: null }),
+    });
+    const child = new T3Child(session, { title: "probe", onStart: () => {} }, "work");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const steering = child.steer("more");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_send"));
+    child.end(5000);
+    await waitFor(() => calls.some((c) => c.name === "task_cancel"));
+    releaseSend();
+    expect((await steering).taken).toBe(true);
+    expect(await child.exited).toMatchObject({ settled: false, errorMessage: "The T3 Code task ended with status interrupted." });
+    expect(calls.filter((c) => c.name === "task_cancel").map((c) => c.args.taskId)).toEqual(["task-1", "task-2"]);
+  });
+
+  test("an end stops waiting after the grace while T3 Code has not answered a steer", async () => {
+    const { session, calls } = fakeT3({
+      delegate_task: () => reply(delegated),
+      t3_thread_send: () => new Promise(() => {}),
+      task_cancel: () => reply({ taskId: "task-1", status: "cancel_requested" }),
+      t3_thread_wait: async () => (await waitFor(() => calls.some((c) => c.name === "t3_thread_send")), reply({ timedOut: false })),
+      task_status: () => reply({ status: "completed", summary: "the answer" }),
+    });
+    const child = new T3Child(session, { title: "probe", onStart: () => {} }, "work");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const steering = child.steer("more");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_send"));
+    const at = Date.now();
+    child.end(100);
+    await child.exited;
+    expect(await steering).toEqual({ response: undefined, taken: false });
+    expect(Date.now() - at).toBeLessThan(2000);
+  });
+
+  test("two queued steers go to T3 Code one at a time, and the run ends with the last queued turn's reply", async () => {
+    let sends = 0;
+    let answered = 0;
+    let lastRunDone = false;
+    const { session, calls } = fakeT3({
+      delegate_task: () => reply(delegated),
+      t3_thread_send: async () => {
+        const n = ++sends;
+        if (n === 1) await Bun.sleep(30);
+        const answer = reply({ threadId: "thread-1", runId: `run-${n + 1}`, status: "queued", delivery: "queued" });
+        answered++;
+        return answer;
+      },
+      t3_thread_wait: async ({ runId }) => {
+        if (runId === "run-1") await waitFor(() => answered === 2);
+        if (runId === "run-3") lastRunDone = true;
+        return reply({ timedOut: false });
+      },
+      task_status: () => reply(lastRunDone ? { status: "completed", summary: "reply to /b" } : { status: "running", summary: null }),
+    });
+    const child = new T3Child(session, { title: "probe", onStart: () => {} }, "work");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    await Promise.all([child.steer("/a first"), child.steer("/b second")]);
+    expect(await child.exited).toMatchObject({ settled: true, finalText: "reply to /b" });
+    expect(calls.filter((c) => c.name === "t3_thread_wait").map((c) => c.args.runId)).toEqual(["run-1", "run-3"]);
+  });
+
+  test("two steers that T3 Code starts as new turns leave the run on the task of the later one, even when the earlier answer is slow", async () => {
+    let sends = 0;
+    let releaseRun;
+    const run = new Promise((resolve) => (releaseRun = resolve));
+    const { session, calls } = fakeT3({
+      delegate_task: () => reply(delegated),
+      t3_thread_send: async () => {
+        const n = ++sends;
+        if (n === 1) await Bun.sleep(30);
+        return reply({ threadId: "thread-1", taskId: `task-${n + 1}`, runId: `run-${n + 1}`, status: "starting", delivery: "started" });
+      },
+      t3_thread_wait: async ({ runId }) => (runId === "run-1" && (await run), reply({ timedOut: false })),
+      task_status: ({ taskId }) => reply({ status: "completed", summary: taskId }),
+    });
+    const started = [];
+    const child = new T3Child(session, { title: "probe", onStart: (task) => started.push(task.taskId) }, "work");
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    await Promise.all([child.steer("first"), child.steer("second")]);
+    releaseRun();
+    expect(await child.exited).toMatchObject({ settled: true, finalText: "task-3" });
+    expect(started).toEqual(["task-1", "task-2", "task-3"]);
+  });
+
+  test("a task_status failure while T3 Code answers a queued or started steer gives way to that steer's turn when the answer comes within the grace", async () => {
+    const answers = {
+      queued: { threadId: "thread-1", runId: "run-2", status: "queued", delivery: "queued" },
+      started: { threadId: "thread-1", taskId: "task-2", runId: "run-2", status: "starting", delivery: "started" },
+    };
+    for (const [delivery, answer] of Object.entries(answers)) {
+      let release;
+      const answered = new Promise((resolve) => (release = resolve));
+      let statuses = 0;
+      const { session, calls } = fakeT3({
+        delegate_task: () => reply(delegated),
+        t3_thread_send: async () => (await answered, reply(answer)),
+        t3_thread_wait: async ({ runId }) => (runId === "run-1" && (await waitFor(() => calls.some((c) => c.name === "t3_thread_send"))), reply({ timedOut: false })),
+        task_status: () => (++statuses === 1 ? (setTimeout(release, 20), failure("T3 Code is restarting.")) : reply({ status: "completed", summary: "the steer's reply" })),
+      });
+      const child = new T3Child(session, { title: "probe", graceMs: 5000, onStart: () => {} }, "work");
+      await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+      expect(await child.steer("/more")).toEqual({ response: { success: true }, taken: true });
+      expect(await child.exited).toMatchObject({ settled: true, finalText: "the steer's reply" });
+      expect(calls.filter((c) => c.name === "task_status").map((c) => c.args.taskId)).toEqual(["task-1", delivery === "started" ? "task-2" : "task-1"]);
+    }
+  });
+
   test("an end before T3 Code answers the launch cancels the task once it has one", async () => {
     let answer;
     const answered = new Promise((resolve) => (answer = resolve));
@@ -164,9 +281,9 @@ describe("T3Child", () => {
       t3_thread_wait: () => reply({ status: "interrupted", timedOut: false }),
       task_status: () => reply({ status: "interrupted", summary: null }),
     });
-    const child = new T3Child(session, { title: "probe", onStart: () => child.end() }, "work");
+    const child = new T3Child(session, { title: "probe", onStart: () => child.end(5000) }, "work");
     await waitFor(() => calls.length === 1);
-    child.end();
+    child.end(5000);
     answer();
     expect((await child.exited).settled).toBe(false);
     expect(calls.map((c) => c.name)).toEqual(["delegate_task", "task_cancel", "t3_thread_wait", "task_status"]);
@@ -253,6 +370,8 @@ describe("the pi agent host: t3 sheet line", () => {
       ["t3", "t3", undefined, undefined],
       ["t3", "t3", "task-1", "thread-1"],
     ]);
+    expect(running[0].t3RequestId).toEqual(expect.any(String));
+    expect(calls.find((c) => c.name === "delegate_task").args.clientRequestId).toBe(running[0].t3RequestId);
     expect(pi.entries.at(-1).data).toMatchObject({ status: "completed", finalText: "the answer" });
   });
 
@@ -322,6 +441,94 @@ describe("the pi agent host: t3 sheet line", () => {
     expect(pi.entries.at(-1).data.status).toBe("stopped");
   });
 
+  test("send_message to a running T3 agent whose steer T3 Code queues delivers the message once, and the agent's result is the queued turn's reply", async () => {
+    let steered;
+    const steer = new Promise((resolve) => (steered = resolve));
+    const { calls } = fakeT3({
+      orchestrator_capabilities: capabilities,
+      delegate_task: () => reply(delegated),
+      t3_thread_send: () => (steered(), reply({ threadId: "thread-1", runId: "run-2", status: "queued", delivery: "queued" })),
+      t3_thread_wait: async ({ runId }) => (runId === "run-1" && (await steer), reply({ status: "completed", timedOut: false })),
+      task_status: (_, all) => reply({ status: "completed", summary: all.some((c) => c.args.runId === "run-2") ? "the queued reply" : "the first reply" }),
+    });
+    const { pi, ctx } = setup(t3Sheet);
+    await pi.call("agent", { description: "long", prompt: "x", run_in_background: true }, ctx);
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const sent = await pi.call("send_message", { to: "long", message: "/note more" }, ctx);
+    expect(sent.details.running).toBe(true);
+    expect(resultText(sent)).toContain("once its current turn ends");
+    await waitFor(() => pi.entries.at(-1).data.status === "completed");
+    expect(calls.filter((c) => c.name === "t3_thread_send").map((c) => [c.args.mode, c.args.message])).toEqual([["steer", "/note more"]]);
+    expect(pi.entries.at(-1).data.finalText).toBe("the queued reply");
+  });
+
+  test("a steer that T3 Code starts as a new turn moves the T3 agent to that turn's task, which stop_agent cancels", async () => {
+    let steered, cancelled;
+    const steer = new Promise((resolve) => (steered = resolve));
+    const cancel = new Promise((resolve) => (cancelled = resolve));
+    const { calls } = fakeT3({
+      orchestrator_capabilities: capabilities,
+      delegate_task: () => reply(delegated),
+      t3_thread_send: () => (steered(), reply({ threadId: "thread-1", taskId: "task-2", runId: "run-2", status: "starting", delivery: "started" })),
+      t3_thread_wait: async ({ runId }) => (await (runId === "run-1" ? steer : cancel), reply({ status: "completed", timedOut: false })),
+      task_cancel: ({ taskId }) => (cancelled(), reply({ taskId, status: "cancel_requested" })),
+      task_status: ({ taskId }) => reply({ status: taskId === "task-2" ? "interrupted" : "completed", summary: null }),
+    });
+    const { pi, ctx } = setup(t3Sheet);
+    await pi.call("agent", { description: "long", prompt: "x", run_in_background: true }, ctx);
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const sent = await pi.call("send_message", { to: "long", message: "more" }, ctx);
+    expect(sent.details.running).toBe(true);
+    expect(pi.entries.at(-1).data).toMatchObject({ status: "running", t3TaskId: "task-2" });
+    await pi.call("stop_agent", { id: "long" }, ctx);
+    expect(calls.filter((c) => c.name === "task_cancel").map((c) => c.args.taskId)).toEqual(["task-2"]);
+    expect(calls.filter((c) => c.name === "t3_thread_send").map((c) => c.args.mode)).toEqual(["steer"]);
+    expect(pi.entries.at(-1).data.status).toBe("stopped");
+  });
+
+  test("a T3 agent whose task_status fails while T3 Code starts a new turn with its steer runs on under that turn's task to its reply", async () => {
+    let release;
+    const answered = new Promise((resolve) => (release = resolve));
+    const { calls } = fakeT3({
+      orchestrator_capabilities: capabilities,
+      delegate_task: () => reply(delegated),
+      t3_thread_send: async () => (await answered, reply({ threadId: "thread-1", taskId: "task-2", runId: "run-2", status: "starting", delivery: "started" })),
+      t3_thread_wait: async ({ runId }) => (runId === "run-1" && (await waitFor(() => calls.some((c) => c.name === "t3_thread_send"))), reply({ timedOut: false })),
+      task_status: ({ taskId }) => (taskId === "task-1" ? (setTimeout(release, 20), failure("T3 Code is restarting.")) : reply({ status: "completed", summary: "the steer's reply" })),
+    });
+    const { pi, ctx } = setup({ ...t3Sheet, settings: { killGraceMs: 5000 } });
+    await pi.call("agent", { description: "long", prompt: "x", run_in_background: true }, ctx);
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const sent = await pi.call("send_message", { to: "long", message: "more" }, ctx);
+    expect(sent.details.running).toBe(true);
+    await waitFor(() => pi.entries.at(-1).data.status !== "running");
+    expect(pi.entries.findLast((e) => e.data.status === "running").data.t3TaskId).toBe("task-2");
+    expect(pi.entries.at(-1).data).toMatchObject({ status: "completed", finalText: "the steer's reply" });
+  });
+
+  test("send_message to a T3 agent whose run fails and outlasts the grace before T3 Code answers the steer is an error, and the task the steer starts is cancelled", async () => {
+    let release;
+    const answered = new Promise((resolve) => (release = resolve));
+    const { calls } = fakeT3({
+      orchestrator_capabilities: capabilities,
+      delegate_task: () => reply(delegated),
+      t3_thread_send: async () => (await answered, reply({ threadId: "thread-1", taskId: "task-2", runId: "run-2", status: "starting", delivery: "started" })),
+      t3_thread_wait: async () => (await waitFor(() => calls.some((c) => c.name === "t3_thread_send")), reply({ timedOut: false })),
+      task_status: () => failure("T3 Code is restarting."),
+      task_cancel: ({ taskId }) => reply({ taskId, status: "cancel_requested" }),
+    });
+    const { pi, ctx } = setup(t3Sheet);
+    await pi.call("agent", { description: "long", prompt: "x", run_in_background: true }, ctx);
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const sending = pi.call("send_message", { to: "long", message: "more" }, ctx).catch((e) => e);
+    await waitFor(() => pi.entries.at(-1).data.status === "failed");
+    release();
+    expect((await sending).message).toContain("did not take the message: T3 Code put it in the agent's thread after its run had ended, so no run reads the reply.");
+    await waitFor(() => calls.some((c) => c.name === "task_cancel"));
+    expect(calls.filter((c) => c.name === "task_cancel").map((c) => c.args.taskId)).toEqual(["task-2"]);
+    expect(calls.filter((c) => c.name === "t3_thread_send").length).toBe(1);
+  });
+
   test("a worktree agent runs as a local process without the T3 Code session, so its own agents stay in its worktree", async () => {
     const { session, calls } = fakeT3(completing());
     const { w, pi, ctx } = setup(t3Sheet);
@@ -366,6 +573,44 @@ describe("the pi agent host: t3 sheet line", () => {
     await pi.emit("session_shutdown", {}, ctx);
   });
 
+  test.each([
+    ["waits for that turn's task to end once T3 Code cancels it", false],
+    ["names that turn's task when T3 Code refuses to cancel it too", true],
+  ])("stop_agent whose cancel T3 Code refuses for an ended task while it answers a steer with a new turn %s", async (_, refuse) => {
+    let release;
+    const answered = new Promise((resolve) => (release = resolve));
+    const cancelled = new Set();
+    const { calls } = fakeT3({
+      orchestrator_capabilities: capabilities,
+      delegate_task: () => reply(delegated),
+      t3_thread_send: async () => (await answered, reply({ threadId: "thread-1", taskId: "task-2", runId: "run-2", status: "starting", delivery: "started" })),
+      t3_thread_wait: async ({ runId }) => {
+        if (runId === "run-1") return (await waitFor(() => calls.some((c) => c.name === "t3_thread_send")), reply({ timedOut: false }));
+        return (await Bun.sleep(20), reply({ timedOut: !cancelled.has("task-2") }));
+      },
+      task_status: ({ taskId }) => reply(taskId === "task-1" ? { status: "completed", summary: "the first reply" } : { status: "interrupted", summary: null }),
+      task_cancel: ({ taskId }) => {
+        if (taskId === "task-1") return (setTimeout(release, 20), failure("Task task-1 has already ended."));
+        if (refuse) return failure("Child runtime mode full-access is broader than parent mode approval-required.");
+        cancelled.add(taskId);
+        return reply({ taskId, status: "cancel_requested" });
+      },
+    });
+    const { pi, ctx } = setup({ ...t3Sheet, settings: { killGraceMs: 5000 } });
+    await pi.call("agent", { description: "long", prompt: "x", run_in_background: true }, ctx);
+    await waitFor(() => calls.some((c) => c.name === "t3_thread_wait"));
+    const sending = pi.call("send_message", { to: "long", message: "more" }, ctx).catch((e) => e);
+    await waitFor(() => calls.some((c) => c.name === "task_status"));
+    await pi.call("stop_agent", { id: "long" }, ctx);
+    expect(calls.filter((c) => c.name === "task_cancel").map((c) => c.args.taskId)).toEqual(["task-1", "task-2"]);
+    expect(calls.filter((c) => c.name === "task_status").map((c) => c.args.taskId)).toEqual(refuse ? ["task-1"] : ["task-1", "task-2"]);
+    expect(pi.entries.findLast((e) => e.data.status === "running").data.t3TaskId).toBe("task-2");
+    expect(pi.entries.at(-1).data).toMatchObject({ status: "stopped" });
+    expect(pi.entries.at(-1).data.finalText).toContain(refuse ? "T3 Code did not cancel task task-2, so thread thread-1 may still be running" : "(stopped before it replied)");
+    await sending;
+    expect(calls.filter((c) => c.name === "t3_thread_send").length).toBe(1);
+  });
+
   test("an agent that ran as a local process resumes as one, even once the line is added and its session file is gone", async () => {
     const { calls } = fakeT3(completing());
     const { w, pi, ctx } = setup();
@@ -399,6 +644,27 @@ describe("the pi agent host: t3 sheet line", () => {
     const resumed = await restore(w, asT3(gone.pid));
     await waitFor(async () => (await listAgents(resumed, ctx))[0].status === "stopped");
     expect(calls.map((c) => [c.name, c.args.taskId ?? c.args.threadId])).toEqual([["task_cancel", "task-1"], ["t3_thread_wait", "thread-1"]]);
+  });
+
+  test("a restored T3 agent whose launch T3 Code had not answered is found again by its request id and cancelled", async () => {
+    const { calls } = fakeT3({
+      delegate_task: () => reply(delegated),
+      task_cancel: () => reply({ taskId: "task-1", status: "cancel_requested" }),
+      t3_thread_wait: () => reply({ status: "interrupted", timedOut: false }),
+    });
+    const { w, pi, ctx } = setup();
+    await pi.call("agent", { description: "in t3", prompt: "x" }, ctx);
+    const gone = w.spawn("sleep", ["0.1"]);
+    await new Promise((resolve) => gone.on("exit", resolve));
+    const record = recordWith(pi.entries[0].data, { agent: { host: "t3" }, status: "running", host: "t3", t3RequestId: "request-1", pid: undefined, parentPid: gone.pid });
+    const resumed = await restore(w, [agentEntry(record)]);
+    await waitFor(async () => (await listAgents(resumed, ctx))[0].status === "stopped");
+    expect(calls.map((c) => [c.name, c.args.clientRequestId ?? c.args.taskId ?? c.args.threadId])).toEqual([
+      ["delegate_task", "request-1"],
+      ["task_cancel", "task-1"],
+      ["t3_thread_wait", "thread-1"],
+    ]);
+    expect(calls[0].args.title).toBe("in t3");
   });
 
   test("a restored T3 agent whose task T3 Code has not cancelled stays unavailable, and the next look tries again", async () => {
@@ -514,6 +780,32 @@ describe.skipIf(!LIVE)("T3Child on a live T3 Code server", () => {
       expect(Date.now() - at).toBeLessThan(MINUTE);
     },
     5 * MINUTE,
+  );
+
+  test(
+    "a steer that T3 Code queues is taken once, and the run ends with the queued turn's reply",
+    async () => {
+      const { child } = launch("Run `sleep 25` with bash and wait for it, then reply with the word done.");
+      await Bun.sleep(12_000);
+      expect((await child.steer("/zeta When you read this, reply with the word zeta.")).taken).toBe(true);
+      const exit = await child.exited;
+      expect(exit.settled).toBe(true);
+      expect(exit.finalText.toLowerCase()).toContain("zeta");
+    },
+    3 * MINUTE,
+  );
+
+  test(
+    "cancelOrphan finds a launch by its request id and cancels it, whether or not T3 Code had received the launch",
+    async () => {
+      const title = `pstack t3 live ${Date.now()}`;
+      const requestId = randomUUID();
+      const child = new T3Child(LIVE_SESSION, { title, model: MODEL, thinking: "low", requestId, onStart: () => {} }, "Run `sleep 120` with bash and wait for it, then say done.");
+      expect(await cancelOrphan({ requestId, title })).toBe(true);
+      expect((await child.exited).settled).toBe(false);
+      expect(await cancelOrphan({ requestId: randomUUID(), title })).toBe(true);
+    },
+    3 * MINUTE,
   );
 
   test(

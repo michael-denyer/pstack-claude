@@ -58,13 +58,15 @@ describe("OMP marketplace plugin", () => {
     const main = before(event, { agent: { kind: "main" } });
     expect(main.systemPrompt[0]).toBe("existing instructions");
     expect(main.systemPrompt[1]).toContain(readFileSync(join(plugin, "hooks/session-start-context.md"), "utf8"));
-    expect(main.systemPrompt[1]).toContain(join(plugin, "skills/poteto-mode/references/omp-tools.md"));
-    expect(main.systemPrompt[1]).toContain(join(plugin, "skills/poteto-mode/SKILL.md"));
-    expect(main.systemPrompt[1]).toContain(join(plugin, "skills/<name>/SKILL.md"));
-    expect(main.systemPrompt[1]).toContain("Do not resolve these names through a bare skill name");
+    const url = "A pstack skill's URL is skill://pstack/<name> when OMP's skill list names pstack/<name>, and skill://<name> otherwise";
+    expect(main.systemPrompt[1]).toContain(url);
+    expect(main.systemPrompt[1]).toContain("read skill://poteto-mode/references/omp-tools.md, or skill://pstack/poteto-mode/references/omp-tools.md when the list names pstack/poteto-mode");
+    expect(main.systemPrompt[1]).toContain("read skill://poteto-mode for pstack:poteto-mode, or skill://pstack/poteto-mode when the list names pstack/poteto-mode");
+    expect(main.systemPrompt[1]).not.toContain(plugin);
     expect(before(main, { agent: { kind: "main" } })).toBeUndefined();
     const child = before(event, { agent: { kind: "sub" } });
     expect(child.systemPrompt[1]).toContain("OMP tool and model mappings");
+    expect(child.systemPrompt[1]).toContain(url);
     expect(child.systemPrompt[1]).not.toContain("<EXTREMELY_IMPORTANT>");
     expect(event.systemPrompt).toEqual(["existing instructions"]);
   });
@@ -127,6 +129,16 @@ describe("omp-tools.md", () => {
     });
     expect(missing).toEqual([]);
     expect(mapping).toContain("look under `.omp/skills/verify/` first");
+  });
+
+  test("skills and poteto-mode's agent kickoff resolve through skill:// URLs", () => {
+    const mapping = readFileSync(join(plugin, "skills/poteto-mode/references/omp-tools.md"), "utf8");
+    expect(mapping).toContain("| Invoke the `Skill` tool | Read the skill's URL: `skill://pstack/<name>` when OMP lists `pstack/<name>`, else `skill://<name>` |");
+    expect(mapping).toContain("`Read skill://poteto-mode/worker.md before anything else.`, or `Read skill://pstack/poteto-mode/worker.md before anything else.` when the list names `pstack/poteto-mode`");
+    expect(mapping).toContain("OMP rejects `..` inside a `skill://` URL");
+    expect(mapping).toContain('`node "$(realpath skill://poteto-mode)/scripts/check-playbooks.mjs"`');
+    expect(mapping).toContain("pstack's own skill invocations then read `skill://pstack/<skill>`");
+    expect(mapping).not.toContain("installed plugin path");
   });
 });
 

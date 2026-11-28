@@ -106,12 +106,12 @@ export function registerAgentTools(pi: ExtensionAPI, runner: AgentRunner, settin
     label: "Send message",
     exposure: "model-only",
     description:
-      "Send a message to an agent this session started, by agentId or description. A running agent reads it after its current tool calls and carries on in the same run, so one completion notice follows. A finished agent resumes in the background with its earlier context and sends a completion notice.",
+      "Send a message to an agent this session started, by agentId or description. A running agent reads it after its current tool calls, or once its current turn ends when its host queues it, and carries on in the same run, so one completion notice follows. A finished agent resumes in the background with its earlier context and sends a completion notice.",
     parameters: sendParams,
     async execute(_id, params) {
       const { record, running } = await runner.send(params.to, params.message);
       const text = running
-        ? `Agent ${record.agent.id} is running; it reads the message after its current tool calls.`
+        ? `Agent ${record.agent.id} is running; it reads the message after its current tool calls, or, when its host queues the message, once its current turn ends.`
         : JSON.stringify({ agentId: record.agent.id, status: "running" });
       return { content: [{ type: "text", text }], details: { agentId: record.agent.id, running } };
     },
